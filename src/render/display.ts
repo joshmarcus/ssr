@@ -14,11 +14,13 @@ export interface DisplayLogEntry {
 // ── Color scheme ────────────────────────────────────────────────
 const COLORS = {
   // Tiles
-  wall: "#666",
+  wall: "#556",
+  wallLight: "#667",
+  wallDark: "#445",
   floor: "#333",
   door: "#a52",
   lockedDoor: "#f00",
-  corridor: "#333",
+  corridor: "#2a2a2a",
 
   // Player
   player: "#0f0",
@@ -40,8 +42,52 @@ const COLORS = {
   smokeBg: "#222",
 
   // Background
-  background: "#111",
+  background: "#0c0c0c",
 } as const;
+
+// ── Room color tints for walls ────────────────────────────────────
+const ROOM_WALL_TINTS: Record<string, string> = {
+  "Engineering Storage": "#665850",
+  "Power Relay Junction": "#665540",
+  "Life Support": "#506066",
+  "Vent Control Room": "#505866",
+  "Communications Hub": "#505866",
+  "Research Lab": "#506650",
+  "Med Bay": "#605060",
+  "Data Core": "#604868",
+  "Robotics Bay": "#585858",
+};
+
+// ── Box-drawing wall characters ──────────────────────────────────
+// Bitfield: N=1, S=2, E=4, W=8 (which neighbors are also walls)
+const WALL_GLYPHS: Record<number, string> = {
+  0b0000: "o",    // isolated
+  0b0001: "│",    // N
+  0b0010: "│",    // S
+  0b0011: "│",    // N+S
+  0b0100: "─",    // E
+  0b1000: "─",    // W
+  0b1100: "─",    // E+W
+  0b0101: "└",    // N+E
+  0b1001: "┘",    // N+W
+  0b0110: "┌",    // S+E
+  0b1010: "┐",    // S+W
+  0b0111: "├",    // N+S+E
+  0b1011: "┤",    // N+S+W
+  0b1101: "┴",    // N+E+W
+  0b1110: "┬",    // S+E+W
+  0b1111: "┼",    // all four
+};
+
+// ── Floor glyph variation ────────────────────────────────────────
+const FLOOR_GLYPHS = ["·", "·", "·", "∙", " ", "·", ".", "·"];
+const CORRIDOR_GLYPHS = ["·", "∙", ".", " ", "·", "·"];
+
+function floorGlyph(x: number, y: number, isCorridor: boolean): string {
+  const hash = ((x * 7) + (y * 13) + (x ^ y)) & 0xff;
+  if (isCorridor) return CORRIDOR_GLYPHS[hash % CORRIDOR_GLYPHS.length];
+  return FLOOR_GLYPHS[hash % FLOOR_GLYPHS.length];
+}
 
 // ── Log type CSS classes ─────────────────────────────────────────
 const LOG_TYPE_CLASSES: Record<LogType, string> = {
@@ -54,33 +100,45 @@ const LOG_TYPE_CLASSES: Record<LogType, string> = {
 };
 
 const ENTITY_COLORS: Record<string, string> = {
-  [EntityType.Relay]: COLORS.relay,
-  [EntityType.SensorPickup]: COLORS.sensorPickup,
-  [EntityType.DataCore]: COLORS.dataCore,
-  [EntityType.ServiceBot]: COLORS.serviceBot,
-  [EntityType.LogTerminal]: COLORS.logTerminal,
-  [EntityType.CrewItem]: COLORS.crewItem,
-  [EntityType.Drone]: "#8a8",
-  [EntityType.MedKit]: "#f88",
-  [EntityType.RepairBot]: "#fa8",
-  [EntityType.Breach]: "#f44",
-  [EntityType.ClosedDoor]: "#a86",
-  [EntityType.SecurityTerminal]: "#4af",
+  [EntityType.Relay]: "#ffcc00",
+  [EntityType.SensorPickup]: "#00ffee",
+  [EntityType.DataCore]: "#ff44ff",
+  [EntityType.ServiceBot]: "#ffaa00",
+  [EntityType.LogTerminal]: "#66ccff",
+  [EntityType.CrewItem]: "#ccaa88",
+  [EntityType.Drone]: "#88bb88",
+  [EntityType.MedKit]: "#ff6666",
+  [EntityType.RepairBot]: "#ffaa66",
+  [EntityType.Breach]: "#ff4444",
+  [EntityType.ClosedDoor]: "#aa8866",
+  [EntityType.SecurityTerminal]: "#44aaff",
+};
+
+// Entity background glow colors (subtle tint behind entities)
+const ENTITY_BG_GLOW: Record<string, string> = {
+  [EntityType.Relay]: "#1a1500",
+  [EntityType.SensorPickup]: "#001a18",
+  [EntityType.DataCore]: "#1a001a",
+  [EntityType.ServiceBot]: "#1a1000",
+  [EntityType.LogTerminal]: "#0a1520",
+  [EntityType.MedKit]: "#1a0808",
+  [EntityType.Breach]: "#200000",
+  [EntityType.SecurityTerminal]: "#081520",
 };
 
 const ENTITY_GLYPHS: Record<string, string> = {
-  [EntityType.Relay]: GLYPHS.relay,
-  [EntityType.SensorPickup]: GLYPHS.sensorPickup,
-  [EntityType.DataCore]: GLYPHS.dataCore,
-  [EntityType.ServiceBot]: GLYPHS.serviceBot,
-  [EntityType.LogTerminal]: GLYPHS.logTerminal,
-  [EntityType.CrewItem]: GLYPHS.crewItem,
-  [EntityType.Drone]: GLYPHS.drone,
-  [EntityType.MedKit]: GLYPHS.medKit,
-  [EntityType.RepairBot]: GLYPHS.repairBot,
-  [EntityType.Breach]: GLYPHS.breach,
-  [EntityType.ClosedDoor]: GLYPHS.closedDoor,
-  [EntityType.SecurityTerminal]: GLYPHS.securityTerminal,
+  [EntityType.Relay]: "\u26a1",       // ⚡
+  [EntityType.SensorPickup]: "\ud83d\udce1", // 📡
+  [EntityType.DataCore]: "\ud83d\udc8e",     // 💎
+  [EntityType.ServiceBot]: "\ud83e\udd16",   // 🤖
+  [EntityType.LogTerminal]: "\ud83d\udcbb",  // 💻
+  [EntityType.CrewItem]: "\ud83d\udce6",     // 📦
+  [EntityType.Drone]: "\ud83d\udd35",        // 🔵
+  [EntityType.MedKit]: "\ud83d\udc8a",       // 💊
+  [EntityType.RepairBot]: "\ud83d\udd27",    // 🔧
+  [EntityType.Breach]: "\u26a0\ufe0f",       // ⚠️
+  [EntityType.ClosedDoor]: "\ud83d\udeaa",   // 🚪
+  [EntityType.SecurityTerminal]: "\ud83d\udcf7", // 📷
 };
 
 // ── Thermal color interpolation ─────────────────────────────────
@@ -336,7 +394,7 @@ export class BrowserDisplay {
     this.showTrail = false;
 
     // Build entity position lookup
-    const entityAt = new Map<string, { glyph: string; color: string }>();
+    const entityAt = new Map<string, { glyph: string; color: string; bgGlow?: string }>();
     for (const [id, entity] of state.entities) {
       if (id === "player") continue;
       // Hidden crew items: only show if cleanliness sensor is active or item was revealed
@@ -347,6 +405,7 @@ export class BrowserDisplay {
       entityAt.set(key, {
         glyph: ENTITY_GLYPHS[entity.type] || "?",
         color: ENTITY_COLORS[entity.type] || "#fff",
+        bgGlow: ENTITY_BG_GLOW[entity.type],
       });
     }
 
@@ -363,17 +422,34 @@ export class BrowserDisplay {
 
         // Fog-of-war: explored but not visible = dim grey memory
         if (!tile.visible) {
-          let memFg = "#222";
+          let memFg = "#1a1a1a";
           let memGlyph = tile.glyph;
-          if (tile.type === TileType.Wall) { memFg = "#333"; }
-          else if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) { memFg = "#442"; }
-          else { memFg = "#1a1a1a"; }
-          this.display.draw(x, y, memGlyph, memFg, "#000");
+          if (tile.type === TileType.Wall) {
+            memGlyph = this.getWallGlyph(state, x, y);
+            memFg = "#282828";
+          } else if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
+            memFg = "#332210";
+          }
+          this.display.draw(x, y, memGlyph, memFg, "#050505");
           continue;
         }
 
-        let glyph = tile.glyph;
-        let fg = this.getTileFg(tile);
+        // Determine base glyph based on tile type
+        let glyph: string;
+        let fg: string;
+        if (tile.type === TileType.Wall) {
+          glyph = this.getWallGlyph(state, x, y);
+          fg = this.getWallColor(state, x, y);
+        } else if (tile.type === TileType.Floor || tile.type === TileType.Corridor) {
+          const inRoom = state.rooms.some(r =>
+            x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height
+          );
+          glyph = floorGlyph(x, y, !inRoom);
+          fg = inRoom ? COLORS.floor : COLORS.corridor;
+        } else {
+          glyph = tile.glyph;
+          fg = this.getTileFg(tile);
+        }
         let bg: string = COLORS.background;
 
         // Smoke rendering: tiles with smoke > 0 show smoke glyph with grey tint
@@ -493,6 +569,9 @@ export class BrowserDisplay {
           if (tile.smoke <= 50 || manhattan <= 1) {
             glyph = ent.glyph;
             fg = ent.color;
+            // Subtle background glow behind entities
+            const glowBg = ent.bgGlow;
+            if (glowBg) bg = glowBg;
           }
         }
 
@@ -510,8 +589,9 @@ export class BrowserDisplay {
 
         // Player always on top
         if (state.player.entity.pos.x === x && state.player.entity.pos.y === y) {
-          glyph = GLYPHS.player;
+          glyph = "\ud83d\ude80"; // 🚀
           fg = COLORS.player;
+          bg = "#0a1a0a";
         }
 
         this.display.draw(x, y, glyph, fg, bg);
@@ -805,22 +885,21 @@ export class BrowserDisplay {
 
     // ── Legend + Controls (side by side) ──────────────────────────
     const legendItems = [
-      { glyph: GLYPHS.player, color: "#0f0", label: "You" },
-      { glyph: GLYPHS.sensorPickup, color: "#0ff", label: "Sensor" },
-      { glyph: GLYPHS.relay, color: "#ff0", label: "Relay" },
-      { glyph: GLYPHS.dataCore, color: "#f0f", label: "Core" },
-      { glyph: GLYPHS.logTerminal, color: "#6cf", label: "Terminal" },
-      { glyph: GLYPHS.serviceBot, color: "#fa0", label: "Bot" },
-      { glyph: GLYPHS.crewItem, color: "#ca8", label: "Item" },
-      { glyph: GLYPHS.drone, color: "#8a8", label: "Drone" },
-      { glyph: GLYPHS.medKit, color: "#f88", label: "MedKit" },
-      { glyph: GLYPHS.repairBot, color: "#fa8", label: "Repair" },
+      { glyph: "\ud83d\ude80", color: "#0f0", label: "You" },
+      { glyph: "\ud83d\udce1", color: "#0ff", label: "Sensor" },
+      { glyph: "\u26a1", color: "#ff0", label: "Relay" },
+      { glyph: "\ud83d\udc8e", color: "#f0f", label: "Core" },
+      { glyph: "\ud83d\udcbb", color: "#6cf", label: "Terminal" },
+      { glyph: "\ud83e\udd16", color: "#fa0", label: "Bot" },
+      { glyph: "\ud83d\udce6", color: "#ca8", label: "Item" },
+      { glyph: "\ud83d\udd35", color: "#8a8", label: "Drone" },
+      { glyph: "\ud83d\udc8a", color: "#f88", label: "MedKit" },
+      { glyph: "\ud83d\udd27", color: "#fa8", label: "Repair" },
       { glyph: GLYPHS.lockedDoor, color: "#f00", label: "Locked" },
       { glyph: GLYPHS.door, color: "#a52", label: "Door" },
       { glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
-      { glyph: GLYPHS.smoke, color: "#999", label: "Smoke" },
-      { glyph: GLYPHS.breach, color: "#f44", label: "Breach" },
-      { glyph: GLYPHS.securityTerminal, color: "#4af", label: "Camera" },
+      { glyph: "\u26a0\ufe0f", color: "#f44", label: "Breach" },
+      { glyph: "\ud83d\udcf7", color: "#4af", label: "Camera" },
     ];
     const legendHtml = legendItems
       .map(l => `<span class="legend-glyph" style="color:${l.color}">${this.escapeHtml(l.glyph)}</span><span class="legend-name">${l.label}</span>`)
@@ -842,15 +921,15 @@ export class BrowserDisplay {
       ? this.logHistory
           .map((entry) => {
             const cls = LOG_TYPE_CLASSES[entry.type] || "log";
-            return `<span class="${cls}">${this.escapeHtml(entry.text)}</span>`;
+            return `<span class="${cls}"><span class="log-prefix">&gt; </span>${this.escapeHtml(entry.text)}</span>`;
           })
-          .join("<br>")
+          .join("")
       : '<span class="log log-system">-- awaiting telemetry --</span>';
 
     const logHtml = `<div class="log-panel">${logEntries}</div>`;
 
-    const topHtml = `<div class="ui-top">${objectiveHtml}${statusHtml}${proximityHtml}${roomListHtml}${infoHtml}</div>`;
-    panel.innerHTML = topHtml + logHtml;
+    const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${statusHtml}${proximityHtml}${roomListHtml}${infoHtml}</div>`;
+    panel.innerHTML = logHtml + bottomHtml;
 
     // Auto-scroll log panel to bottom
     const logPanel = panel.querySelector(".log-panel");
@@ -873,6 +952,37 @@ export class BrowserDisplay {
       default:
         return "#888";
     }
+  }
+
+  /** Compute box-drawing glyph for a wall based on its neighbors. */
+  private getWallGlyph(state: GameState, x: number, y: number): string {
+    let bits = 0;
+    // N
+    if (y > 0 && !state.tiles[y - 1][x].walkable) bits |= 1;
+    // S
+    if (y < state.height - 1 && !state.tiles[y + 1][x].walkable) bits |= 2;
+    // E
+    if (x < state.width - 1 && !state.tiles[y][x + 1].walkable) bits |= 4;
+    // W
+    if (x > 0 && !state.tiles[y][x - 1].walkable) bits |= 8;
+    return WALL_GLYPHS[bits] || "█";
+  }
+
+  /** Get wall color tinted by room proximity. */
+  private getWallColor(state: GameState, x: number, y: number): string {
+    // Check if this wall is adjacent to a room and tint accordingly
+    for (const room of state.rooms) {
+      if (x >= room.x - 1 && x <= room.x + room.width &&
+          y >= room.y - 1 && y <= room.y + room.height) {
+        const tint = ROOM_WALL_TINTS[room.name];
+        if (tint) return tint;
+      }
+    }
+    // Subtle variation based on position
+    const hash = ((x * 3) + (y * 7)) & 0xf;
+    if (hash < 4) return COLORS.wallDark;
+    if (hash > 11) return COLORS.wallLight;
+    return COLORS.wall;
   }
 
   private escapeHtml(text: string): string {

@@ -26,6 +26,7 @@
       position: relative;
       flex-shrink: 0;
     }
+    /* Scanlines overlay */
     #rot-display::after {
       content: "";
       position: absolute;
@@ -35,15 +36,36 @@
         to bottom,
         transparent 0px,
         transparent 2px,
-        rgba(0, 0, 0, 0.15) 2px,
-        rgba(0, 0, 0, 0.15) 4px
+        rgba(0, 0, 0, 0.12) 2px,
+        rgba(0, 0, 0, 0.12) 4px
       );
       z-index: 10;
     }
+    /* Vignette overlay */
+    #rot-display::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 55%,
+        rgba(0, 0, 0, 0.35) 80%,
+        rgba(0, 0, 0, 0.7) 100%
+      );
+      z-index: 11;
+    }
     #rot-display canvas {
       display: block;
-      text-shadow: 0 0 6px rgba(0, 255, 60, 0.4);
-      filter: drop-shadow(0 0 3px rgba(0, 255, 60, 0.25));
+      filter: drop-shadow(0 0 4px rgba(0, 255, 60, 0.3))
+              drop-shadow(0 0 12px rgba(0, 180, 40, 0.1));
+    }
+    /* Subtle CRT barrel distortion */
+    #rot-display {
+      perspective: 800px;
+    }
+    #rot-display canvas {
+      transform: perspective(800px) rotateX(0.3deg) rotateY(-0.3deg);
     }
     #ui-panel {
       font-family: monospace;
@@ -61,7 +83,7 @@
       display: flex;
       flex-direction: column;
     }
-    #ui-panel .ui-top {
+    #ui-panel .ui-bottom {
       flex-shrink: 0;
       padding: 8px 12px 4px;
       overflow: hidden;
@@ -137,10 +159,12 @@
     #ui-panel .log-panel {
       flex: 1;
       padding: 4px 12px;
-      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #333;
       overflow-y: auto;
       min-height: 0;
     }
+    #ui-panel .log-prefix { color: #444; user-select: none; }
+    #ui-panel .log-panel > span { display: block; padding: 2px 0; border-bottom: 1px solid #333; }
 
     /* ── Sidebar section headers ────────────────────────── */
     #ui-panel .sidebar-section {
