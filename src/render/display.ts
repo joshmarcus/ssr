@@ -130,7 +130,7 @@ const ENTITY_GLYPHS: Record<string, string> = {
   [EntityType.Relay]: "\u26a1",       // ⚡
   [EntityType.SensorPickup]: "\ud83d\udce1", // 📡
   [EntityType.DataCore]: "\ud83d\udc8e",     // 💎
-  [EntityType.ServiceBot]: "\ud83e\udd16",   // 🤖
+  [EntityType.ServiceBot]: "\ud83d\udd0b",   // 🔋
   [EntityType.LogTerminal]: "\ud83d\udcbb",  // 💻
   [EntityType.CrewItem]: "\ud83d\udce6",     // 📦
   [EntityType.Drone]: "\ud83d\udd35",        // 🔵
@@ -589,7 +589,7 @@ export class BrowserDisplay {
 
         // Player always on top
         if (state.player.entity.pos.x === x && state.player.entity.pos.y === y) {
-          glyph = "\ud83d\ude80"; // 🚀
+          glyph = "\ud83e\udd16"; // 🤖
           fg = COLORS.player;
           bg = "#0a1a0a";
         }
@@ -885,12 +885,12 @@ export class BrowserDisplay {
 
     // ── Legend + Controls (side by side) ──────────────────────────
     const legendItems = [
-      { glyph: "\ud83d\ude80", color: "#0f0", label: "You" },
+      { glyph: "\ud83e\udd16", color: "#0f0", label: "You" },
       { glyph: "\ud83d\udce1", color: "#0ff", label: "Sensor" },
       { glyph: "\u26a1", color: "#ff0", label: "Relay" },
       { glyph: "\ud83d\udc8e", color: "#f0f", label: "Core" },
       { glyph: "\ud83d\udcbb", color: "#6cf", label: "Terminal" },
-      { glyph: "\ud83e\udd16", color: "#fa0", label: "Bot" },
+      { glyph: "\ud83d\udd0b", color: "#fa0", label: "SvcBot" },
       { glyph: "\ud83d\udce6", color: "#ca8", label: "Item" },
       { glyph: "\ud83d\udd35", color: "#8a8", label: "Drone" },
       { glyph: "\ud83d\udc8a", color: "#f88", label: "MedKit" },
