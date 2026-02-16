@@ -51,13 +51,42 @@ function getInteractableEntities(state: GameState): Entity[] {
 }
 
 /**
+ * Check if an entity still has a meaningful interaction available.
+ * Exhausted entities (sealed breaches, used medkits, read terminals, etc.)
+ * are deprioritized by auto-targeting.
+ */
+function isEntityExhausted(entity: Entity, state: GameState): boolean {
+  switch (entity.type) {
+    case EntityType.Breach:
+      return entity.props["sealed"] === true;
+    case EntityType.MedKit:
+      return entity.props["used"] === true;
+    case EntityType.Relay:
+      return entity.props["activated"] === true || entity.props["locked"] === true;
+    case EntityType.ClosedDoor:
+      return entity.props["closed"] === false;
+    case EntityType.SecurityTerminal:
+      return entity.props["accessed"] === true;
+    case EntityType.CrewItem:
+      return entity.props["examined"] === true || entity.props["hidden"] === true;
+    case EntityType.LogTerminal:
+      return state.logs.some(l => l.id === `log_terminal_${entity.id}`);
+    default:
+      return false;
+  }
+}
+
+/**
  * Handle interact action with a target entity.
  */
 function handleInteract(state: GameState, targetId: string | undefined): GameState {
-  // Auto-target: if no targetId, pick the first interactable entity nearby
+  // Auto-target: if no targetId, pick the best interactable entity nearby.
+  // Prefer entities that still have meaningful interactions.
   if (!targetId) {
     const interactable = getInteractableEntities(state);
-    if (interactable.length === 0) {
+    const fresh = interactable.filter(e => !isEntityExhausted(e, state));
+    const candidates = fresh.length > 0 ? fresh : interactable;
+    if (candidates.length === 0) {
       return {
         ...state,
         turn: state.turn + 1,
@@ -73,7 +102,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         ],
       };
     }
-    targetId = interactable[0].id;
+    targetId = candidates[0].id;
   }
 
   const target = getEntityById(state, targetId);
