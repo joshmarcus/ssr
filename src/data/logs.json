@@ -1,0 +1,234 @@
+[
+  {
+    "id": "LOG_SYS_001",
+    "category": "system",
+    "timestamp": "2187-03-14T06:00:00Z",
+    "source": "PWR-MAIN",
+    "title": "Power Grid — Morning Diagnostic",
+    "text": "[06:00] DIAG PASS. All 4 relay nodes nominal. Total draw 74% capacity. Relay P03 temp: 41C (normal)."
+  },
+  {
+    "id": "LOG_CREW_001",
+    "category": "personal",
+    "timestamp": "2187-03-13T22:15:00Z",
+    "source": "VASQUEZ, R. — Chief Engineer",
+    "title": "Personal Note (Vasquez)",
+    "text": "Coolant loop B has been marginal for weeks. I filed three maintenance requests. Okafor keeps saying the budget isn't there. If P03 trips under load we lose the entire Data Core wing. I'm leaving a backup power routing procedure in the Engineering Storage terminal, just in case."
+  },
+  {
+    "id": "LOG_CREW_002",
+    "category": "personal",
+    "timestamp": "2187-03-14T08:30:00Z",
+    "source": "OKAFOR, D. — Station Commander",
+    "title": "Commander's Log (Okafor)",
+    "text": "Research team says the core bundle is ready for transmission tomorrow. I want all power routed to Data Core for the upload window. Vasquez is worried about the relays again. She worries too much — they've held this long."
+  },
+  {
+    "id": "LOG_SYS_002",
+    "category": "system",
+    "timestamp": "2187-03-14T10:17:00Z",
+    "source": "COOL-SYS",
+    "title": "Coolant Loop B — Pressure Drop",
+    "text": "[10:17] ADVISORY: Coolant Loop B pressure 14.2 PSI (nominal 22.0). Rate of loss: 0.3 PSI/hr. Seal integrity check recommended at junction V-4. No action taken — maintenance queue position: 47."
+  },
+  {
+    "id": "LOG_CREW_006",
+    "category": "personal",
+    "timestamp": "2187-03-14T10:45:00Z",
+    "source": "TANAKA, S. — Research Lead",
+    "title": "Personal Note (Tanaka)",
+    "text": "Nine months of data. Nine months of isolation, bad coffee, and Okafor breathing down our necks about deadlines. Tomorrow we transmit and this all means something. Chen promised me a real meal from the reserve stores if we hit the upload window. I told her she's the only reason this station feels like anything other than a coffin."
+  },
+  {
+    "id": "LOG_CREW_003",
+    "category": "personal",
+    "timestamp": "2187-03-14T12:00:00Z",
+    "source": "CHEN, M. — Life Support Tech",
+    "title": "Personal Note (Chen)",
+    "text": "Something smells burnt near the relay junction. Ran a portable thermal scan — P03 housing is hot to the touch even through gloves. Told Vasquez. She looked like she hadn't slept. Said she'd handle it after lunch."
+  },
+  {
+    "id": "LOG_SYS_003",
+    "category": "system",
+    "timestamp": "2187-03-14T13:45:00Z",
+    "source": "ENV-CTL",
+    "title": "Environmental — Air Quality Alert",
+    "text": "[13:45] NOTICE: Particulate count elevated in Life Support sector. Source: thermal degradation of insulation material near Relay P03 housing. Scrubbers compensating. No crew action required at this time."
+  },
+  {
+    "id": "LOG_CREW_007",
+    "category": "personal",
+    "timestamp": "2187-03-14T14:05:00Z",
+    "source": "VASQUEZ, R. — Chief Engineer",
+    "title": "Personal Note (Vasquez) — Afternoon",
+    "text": "I went to Okafor one more time. Told him we need to pull P03 offline for maintenance before the upload window. He said no. Said we can't afford the downtime. I said we can't afford not to. He pulled rank. His station, his call. I'm documenting this in case anyone ever asks why."
+  },
+  {
+    "id": "LOG_SYS_004",
+    "category": "system",
+    "timestamp": "2187-03-14T14:22:00Z",
+    "source": "PWR-MAIN",
+    "title": "Relay P03 — Thermal Warning",
+    "text": "[14:22] WARN: Relay P03 temp rising. 68C at 14:22, projected 85C by 15:00. Coolant loop B pressure low. Recommend manual inspection."
+  },
+  {
+    "id": "LOG_SYS_005",
+    "category": "system",
+    "timestamp": "2187-03-14T14:47:00Z",
+    "source": "DOOR-CTL",
+    "title": "Door D17 — Access Log",
+    "text": "[14:47] ACCESS: badge=ENG-VASQUEZ door=D17 result=GRANTED. Note: D17 power supply routed through Relay P03."
+  },
+  {
+    "id": "LOG_SYS_006",
+    "category": "system",
+    "timestamp": "2187-03-14T15:03:00Z",
+    "source": "PWR-MAIN",
+    "title": "Relay P03 — Critical Overheat",
+    "text": "[15:03] CRITICAL: Relay P03 temp 94C. Automatic load-shed initiated. Door D17 DEPOWERED. Coolant loop B OFFLINE — seal fault detected at junction V-4."
+  },
+  {
+    "id": "LOG_SYS_007",
+    "category": "system",
+    "timestamp": "2187-03-14T15:11:00Z",
+    "source": "ENV-CTL",
+    "title": "Vent System — Auto-Seal Engaged",
+    "text": "[15:11] Smoke detected in Life Support sector. Vent dampers SEALED to contain spread. Manual override available at panel P04."
+  },
+  {
+    "id": "LOG_CREW_008",
+    "category": "personal",
+    "timestamp": "2187-03-14T15:14:00Z",
+    "source": "OKAFOR, D. — Station Commander",
+    "title": "Commander's Log — Emergency",
+    "text": "She was right. God help me, Vasquez was right. P03 is cascading and the smoke is spreading faster than the scrubbers can handle. I'm ordering full evac to Cargo Hold. The research data — we were one day away. One day."
+  },
+  {
+    "id": "LOG_CREW_004",
+    "category": "personal",
+    "timestamp": "2187-03-14T15:20:00Z",
+    "source": "PRIYA, K. — Robotics Specialist",
+    "title": "Emergency Note (Priya)",
+    "text": "Station-wide alarm. Smoke in the corridors east of the junction. Vasquez ran toward Life Support with a manual bypass kit. Okafor ordered evac to the cargo hold. I'm powering down the bots in Robotics Bay so they don't draw from the grid. If anyone finds this: the service bot in bay 7 is fully charged. Badge override is PRIYA-7741."
+  },
+  {
+    "id": "LOG_SYS_008",
+    "category": "system",
+    "timestamp": "2187-03-14T15:34:00Z",
+    "source": "COMMS",
+    "title": "Communications — Link Loss",
+    "text": "[15:34] COMMS ARRAY: Primary uplink OFFLINE. Backup antenna power insufficient. Emergency terminal beacon active on low-band. Station status: SILENT."
+  },
+  {
+    "id": "LOG_SYS_009",
+    "category": "system",
+    "timestamp": "2187-03-14T15:38:00Z",
+    "source": "LIFE-SUPPORT",
+    "title": "Life Support — Cascade Alert",
+    "text": "[15:38] Heat cascade in progress. Sectors affected: Life Support, Power Relay Junction. Vent dampers holding. Recommend immediate manual cooldown via P04 OPEN_VENTS or reroute at P03."
+  },
+  {
+    "id": "LOG_CREW_009",
+    "category": "personal",
+    "timestamp": "2187-03-14T15:40:00Z",
+    "source": "CHEN, M. — Life Support Tech",
+    "title": "Note (Chen) — Cargo Hold",
+    "text": "We're all in the hold now. Eleven of us. Vasquez hasn't come back. Radio silence from her end. Tanaka keeps staring at the bulkhead like she can see through it. She whispered to me: 'Nine months, Chen. Nine months for nothing.' I told her it's not over yet. I don't know if I believe that."
+  },
+  {
+    "id": "LOG_CREW_005",
+    "category": "personal",
+    "timestamp": "2187-03-14T15:45:00Z",
+    "source": "VASQUEZ, R. — Chief Engineer",
+    "title": "Final Note (Vasquez)",
+    "text": "I can't reach P03 — too much heat. Tried the vent override at P04 but the panel needs a hard reboot. The thermal module from storage would show exactly which relay is cascading. I'm falling back to Cargo Hold with the others. If a maintenance bot gets through, the procedure is: equip thermal, identify the hot relay, reroute power BEFORE it trips. Vent override at P04 can buy time. God, I hope someone reads this."
+  },
+  {
+    "id": "LOG_CREW_010",
+    "category": "personal",
+    "timestamp": "2187-03-14T15:58:00Z",
+    "source": "VASQUEZ, R. — Chief Engineer",
+    "title": "Scrawled Note (Vasquez) — Cargo Hold Wall",
+    "text": "Made it back. Burns on both arms but I'm here. Twelve of us now, sealed in cargo. Okafor tried to apologize. I told him to save it. If the bot gets through, if someone picks up our beacon, the data can still be saved. That's all that matters now. That's the only thing that makes nine months in this tin can mean something."
+  },
+  {
+    "id": "LOG_SYS_010",
+    "category": "system",
+    "timestamp": "2187-03-14T16:02:00Z",
+    "source": "BOT-CTL",
+    "title": "Bot Controller — Status Report",
+    "text": "[16:02] Janitor Rover A3: STANDBY at Arrival Bay. Battery: 100%. Sensor: CLEANLINESS only. Awaiting remote operator link. Service Bot B07: DORMANT in Robotics Bay (powered down by crew)."
+  },
+  {
+    "id": "LOG_SYS_011",
+    "category": "system",
+    "timestamp": "2187-03-14T16:05:00Z",
+    "source": "PWR-MAIN",
+    "title": "Power Grid — Degraded Status",
+    "text": "[16:05] STATION POWER SUMMARY: Reactor output NOMINAL. Distribution DEGRADED. Relay P01: OK. Relay P02: OK. Relay P03: OVERHEAT / ACTIVE. Relay P04 (vent): OK. Data Core wing: UNPOWERED. Estimated time to P03 trip: variable. Reroute procedure available."
+  },
+  {
+    "id": "LOG_MYSTERY_001",
+    "category": "mystery",
+    "timestamp": "2187-03-12T02:17:00Z",
+    "source": "DOOR-CTL",
+    "title": "Data Core — Anomalous Access",
+    "text": "[02:17] ACCESS: badge=UNKNOWN door=DATA_CORE result=GRANTED. Authorization level: ADMINISTRATOR. Note: No crew members logged as on-shift at this hour. Access duration: 4 minutes 11 seconds."
+  },
+  {
+    "id": "LOG_MYSTERY_002",
+    "category": "mystery",
+    "timestamp": "2187-03-10T09:30:00Z",
+    "source": "TANAKA, S. — Research Lead",
+    "title": "Research Note (Tanaka) — Classified Signal",
+    "text": "The signal analysis is still classified. Even I can't access the full dataset, and I'm the one who found it. Okafor says corporate wants the raw data before we publish anything. Nine months of work and I still don't know what we actually found. Just that it was important enough to keep us out here."
+  },
+  {
+    "id": "LOG_MYSTERY_003",
+    "category": "mystery",
+    "timestamp": "2187-02-28T11:00:00Z",
+    "source": "VASQUEZ, R. — Chief Engineer",
+    "title": "Maintenance Log (Vasquez) — Request #47",
+    "text": "MR-47 still pending. Three months now. Coolant loop B seal replacement — a four-hour job. I've flagged it critical twice. System keeps bouncing it back: 'Budget allocation pending review.' Someone upstairs doesn't want this fixed. Or doesn't care. Same thing, in the end."
+  },
+  {
+    "id": "LOG_MYSTERY_004",
+    "category": "mystery",
+    "timestamp": "2187-03-13T23:45:00Z",
+    "source": "COMMS",
+    "title": "Communications — Encrypted Burst",
+    "text": "[23:45] ENCRYPTED BURST RECEIVED on primary array. Origin: EARTHSIDE-CMD. Decryption key: OKAFOR-EYES-ONLY. Message length: 2.4 KB. Commander Okafor accessed message at 23:51. No reply logged."
+  },
+  {
+    "id": "LOG_MYSTERY_005",
+    "category": "mystery",
+    "timestamp": "2187-03-14T01:30:00Z",
+    "source": "ENV-CTL",
+    "title": "Environmental — Anomalous Reading",
+    "text": "[01:30] ANOMALY: Atmospheric sensor grid detected a 0.3-second pressure differential across the entire station. No structural breach found. No seismic activity logged. Sensor malfunction assumed. Note: This is the third such event in 72 hours."
+  },
+  {
+    "id": "LOG_MYSTERY_006",
+    "category": "mystery",
+    "timestamp": "2187-03-11T14:20:00Z",
+    "source": "CHEN, M. — Life Support Tech",
+    "title": "Personal Note (Chen) — Strange Readings",
+    "text": "The atmospheric scrubbers keep cycling to maximum even when air quality reads nominal. I've recalibrated twice. Priya says the bots are reporting the same thing — their cleanliness sensors detect contamination that isn't there. Or contamination we can't identify. I mentioned it to Okafor. He said to log it and move on."
+  },
+  {
+    "id": "LOG_MYSTERY_007",
+    "category": "mystery",
+    "timestamp": "2187-03-13T19:00:00Z",
+    "source": "PRIYA, K. — Robotics Specialist",
+    "title": "Maintenance Note (Priya) — Bot Behavior",
+    "text": "Drone D2 stopped its patrol at 18:47 and stood motionless in the corridor outside the Data Core for eleven minutes. No obstruction, no error code. When it resumed, it reversed its route — first time in six months of operation. I pulled the nav log. The route change originated from an external command I didn't issue. Who else has bot admin access?"
+  },
+  {
+    "id": "LOG_MYSTERY_008",
+    "category": "mystery",
+    "timestamp": "2187-03-14T07:15:00Z",
+    "source": "PWR-MAIN",
+    "title": "Power Grid — Load Anomaly",
+    "text": "[07:15] ADVISORY: Unexplained 12% power draw spike at 07:14. Duration: 8 seconds. Source sector: Data Core wing. No scheduled processes. The Data Core was powered down for maintenance at the time. Logging for review."
+  }
+]

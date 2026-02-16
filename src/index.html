@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SSR — CORVUS-7</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0a;
+      color: #aaa;
+      font-family: monospace;
+      overflow: hidden;
+      height: 100vh;
+    }
+    #game-container {
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      width: 100%;
+    }
+    #rot-display {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      flex-shrink: 0;
+    }
+    #rot-display::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 2px,
+        rgba(0, 0, 0, 0.15) 2px,
+        rgba(0, 0, 0, 0.15) 4px
+      );
+      z-index: 10;
+    }
+    #rot-display canvas {
+      display: block;
+      text-shadow: 0 0 6px rgba(0, 255, 60, 0.4);
+      filter: drop-shadow(0 0 3px rgba(0, 255, 60, 0.25));
+    }
+    #ui-panel {
+      font-family: monospace;
+      font-size: 13px;
+      color: #aaa;
+      background: #0e0e0e;
+      border-left: 1px solid #222;
+      padding: 0;
+      flex: 1;
+      min-width: 260px;
+      max-width: 340px;
+      overflow: hidden;
+      height: 100vh;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+    }
+    #ui-panel .ui-top {
+      flex-shrink: 0;
+      padding: 8px 12px 4px;
+      overflow: hidden;
+    }
+    #ui-panel .label { color: #555; }
+    #ui-panel .value { color: #0f0; }
+    #ui-panel .log { font-style: italic; }
+    #ui-panel .log-system { color: #667; }
+    #ui-panel .log-narrative { color: #4ec9b0; font-style: normal; border-left: 2px solid #2a7a6a; padding-left: 6px; display: inline-block; margin: 1px 0; }
+    #ui-panel .log-warning { color: #fa0; }
+    #ui-panel .log-critical { color: #f44; font-weight: bold; animation: pulse-red 1s ease-in-out 3; }
+    #ui-panel .log-milestone { color: #0f0; font-weight: bold; font-style: normal; text-shadow: 0 0 8px rgba(0,255,0,0.4); }
+    #ui-panel .log-sensor { color: #6af; }
+    #ui-panel .thermal-active { color: #f44; font-weight: bold; }
+    #ui-panel .interact-hint { color: #fa0; font-weight: bold; }
+
+    @keyframes pulse-red {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    #ui-panel .objective-panel {
+      padding: 4px 0 6px;
+      border-bottom: 1px solid #222;
+      margin-bottom: 4px;
+    }
+    #ui-panel .objective-label { color: #fa0; font-weight: bold; }
+    #ui-panel .objective-text { color: #fff; font-weight: bold; }
+    #ui-panel .objective-detail { color: #888; font-size: 12px; }
+
+    #ui-panel .status-bar { margin-bottom: 2px; }
+
+    #ui-panel .info-bar {
+      font-size: 12px;
+      color: #666;
+      padding: 2px 0 4px;
+      border-bottom: 1px solid #222;
+    }
+    #ui-panel .legend-glyph { font-weight: bold; margin-left: 4px; }
+    #ui-panel .legend-name { color: #777; margin-right: 2px; }
+    #ui-panel .key {
+      background: #222;
+      color: #aaa;
+      padding: 0 3px;
+      border: 1px solid #444;
+      border-radius: 2px;
+      font-size: 11px;
+    }
+
+    #ui-panel .proximity-bar {
+      color: #888;
+      font-size: 12px;
+      padding: 2px 0;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    #ui-panel .room-list-panel {
+      font-size: 11px;
+      padding: 3px 0;
+      border-bottom: 1px solid #222;
+    }
+    #ui-panel .room-row {
+      display: flex;
+    }
+    #ui-panel .room-col {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-right: 8px;
+    }
+
+    #ui-panel .log-panel {
+      flex: 1;
+      padding: 4px 12px;
+      border-top: 1px solid #1a1a1a;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    /* ── Sidebar section headers ────────────────────────── */
+    #ui-panel .sidebar-section {
+      margin-bottom: 6px;
+    }
+    #ui-panel .sidebar-hp {
+      margin: 4px 0;
+    }
+    #ui-panel .sidebar-stats {
+      font-size: 12px;
+      color: #888;
+      padding: 2px 0;
+      border-bottom: 1px solid #222;
+    }
+
+    /* ── Opening crawl overlay ─────────────────────────── */
+    #crawl-overlay {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      cursor: pointer;
+    }
+    .crawl-text {
+      color: #4a8;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 680px;
+      padding: 2rem;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .crawl-skip {
+      position: fixed;
+      bottom: 2rem;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #555;
+      font-family: monospace;
+      font-size: 12px;
+      animation: crawl-skip-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes crawl-skip-pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="crawl-overlay"></div>
+  <div id="game-container">
+    <div id="rot-display"></div>
+    <div id="ui-panel"></div>
+  </div>
+  <script type="module" src="./browser.ts"></script>
+</body>
+</html>

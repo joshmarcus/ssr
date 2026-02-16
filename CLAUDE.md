@@ -27,6 +27,7 @@ src/
   render/    — ROT.js terminal rendering (glyphs + panels)
   harness/   — Headless runner + observation/action API (agent/AI playtesting)
   shared/    — Shared types, constants, utilities
+  data/      — Lore data, golden seed room definitions
 tests/       — Golden seed + unit tests (Vitest)
 ```
 
@@ -61,24 +62,46 @@ All design docs live in `space_station_roguelike_docs_v10/`:
 - `design/04_procgen_station_layout.md` — Generation pipeline (macro graph → rooms → doors → hazards → loot)
 - `design/05_mystery_narrative_system.md` — Crew gen, evidence types, incident archetypes
 - `design/06_puzzles_and_interactions.md` — Puzzle categories and mechanics
-- `design/08_technical_architecture.md` — System architecture, module boundaries
+- `design/07_content_pipeline_and_data_formats.md` — Content pipeline and data format specs
+- `design/08_technical_architecture.md` — System architecture, module boundaries (TypeScript + ROT.js)
+- `design/09_input_and_controller.md` — Input mapping and controller support
+- `design/10_meta_progression.md` — Meta-progression design
+- `design/11_sensor_ladder_and_variants.md` — Sensor types and variants
+- `design/12_minimal_combat.md` — Optional combat-lite design
 - `design/13_realtime_simulation.md` — Future real-time mode (post-MVP)
+- `design/14_platform_pc_steam_deck.md` — Platform targets and Steam Deck constraints
+- `design/15_visual_style_no_art.md` — Visual style: representational, no art pipeline
 - `design/16_agent_harness.md` — AI testing framework, observation/action format
-- `design/17_terminal_v0_prototype.md` — V0 prototype specs
+- `design/17_terminal_v0_prototype.md` — V0 prototype specs (ROT.js Display, full visibility)
+- `design/18_tech_stack_rotjs_typescript.md` — Technology choices and rationale (active)
+- `design/golden_seed_puzzle_design.md` — Thermal-gated power routing puzzle design
+- `design/18_tech_stack_python_tcod.md` — (superseded) Original Python tech stack doc
 
 ### Tasks (implementation roadmap)
+- `tasks/00_repo_scaffold_typescript.md` — Repository structure (TypeScript, active)
+- `tasks/01_ci_plan_typescript.md` — CI/testing plan (GitHub Actions + Vitest)
 - `tasks/mvp_spec.md` — MVP requirements and scope
-- `tasks/golden_seed_run_184201.md` — Integration test spec (seed 184201, 25x17 map, 31 turns)
-- `tasks/backlog.md` — Milestone roadmap (V0.1 → V0.3 → M1 → M2 → M3)
+- `tasks/golden_seed_run_184201.md` — Integration test spec (seed 184201, ROT.js Digger map)
+- `tasks/backlog.md` — Milestone roadmap (V0.0 → V0.1 → M0 → M1 → M2 → M3)
+- `tasks/v0_terminal_roadmap.md` — V0 terminal-first development roadmap
+- `tasks/00_repo_scaffold_python.md` — (superseded) Original Python scaffold doc
+- `tasks/01_ci_plan_python.md` — (superseded) Original Python CI plan
+
+### Status
+- `STATUS.md` — Current project status, what works, known issues, next steps
 
 ### Schemas (data formats)
 - `schemas/` — Specs for bots, systems, puzzles, incidents, attachments, log templates
 
 ### Agent Prompts (AI-assisted dev)
-- `agents/agent_core_engineering.md` — Core sim implementation
-- `agents/agent_ui_terminal.md` — UI/terminal rendering
+- `agents/agent_core_engineering.md` — Core sim implementation (TypeScript)
+- `agents/agent_ui_terminal.md` — UI/terminal rendering (ROT.js)
 - `agents/agent_procgen.md` — Procedural generation
-- Plus specialized agents for narrative, puzzles, harness, QA, and integration
+- `agents/agent_narrative_puzzle.md` — Narrative and puzzle design
+- `agents/agent_input_controller.md` — Input and controller mapping
+- `agents/agent_hazards_realtime.md` — Hazards and real-time systems
+- `agents/agent_playtest_balance.md` — Playtesting and balance
+- `agents/agent_packaging_steam_deck.md` — Packaging and Steam Deck deployment
 
 ## Development Conventions
 

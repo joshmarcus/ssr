@@ -1,11 +1,13 @@
-import type { GameState, Tile, TileType, Entity, EntityId, PlayerBot, Room, LogEntry } from "../shared/types.js";
+import type { GameState, Tile, TileType, Entity, EntityId, PlayerBot, Room, LogEntry, Attachment } from "../shared/types.js";
+import { PLAYER_MAX_HP, GLYPHS } from "../shared/constants.js";
+import { AttachmentSlot, SensorType } from "../shared/types.js";
 
 export function createEmptyState(seed: number, width: number, height: number): GameState {
   const tiles: Tile[][] = [];
   for (let y = 0; y < height; y++) {
     tiles[y] = [];
     for (let x = 0; x < width; x++) {
-      tiles[y][x] = { type: "wall" as TileType, glyph: "#", walkable: false, heat: 0, smoke: 0 };
+      tiles[y][x] = { type: "wall" as TileType, glyph: GLYPHS.wall, walkable: false, heat: 0, smoke: 0, dirt: 0, pressure: 100, explored: false, visible: false };
     }
   }
 
@@ -16,10 +18,19 @@ export function createEmptyState(seed: number, width: number, height: number): G
     props: {},
   };
 
+  // Player starts with a cleanliness sensor (base sensor for a janitor bot)
+  const cleanlinessSensor: Attachment = {
+    slot: AttachmentSlot.Sensor,
+    name: "cleanliness sensor",
+    sensorType: SensorType.Cleanliness,
+  };
+
   const player: PlayerBot = {
     entity: playerEntity,
-    attachments: {},
+    attachments: { [AttachmentSlot.Sensor]: cleanlinessSensor },
     alive: true,
+    hp: PLAYER_MAX_HP,
+    maxHp: PLAYER_MAX_HP,
   };
 
   return {

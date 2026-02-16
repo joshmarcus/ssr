@@ -19,6 +19,10 @@ export interface Tile {
   walkable: boolean;
   heat: number; // 0-100 thermal value
   smoke: number; // 0-100 smoke density
+  dirt: number; // 0-100 cleanliness value (crew activity traces)
+  pressure: number; // 0-100 atmospheric pressure (100 = normal, 0 = vacuum)
+  explored: boolean; // true if tile has ever been visible
+  visible: boolean; // true if tile is currently visible
 }
 
 // ── Entities ─────────────────────────────────────────────────
@@ -31,6 +35,13 @@ export enum EntityType {
   DataCore = "data_core",
   ServiceBot = "service_bot",
   LogTerminal = "log_terminal",
+  CrewItem = "crew_item",
+  Drone = "drone",
+  MedKit = "med_kit",
+  RepairBot = "repair_bot",
+  Breach = "breach",
+  ClosedDoor = "closed_door",
+  SecurityTerminal = "security_terminal",
 }
 
 export interface Entity {
@@ -67,6 +78,8 @@ export interface PlayerBot {
   entity: Entity;
   attachments: Partial<Record<AttachmentSlot, Attachment>>;
   alive: boolean;
+  hp: number;
+  maxHp: number;
 }
 
 // ── Actions ──────────────────────────────────────────────────
@@ -76,6 +89,7 @@ export enum ActionType {
   Scan = "scan",
   Clean = "clean",
   Wait = "wait",
+  Look = "look",
 }
 
 export enum Direction {

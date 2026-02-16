@@ -4,14 +4,20 @@
   "description": "Space Station Terminal Roguelike — ROT.js + TypeScript",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsx src/main.ts",
+    "build": "vite build",
+    "dev": "vite --open",
+    "dev:cli": "tsx src/main.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "harness": "tsx src/harness/cli.ts",
     "lint": "tsc --noEmit"
   },
-  "keywords": ["roguelike", "rot-js", "terminal", "space-station"],
+  "keywords": [
+    "roguelike",
+    "rot-js",
+    "terminal",
+    "space-station"
+  ],
   "author": "joshmarcus",
   "license": "ISC",
   "type": "module",
@@ -22,6 +28,7 @@
     "@types/node": "^25.2.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
+    "vite": "^7.3.1",
     "vitest": "^4.0.18"
   }
 }
