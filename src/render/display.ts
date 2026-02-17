@@ -61,23 +61,25 @@ const ROOM_WALL_TINTS: Record<string, string> = {
 
 // ── Box-drawing wall characters ──────────────────────────────────
 // Bitfield: N=1, S=2, E=4, W=8 (which neighbors are also walls)
+// Using heavy box-drawing characters (━/┃/┏/etc.) for better horizontal
+// connectivity in square-ratio cells where thin ─ leaves gaps.
 const WALL_GLYPHS: Record<number, string> = {
-  0b0000: "o",    // isolated
-  0b0001: "│",    // N
-  0b0010: "│",    // S
-  0b0011: "│",    // N+S
-  0b0100: "─",    // E
-  0b1000: "─",    // W
-  0b1100: "─",    // E+W
-  0b0101: "└",    // N+E
-  0b1001: "┘",    // N+W
-  0b0110: "┌",    // S+E
-  0b1010: "┐",    // S+W
-  0b0111: "├",    // N+S+E
-  0b1011: "┤",    // N+S+W
-  0b1101: "┴",    // N+E+W
-  0b1110: "┬",    // S+E+W
-  0b1111: "┼",    // all four
+  0b0000: "■",    // isolated
+  0b0001: "┃",    // N
+  0b0010: "┃",    // S
+  0b0011: "┃",    // N+S
+  0b0100: "━",    // E
+  0b1000: "━",    // W
+  0b1100: "━",    // E+W
+  0b0101: "┗",    // N+E
+  0b1001: "┛",    // N+W
+  0b0110: "┏",    // S+E
+  0b1010: "┓",    // S+W
+  0b0111: "┣",    // N+S+E
+  0b1011: "┫",    // N+S+W
+  0b1101: "┻",    // N+E+W
+  0b1110: "┳",    // S+E+W
+  0b1111: "╋",    // all four
 };
 
 // ── Floor glyph variation ────────────────────────────────────────
