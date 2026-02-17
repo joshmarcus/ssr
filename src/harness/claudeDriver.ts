@@ -11,12 +11,14 @@
 import { generate } from "../sim/procgen.js";
 import { step } from "../sim/step.js";
 import { isValidAction } from "../sim/actions.js";
+import { getRoomCleanliness } from "../sim/rooms.js";
 import { GOLDEN_SEED } from "../shared/constants.js";
+import { getObjective, getRoomExits, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import type {
   GameState, Action, Entity, Room, Position,
 } from "../shared/types.js";
 import {
-  ActionType, Direction, EntityType,
+  ActionType, Direction, EntityType, TileType,
 } from "../shared/types.js";
 import type { HarnessObservation, PoiEntry, ValidAction } from "./types.js";
 
@@ -30,7 +32,7 @@ const MAX_TOKENS = 200;
 const CONVERSATION_WINDOW = 5; // keep last N turns of context
 const MAX_RETRIES = 5;
 const INITIAL_BACKOFF_MS = 1000;
-const TURN_DELAY_MS = 500; // delay between turns to avoid rate limiting
+const TURN_DELAY_MS = 1500; // delay between turns to avoid rate limiting
 
 // ── Result types ─────────────────────────────────────────────
 
@@ -62,65 +64,6 @@ function manhattan(a: Position, b: Position): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-function entityDisplayName(entity: Entity): string {
-  const names: Record<string, string> = {
-    [EntityType.Relay]: "Power Relay",
-    [EntityType.SensorPickup]: "Sensor Pickup",
-    [EntityType.DataCore]: "Data Core",
-    [EntityType.ServiceBot]: "Service Bot",
-    [EntityType.LogTerminal]: "Log Terminal",
-    [EntityType.CrewItem]: "Crew Item",
-    [EntityType.Drone]: "Drone",
-    [EntityType.MedKit]: "Med Kit",
-    [EntityType.RepairBot]: "Repair Bot",
-    [EntityType.Breach]: "Hull Breach",
-    [EntityType.ClosedDoor]: "Closed Door",
-    [EntityType.SecurityTerminal]: "Security Terminal",
-    [EntityType.PatrolDrone]: "Patrol Drone",
-    [EntityType.PressureValve]: "Pressure Valve",
-    [EntityType.FuseBox]: "Fuse Box",
-    [EntityType.PowerCell]: "Power Cell",
-    [EntityType.EvidenceTrace]: "Evidence Trace",
-    [EntityType.RadiationSource]: "Radiation Source",
-    [EntityType.ShieldGenerator]: "Shield Generator",
-    [EntityType.ReinforcementPanel]: "Reinforcement Panel",
-    [EntityType.SignalBooster]: "Signal Booster",
-    [EntityType.HiddenDevice]: "Hidden Device",
-    [EntityType.EscapePod]: "Escape Pod",
-    [EntityType.CrewNPC]: "Crew NPC",
-    [EntityType.RepairCradle]: "Repair Cradle",
-    [EntityType.Rubble]: "Rubble",
-  };
-  return names[entity.type] ?? entity.type;
-}
-
-function isEntityExhaustedSimple(entity: Entity): boolean {
-  switch (entity.type) {
-    case EntityType.Breach:
-      return entity.props["sealed"] === true;
-    case EntityType.MedKit:
-      return entity.props["used"] === true;
-    case EntityType.Relay:
-      return entity.props["activated"] === true || entity.props["locked"] === true;
-    case EntityType.ClosedDoor:
-      return entity.props["closed"] === false;
-    case EntityType.CrewItem:
-      return entity.props["examined"] === true || entity.props["hidden"] === true;
-    case EntityType.PressureValve:
-      return entity.props["turned"] === true;
-    case EntityType.FuseBox:
-      return entity.props["powered"] === true;
-    case EntityType.PowerCell:
-      return entity.props["collected"] === true;
-    case EntityType.PatrolDrone:
-    case EntityType.Drone:
-    case EntityType.RepairBot:
-      return true;
-    default:
-      return false;
-  }
-}
-
 function buildObservation(state: GameState, _visibility: "full" | "player" = "full"): HarnessObservation {
   const px = state.player.entity.pos.x;
   const py = state.player.entity.pos.y;
@@ -129,6 +72,9 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
   // Current room
   const room = getRoomAt(state, playerPos);
   const currentRoom = room ? room.name : "Corridor";
+
+  // Room exits
+  const roomExits = room ? getRoomExits(state, room) : [];
 
   // Sensors
   const playerSensors = state.player.sensors ?? [];
@@ -172,7 +118,7 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
     if (entity.id === "player") continue;
     const dist = manhattan(playerPos, entity.pos);
     if (dist > 12) continue; // only nearby entities
-    const interactable = dist <= 1 && !isEntityExhaustedSimple(entity);
+    const interactable = dist <= 1 && !isEntityExhausted(entity);
     const attrs: Record<string, unknown> = {};
     if (entity.props["activated"] !== undefined) attrs["activated"] = entity.props["activated"];
     if (entity.props["sealed"] !== undefined) attrs["sealed"] = entity.props["sealed"];
@@ -234,8 +180,20 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
   validActions.push({ type: "CLEAN", description: "Clean the current tile" });
   validActions.push({ type: "WAIT", description: "Wait one turn" });
 
-  // Recent logs
-  const recentLogs = state.logs.slice(-5).map(l => l.text);
+  // Recent logs (more context for the AI)
+  const recentLogs = state.logs.slice(-10).map(l => l.text);
+
+  // Objective — shared with display.ts
+  const objective = getObjective(state);
+  const objectiveText = objective.text;
+  const objectiveDetail = objective.detail;
+
+  // Stun
+  const stunTurns = state.player.stunTurns ?? 0;
+
+  // Discovery counter — shared with display.ts
+  const disc = getDiscoveries(state);
+  const discoveries = `${disc.discovered}/${disc.total}`;
 
   // Alerts
   const alerts: string[] = [];
@@ -248,6 +206,15 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
   if (state.player.hp < 30) alerts.push(`CRITICAL: Low HP (${state.player.hp}/${state.player.maxHp})!`);
   if (state.stationIntegrity < 40) alerts.push(`ALERT: Station integrity at ${state.stationIntegrity}%!`);
 
+  // Cleaning directive — tell the AI explicitly about the room lock
+  if (state.mystery?.cleaningDirective && room) {
+    const cleanliness = getRoomCleanliness(state, room.name);
+    const goal = state.mystery.roomCleanlinessGoal ?? 80;
+    if (cleanliness < goal) {
+      alerts.push(`CLEANING DIRECTIVE ACTIVE: You cannot leave ${room.name} until cleanliness reaches ${goal}% (currently ${cleanliness}%). Use CLEAN action repeatedly to clean tiles!`);
+    }
+  }
+
   return {
     turn: state.turn,
     seed: state.seed,
@@ -257,10 +224,15 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
     maxHp: state.player.maxHp,
     pos: playerPos,
     currentRoom,
+    roomExits,
     sensors,
     activeSensor,
     stationIntegrity: Math.round(state.stationIntegrity),
     objectivePhase: state.mystery?.objectivePhase ?? "clean",
+    objectiveText,
+    objectiveDetail,
+    stunTurns,
+    discoveries,
     mapText,
     poi,
     validActions,
@@ -305,9 +277,14 @@ function renderObservationAsText(obs: HarnessObservation): string {
   const lines: string[] = [];
 
   lines.push(`=== TURN ${obs.turn} ===`);
-  lines.push(`Location: ${obs.currentRoom} | Position: (${obs.pos.x}, ${obs.pos.y})`);
-  lines.push(`HP: ${obs.hp}/${obs.maxHp} | Station Integrity: ${obs.stationIntegrity}%`);
-  lines.push(`Objective: ${obs.objectivePhase}`);
+  const exitsStr = obs.roomExits.length > 0 ? ` [exits: ${obs.roomExits.join(" ")}]` : "";
+  lines.push(`Location: ${obs.currentRoom}${exitsStr} | Position: (${obs.pos.x}, ${obs.pos.y})`);
+  lines.push(`HP: ${obs.hp}/${obs.maxHp} | Station Integrity: ${obs.stationIntegrity}% | Discoveries: ${obs.discoveries}`);
+  if (obs.stunTurns > 0) {
+    lines.push(`STATUS: STUNNED (${obs.stunTurns} turns remaining — cannot act)`);
+  }
+  lines.push(`OBJECTIVE: ${obs.objectiveText}`);
+  lines.push(`  ${obs.objectiveDetail}`);
   if (obs.sensors.length > 0) {
     lines.push(`Sensors: ${obs.sensors.join(", ")}`);
   }
@@ -457,8 +434,9 @@ STRATEGY TIPS:
 8. INTERACT with the Data Core to transmit data and win the game.
 9. INTERACT with Log Terminals and Crew Items to gather evidence.
 10. If HP is critical, prioritize finding Med Kits or Repair Cradles.
-11. Clean dirty rooms when the objective phase is "clean".
+11. Clean dirty rooms when the objective phase is "clean". Your CLEANING DIRECTIVE may lock you in a room until it reaches 80% cleanliness — use CLEAN repeatedly on dirty tiles until the directive clears!
 12. INTERACT with Closed Doors to open them for further exploration.
+13. When you see a "CLEANING DIRECTIVE ACTIVE" alert, you MUST use CLEAN action repeatedly until room cleanliness reaches the goal. You cannot leave the room until then.
 
 CRITICAL RULES:
 1. ONLY choose actions from the "VALID ACTIONS" list in your observation. Do NOT try directions not listed.

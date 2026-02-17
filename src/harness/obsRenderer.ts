@@ -11,6 +11,7 @@ import {
   STATION_INTEGRITY_CRITICAL,
 } from "../shared/constants.js";
 import { isValidAction } from "../sim/actions.js";
+import { getObjective, getRoomExits, getDiscoveries } from "../shared/ui.js";
 
 import type {
   HarnessObservation,
@@ -309,14 +310,20 @@ export function buildObservation(
   const hp = state.player.hp;
   const maxHp = state.player.maxHp;
   const currentRoom = roomNameAt(state, px, py);
+  const roomObj = state.rooms.find(r =>
+    px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height
+  ) ?? null;
+  const roomExits = roomObj ? getRoomExits(state, roomObj) : [];
 
   // ── Sensors ──
   const sensors = state.player.sensors ?? [];
   const sensorNames: string[] = sensors.map(s => s as string);
   const activeSensor: string | null = sensors.length > 0 ? sensors[sensors.length - 1] : null;
 
-  // ── Objective phase ──
+  // ── Objective ──
   const objectivePhase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
+  const objective = getObjective(state);
+  const disc = getDiscoveries(state);
 
   // ── Map window (21x21 centered on player) ──
   const mapLines: string[] = [];
@@ -510,10 +517,15 @@ export function buildObservation(
     maxHp,
     pos: { x: px, y: py },
     currentRoom,
+    roomExits,
     sensors: sensorNames,
     activeSensor,
     stationIntegrity: state.stationIntegrity,
     objectivePhase,
+    objectiveText: objective.text,
+    objectiveDetail: objective.detail,
+    stunTurns: state.player.stunTurns ?? 0,
+    discoveries: `${disc.discovered}/${disc.total}`,
     mapText,
     poi,
     validActions,

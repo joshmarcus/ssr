@@ -2,6 +2,7 @@ import * as ROT from "rot-js";
 import type { GameState, Entity, Room } from "../shared/types.js";
 import { TileType, EntityType, AttachmentSlot, SensorType } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
+import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName } from "../shared/ui.js";
 import type { IGameDisplay } from "./displayInterface.js";
 
 // ── Log entry types for color-coding ────────────────────────────
@@ -189,29 +190,7 @@ function heatToBgColor(heat: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-// ── Friendly entity names for interaction hints ─────────────────
-const ENTITY_NAMES: Record<string, string> = {
-  [EntityType.Relay]: "Power Relay",
-  [EntityType.SensorPickup]: "Sensor Module",
-  [EntityType.DataCore]: "Data Core",
-  [EntityType.ServiceBot]: "Service Bot",
-  [EntityType.LogTerminal]: "Log Terminal",
-  [EntityType.CrewItem]: "Crew Item",
-  [EntityType.Drone]: "Maintenance Drone",
-  [EntityType.MedKit]: "Med Kit",
-  [EntityType.RepairBot]: "Repair Bot",
-  [EntityType.Breach]: "Hull Breach",
-  [EntityType.ClosedDoor]: "Sealed Door",
-  [EntityType.SecurityTerminal]: "Security Terminal",
-  [EntityType.PatrolDrone]: "Patrol Drone",
-  [EntityType.PressureValve]: "Pressure Valve",
-  [EntityType.FuseBox]: "Fuse Box",
-  [EntityType.PowerCell]: "Power Cell",
-  [EntityType.EscapePod]: "Escape Pod",
-  [EntityType.CrewNPC]: "Crew Survivor",
-  [EntityType.RepairCradle]: "Repair Cradle",
-  [EntityType.Rubble]: "Rubble",
-};
+// Entity names for interaction hints — delegate to shared module
 
 // ── Smoke color interpolation ───────────────────────────────────
 function smokeToFgColor(smoke: number): string {
@@ -493,40 +472,8 @@ export class BrowserDisplay implements IGameDisplay {
     return null;
   }
 
-  /**
-   * Determine exit directions from a room by checking for walkable tiles
-   * just outside the room boundary.
-   */
   private getRoomExits(state: GameState, room: Room): string[] {
-    const exits: string[] = [];
-    const { x, y, width, height } = room;
-
-    // Check north edge (y - 1)
-    if (y > 0) {
-      for (let rx = x; rx < x + width; rx++) {
-        if (state.tiles[y - 1]?.[rx]?.walkable) { exits.push("N"); break; }
-      }
-    }
-    // Check south edge (y + height)
-    if (y + height < state.height) {
-      for (let rx = x; rx < x + width; rx++) {
-        if (state.tiles[y + height]?.[rx]?.walkable) { exits.push("S"); break; }
-      }
-    }
-    // Check west edge (x - 1)
-    if (x > 0) {
-      for (let ry = y; ry < y + height; ry++) {
-        if (state.tiles[ry]?.[x - 1]?.walkable) { exits.push("W"); break; }
-      }
-    }
-    // Check east edge (x + width)
-    if (x + width < state.width) {
-      for (let ry = y; ry < y + height; ry++) {
-        if (state.tiles[ry]?.[x + width]?.walkable) { exits.push("E"); break; }
-      }
-    }
-
-    return exits;
+    return getRoomExitsShared(state, room);
   }
 
   // ── Track room entry for flash message ─────────────────────────
@@ -879,109 +826,8 @@ export class BrowserDisplay implements IGameDisplay {
     }
   }
 
-  // ── Compute current objective based on game state ─────────────
   private getObjective(state: GameState): { text: string; detail: string } {
-    if (state.gameOver) {
-      return state.victory
-        ? { text: "MISSION COMPLETE", detail: "Transmission sent. The crew's work survives." }
-        : { text: "CONNECTION LOST", detail: "Refresh to try again." };
-    }
-
-    const phase = state.mystery?.objectivePhase;
-    const sensors = state.player.sensors ?? [];
-
-    // Count relay status
-    let totalRelays = 0;
-    let activatedRelays = 0;
-    for (const [, e] of state.entities) {
-      if (e.type === EntityType.Relay && e.props["locked"] !== true) {
-        totalRelays++;
-        if (e.props["activated"] === true) activatedRelays++;
-      }
-    }
-    const remainingRelays = totalRelays - activatedRelays;
-
-    // Count sensor pickups still on the map
-    const sensorPickups = Array.from(state.entities.values()).filter(e => e.type === EntityType.SensorPickup);
-
-    // Data core status
-    const dataCore = Array.from(state.entities.values()).find(e => e.type === EntityType.DataCore);
-    const hasLockedDoor = state.tiles.some(row => row.some(t => t.type === TileType.LockedDoor));
-
-    // ── Phase: Clean ──────────────────────────────────────
-    if (phase === "clean") {
-      const cleaned = state.mystery?.roomsCleanedCount ?? 0;
-      const trigger = state.mystery?.investigationTrigger ?? 3;
-      return {
-        text: `Clean the station (${cleaned}/${trigger} rooms)`,
-        detail: "Clean each room to 80%. You can't leave until the room is clean. Press [c] to clean, [t] to toggle cleanliness overlay.",
-      };
-    }
-
-    // ── Phase: Investigate ────────────────────────────────
-    if (phase === "investigate") {
-      const journalCount = state.mystery?.journal.length ?? 0;
-      const threshold = state.mystery?.evidenceThreshold ?? 5;
-
-      // Sub-objectives within investigation
-      if (sensorPickups.length > 0 && sensors.length <= 1) {
-        return {
-          text: `Investigate: find sensors and evidence (${journalCount}/${threshold})`,
-          detail: "Explore rooms. Pick up sensor upgrades (S) and interact with terminals (T), crew items (*), and evidence traces (?) to learn what happened.",
-        };
-      }
-
-      if (remainingRelays > 0) {
-        return {
-          text: `Investigate: reroute relays and gather evidence (${journalCount}/${threshold})`,
-          detail: `Reroute overheating relays (R) with [i] — ${activatedRelays}/${totalRelays} done. Read logs and examine evidence to piece together the mystery.`,
-        };
-      }
-
-      return {
-        text: `Investigate: gather evidence (${journalCount}/${threshold})`,
-        detail: "Interact with terminals, crew items, and evidence traces. Press [b] to broadcast a report when ready.",
-      };
-    }
-
-    // ── Phase: Recover ────────────────────────────────────
-    if (phase === "recover") {
-      if (remainingRelays > 0) {
-        return {
-          text: `Restore station systems (${activatedRelays}/${totalRelays} relays)`,
-          detail: "Reroute remaining relays to stabilize the station. Seal hull breaches. Prepare for data transmission.",
-        };
-      }
-
-      if (dataCore && hasLockedDoor) {
-        return {
-          text: "Reach the Data Core",
-          detail: "All relays rerouted. Find a way past the locked door to reach the data core.",
-        };
-      }
-
-      return {
-        text: "Transmit from the Data Core",
-        detail: "Find the data core (D) and press [i] to transmit the research data and complete the mission.",
-      };
-    }
-
-    // ── Phase: Evacuate ───────────────────────────────────
-    if (phase === "evacuate") {
-      const evac = state.mystery?.evacuation;
-      const rescued = evac?.crewEvacuated?.length ?? 0;
-      const total = (evac?.crewFound?.length ?? 0) + rescued + (evac?.crewDead?.length ?? 0);
-      return {
-        text: `Evacuate crew (${rescued}/${total} rescued)`,
-        detail: "Guide surviving crew to escape pods. Interact with crew members to have them follow you, then lead them to escape pods (E).",
-      };
-    }
-
-    // ── Fallback: general exploration ─────────────────────
-    return {
-      text: "Explore the station",
-      detail: "Search rooms for equipment and clues about what happened.",
-    };
+    return getObjectiveShared(state);
   }
 
   renderUI(state: GameState, panel: HTMLElement, visitedRoomIds?: Set<string>): void {
@@ -1001,7 +847,7 @@ export class BrowserDisplay implements IGameDisplay {
       const nearby = this.getAdjacentInteractables(state);
       if (nearby.length > 0) {
         const target = nearby[0];
-        const name = ENTITY_NAMES[target.type] || target.type;
+        const name = entityDisplayName(target);
         interactHint = `<span class="interact-hint"> ▸ [i] ${this.escapeHtml(name)}</span>`;
       }
     }
@@ -1012,7 +858,7 @@ export class BrowserDisplay implements IGameDisplay {
       const nearbyEnts = this.getNearbyEntities(state, 3);
       if (nearbyEnts.length > 0) {
         const items = nearbyEnts.slice(0, 4).map(n => {
-          const name = ENTITY_NAMES[n.entity.type] || n.entity.type;
+          const name = entityDisplayName(n.entity);
           const color = ENTITY_COLORS[n.entity.type] || "#aaa";
           return `<span style="color:${color}">${this.escapeHtml(name)}</span> <span class="label">(${n.dist} tile${n.dist > 1 ? "s" : ""} ${n.dir})</span>`;
         });
@@ -1047,30 +893,9 @@ export class BrowserDisplay implements IGameDisplay {
       ? ` | <span style="color:#ca8">[${unreadCount} UNREAD]</span>`
       : "";
 
-    // ── Discovery counter (Item 13) ─────────────────────────────
-    let totalDiscoverables = 0;
-    let discovered = 0;
-    for (const [, entity] of state.entities) {
-      if (entity.type === EntityType.CrewItem && entity.props["hidden"] !== true) {
-        totalDiscoverables++;
-        if (entity.props["examined"] === true) discovered++;
-      }
-      if (entity.type === EntityType.LogTerminal) {
-        totalDiscoverables++;
-        if (state.logs.some(l => l.id === `log_terminal_${entity.id}`)) discovered++;
-      }
-    }
-    // Also count already-examined hidden items that were revealed
-    for (const [, entity] of state.entities) {
-      if (entity.type === EntityType.CrewItem && entity.props["hidden"] === true) {
-        // Only count as discoverable if it has been revealed (cleaned)
-        if (entity.props["revealed"] === true) {
-          totalDiscoverables++;
-          if (entity.props["examined"] === true) discovered++;
-        }
-      }
-    }
-    const discoveryTag = ` | <span class="label">Discoveries:</span> <span style="color:#ca8">${discovered}/${totalDiscoverables}</span>`;
+    // ── Discovery counter ──────────────────────────────────────
+    const disc = getDiscoveries(state);
+    const discoveryTag = ` | <span class="label">Discoveries:</span> <span style="color:#ca8">${disc.discovered}/${disc.total}</span>`;
 
     // ── Report ready indicator ──────────────────────────────────
     let reportTag = "";

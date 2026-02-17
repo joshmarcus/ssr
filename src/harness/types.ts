@@ -13,14 +13,19 @@ export interface HarnessObservation {
   maxHp: number;
   pos: { x: number; y: number };
   currentRoom: string;
+  roomExits: string[];        // compass directions of exits from current room
   sensors: string[];          // equipped sensor names
   activeSensor: string | null;
   stationIntegrity: number;
   objectivePhase: string;     // Clean, Investigate, Recover, Evacuate
+  objectiveText: string;      // human-readable objective description
+  objectiveDetail: string;    // detailed instructions for current objective
+  stunTurns: number;          // turns remaining stunned (0 = not stunned)
+  discoveries: string;        // "discovered/total" progress string
   mapText: string;            // ASCII map centered on player
   poi: PoiEntry[];            // visible entities with IDs and attributes
   validActions: ValidAction[];
-  recentLogs: string[];       // last 5 log messages
+  recentLogs: string[];       // last 10 log messages
   alerts: string[];           // urgent warnings
 }
 
