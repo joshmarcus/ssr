@@ -2227,8 +2227,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           },
         ];
       } else {
-        const healAmount = 30;
-        const newHp = Math.min(state.player.maxHp, state.player.hp + healAmount);
+        const newHp = state.player.maxHp;
         const actualHeal = newHp - state.player.hp;
         next.player = {
           ...state.player,

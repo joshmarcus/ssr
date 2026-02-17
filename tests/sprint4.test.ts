@@ -914,26 +914,16 @@ describe("Repair cradle", () => {
     return state;
   }
 
-  it("heals player when HP < maxHp (heals 30, capped at maxHp)", () => {
+  it("fully heals player when HP < maxHp", () => {
     const state = makeCradleState();
     state.player = { ...state.player, hp: 50 };
 
     const next = step(state, { type: ActionType.Interact, targetId: "repair_cradle_0" });
 
-    // Should heal 30 HP: 50 + 30 = 80
-    expect(next.player.hp).toBe(80);
+    // Should fully heal to maxHp
+    expect(next.player.hp).toBe(PLAYER_MAX_HP);
     // Should have a repair log
     expect(next.logs.some(l => l.text.includes("Repair cradle activated"))).toBe(true);
-  });
-
-  it("healing is capped at maxHp", () => {
-    const state = makeCradleState();
-    state.player = { ...state.player, hp: PLAYER_MAX_HP - 10, maxHp: PLAYER_MAX_HP };
-
-    const next = step(state, { type: ActionType.Interact, targetId: "repair_cradle_0" });
-
-    // Should cap at maxHp: min(maxHp, (maxHp-10) + 30) = maxHp
-    expect(next.player.hp).toBe(PLAYER_MAX_HP);
   });
 
   it("does nothing at full HP", () => {
@@ -952,9 +942,9 @@ describe("Repair cradle", () => {
     const state = makeCradleState();
     state.player = { ...state.player, hp: 50 };
 
-    // First use: heals
+    // First use: fully heals
     const afterFirst = step(state, { type: ActionType.Interact, targetId: "repair_cradle_0" });
-    expect(afterFirst.player.hp).toBe(80);
+    expect(afterFirst.player.hp).toBe(PLAYER_MAX_HP);
 
     // The cradle should have a cooldown set (turn inside step is state.turn+1, so cooldown = state.turn + 1 + 15)
     const cradle = afterFirst.entities.get("repair_cradle_0")!;
