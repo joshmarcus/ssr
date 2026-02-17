@@ -46,14 +46,14 @@ export const PATROL_DRONE_SPEED = 3; // drone moves every N turns
 export const PATROL_DRONE_ATTACK_COOLDOWN = 4; // turns between attacks (drone retreats after hitting)
 
 // ── Radiation ───────────────────────────────────────────────
-export const RADIATION_SPREAD_RATE = 0.2; // very slow spread
-export const RADIATION_SPREAD_RANGE = 2; // spread distance
+export const RADIATION_SPREAD_RATE = 0.1; // glacial spread
+export const RADIATION_SPREAD_RANGE = 1; // only immediate neighbors
 export const RADIATION_DAMAGE_THRESHOLD = 70; // need high radiation to hurt
-export const RADIATION_DAMAGE_PER_TURN = 2; // mild damage with sensor
-export const RADIATION_DAMAGE_NO_SENSOR = 3; // slightly worse without sensor
-export const RADIATION_SOURCE_RATE = 2; // slower buildup
+export const RADIATION_DAMAGE_PER_TURN = 1; // -1 HP per turn
+export const RADIATION_DAMAGE_NO_SENSOR = 1; // -1 HP per turn (same, just no warning)
+export const RADIATION_SOURCE_RATE = 1; // slow buildup at source
 export const RADIATION_SOURCE_CAP = 85;
-export const RADIATION_DECAY_RATE = 0.5; // moderate decay away from source
+export const RADIATION_DECAY_RATE = 0.8; // fast decay away from source
 export const SHIELD_GENERATOR_RADIUS = 5;
 
 // ── Structural stress ──────────────────────────────────────
@@ -90,27 +90,27 @@ export const GLYPHS = {
   dataCore: "◆",  // filled diamond — the objective
   serviceBot: "♦", // diamond — dormant bot
   logTerminal: "▣", // filled square — data terminal
-  crewItem: "✦",  // four-pointed star — crew belonging
+  crewItem: "🗃",  // card file box — crew belonging
   heat: "≈",      // wavy lines — heat shimmer
   smoke: "░",     // light shade — smoke/haze
   drone: "○",     // circle — roaming drone
   medKit: "✚",    // cross — med kit
   repairBot: "◎",  // circled ring — repair bot
-  breach: "⊘",    // circle with slash — hull breach
+  breach: "💨",    // wind — hull breach
   closedDoor: "▯", // same as door but non-walkable
   securityTerminal: "◫", // security camera terminal
-  patrolDrone: "🤖", // robot — patrol drone
+  patrolDrone: "🛸", // UFO — patrol drone
   pressureValve: "◉", // filled circle — pressure valve
   fuseBox: "▦",  // grid — fuse box / junction
   powerCell: "⬡", // hexagon — power cell
-  evidenceTrace: "※", // reference mark — evidence trace
+  evidenceTrace: "👣", // footprints — evidence trace
   radiationSource: "☢", // radioactive — radiation source
-  shieldGenerator: "⊛", // circled star — shield generator
+  shieldGenerator: "🛡", // shield — shield generator
   reinforcementPanel: "▧", // hatched — reinforcement panel
   signalBooster: "⊡", // squared dot — signal booster
   hiddenDevice: "◇", // diamond outline — hidden device (EM sensor only)
   escapePod: "⬡",    // hexagon — escape pod
   rubble: "▒",       // medium shade — debris/rubble
-  crewNPC: "☺",      // smiley face — living crew member
-  repairCradle: "⚕",  // medical — bot repair station
+  crewNPC: "🙋",      // person raising hand — living crew member
+  repairCradle: "⚕️",  // medical — bot repair station
 } as const;

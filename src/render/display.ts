@@ -149,22 +149,24 @@ const ENTITY_GLYPHS: Record<string, string> = {
   [EntityType.DataCore]: "\ud83d\udc8e",     // 💎
   [EntityType.ServiceBot]: "\ud83d\udd0b",   // 🔋
   [EntityType.LogTerminal]: "\ud83d\udcbb",  // 💻
-  [EntityType.CrewItem]: "\ud83d\udce6",     // 📦
+  [EntityType.CrewItem]: "\ud83d\uddc3\ufe0f", // 🗃️
   [EntityType.Drone]: "\ud83d\udd35",        // 🔵
   [EntityType.MedKit]: "\ud83d\udc8a",       // 💊
   [EntityType.RepairBot]: "\ud83d\udd27",    // 🔧
-  [EntityType.Breach]: "\u26a0\ufe0f",       // ⚠️
+  [EntityType.Breach]: "\ud83d\udca8",       // 💨
   [EntityType.ClosedDoor]: "\ud83d\udeaa",   // 🚪
   [EntityType.SecurityTerminal]: "\ud83d\udcf7", // 📷
-  [EntityType.PatrolDrone]: "\ud83e\udd16",     // 🤖
+  [EntityType.PatrolDrone]: "\ud83d\udef8",     // 🛸
   [EntityType.RadiationSource]: "\u2622\ufe0f", // ☢️
   [EntityType.PressureValve]: "\u2699\ufe0f", // ⚙️
   [EntityType.FuseBox]: "\ud83d\udd0c",       // 🔌
   [EntityType.PowerCell]: "\ud83d\udd0b",     // 🔋 (reuse battery glyph)
   [EntityType.EscapePod]: "\ud83d\ude80",     // 🚀
-  [EntityType.CrewNPC]: "\ud83e\uddd1",       // 🧑
-  [EntityType.RepairCradle]: "\ud83d\udd27",  // 🔧
+  [EntityType.CrewNPC]: "\ud83d\ude4b",       // 🙋
+  [EntityType.RepairCradle]: "\u2695\ufe0f",  // ⚕️
   [EntityType.Rubble]: "\ud83e\udea8",         // 🪨
+  [EntityType.ShieldGenerator]: "\ud83d\udee1\ufe0f", // 🛡️
+  [EntityType.EvidenceTrace]: "\ud83d\udc63",  // 👣
 };
 
 // ── Thermal color interpolation ─────────────────────────────────
@@ -719,7 +721,7 @@ export class BrowserDisplay implements IGameDisplay {
 
         // Player always on top
         if (state.player.entity.pos.x === x && state.player.entity.pos.y === y) {
-          glyph = "\ud83e\udd16"; // 🤖
+          glyph = GLYPHS.player;
           fg = COLORS.player;
           bg = "#0a1a0a";
         }
@@ -1017,7 +1019,7 @@ export class BrowserDisplay implements IGameDisplay {
       { key: EntityType.RepairCradle, glyph: ENTITY_GLYPHS[EntityType.RepairCradle] || "⚕", color: "#4df", label: "Repair Cradle" },
       { key: EntityType.Breach, glyph: ENTITY_GLYPHS[EntityType.Breach] || "⊘", color: "#f44", label: "Breach" },
       { key: EntityType.SecurityTerminal, glyph: ENTITY_GLYPHS[EntityType.SecurityTerminal] || "◫", color: "#4af", label: "Security" },
-      { key: EntityType.PatrolDrone, glyph: ENTITY_GLYPHS[EntityType.PatrolDrone] || "🤖", color: "#f22", label: "Patrol" },
+      { key: EntityType.PatrolDrone, glyph: ENTITY_GLYPHS[EntityType.PatrolDrone] || "🛸", color: "#f22", label: "Patrol" },
       { key: EntityType.PressureValve, glyph: ENTITY_GLYPHS[EntityType.PressureValve] || "◉", color: "#4ba", label: "Valve" },
       { key: EntityType.FuseBox, glyph: ENTITY_GLYPHS[EntityType.FuseBox] || "▦", color: "#d80", label: "Fuse Box" },
       { key: EntityType.PowerCell, glyph: ENTITY_GLYPHS[EntityType.PowerCell] || "⬡", color: "#fd4", label: "Power Cell" },
