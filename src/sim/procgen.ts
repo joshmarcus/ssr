@@ -1,11 +1,17 @@
 import * as ROT from "rot-js";
-import type { GameState, Entity } from "../shared/types.js";
-import { TileType, EntityType, SensorType } from "../shared/types.js";
+import type { GameState, Entity, MysteryState, MysteryChoice } from "../shared/types.js";
+import { TileType, EntityType, SensorType, ObjectivePhase, IncidentArchetype, CrewFate, DoorKeyType } from "../shared/types.js";
 import { DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, GLYPHS, PRESSURE_NORMAL } from "../shared/constants.js";
 import { createEmptyState } from "./state.js";
 import { updateVision } from "./vision.js";
 import AUTHORED_LOGS from "../data/logs.json" with { type: "json" };
 import { CREW_ITEMS } from "../data/crewItems.js";
+import { generateCrew, findByRole } from "./crewGen.js";
+import { selectArchetype } from "./incidents.js";
+import { generateTimeline, generateLogs } from "./timeline.js";
+import { CrewRole } from "../shared/types.js";
+import { generateMysteryChoices } from "./mysteryChoices.js";
+import { generateDeductions } from "./deduction.js";
 
 /**
  * Room name assignments — enough for a large station.
@@ -19,7 +25,7 @@ const ROOM_NAMES = [
   "Life Support",
   "Vent Control Room",
   "Cargo Hold",
-  "Charging Bay",
+  "Bot Maintenance",
   "Communications Hub",
   "Crew Quarters",
   "Research Lab",
@@ -31,6 +37,7 @@ const ROOM_NAMES = [
   "Server Annex",
   "Auxiliary Power",
   "Emergency Shelter",
+  "Escape Pod Bay",
 ];
 
 type DiggerRoom = {
@@ -66,6 +73,9 @@ export function generate(seed: number): GameState {
         smoke: 0,
         dirt: 0,
         pressure: 100,
+        radiation: 0,
+        stress: 0,
+        stressTurns: 0,
         explored: false,
         visible: false,
       };
@@ -93,6 +103,9 @@ export function generate(seed: number): GameState {
         smoke: 0,
         dirt: 0,
         pressure: 100,
+        radiation: 0,
+        stress: 0,
+        stressTurns: 0,
         explored: false,
         visible: false,
       };
@@ -107,11 +120,56 @@ export function generate(seed: number): GameState {
     state.player.entity.pos = { x: cx, y: cy };
   }
 
+  // ── Mystery engine: generate crew, incident, timeline ────────
+  const roomNames = state.rooms.map(r => r.name);
+  const crewSize = 8 + Math.floor(ROT.RNG.getUniform() * 5); // 8-12 crew
+  const crew = generateCrew(crewSize, seed, roomNames);
+  const archetype = selectArchetype(seed);
+  const timeline = generateTimeline(crew, archetype, roomNames);
+  const generatedLogCount = Math.min(16, 5 + Math.floor(ROT.RNG.getUniform() * 12));
+  const generatedLogData = generateLogs(crew, timeline, roomNames, generatedLogCount);
+  const choices = generateMysteryChoices(crew, timeline, roomNames);
+  const deductions = generateDeductions(crew, timeline, roomNames);
+
+  // Evidence threshold: need to find ~40% of available logs to unlock recovery phase
+  const evidenceThreshold = Math.max(3, Math.floor(generatedLogCount * 0.4));
+
+  state.mystery = {
+    crew,
+    timeline,
+    generatedLogs: generatedLogData.map((l, i) => ({ terminalId: `log_terminal_${i}`, ...l })),
+    discoveredEvidence: new Set<string>(),
+    choices,
+    journal: [],
+    deductions,
+    objectivePhase: ObjectivePhase.Clean,
+    roomsCleanedCount: 0,
+    investigationTrigger: 1, // clean 1 room before yellow alert triggers investigation
+    evidenceThreshold,
+    cleaningDirective: true,
+    roomCleanlinessGoal: 80,
+    directiveViolationTurns: 0,
+  };
+
   placeEntities(state, rooms);
+  placeEvidenceTraces(state, rooms);
   generateDirtTrails(state, rooms);
 
   // Place 1-2 security terminals in mid-station rooms
   placeSecurityTerminals(state, rooms);
+
+  // Place Sprint 3 entities: radiation sources, shield generators, etc.
+  placeSprintThreeEntities(state, rooms);
+
+  // Place Sprint 3 sensor pickups
+  placeSprintThreeSensors(state, rooms);
+
+  // Place crew NPCs and escape pods for evacuation mechanic
+  placeCrewAndPods(state, rooms);
+
+  // Place keyed doors (clearance + environmental)
+  placeClearanceDoors(state, rooms);
+  placeEnvironmentalDoors(state, rooms);
 
   // Reveal starting room via vision system
   return updateVision(state);
@@ -286,10 +344,12 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
   });
 
   // ── Three overheating relays ──────────────────────────────────
+  // Seed-varied initial heat levels — each run feels different
+  const heatRng = ((state.seed * 1103515245 + 12345) >>> 0) % 20;
   const relayDefs = [
-    { id: "relay_p01", roomIdx: relay1Idx, heat: 10, smoke: 5 },
-    { id: "relay_p03", roomIdx: relay2Idx, heat: 15, smoke: 8 },
-    { id: "relay_p04", roomIdx: relay3Idx, heat: 8, smoke: 3 },
+    { id: "relay_p01", roomIdx: relay1Idx, heat: 8 + heatRng % 10, smoke: 3 + heatRng % 5 },
+    { id: "relay_p03", roomIdx: relay2Idx, heat: 12 + (heatRng + 7) % 12, smoke: 5 + (heatRng + 3) % 6 },
+    { id: "relay_p04", roomIdx: relay3Idx, heat: 6 + (heatRng + 13) % 8, smoke: 2 + (heatRng + 5) % 4 },
   ];
 
   for (const def of relayDefs) {
@@ -341,6 +401,9 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
           smoke: 0,
           dirt: 0,
           pressure: PRESSURE_NORMAL,
+          radiation: 0,
+          stress: 0,
+          stressTurns: 0,
           explored: false,
           visible: false,
         };
@@ -364,6 +427,9 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
       smoke: 0,
       dirt: 0,
       pressure: PRESSURE_NORMAL,
+      radiation: 0,
+      stress: 0,
+      stressTurns: 0,
       explored: false,
       visible: false,
     };
@@ -412,6 +478,19 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
       type: EntityType.MedKit,
       pos: medKitPos,
       props: { used: false },
+    });
+  }
+
+  // ── Repair cradle in Bot Maintenance room ──────────────────
+  const botMaintIdx = state.rooms.findIndex(r => r.name === "Bot Maintenance");
+  if (botMaintIdx >= 0 && botMaintIdx < n) {
+    const botMaintRoom = rooms[botMaintIdx];
+    const cradlePos = getRoomCenter(botMaintRoom);
+    state.entities.set("repair_cradle_0", {
+      id: "repair_cradle_0",
+      type: EntityType.RepairCradle,
+      pos: cradlePos,
+      props: { cooldown: 0 },
     });
   }
 
@@ -498,7 +577,10 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
       breachRoomCandidates.push(ri);
     }
   }
-  const breachRooms = breachRoomCandidates.slice(0, 2);
+  // Seed-varied breach count (1-3 breaches)
+  const breachCountRng = ((state.seed * 39916801) >>> 0) % 100;
+  const breachCount = breachCountRng < 25 ? 1 : breachCountRng < 75 ? 2 : 3;
+  const breachRooms = breachRoomCandidates.slice(0, breachCount);
   breachRooms.forEach((ri, i) => {
     const room = rooms[ri];
     const pos = getRoomPos(room, i === 0 ? 1 : -1, 0);
@@ -591,6 +673,9 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
         smoke: 0,
         dirt: 0,
         pressure: 100,
+        radiation: 0,
+        stress: 0,
+        stressTurns: 0,
         explored: false,
         visible: false,
       };
@@ -604,17 +689,69 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
     }
   }
 
+  // ── Puzzle variation: seed determines which optional puzzles appear ──
+  // Use the seed to pick 1-2 optional puzzle types per run
+  const puzzleRng = ((state.seed * 2654435761) >>> 0) % 100;
+
+  // Puzzle A: Pressure valve puzzle (appears ~60% of runs)
+  if (puzzleRng < 60) {
+    placePressureValvePuzzle(state, rooms, n, reservedRooms);
+  }
+
+  // Puzzle B: Power cell / fuse box puzzle (appears ~60% of runs, different threshold)
+  if (puzzleRng >= 30) {
+    placePowerCellPuzzle(state, rooms, n, reservedRooms);
+  }
+
+  // ── Hostile patrol drones (1-3, seed-varied placement) ──────
+  const droneCountRng = ((state.seed * 48271) >>> 0) % 100;
+  const patrolDroneCount = droneCountRng < 30 ? 1 : droneCountRng < 80 ? 2 : 3;
+  const patrolDroneExclude = new Set([0, 1, sensorIdx, dataCoreIdx]);
+  // Vary starting rooms based on seed
+  const droneStartOffset = ((state.seed * 16807) >>> 0) % Math.max(1, n - 4);
+  const patrolDroneRoomIndices: number[] = [];
+  for (let di = 0; di < patrolDroneCount; di++) {
+    const ri = Math.min(n - 1, Math.max(2, droneStartOffset + di * Math.floor(n / (patrolDroneCount + 1))));
+    if (!patrolDroneExclude.has(ri) && !patrolDroneRoomIndices.includes(ri)) {
+      patrolDroneRoomIndices.push(ri);
+    }
+  }
+  patrolDroneRoomIndices.forEach((ri, i) => {
+    const room = rooms[ri];
+    const pos = getRoomPos(room, i === 0 ? -1 : 1, i === 0 ? 1 : -1);
+    state.entities.set(`patrol_drone_${i}`, {
+      id: `patrol_drone_${i}`,
+      type: EntityType.PatrolDrone,
+      pos,
+      props: { hostile: false },
+    });
+  });
+
   logRoomIndices.forEach((ri, i) => {
     const room = rooms[ri];
     const pos = getRoomPos(room, 1, 0);
-    const log = logSelections[i] || AUTHORED_LOGS[i % AUTHORED_LOGS.length];
+
+    // Use mystery-generated logs if available, fall back to authored logs
+    const mysteryLog = state.mystery?.generatedLogs[i];
+    let logText: string;
+    let logSource: string;
+
+    if (mysteryLog) {
+      logText = `${mysteryLog.title}\n${mysteryLog.text}`;
+      logSource = mysteryLog.source;
+    } else {
+      const log = logSelections[i] || AUTHORED_LOGS[i % AUTHORED_LOGS.length];
+      logText = log ? `${log.title}\n${log.text}` : "Terminal offline.";
+      logSource = log?.source || "unknown";
+    }
+
     state.entities.set(`log_terminal_${i}`, {
       id: `log_terminal_${i}`,
       type: EntityType.LogTerminal,
       pos,
       props: {
-        text: log ? `${log.title}\n${log.text}` : "Terminal offline.",
-        source: log?.source || "unknown",
+        text: logText,
+        source: logSource,
       },
     });
   });
@@ -646,11 +783,648 @@ function placeSecurityTerminals(state: GameState, rooms: DiggerRoom[]): void {
       revealRooms.push(j);
     }
 
+    // Find door tiles adjacent to controlled rooms for electronic door control
+    const controlledDoorPositions: { x: number; y: number }[] = [];
+    for (const roomIdx of revealRooms) {
+      if (roomIdx < 0 || roomIdx >= n) continue;
+      const ctrlRoom = rooms[roomIdx];
+      ctrlRoom.getDoors((dx: number, dy: number) => {
+        if (!controlledDoorPositions.some(p => p.x === dx && p.y === dy)) {
+          controlledDoorPositions.push({ x: dx, y: dy });
+        }
+      });
+    }
+
     state.entities.set(`security_terminal_${i}`, {
       id: `security_terminal_${i}`,
       type: EntityType.SecurityTerminal,
       pos,
-      props: { accessed: false, revealRooms },
+      props: {
+        accessed: false,
+        revealRooms,
+        controlledDoors: controlledDoorPositions,
+        doorsLocked: false,
+      },
     });
   });
+}
+
+/**
+ * Place evidence traces in rooms based on the incident timeline.
+ * Evidence traces are physical marks (scorch marks, footprints, anomalies)
+ * that provide clues about what happened. Some require specific sensors to see.
+ */
+function placeEvidenceTraces(state: GameState, rooms: DiggerRoom[]): void {
+  if (!state.mystery) return;
+  const n = rooms.length;
+  if (n < 5) return;
+
+  const timeline = state.mystery.timeline;
+  const crew = state.mystery.crew;
+
+  // Place 3-5 evidence traces in rooms corresponding to timeline events
+  const traceCount = Math.min(5, timeline.events.length);
+
+  for (let i = 0; i < traceCount; i++) {
+    const event = timeline.events[i];
+    // Find a room matching the event location, or use a random mid-station room
+    let roomIdx = state.rooms.findIndex(r => r.name === event.location);
+    if (roomIdx < 0 || roomIdx >= n) {
+      roomIdx = Math.min(n - 1, Math.max(1, 2 + Math.floor(ROT.RNG.getUniform() * (n - 3))));
+    }
+
+    const room = rooms[roomIdx];
+    const offsetX = Math.floor(ROT.RNG.getUniform() * 3) - 1;
+    const offsetY = Math.floor(ROT.RNG.getUniform() * 3) - 1;
+    const pos = getRoomPos(room, offsetX, offsetY);
+
+    // Trace type depends on the incident's primary hazard
+    let traceDesc: string;
+    let sensorRequired: string | null = null;
+
+    switch (timeline.primaryHazard) {
+      case "heat":
+        traceDesc = "Scorch marks on the floor. The burn pattern suggests a heat source was here — or passed through quickly.";
+        sensorRequired = SensorType.Thermal;
+        break;
+      case "pressure":
+        traceDesc = "Micro-fractures in the wall plating. Pressure differential left a visible stress pattern. Someone was here when it happened.";
+        sensorRequired = SensorType.Atmospheric;
+        break;
+      case "radiation":
+        traceDesc = "Faint discoloration on the surface. Radiation exposure, brief but intense. Someone walked through here recently.";
+        sensorRequired = null; // visible to cleanliness sensor
+        break;
+      case "atmospheric":
+        traceDesc = "Chemical residue on the floor panels. Something contaminated this area. Footprints lead away toward the corridor.";
+        sensorRequired = SensorType.Atmospheric;
+        break;
+      default:
+        traceDesc = "Unusual marks on the surface. Something happened here that left a physical trace. Worth noting.";
+        sensorRequired = null;
+    }
+
+    // Add crew context to the trace
+    const actor = crew.find(c => c.id === event.actorId);
+    if (actor && i > 0) { // don't spoil the first event
+      traceDesc += ` A badge reader nearby shows ${actor.badgeId} was the last access.`;
+    }
+
+    state.entities.set(`evidence_trace_${i}`, {
+      id: `evidence_trace_${i}`,
+      type: EntityType.EvidenceTrace,
+      pos,
+      props: {
+        text: traceDesc,
+        phase: event.phase,
+        sensorRequired,
+        discovered: false,
+        crewMemberId: actor?.id || null,
+      },
+    });
+  }
+}
+
+/**
+ * Place 2-3 pressure valves in rooms near breaches.
+ * Turning all valves in a group restores pressure in the area.
+ */
+function placePressureValvePuzzle(
+  state: GameState,
+  rooms: DiggerRoom[],
+  n: number,
+  reservedRooms: Set<number>,
+): void {
+  if (n < 8) return;
+
+  // Find rooms with low pressure (near breaches)
+  const lowPressureRooms: number[] = [];
+  for (let ri = 0; ri < n; ri++) {
+    if (reservedRooms.has(ri)) continue;
+    const room = rooms[ri];
+    const cx = Math.floor((room.getLeft() + room.getRight()) / 2);
+    const cy = Math.floor((room.getTop() + room.getBottom()) / 2);
+    if (cx >= 0 && cx < state.width && cy >= 0 && cy < state.height) {
+      if (state.tiles[cy][cx].pressure < 80) {
+        lowPressureRooms.push(ri);
+      }
+    }
+  }
+
+  // If no low-pressure rooms, pick rooms adjacent to breach rooms
+  if (lowPressureRooms.length < 2) {
+    for (let ri = Math.floor(n * 0.3); ri < Math.floor(n * 0.7); ri++) {
+      if (!reservedRooms.has(ri) && !lowPressureRooms.includes(ri)) {
+        lowPressureRooms.push(ri);
+        if (lowPressureRooms.length >= 3) break;
+      }
+    }
+  }
+
+  const valveRooms = lowPressureRooms.slice(0, 3);
+  const groupId = "valve_group_a";
+
+  valveRooms.forEach((ri, i) => {
+    const room = rooms[ri];
+    const pos = getRoomPos(room, i % 2 === 0 ? 1 : -1, i % 2 === 0 ? -1 : 1);
+    state.entities.set(`pressure_valve_${i}`, {
+      id: `pressure_valve_${i}`,
+      type: EntityType.PressureValve,
+      pos,
+      props: { turned: false, group: groupId },
+    });
+    // Reduce pressure around the valve to make the puzzle visible
+    if (pos.y >= 0 && pos.y < state.height && pos.x >= 0 && pos.x < state.width) {
+      state.tiles[pos.y][pos.x].pressure = Math.min(state.tiles[pos.y][pos.x].pressure, 50);
+    }
+  });
+}
+
+/**
+ * Place 2 power cells and 2 fuse boxes.
+ * Collecting cells and inserting them into fuse boxes powers up systems.
+ */
+function placePowerCellPuzzle(
+  state: GameState,
+  rooms: DiggerRoom[],
+  n: number,
+  reservedRooms: Set<number>,
+): void {
+  if (n < 8) return;
+
+  const groupId = "fuse_group_a";
+
+  // Place fuse boxes in mid-to-late rooms (near heat sources)
+  const fuseRoomCandidates: number[] = [];
+  for (let ri = Math.floor(n * 0.4); ri < Math.floor(n * 0.8); ri++) {
+    if (!reservedRooms.has(ri)) fuseRoomCandidates.push(ri);
+  }
+
+  const fuseRooms = fuseRoomCandidates.slice(0, 2);
+  fuseRooms.forEach((ri, i) => {
+    const room = rooms[ri];
+    const pos = getRoomPos(room, i === 0 ? -1 : 1, 0);
+    state.entities.set(`fuse_box_${i}`, {
+      id: `fuse_box_${i}`,
+      type: EntityType.FuseBox,
+      pos,
+      props: { powered: false, group: groupId },
+    });
+    // Add heat around fuse boxes to indicate broken systems
+    if (pos.y >= 0 && pos.y < state.height && pos.x >= 0 && pos.x < state.width) {
+      state.tiles[pos.y][pos.x].heat = Math.max(state.tiles[pos.y][pos.x].heat, 25);
+    }
+  });
+
+  // Place power cells in early-to-mid rooms (player finds them before fuse boxes)
+  const cellRoomCandidates: number[] = [];
+  for (let ri = 1; ri < Math.floor(n * 0.5); ri++) {
+    if (!reservedRooms.has(ri) && !fuseRooms.includes(ri)) cellRoomCandidates.push(ri);
+  }
+
+  const cellRooms = cellRoomCandidates.slice(0, 2);
+  cellRooms.forEach((ri, i) => {
+    const room = rooms[ri];
+    const pos = getRoomPos(room, i === 0 ? 1 : -1, i === 0 ? 1 : -1);
+    state.entities.set(`power_cell_${i}`, {
+      id: `power_cell_${i}`,
+      type: EntityType.PowerCell,
+      pos,
+      props: { collected: false },
+    });
+  });
+}
+
+/**
+ * Place Sprint 3 entities: RadiationSource, ShieldGenerator, ReinforcementPanel,
+ * SignalBooster, HiddenDevice.
+ */
+function placeSprintThreeEntities(state: GameState, rooms: DiggerRoom[]): void {
+  const n = rooms.length;
+  if (n < 5) return;
+
+  const archetype = state.mystery?.timeline.archetype;
+  const isReactorScram = archetype === IncidentArchetype.ReactorScram;
+
+  // ── Radiation sources and shield generators ───────────────────
+  // ReactorScram: 1-2 RadiationSource in mid-station, 1-2 ShieldGenerator nearby
+  // Other archetypes: 1 RadiationSource, 1 ShieldGenerator (lighter presence)
+  const radSourceCount = isReactorScram ? Math.min(2, Math.max(1, Math.floor(n / 5))) : 1;
+  const shieldGenCount = radSourceCount; // match source count
+
+  const midStart = Math.floor(n * 0.3);
+  const midEnd = Math.floor(n * 0.7);
+
+  for (let i = 0; i < radSourceCount; i++) {
+    const ri = Math.min(n - 2, midStart + Math.floor((midEnd - midStart) * (i + 1) / (radSourceCount + 1)));
+    const room = rooms[ri];
+    const pos = getRoomCenter(room);
+    state.entities.set(`radiation_source_${i}`, {
+      id: `radiation_source_${i}`,
+      type: EntityType.RadiationSource,
+      pos,
+      props: {},
+    });
+    // Seed initial radiation on the tile
+    if (pos.y >= 0 && pos.y < state.height && pos.x >= 0 && pos.x < state.width) {
+      state.tiles[pos.y][pos.x].radiation = 30;
+    }
+  }
+
+  for (let i = 0; i < shieldGenCount; i++) {
+    // Place shield generator 1-2 rooms after the corresponding radiation source
+    const ri = Math.min(n - 2, midStart + Math.floor((midEnd - midStart) * (i + 1) / (shieldGenCount + 1)) + 1);
+    const room = rooms[ri];
+    const pos = getRoomPos(room, 1, -1);
+    state.entities.set(`shield_generator_${i}`, {
+      id: `shield_generator_${i}`,
+      type: EntityType.ShieldGenerator,
+      pos,
+      props: { activated: false },
+    });
+  }
+
+  // ── Reinforcement panel: 1 in a room with stress potential ──────
+  // Pick a room in mid-station; seed initial stress on tiles
+  const reinforceIdx = Math.min(n - 2, Math.floor(n * 0.5));
+  const reinforceRoom = rooms[reinforceIdx];
+  const reinforcePos = getRoomPos(reinforceRoom, -1, 0);
+  state.entities.set("reinforcement_panel_0", {
+    id: "reinforcement_panel_0",
+    type: EntityType.ReinforcementPanel,
+    pos: reinforcePos,
+    props: { installed: false },
+  });
+  // Seed some structural stress nearby
+  if (reinforcePos.y >= 0 && reinforcePos.y < state.height &&
+      reinforcePos.x >= 0 && reinforcePos.x < state.width) {
+    state.tiles[reinforcePos.y][reinforcePos.x].stress = 40;
+    const adjDeltas = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 }];
+    for (const d of adjDeltas) {
+      const ax = reinforcePos.x + d.x;
+      const ay = reinforcePos.y + d.y;
+      if (ax >= 0 && ax < state.width && ay >= 0 && ay < state.height && state.tiles[ay][ax].walkable) {
+        state.tiles[ay][ax].stress = Math.max(state.tiles[ay][ax].stress, 25);
+      }
+    }
+  }
+
+  // ── Signal boosters: 1-2 in mid-to-late rooms ──────────────────
+  const signalBoosterCount = Math.min(2, Math.max(1, Math.floor(n / 6)));
+  for (let i = 0; i < signalBoosterCount; i++) {
+    const ri = Math.min(n - 2, Math.floor(n * 0.6) + i * Math.floor(n * 0.15));
+    const room = rooms[ri];
+    const pos = getRoomPos(room, i === 0 ? 1 : -1, i === 0 ? 1 : -1);
+    state.entities.set(`signal_booster_${i}`, {
+      id: `signal_booster_${i}`,
+      type: EntityType.SignalBooster,
+      pos,
+      props: { activated: false },
+    });
+  }
+
+  // ── Hidden devices: 1-2 (only visible with EM sensor) ──────────
+  const hiddenDeviceCount = Math.min(2, Math.max(1, Math.floor(n / 7)));
+  for (let i = 0; i < hiddenDeviceCount; i++) {
+    // Place in later rooms for mystery relevance
+    const ri = Math.min(n - 2, Math.floor(n * 0.65) + i * Math.floor(n * 0.12));
+    const room = rooms[ri];
+    const pos = getRoomPos(room, i === 0 ? -1 : 1, i === 0 ? -1 : 1);
+    state.entities.set(`hidden_device_${i}`, {
+      id: `hidden_device_${i}`,
+      type: EntityType.HiddenDevice,
+      pos,
+      props: { discovered: false, evidenceText: `Hidden device ${i}: encrypted data fragment recovered. Signal analysis required.` },
+    });
+  }
+}
+
+/**
+ * Place Sprint 3 sensor pickups: Radiation, Structural, EM/Signal.
+ */
+function placeSprintThreeSensors(state: GameState, rooms: DiggerRoom[]): void {
+  const n = rooms.length;
+  if (n < 5) return;
+
+  const archetype = state.mystery?.timeline.archetype;
+  const isReactorScram = archetype === IncidentArchetype.ReactorScram;
+
+  // ── Radiation sensor ──────────────────────────────────────────
+  // ReactorScram: place before first radiation zone
+  // Otherwise: mid-station room
+  let radSensorIdx: number;
+  if (isReactorScram) {
+    // Place before the first radiation source (which is at ~30-40% through)
+    radSensorIdx = Math.max(1, Math.floor(n * 0.25));
+  } else {
+    radSensorIdx = Math.max(1, Math.floor(n * 0.35));
+  }
+  radSensorIdx = Math.min(radSensorIdx, n - 2);
+  const radSensorRoom = rooms[radSensorIdx];
+  const radSensorPos = getRoomPos(radSensorRoom, 1, 0);
+  state.entities.set("sensor_radiation", {
+    id: "sensor_radiation",
+    type: EntityType.SensorPickup,
+    pos: radSensorPos,
+    props: { sensorType: SensorType.Radiation },
+  });
+
+  // ── Structural sensor ─────────────────────────────────────────
+  // Near Engineering Storage
+  let structSensorIdx = state.rooms.findIndex(r => r.name === "Engineering Storage");
+  if (structSensorIdx < 0 || structSensorIdx >= n) {
+    structSensorIdx = Math.max(1, Math.floor(n * 0.2));
+  }
+  // Place in adjacent room if possible, otherwise same room different position
+  const structActualIdx = Math.min(n - 2, structSensorIdx + 1);
+  const structSensorRoom = rooms[structActualIdx];
+  const structSensorPos = getRoomPos(structSensorRoom, -1, 1);
+  state.entities.set("sensor_structural", {
+    id: "sensor_structural",
+    type: EntityType.SensorPickup,
+    pos: structSensorPos,
+    props: { sensorType: SensorType.Structural },
+  });
+
+  // ── EM/Signal sensor ──────────────────────────────────────────
+  // In Data Core vicinity or late-game room
+  let emSensorIdx = state.rooms.findIndex(r => r.name === "Data Core");
+  if (emSensorIdx < 0 || emSensorIdx >= n) {
+    emSensorIdx = n - 2; // fallback to near-last room
+  }
+  // Place 1-2 rooms before Data Core
+  const emActualIdx = Math.max(1, emSensorIdx - 2);
+  const emSensorRoom = rooms[emActualIdx];
+  const emSensorPos = getRoomPos(emSensorRoom, 1, -1);
+  state.entities.set("sensor_em_signal", {
+    id: "sensor_em_signal",
+    type: EntityType.SensorPickup,
+    pos: emSensorPos,
+    props: { sensorType: SensorType.EMSignal },
+  });
+}
+
+/**
+ * Place crew NPCs and escape pods for the evacuation mechanic.
+ *
+ * Escape Pod Bay: a single dedicated room with 12 organized pods.
+ * Crew NPCs (3-5 survivors): sealed behind emergency doors in their rooms.
+ */
+function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
+  if (!state.mystery) return;
+  const n = rooms.length;
+  if (n < 5) return;
+
+  const crew = state.mystery.crew;
+
+  // ── Escape Pod Bay ────────────────────────────────────────────────
+  // Find or designate the Escape Pod Bay room
+  let podBayIdx = state.rooms.findIndex(r => r.name === "Escape Pod Bay");
+  if (podBayIdx < 0) {
+    // Rename the last room to serve as the pod bay
+    podBayIdx = n - 1;
+    state.rooms[podBayIdx] = { ...state.rooms[podBayIdx], name: "Escape Pod Bay" };
+  }
+
+  const podBayRoom = rooms[podBayIdx];
+  const bayLeft = podBayRoom.getLeft();
+  const bayRight = podBayRoom.getRight();
+  const bayTop = podBayRoom.getTop();
+  const bayBottom = podBayRoom.getBottom();
+  const bayW = bayRight - bayLeft + 1;
+  const bayH = bayBottom - bayTop + 1;
+
+  // Place 12 pods in organized rows (2 rows along walls, center walkway)
+  const podPositions: { x: number; y: number }[] = [];
+  for (let row = 0; row < bayH && podPositions.length < 12; row++) {
+    for (let col = 0; col < bayW && podPositions.length < 12; col++) {
+      const x = bayLeft + col;
+      const y = bayTop + row;
+      // Leave center column as walkway (skip middle column)
+      const midCol = Math.floor(bayW / 2);
+      if (col === midCol && bayW >= 3) continue;
+      // Don't place on doorways
+      if (state.tiles[y][x].type === TileType.Door) continue;
+      podPositions.push({ x, y });
+    }
+  }
+
+  for (let i = 0; i < podPositions.length; i++) {
+    state.entities.set(`escape_pod_${i}`, {
+      id: `escape_pod_${i}`,
+      type: EntityType.EscapePod,
+      pos: podPositions[i],
+      props: { powered: false, capacity: 1, boarded: 0 },
+    });
+  }
+
+  // ── Crew NPCs (sealed behind emergency doors) ─────────────────
+  const survivors = crew.filter(c => c.fate === CrewFate.Survived || c.fate === CrewFate.InCryo);
+  const npcCandidates = survivors.slice(0, 5);
+  if (npcCandidates.length < 3) {
+    const missing = crew.filter(c => c.fate === CrewFate.Missing);
+    for (const m of missing) {
+      if (npcCandidates.length >= 3) break;
+      npcCandidates.push(m);
+    }
+  }
+
+  let npcCount = 0;
+  for (const member of npcCandidates) {
+    let roomIdx = state.rooms.findIndex(r => r.name === member.lastKnownRoom);
+    if (roomIdx < 0 || roomIdx >= n || roomIdx === podBayIdx) {
+      roomIdx = Math.min(n - 2, Math.max(1, Math.floor(n * 0.3) + npcCount));
+      if (roomIdx === podBayIdx) roomIdx = Math.max(1, podBayIdx - 1);
+    }
+
+    const room = rooms[roomIdx];
+    const offsetX = (npcCount % 2 === 0) ? 1 : -1;
+    const offsetY = (npcCount % 3 === 0) ? -1 : 1;
+    const pos = getRoomPos(room, offsetX, offsetY);
+
+    const isUnconscious = member.fate === CrewFate.InCryo;
+
+    state.entities.set(`crew_npc_${member.id}`, {
+      id: `crew_npc_${member.id}`,
+      type: EntityType.CrewNPC,
+      pos,
+      props: {
+        crewId: member.id,
+        found: false,
+        following: false,
+        evacuated: false,
+        dead: false,
+        sealed: true,
+        hp: 50,
+        unconscious: isUnconscious,
+        firstName: member.firstName,
+        lastName: member.lastName,
+        personality: member.personality,
+      },
+    });
+    npcCount++;
+  }
+}
+
+/**
+ * Place 1-2 clearance-locked doors in mid-to-late station rooms.
+ * These doors require the player to solve a deduction with rewardType="clearance"
+ * to obtain clearance level >= the door's clearanceLevel.
+ */
+function placeClearanceDoors(state: GameState, rooms: DiggerRoom[]): void {
+  const n = rooms.length;
+  if (n < 6) return;
+
+  // Find rooms between 40-70% through the station
+  const candidateStart = Math.floor(n * 0.4);
+  const candidateEnd = Math.floor(n * 0.7);
+
+  // Look for door tiles at room boundaries that we can convert to clearance doors
+  let placed = 0;
+  for (let ri = candidateStart; ri <= candidateEnd && placed < 2; ri++) {
+    const room = rooms[ri];
+    // Scan the room perimeter for existing door tiles
+    for (let x = room.getLeft() - 1; x <= room.getRight() + 1 && placed < 2; x++) {
+      for (let y = room.getTop() - 1; y <= room.getBottom() + 1 && placed < 2; y++) {
+        if (x < 0 || x >= state.width || y < 0 || y >= state.height) continue;
+        if (state.tiles[y][x].type !== TileType.Door) continue;
+
+        // Don't convert the only entrance to a room — check if room has multiple doors
+        let doorCount = 0;
+        for (let dx = room.getLeft() - 1; dx <= room.getRight() + 1; dx++) {
+          for (let dy = room.getTop() - 1; dy <= room.getBottom() + 1; dy++) {
+            if (dx < 0 || dx >= state.width || dy < 0 || dy >= state.height) continue;
+            if (state.tiles[dy][dx].type === TileType.Door || state.tiles[dy][dx].type === TileType.LockedDoor) {
+              doorCount++;
+            }
+          }
+        }
+        if (doorCount < 2) continue;
+
+        // Don't overwrite doors that already have entities on them
+        let hasEntity = false;
+        for (const [, entity] of state.entities) {
+          if (entity.pos.x === x && entity.pos.y === y) {
+            hasEntity = true;
+            break;
+          }
+        }
+        if (hasEntity) continue;
+
+        // Deterministic selection based on position + seed
+        const hash = (x * 17 + y * 31 + state.seed * 7) % 5;
+        if (hash !== 0) continue;
+
+        // Convert to a clearance-locked door
+        state.tiles[y][x] = {
+          type: TileType.Door,
+          glyph: GLYPHS.closedDoor,
+          walkable: false,
+          heat: 0,
+          smoke: 0,
+          dirt: 0,
+          pressure: PRESSURE_NORMAL,
+          radiation: 0,
+          stress: 0,
+          stressTurns: 0,
+          explored: false,
+          visible: false,
+        };
+
+        state.entities.set(`clearance_door_${placed}`, {
+          id: `clearance_door_${placed}`,
+          type: EntityType.ClosedDoor,
+          pos: { x, y },
+          props: {
+            closed: true,
+            keyType: DoorKeyType.Clearance,
+            clearanceLevel: 1,
+            locked: true,
+          },
+        });
+        placed++;
+      }
+    }
+  }
+}
+
+/**
+ * Place 1 environmental door — a door blocked by a hazard.
+ * The tile behind it has high heat or low pressure.
+ * Clear the hazard and the door becomes passable.
+ */
+function placeEnvironmentalDoors(state: GameState, rooms: DiggerRoom[]): void {
+  const n = rooms.length;
+  if (n < 6) return;
+
+  // Look for rooms with active hazards (high heat or low pressure)
+  const candidateStart = Math.floor(n * 0.3);
+  const candidateEnd = Math.floor(n * 0.7);
+
+  for (let ri = candidateStart; ri <= candidateEnd; ri++) {
+    const room = rooms[ri];
+    // Check if this room has heat or pressure issues
+    const center = getRoomCenter(room);
+    if (center.y < 0 || center.y >= state.height || center.x < 0 || center.x >= state.width) continue;
+    const centerTile = state.tiles[center.y][center.x];
+
+    let hazardType: "heat" | "pressure" | null = null;
+    if (centerTile.heat > 30) {
+      hazardType = "heat";
+    } else if (centerTile.pressure < 60) {
+      hazardType = "pressure";
+    }
+    if (!hazardType) continue;
+
+    // Find a door tile at this room's boundary
+    for (let x = room.getLeft() - 1; x <= room.getRight() + 1; x++) {
+      for (let y = room.getTop() - 1; y <= room.getBottom() + 1; y++) {
+        if (x < 0 || x >= state.width || y < 0 || y >= state.height) continue;
+        if (state.tiles[y][x].type !== TileType.Door) continue;
+
+        // Don't overwrite doors that already have entities on them
+        let hasEntity = false;
+        for (const [, entity] of state.entities) {
+          if (entity.pos.x === x && entity.pos.y === y) {
+            hasEntity = true;
+            break;
+          }
+        }
+        if (hasEntity) continue;
+
+        // Deterministic selection
+        const hash = (x * 13 + y * 23 + state.seed * 11) % 7;
+        if (hash !== 0) continue;
+
+        // Seed the hazard on the door tile
+        if (hazardType === "heat") {
+          state.tiles[y][x].heat = Math.max(state.tiles[y][x].heat, 65);
+        } else {
+          state.tiles[y][x].pressure = Math.min(state.tiles[y][x].pressure, 35);
+        }
+
+        // Convert to an environmental-locked door
+        state.tiles[y][x] = {
+          ...state.tiles[y][x],
+          type: TileType.Door,
+          glyph: GLYPHS.closedDoor,
+          walkable: false,
+        };
+
+        state.entities.set(`env_door_0`, {
+          id: `env_door_0`,
+          type: EntityType.ClosedDoor,
+          pos: { x, y },
+          props: {
+            closed: true,
+            keyType: DoorKeyType.Environmental,
+            hazardType,
+            locked: true,
+          },
+        });
+
+        return; // Only place 1 environmental door
+      }
+    }
+  }
 }

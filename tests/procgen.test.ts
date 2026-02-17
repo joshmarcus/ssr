@@ -67,6 +67,8 @@ describe("Procgen entity placement", () => {
           if (id === "player") continue;
           if (id === "locked_door_main") continue;
           if (id.startsWith("closed_door_")) continue;
+          if (id.startsWith("clearance_door_")) continue;
+          if (id.startsWith("env_door_")) continue;
 
           const tile = state.tiles[entity.pos.y][entity.pos.x];
           expect(

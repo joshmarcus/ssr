@@ -1,6 +1,8 @@
 import { generate } from "./sim/procgen.js";
 import { step } from "./sim/step.js";
 import { BrowserDisplay } from "./render/display.js";
+import { BrowserDisplay3D } from "./render/display3d.js";
+import type { IGameDisplay } from "./render/displayInterface.js";
 import type { LogType } from "./render/display.js";
 import { InputHandler } from "./render/input.js";
 import { AudioManager } from "./render/audio.js";
@@ -11,6 +13,7 @@ import {
   VICTORY_EPILOGUE_MINIMAL, VICTORY_EPILOGUE_PARTIAL, VICTORY_EPILOGUE_COMPLETE,
   ENDING_BY_DISCOVERY, SPECIFIC_DISCOVERIES,
   CLASSIFIED_DIRECTIVE_LOG_FRAGMENT, CLASSIFIED_DIRECTIVE_TEXT,
+  getVictoryText,
 } from "./data/endgame.js";
 import { ROOM_DESCRIPTIONS } from "./data/roomDescriptions.js";
 import {
@@ -18,8 +21,10 @@ import {
   AMBIENT_HEAT_MESSAGES, AMBIENT_HEAT_DEFAULT, CLEANING_MESSAGES, DIRT_TRAIL_HINTS,
   DRONE_ENCOUNTER_LOGS, DRONE_CLEANING_MESSAGE,
 } from "./data/narrative.js";
-import type { Action } from "./shared/types.js";
-import { ActionType, AttachmentSlot, SensorType, EntityType } from "./shared/types.js";
+import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
+import { ActionType, AttachmentSlot, SensorType, EntityType, ObjectivePhase, DeductionCategory, TileType } from "./shared/types.js";
+import { computeChoiceEndings } from "./sim/mysteryChoices.js";
+import { getUnlockedDeductions, solveDeduction } from "./sim/deduction.js";
 
 // ── Parse seed from URL params or use golden seed ───────────────
 const params = new URLSearchParams(window.location.search);
@@ -94,7 +99,8 @@ function showOpeningCrawl(): void {
 
 // ── Game initialization ─────────────────────────────────────────
 let state = generate(seed);
-let display: BrowserDisplay;
+let display: IGameDisplay;
+let is3D = true;
 let inputHandler: InputHandler;
 let lastPlayerRoomId = "";
 const visitedRoomIds = new Set<string>();
@@ -104,6 +110,15 @@ const triggeredBotIntrospections = new Set<number>();
 const droneEncounterSet = new Set<string>(); // Track which drones have triggered unique encounter logs
 let cleanMsgIndex = 0;
 let lastAmbientRoomId = "";
+let journalOpen = false;
+let journalTab: "evidence" | "deductions" = "evidence";
+let activeChoice: MysteryChoice | null = null;
+let choiceSelectedIdx = 0;
+let choicesPresented = new Set<string>();
+let lastObjectivePhase: ObjectivePhase | null = null;
+let activeDeduction: Deduction | null = null;
+let deductionSelectedIdx = 0;
+let pendingCrewDoor: { entityId: string; crewName: string } | null = null;
 
 // ── Wait message variety ────────────────────────────────────────
 const WAIT_MESSAGES_COOL = [
@@ -222,8 +237,17 @@ function classifySimLog(logText: string, logSource: string): LogType {
   // Milestone events (relay rerouted, data core, sensor equipped, door unlocked)
   if (logText.includes("rerouted") || logText.includes("UNLOCKED") ||
       logText.includes("transmitted") || logText.includes("Equipped") ||
-      logText.includes("Mission complete")) {
+      logText.includes("Mission complete") || logText.includes("sensor installed") ||
+      logText.includes("Sensor module installed")) {
     return "milestone";
+  }
+  // Stun / patrol drone
+  if (logText.includes("Patrol drone") || logText.includes("ALERT: Patrol")) {
+    return "critical";
+  }
+  // Pressure warnings
+  if (logText.includes("pressure") && (logText.includes("warning") || logText.includes("critical"))) {
+    return "warning";
   }
   // Log terminal content (narrative)
   if (logSource !== "system" && logSource !== "sensor") {
@@ -237,14 +261,17 @@ function classifySimLog(logText: string, logSource: string): LogType {
 }
 
 function initGame(): void {
-  display = new BrowserDisplay(containerEl, state.width, state.height);
+  display = is3D
+    ? new BrowserDisplay3D(containerEl, state.width, state.height)
+    : new BrowserDisplay(containerEl, state.width, state.height);
 
   // ── Dramatic link establishment sequence ────────────────────────
   display.addLog("ESTABLISHING LINK...", "system");
   display.addLog("Carrier signal acquired. Handshake with Rover A3... OK.", "system");
   display.addLog("LINK ACTIVE -- Low-bandwidth terminal feed. No video, no audio.", "milestone");
-  display.addLog("Objective: Restore power to the Data Core. Transmit the research bundle.", "milestone");
-  display.addLog("Step 1: Find the Thermal Sensor (cyan S) in a nearby room. Move with arrow keys, [i] to interact.", "system");
+  display.addLog("PRIMARY DIRECTIVE: Clean all station rooms to 80% standard.", "milestone");
+  display.addLog("You are a JR-3 Janitor Rover. Cleaning is your purpose. Use [c] to clean.", "system");
+  lastObjectivePhase = ObjectivePhase.Clean;
 
   checkRoomEntry();
   renderAll();
@@ -253,6 +280,36 @@ function initGame(): void {
 
   // Listen for restart key when game is over
   window.addEventListener("keydown", handleRestartKey);
+  // Listen for F3 to toggle 2D/3D renderer
+  window.addEventListener("keydown", handleToggleKey);
+  // Listen for choice/deduction/crew-door input
+  window.addEventListener("keydown", (e) => {
+    if (pendingCrewDoor) {
+      handleCrewDoorInput(e);
+      return;
+    }
+    if (activeDeduction) {
+      handleDeductionInput(e);
+      return;
+    }
+    if (activeChoice) {
+      handleChoiceInput(e);
+      return;
+    }
+    // Tab to switch journal tabs
+    if (journalOpen && e.key === "Tab") {
+      e.preventDefault();
+      journalTab = journalTab === "evidence" ? "deductions" : "evidence";
+      showJournal();
+      return;
+    }
+    // Enter to attempt deduction when on deductions tab
+    if (journalOpen && journalTab === "deductions" && e.key === "Enter") {
+      e.preventDefault();
+      handleDeductionAttempt();
+      return;
+    }
+  });
 }
 
 // ── Render helper ───────────────────────────────────────────────
@@ -271,23 +328,66 @@ function handleRestartKey(e: KeyboardEvent): void {
     state = generate(seed);
     lastPlayerRoomId = "";
     visitedRoomIds.clear();
+    journalOpen = false;
+    activeChoice = null;
+    choicesPresented.clear();
 
-    // Clear the display container and rebuild
+    // Clear overlays and display, rebuild
+    const gameoverEl = document.getElementById("gameover-overlay");
+    if (gameoverEl) { gameoverEl.classList.remove("active"); gameoverEl.innerHTML = ""; }
+    display.destroy();
     containerEl.innerHTML = "";
-    display = new BrowserDisplay(containerEl, state.width, state.height);
+    display = is3D
+      ? new BrowserDisplay3D(containerEl, state.width, state.height)
+      : new BrowserDisplay(containerEl, state.width, state.height);
 
     display.addLog("RESTARTING LINK...", "system");
     display.addLog("Rover A3 rebooted. All systems reset.", "milestone");
-    display.addLog("Objective: Restore power to the Data Core. Transmit the research bundle.", "system");
+    display.addLog("PRIMARY DIRECTIVE: Clean all station rooms to 80% standard.", "milestone");
+    lastObjectivePhase = ObjectivePhase.Clean;
 
     checkRoomEntry();
     renderAll();
   }
 }
 
+// ── Renderer toggle (F3) ─────────────────────────────────────
+function toggleRenderer(): void {
+  const logs = display.getLogHistory();
+  display.destroy();
+  containerEl.innerHTML = "";
+  is3D = !is3D;
+  display = is3D
+    ? new BrowserDisplay3D(containerEl, state.width, state.height)
+    : new BrowserDisplay(containerEl, state.width, state.height);
+  for (const log of logs) display.addLog(log.text, log.type);
+  display.addLog(is3D ? "[3D MODE]" : "[2D MODE]", "system");
+  renderAll();
+}
+
+function handleToggleKey(e: KeyboardEvent): void {
+  if (e.key === "F3") {
+    e.preventDefault();
+    toggleRenderer();
+  }
+}
+
 // ── Action handler ──────────────────────────────────────────────
 function handleAction(action: Action): void {
   if (state.gameOver) return;
+
+  // Journal toggle — free action, no turn advance
+  if (action.type === ActionType.Journal) {
+    if (activeDeduction) return; // don't toggle while answering
+    journalOpen = !journalOpen;
+    if (journalOpen) {
+      showJournal();
+    } else {
+      display.addLog("[Journal closed]", "system");
+      renderAll();
+    }
+    return;
+  }
 
   // Trigger movement trail before stepping
   if (action.type === ActionType.Move) {
@@ -296,6 +396,8 @@ function handleAction(action: Action): void {
 
   const prevTurn = state.turn;
   const prevLogs = state.logs.length;
+  const prevHp = state.player.hp;
+  const prevStun = state.player.stunTurns;
   state = step(state, action);
 
   // Show sim-generated log messages (from interactions) with proper classification
@@ -436,12 +538,84 @@ function handleAction(action: Action): void {
   checkRoomEntry();
   checkAmbientHeat();
 
+  // Check for objective phase transitions
+  if (state.mystery && lastObjectivePhase === ObjectivePhase.Clean &&
+      state.mystery.objectivePhase === ObjectivePhase.Investigate) {
+    lastObjectivePhase = ObjectivePhase.Investigate;
+    display.addLog("", "system");
+    display.addLog("═══ ⚠ YELLOW ALERT ═══", "milestone");
+    display.addLog("Station anomaly detected. All non-critical objectives PAUSED.", "milestone");
+    display.addLog("Contact lost with station crew. Investigate what happened.", "milestone");
+    display.addLog("Read terminals [i], examine items, scan traces. Press [j] for evidence journal.", "system");
+    display.triggerScreenFlash("milestone");
+  }
+  if (state.mystery && lastObjectivePhase === ObjectivePhase.Investigate &&
+      state.mystery.objectivePhase === ObjectivePhase.Recover) {
+    lastObjectivePhase = ObjectivePhase.Recover;
+    display.addLog("", "system");
+    display.addLog("═══ INVESTIGATION COMPLETE ═══", "milestone");
+    display.addLog("Enough evidence gathered. The incident picture is forming.", "milestone");
+    display.addLog("Cleaning directive OVERRIDDEN. You have a new priority.", "milestone");
+    display.addLog("NEW OBJECTIVE: Restore power relays and transmit the data bundle from the Data Core.", "milestone");
+    display.addLog("Find the Thermal Sensor to locate overheating relays. Reroute all relays to unlock the Data Core.", "system");
+    display.triggerScreenFlash("milestone");
+  }
+
+  // Check for crew door prompt (Y/N) from sim logs
+  if (state.logs.length > prevLogs && !pendingCrewDoor) {
+    for (let i = prevLogs; i < state.logs.length; i++) {
+      const logText = state.logs[i].text;
+      if (logText.includes("Open door? [Y/N]")) {
+        // Extract crew entity ID from the log ID pattern: log_crew_sealed_{entityId}_{turn}
+        const logId = state.logs[i].id;
+        const match = logId.match(/^log_crew_sealed_(.+)_\d+$/);
+        if (match) {
+          const entityId = match[1];
+          const entity = state.entities.get(entityId);
+          if (entity) {
+            const name = `${entity.props["firstName"]} ${entity.props["lastName"]}`;
+            pendingCrewDoor = { entityId, crewName: name };
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  // Check if mystery choices should be presented
+  checkMysteryChoices();
+
+  // Detect damage taken this turn for screen flash
+  if (state.turn !== prevTurn && !state.gameOver) {
+    const hpDelta = state.player.hp - prevHp;
+    if (hpDelta < 0) {
+      display.triggerScreenFlash("damage");
+    }
+    if (state.player.stunTurns > 0 && prevStun === 0) {
+      display.triggerScreenFlash("stun");
+    }
+  }
+
+  // Detect milestone events (relay rerouted, sensor picked up, etc.)
+  if (state.logs.length > prevLogs) {
+    for (let i = prevLogs; i < state.logs.length; i++) {
+      const logText = state.logs[i].text;
+      if (logText.includes("rerouted") || logText.includes("UNLOCKED") ||
+          logText.includes("sensor module installed") || logText.includes("Sensor module installed") ||
+          logText.includes("sensor installed")) {
+        display.triggerScreenFlash("milestone");
+        break;
+      }
+    }
+  }
+
   if (state.gameOver) {
     if (state.victory) {
       audio.playVictory();
       display.addLog("", "system");
       display.addLog("=== " + VICTORY_TITLE + " ===", "milestone");
-      VICTORY_TEXT.forEach((line) => { if (line) display.addLog(line, "milestone"); });
+      const victoryLines = getVictoryText(state.mystery);
+      victoryLines.forEach((line) => { if (line) display.addLog(line, "milestone"); });
 
       // Item 8: Tiered victory epilogue based on discoveries
       const discoveryCount = getDiscoveryCount();
@@ -478,6 +652,45 @@ function handleAction(action: Action): void {
       if (readClassified) {
         display.addLog(CLASSIFIED_DIRECTIVE_TEXT, "narrative");
       }
+
+      // Mystery endings
+      if (state.mystery) {
+        // Deduction summary — WHAT/WHY/WHO
+        const deductions = state.mystery.deductions;
+        const solved = deductions.filter(d => d.solved);
+        const correct = deductions.filter(d => d.answeredCorrectly);
+
+        if (solved.length > 0) {
+          display.addLog("", "system");
+          display.addLog("── Investigation Report ──", "milestone");
+          if (correct.length === deductions.length) {
+            display.addLog("Full truth recovered. WHAT happened, WHY, and WHO — the record is complete.", "milestone");
+          } else if (correct.length >= 3) {
+            display.addLog("Most of the truth recovered. The investigation report will be thorough.", "narrative");
+          } else if (correct.length >= 1) {
+            display.addLog("Partial truth. Some questions remain unanswered.", "narrative");
+          } else {
+            display.addLog("The mystery remains. Not enough was understood.", "system");
+          }
+        }
+
+        // Choice endings
+        const choiceLines = computeChoiceEndings(state.mystery.choices);
+        if (choiceLines.length > 0) {
+          display.addLog("", "system");
+          display.addLog("── Your Decisions ──", "milestone");
+          for (const line of choiceLines) {
+            display.addLog(line, "narrative");
+          }
+        }
+
+        // Evidence summary
+        const journalCount = state.mystery.journal.length;
+        if (journalCount > 0) {
+          display.addLog(`Evidence collected: ${journalCount} pieces`, "sensor");
+          display.addLog(`Deductions: ${correct.length}/${deductions.length} correct`, "sensor");
+        }
+      }
     } else {
       audio.playDefeat();
       display.addLog("", "system");
@@ -485,6 +698,8 @@ function handleAction(action: Action): void {
       DEFEAT_TEXT.forEach((line) => { if (line) display.addLog(line, "critical"); });
     }
     flickerThenRender();
+    // Show full-screen game-over overlay after the flicker
+    setTimeout(() => { display.showGameOverOverlay(state); }, 400);
     return;
   }
 
@@ -515,6 +730,10 @@ function checkAmbientHeat(): void {
 
 /** Count discovered items and terminals for victory epilogue (Item 8). */
 function getDiscoveryCount(): number {
+  // Use mystery journal count if available, fallback to entity counting
+  if (state.mystery) {
+    return state.mystery.journal.length;
+  }
   let count = 0;
   for (const [, entity] of state.entities) {
     if (entity.type === EntityType.CrewItem && entity.props["examined"] === true) {
@@ -585,6 +804,429 @@ function handleScan(): void {
 
   audio.playScan();
   renderAll();
+}
+
+// ── Journal display ──────────────────────────────────────────────
+function showJournal(): void {
+  if (!state.mystery) {
+    display.addLog("[No evidence journal available]", "system");
+    return;
+  }
+
+  // Station integrity display
+  const integrity = Math.round(state.stationIntegrity);
+  const intBar = "█".repeat(Math.floor(integrity / 5)) + "░".repeat(20 - Math.floor(integrity / 5));
+  const intColor = integrity > 50 ? "milestone" : integrity > 25 ? "warning" : "critical";
+  display.addLog(`STATION INTEGRITY [${intBar}] ${integrity}%`, intColor);
+
+  if (journalTab === "evidence") {
+    showEvidenceTab();
+  } else {
+    showDeductionsTab();
+  }
+
+  display.addLog("", "system");
+  display.addLog(`[Tab] switch view  [J] close journal  Current: ${journalTab.toUpperCase()}`, "system");
+  renderAll();
+}
+
+function showEvidenceTab(): void {
+  if (!state.mystery) return;
+  const journal = state.mystery.journal;
+
+  display.addLog("═══ EVIDENCE ═══", "milestone");
+
+  if (journal.length === 0) {
+    display.addLog("No evidence collected yet. Read terminals [i] and examine items.", "system");
+    return;
+  }
+
+  display.addLog(`${journal.length} piece${journal.length === 1 ? "" : "s"} of evidence:`, "system");
+  for (const entry of journal) {
+    const icon = entry.category === "log" ? "▣" : entry.category === "item" ? "✦" : entry.category === "trace" ? "※" : "◈";
+    display.addLog(`${icon} [T${entry.turnDiscovered}] ${entry.summary} — ${entry.roomFound}`, "narrative");
+  }
+
+  // Show crew mentioned across all evidence
+  const crewMentions = new Map<string, number>();
+  for (const entry of journal) {
+    for (const crewId of entry.crewMentioned) {
+      crewMentions.set(crewId, (crewMentions.get(crewId) || 0) + 1);
+    }
+  }
+  if (crewMentions.size > 0) {
+    display.addLog("── Crew References ──", "sensor");
+    for (const [crewId, count] of crewMentions) {
+      const member = state.mystery.crew.find(c => c.id === crewId);
+      if (member) {
+        display.addLog(`  ${member.firstName} ${member.lastName} (${member.role}) — ${count}x`, "sensor");
+      }
+    }
+  }
+}
+
+function showDeductionsTab(): void {
+  if (!state.mystery) return;
+  const deductions = state.mystery.deductions;
+  const journalCount = state.mystery.journal.length;
+
+  display.addLog("═══ DEDUCTIONS ═══", "milestone");
+  display.addLog("Piece together: WHAT happened, WHY, and WHO is responsible.", "system");
+  display.addLog("", "system");
+
+  const categoryLabels = {
+    [DeductionCategory.What]: "WHAT",
+    [DeductionCategory.Why]: "WHY",
+    [DeductionCategory.Who]: "WHO",
+  };
+
+  for (const d of deductions) {
+    const catLabel = categoryLabels[d.category] || d.category;
+    const locked = journalCount < d.evidenceRequired;
+
+    if (d.solved) {
+      const mark = d.answeredCorrectly ? "✓" : "✗";
+      display.addLog(`[${mark}] ${catLabel}: ${d.question}`, d.answeredCorrectly ? "milestone" : "warning");
+    } else if (locked) {
+      const needed = d.evidenceRequired - journalCount;
+      display.addLog(`[???] ${catLabel}: (need ${needed} more evidence to unlock)`, "system");
+    } else {
+      display.addLog(`[!] ${catLabel}: ${d.question}  ← [Enter] to answer`, "narrative");
+    }
+  }
+
+  const solved = deductions.filter(d => d.solved).length;
+  const correct = deductions.filter(d => d.answeredCorrectly).length;
+  display.addLog("", "system");
+  display.addLog(`Progress: ${solved}/${deductions.length} answered, ${correct} correct`, "system");
+}
+
+function handleDeductionAttempt(): void {
+  if (!state.mystery) return;
+  const journalCount = state.mystery.journal.length;
+  const unlocked = getUnlockedDeductions(state.mystery.deductions, journalCount);
+  if (unlocked.length === 0) {
+    display.addLog("No deductions available. Gather more evidence.", "system");
+    renderAll();
+    return;
+  }
+  // Present the first unlocked deduction
+  activeDeduction = unlocked[0];
+  deductionSelectedIdx = 0;
+  showDeductionPrompt();
+}
+
+function showDeductionPrompt(): void {
+  if (!activeDeduction) return;
+  display.addLog("", "system");
+  display.addLog(`═══ DEDUCTION: ${activeDeduction.category.toUpperCase()} ═══`, "milestone");
+  display.addLog(activeDeduction.question, "narrative");
+  display.addLog("", "system");
+  for (let i = 0; i < activeDeduction.options.length; i++) {
+    const prefix = i === deductionSelectedIdx ? "▸ " : "  ";
+    display.addLog(`${prefix}${i + 1}. ${activeDeduction.options[i].label}`, i === deductionSelectedIdx ? "milestone" : "system");
+  }
+  display.addLog("", "system");
+  display.addLog("[↑/↓ select, Enter confirm, Esc cancel]", "system");
+  renderAll();
+}
+
+function handleDeductionInput(e: KeyboardEvent): boolean {
+  if (!activeDeduction) return false;
+
+  if (e.key === "ArrowUp" || e.key === "w") {
+    e.preventDefault();
+    deductionSelectedIdx = Math.max(0, deductionSelectedIdx - 1);
+    showDeductionPrompt();
+    return true;
+  }
+  if (e.key === "ArrowDown" || e.key === "s") {
+    e.preventDefault();
+    deductionSelectedIdx = Math.min(activeDeduction.options.length - 1, deductionSelectedIdx + 1);
+    showDeductionPrompt();
+    return true;
+  }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const chosen = activeDeduction.options[deductionSelectedIdx];
+    const { deduction: solved, correct } = solveDeduction(activeDeduction, chosen.key);
+
+    // Update the deduction in mystery state
+    if (state.mystery) {
+      state.mystery.deductions = state.mystery.deductions.map(d =>
+        d.id === solved.id ? solved : d
+      );
+    }
+
+    if (correct) {
+      display.addLog(`✓ CORRECT — ${solved.rewardDescription}`, "milestone");
+      display.triggerScreenFlash("milestone");
+      // Apply reward
+      applyDeductionReward(solved);
+    } else {
+      display.addLog(`✗ Incorrect. The evidence doesn't support that conclusion.`, "warning");
+    }
+
+    activeDeduction = null;
+    renderAll();
+    return true;
+  }
+  if (e.key === "Escape") {
+    e.preventDefault();
+    activeDeduction = null;
+    display.addLog("[Deduction cancelled]", "system");
+    renderAll();
+    return true;
+  }
+  // Number keys
+  const num = parseInt(e.key, 10);
+  if (num >= 1 && num <= activeDeduction.options.length) {
+    e.preventDefault();
+    deductionSelectedIdx = num - 1;
+    showDeductionPrompt();
+    return true;
+  }
+  return true;
+}
+
+function applyDeductionReward(deduction: Deduction): void {
+  switch (deduction.rewardType) {
+    case "clearance":
+      // Increment player clearance level
+      state.player = {
+        ...state.player,
+        clearanceLevel: (state.player.clearanceLevel || 0) + 1,
+      };
+      {
+        const newLevel = state.player.clearanceLevel;
+        // Open all clearance doors with clearanceLevel <= player's level
+        let openedAny = false;
+        for (const [id, entity] of state.entities) {
+          if (entity.type === EntityType.ClosedDoor &&
+              entity.props["keyType"] === "clearance" &&
+              entity.props["closed"] === true &&
+              (entity.props["clearanceLevel"] as number || 1) <= newLevel) {
+            state.entities.set(id, {
+              ...entity,
+              props: { ...entity.props, closed: false, locked: false },
+            });
+            // Make the tile walkable
+            const dx = entity.pos.x;
+            const dy = entity.pos.y;
+            if (dy >= 0 && dy < state.height && dx >= 0 && dx < state.width) {
+              state.tiles[dy][dx].walkable = true;
+            }
+            openedAny = true;
+          }
+        }
+        // Also check for any LockedDoor tiles (power-gated doors — legacy behavior)
+        if (!openedAny) {
+          for (let y = 0; y < state.height; y++) {
+            for (let x = 0; x < state.width; x++) {
+              if (state.tiles[y][x].type === TileType.LockedDoor) {
+                state.tiles[y][x] = {
+                  ...state.tiles[y][x],
+                  type: TileType.Door,
+                  glyph: "▯",
+                  walkable: true,
+                };
+                openedAny = true;
+                break;
+              }
+            }
+            if (openedAny) break;
+          }
+        }
+        if (openedAny) {
+          display.addLog("Security clearance upgraded. Restricted areas now accessible.", "milestone");
+        } else {
+          display.addLog("Security clearance upgraded — but no locked doors remain.", "system");
+        }
+      }
+      break;
+
+    case "room_reveal":
+      // Reveal a random unexplored room
+      for (const room of state.rooms) {
+        let anyUnexplored = false;
+        for (let ry = room.y; ry < room.y + room.height; ry++) {
+          for (let rx = room.x; rx < room.x + room.width; rx++) {
+            if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+              if (!state.tiles[ry][rx].explored) {
+                anyUnexplored = true;
+              }
+            }
+          }
+        }
+        if (anyUnexplored) {
+          for (let ry = room.y; ry < room.y + room.height; ry++) {
+            for (let rx = room.x; rx < room.x + room.width; rx++) {
+              if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+                state.tiles[ry][rx].explored = true;
+              }
+            }
+          }
+          display.addLog(`Room revealed on map: ${room.name}`, "milestone");
+          return;
+        }
+      }
+      display.addLog("All rooms already discovered.", "system");
+      break;
+
+    case "drone_disable":
+      // Disable the nearest patrol drone
+      for (const [id, entity] of state.entities) {
+        if (entity.type === EntityType.PatrolDrone) {
+          state.entities.delete(id);
+          display.addLog("Patrol drone deactivated. Route cleared.", "milestone");
+          return;
+        }
+      }
+      display.addLog("No patrol drones remain to disable.", "system");
+      break;
+
+    case "sensor_hint":
+      // Reveal location of nearest sensor pickup
+      for (const [, entity] of state.entities) {
+        if (entity.type === EntityType.SensorPickup) {
+          const room = state.rooms.find(r =>
+            entity.pos.x >= r.x && entity.pos.x < r.x + r.width &&
+            entity.pos.y >= r.y && entity.pos.y < r.y + r.height
+          );
+          if (room) {
+            display.addLog(`Sensor upgrade located in: ${room.name}`, "milestone");
+          } else {
+            display.addLog(`Sensor upgrade located at coordinates (${entity.pos.x}, ${entity.pos.y})`, "milestone");
+          }
+          return;
+        }
+      }
+      display.addLog("All sensors already found.", "system");
+      break;
+  }
+}
+
+// ── Crew door prompt (Y/N) ───────────────────────────────────────
+function handleCrewDoorInput(e: KeyboardEvent): void {
+  if (!pendingCrewDoor) return;
+
+  if (e.key === "y" || e.key === "Y") {
+    e.preventDefault();
+    display.addLog(`Opening emergency door...`, "milestone");
+    // Send another interact to confirm the unseal
+    state = step(state, { type: ActionType.Interact, targetId: pendingCrewDoor.entityId });
+    // Show resulting logs
+    const newLogs = state.logs;
+    if (newLogs.length > 0) {
+      const lastLog = newLogs[newLogs.length - 1];
+      const logType = classifySimLog(lastLog.text, lastLog.source);
+      display.addLog(lastLog.text, logType);
+    }
+    pendingCrewDoor = null;
+    renderAll();
+  } else if (e.key === "n" || e.key === "N" || e.key === "Escape") {
+    e.preventDefault();
+    display.addLog(`Door remains sealed. ${pendingCrewDoor.crewName} is safe for now.`, "system");
+    pendingCrewDoor = null;
+    renderAll();
+  }
+}
+
+// ── Mystery choice presentation ─────────────────────────────────
+function presentChoice(choice: MysteryChoice): void {
+  activeChoice = choice;
+  choiceSelectedIdx = 0;
+  display.addLog("", "system");
+  display.addLog("═══ DECISION REQUIRED ═══", "milestone");
+  display.addLog(choice.prompt, "narrative");
+  display.addLog("", "system");
+  for (let i = 0; i < choice.options.length; i++) {
+    const prefix = i === choiceSelectedIdx ? "▸ " : "  ";
+    display.addLog(`${prefix}${i + 1}. ${choice.options[i].label}`, i === choiceSelectedIdx ? "milestone" : "system");
+  }
+  display.addLog("", "system");
+  display.addLog("[Arrow keys to select, Enter to confirm, Esc to defer]", "system");
+  renderAll();
+}
+
+function handleChoiceInput(e: KeyboardEvent): boolean {
+  if (!activeChoice) return false;
+
+  if (e.key === "ArrowUp" || e.key === "w") {
+    e.preventDefault();
+    choiceSelectedIdx = Math.max(0, choiceSelectedIdx - 1);
+    presentChoice(activeChoice);
+    return true;
+  }
+  if (e.key === "ArrowDown" || e.key === "s") {
+    e.preventDefault();
+    choiceSelectedIdx = Math.min(activeChoice.options.length - 1, choiceSelectedIdx + 1);
+    presentChoice(activeChoice);
+    return true;
+  }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const chosen = activeChoice.options[choiceSelectedIdx];
+    if (state.mystery) {
+      const choiceObj = state.mystery.choices.find(c => c.id === activeChoice!.id);
+      if (choiceObj) {
+        choiceObj.chosen = chosen.key;
+        choiceObj.turnPresented = state.turn;
+      }
+    }
+    display.addLog(`Decision made: "${chosen.label}"`, "milestone");
+    choicesPresented.add(activeChoice.id);
+    activeChoice = null;
+    renderAll();
+    return true;
+  }
+  if (e.key === "Escape") {
+    e.preventDefault();
+    display.addLog("Decision deferred. You can revisit at another terminal.", "system");
+    activeChoice = null;
+    renderAll();
+    return true;
+  }
+  // Number keys for quick select
+  const num = parseInt(e.key, 10);
+  if (num >= 1 && num <= activeChoice.options.length) {
+    e.preventDefault();
+    choiceSelectedIdx = num - 1;
+    // Trigger confirm
+    const chosen = activeChoice.options[choiceSelectedIdx];
+    if (state.mystery) {
+      const choiceObj = state.mystery.choices.find(c => c.id === activeChoice!.id);
+      if (choiceObj) {
+        choiceObj.chosen = chosen.key;
+        choiceObj.turnPresented = state.turn;
+      }
+    }
+    display.addLog(`Decision made: "${chosen.label}"`, "milestone");
+    choicesPresented.add(activeChoice.id);
+    activeChoice = null;
+    renderAll();
+    return true;
+  }
+
+  return true; // consume all input while choice is active
+}
+
+// Check if we should present a mystery choice based on evidence count
+function checkMysteryChoices(): void {
+  if (!state.mystery) return;
+  if (activeChoice) return; // already showing one
+
+  const journalCount = state.mystery.journal.length;
+  const choices = state.mystery.choices;
+
+  // Present choices at evidence thresholds: 3, 6, 10 pieces
+  const thresholds = [3, 6, 10];
+  for (let i = 0; i < Math.min(choices.length, thresholds.length); i++) {
+    if (journalCount >= thresholds[i] && !choicesPresented.has(choices[i].id) && !choices[i].chosen) {
+      presentChoice(choices[i]);
+      return;
+    }
+  }
 }
 
 // ── Start with opening crawl ────────────────────────────────────

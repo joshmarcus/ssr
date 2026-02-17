@@ -85,6 +85,10 @@ export class InputHandler {
       case ".":
       case " ":
         return { type: ActionType.Wait };
+      // Journal (evidence review)
+      case "j":
+      case "J":
+        return { type: ActionType.Journal };
       default:
         return null;
     }

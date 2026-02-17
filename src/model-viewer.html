@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Synty Model Browser</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a1a2e; color: #eee; font-family: monospace; padding: 20px; }
+    h1 { margin-bottom: 10px; color: #4ec9b0; }
+    .controls { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
+    .controls input { padding: 6px 12px; font-size: 14px; background: #222; color: #eee; border: 1px solid #444; width: 400px; }
+    .controls span { color: #666; font-size: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .card { background: #222; border: 2px solid #333; border-radius: 6px; overflow: hidden; cursor: pointer; }
+    .card:hover { border-color: #4ec9b0; }
+    .card.current { border-color: #0f0; }
+    .card img { width: 100%; height: 180px; display: block; object-fit: contain; background: #2a2a3e; }
+    .card .name { padding: 6px 8px; font-size: 11px; color: #aaa; word-break: break-all; }
+    .card .loading { width: 100%; height: 180px; display: flex; align-items: center; justify-content: center; color: #555; background: #2a2a3e; }
+  </style>
+</head>
+<body>
+  <h1>Model Browser (267 models — Synty + Quaternius)</h1>
+  <div class="controls">
+    <input type="text" id="filter" placeholder="Filter: computer, door, device, detector, screen, lab, barrel..." />
+    <span>Click model to copy its path. Green border = currently used in game.</span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const BASE = import.meta.env.BASE_URL;
+    const loader = new GLTFLoader();
+
+    const CURRENT = new Set([
+      'SM_Electric_Generator_For_Type_01', 'SM_Detector', 'SM_Lab_Computer',
+      'SM_Control_Panel', 'SM_Screen', 'SM_Camera', 'SM_Box_for_energy_cells',
+      'SM_Floor_Locker_01', 'SM_Door_For_Type_01'
+    ]);
+
+    // Single shared renderer for snapshots
+    const offscreen = document.createElement('canvas');
+    offscreen.width = 400;
+    offscreen.height = 320;
+    const renderer = new THREE.WebGLRenderer({ canvas: offscreen, antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setClearColor(0x2a2a3e);
+    renderer.setSize(400, 320);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, 400 / 320, 0.1, 100);
+    camera.position.set(2, 1.5, 2);
+    camera.lookAt(0, 0.3, 0);
+    scene.add(new THREE.AmbientLight(0x888888, 1.5));
+    const dir = new THREE.DirectionalLight(0xffffff, 1);
+    dir.position.set(3, 5, 3);
+    scene.add(dir);
+
+    function renderSnapshot(gltfScene) {
+      const model = gltfScene.clone();
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) model.scale.multiplyScalar(1.5 / maxDim);
+
+      const b2 = new THREE.Box3().setFromObject(model);
+      const center = new THREE.Vector3();
+      b2.getCenter(center);
+      model.position.sub(center);
+      model.position.y += b2.getSize(new THREE.Vector3()).y / 2;
+
+      scene.add(model);
+      renderer.render(scene, camera);
+      const dataUrl = offscreen.toDataURL('image/png');
+      scene.remove(model);
+      return dataUrl;
+    }
+
+    let files = [];
+    try {
+      const resp = await fetch(BASE + 'model-list.json');
+      files = await resp.json();
+    } catch (e) {
+      document.getElementById('grid').textContent = 'Failed to load model-list.json: ' + e;
+    }
+
+    const grid = document.getElementById('grid');
+    const filterEl = document.getElementById('filter');
+    const cardEls = [];
+    const cardData = [];
+
+    for (const filename of files) {
+      const basename = filename.split('/').pop().replace(/\.(glb|gltf)$/, '');
+      const card = document.createElement('div');
+      card.className = 'card' + (CURRENT.has(basename) ? ' current' : '');
+      card.dataset.name = basename.toLowerCase();
+
+      const placeholder = document.createElement('div');
+      placeholder.className = 'loading';
+      placeholder.textContent = '...';
+      card.appendChild(placeholder);
+
+      const label = document.createElement('div');
+      label.className = 'name';
+      label.textContent = basename;
+      card.appendChild(label);
+
+      card.addEventListener('click', () => {
+        navigator.clipboard.writeText(filename);
+        label.textContent = basename + '  —  COPIED!';
+        label.style.color = '#0f0';
+        setTimeout(() => { label.textContent = basename; label.style.color = ''; }, 2000);
+      });
+
+      grid.appendChild(card);
+      cardEls.push(card);
+      cardData.push({ filename, name: basename, card, loaded: false });
+    }
+
+    filterEl.addEventListener('input', () => {
+      const q = filterEl.value.toLowerCase();
+      cardEls.forEach(c => {
+        c.style.display = c.dataset.name.includes(q) ? '' : 'none';
+      });
+    });
+
+    // Lazy load with IntersectionObserver — load 1 at a time via queue
+    const queue = [];
+    let loading = false;
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          const idx = cardEls.indexOf(entry.target);
+          if (idx >= 0 && !cardData[idx].loaded) {
+            cardData[idx].loaded = true;
+            observer.unobserve(entry.target);
+            queue.push(idx);
+            processQueue();
+          }
+        }
+      }
+    }, { rootMargin: '400px' });
+
+    cardEls.forEach(c => observer.observe(c));
+
+    async function processQueue() {
+      if (loading) return;
+      loading = true;
+      while (queue.length > 0) {
+        const idx = queue.shift();
+        const d = cardData[idx];
+        const url = BASE + d.filename;
+        try {
+          const gltf = await new Promise((resolve, reject) => {
+            loader.load(url, resolve, undefined, reject);
+          });
+          const dataUrl = renderSnapshot(gltf.scene);
+          const img = document.createElement('img');
+          img.src = dataUrl;
+          const placeholder = d.card.querySelector('.loading');
+          if (placeholder) d.card.replaceChild(img, placeholder);
+        } catch {
+          const placeholder = d.card.querySelector('.loading');
+          if (placeholder) { placeholder.textContent = 'FAILED'; placeholder.style.color = '#f44'; }
+        }
+        // Small delay to keep UI responsive
+        await new Promise(r => setTimeout(r, 10));
+      }
+      loading = false;
+    }
+  </script>
+</body>
+</html>

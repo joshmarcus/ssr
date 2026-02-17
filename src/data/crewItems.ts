@@ -159,7 +159,7 @@ export const CREW_ITEMS: CrewItemDef[] = [
     description:
       "Week of March 14. Every shift has Vasquez's name. She was covering for three people.",
     crewMember: "Vasquez",
-    roomHint: "Charging Bay",
+    roomHint: "Bot Maintenance",
     hidden: true,
   },
 ];

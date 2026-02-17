@@ -18,6 +18,9 @@ function makeTestState() {
         smoke: 0,
         dirt: 0,
         pressure: 100,
+        radiation: 0,
+        stress: 0,
+        stressTurns: 0,
         explored: true,
         visible: true,
       };
@@ -121,6 +124,9 @@ describe("Interact action", () => {
       smoke: 0,
       dirt: 0,
       pressure: 100,
+      radiation: 0,
+      stress: 0,
+      stressTurns: 0,
       explored: true,
       visible: true,
     };

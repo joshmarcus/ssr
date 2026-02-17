@@ -17,6 +17,9 @@ function makeFloorState(width = 20, height = 20) {
         smoke: 0,
         dirt: 0,
         pressure: 100,
+        radiation: 0,
+        stress: 0,
+        stressTurns: 0,
         explored: false,
         visible: false,
       };

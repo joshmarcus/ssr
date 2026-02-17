@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(cmd.exe /c \"where node 2>NUL & where npm 2>NUL & where npx 2>NUL\")",
+      "Bash(cmd.exe /c \"node --version 2>NUL || echo NOT_FOUND\")",
+      "Bash(cmd.exe /c \"winget install Schniz.fnm --accept-package-agreements --accept-source-agreements\")",
+      "Bash(powershell.exe -Command \"winget install Schniz.fnm --accept-package-agreements --accept-source-agreements\")",
+      "Bash(powershell.exe -Command \"fnm install --lts; fnm default lts-latest; fnm use lts-latest; node --version; npm --version\")",
+      "Bash(powershell.exe -Command \"Get-Command fnm -ErrorAction SilentlyContinue | Select-Object Source; Get-ChildItem -Path ''$env:LOCALAPPDATA\\\\Microsoft\\\\WinGet'' -Recurse -Filter ''fnm*'' -ErrorAction SilentlyContinue | Select-Object FullName\")"
+    ]
+  }
+}

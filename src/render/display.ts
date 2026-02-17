@@ -2,6 +2,7 @@ import * as ROT from "rot-js";
 import type { GameState, Entity, Room } from "../shared/types.js";
 import { TileType, EntityType, AttachmentSlot, SensorType } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
+import type { IGameDisplay } from "./displayInterface.js";
 
 // ── Log entry types for color-coding ────────────────────────────
 export type LogType = "system" | "narrative" | "warning" | "critical" | "milestone" | "sensor";
@@ -112,6 +113,13 @@ const ENTITY_COLORS: Record<string, string> = {
   [EntityType.Breach]: "#ff4444",
   [EntityType.ClosedDoor]: "#aa8866",
   [EntityType.SecurityTerminal]: "#44aaff",
+  [EntityType.PatrolDrone]: "#ff2222",
+  [EntityType.PressureValve]: "#44bbaa",
+  [EntityType.FuseBox]: "#dd8800",
+  [EntityType.PowerCell]: "#ffdd44",
+  [EntityType.EscapePod]: "#44ffaa",
+  [EntityType.CrewNPC]: "#ffee66",
+  [EntityType.RepairCradle]: "#44ddff",
 };
 
 // Entity background glow colors (subtle tint behind entities)
@@ -124,6 +132,13 @@ const ENTITY_BG_GLOW: Record<string, string> = {
   [EntityType.MedKit]: "#1a0808",
   [EntityType.Breach]: "#200000",
   [EntityType.SecurityTerminal]: "#081520",
+  [EntityType.PatrolDrone]: "#200808",
+  [EntityType.PressureValve]: "#081a18",
+  [EntityType.FuseBox]: "#1a1000",
+  [EntityType.PowerCell]: "#1a1800",
+  [EntityType.EscapePod]: "#081a10",
+  [EntityType.CrewNPC]: "#1a1800",
+  [EntityType.RepairCradle]: "#081820",
 };
 
 const ENTITY_GLYPHS: Record<string, string> = {
@@ -139,6 +154,13 @@ const ENTITY_GLYPHS: Record<string, string> = {
   [EntityType.Breach]: "\u26a0\ufe0f",       // ⚠️
   [EntityType.ClosedDoor]: "\ud83d\udeaa",   // 🚪
   [EntityType.SecurityTerminal]: "\ud83d\udcf7", // 📷
+  [EntityType.PatrolDrone]: "\u2622\ufe0f",     // ☢️
+  [EntityType.PressureValve]: "\u2699\ufe0f", // ⚙️
+  [EntityType.FuseBox]: "\ud83d\udd0c",       // 🔌
+  [EntityType.PowerCell]: "\ud83d\udd0b",     // 🔋 (reuse battery glyph)
+  [EntityType.EscapePod]: "\ud83d\ude80",     // 🚀
+  [EntityType.CrewNPC]: "\ud83e\uddd1",       // 🧑
+  [EntityType.RepairCradle]: "\ud83d\udd27",  // 🔧
 };
 
 // ── Thermal color interpolation ─────────────────────────────────
@@ -173,6 +195,13 @@ const ENTITY_NAMES: Record<string, string> = {
   [EntityType.Breach]: "Hull Breach",
   [EntityType.ClosedDoor]: "Sealed Door",
   [EntityType.SecurityTerminal]: "Security Terminal",
+  [EntityType.PatrolDrone]: "Patrol Drone",
+  [EntityType.PressureValve]: "Pressure Valve",
+  [EntityType.FuseBox]: "Fuse Box",
+  [EntityType.PowerCell]: "Power Cell",
+  [EntityType.EscapePod]: "Escape Pod",
+  [EntityType.CrewNPC]: "Crew Survivor",
+  [EntityType.RepairCradle]: "Repair Cradle",
 };
 
 // ── Smoke color interpolation ───────────────────────────────────
@@ -203,7 +232,7 @@ function computeFontSize(cellsW: number, cellsH: number): number {
 }
 
 // ── ROT.js Display renderer ─────────────────────────────────────
-export class BrowserDisplay {
+export class BrowserDisplay implements IGameDisplay {
   private display: ROT.Display;
   private container: HTMLElement;
   private sensorMode: SensorType | null = null;
@@ -221,6 +250,9 @@ export class BrowserDisplay {
 
   // Flash tile mechanism for interaction feedback
   private flashTiles: Set<string> = new Set();
+
+  // Stored handler for cleanup
+  private resizeHandler: () => void;
 
   constructor(container: HTMLElement, mapWidth?: number, mapHeight?: number) {
     this.container = container;
@@ -242,7 +274,8 @@ export class BrowserDisplay {
     }
 
     // Listen for window resize to rescale
-    window.addEventListener("resize", () => this.handleResize());
+    this.resizeHandler = () => this.handleResize();
+    window.addEventListener("resize", this.resizeHandler);
   }
 
   get isThermalActive(): boolean {
@@ -274,6 +307,93 @@ export class BrowserDisplay {
 
   getLogHistory(): DisplayLogEntry[] {
     return this.logHistory;
+  }
+
+  triggerScreenFlash(type: "damage" | "milestone" | "stun"): void {
+    const flash = document.getElementById("damage-flash");
+    if (!flash) return;
+    flash.className = `active ${type}`;
+    setTimeout(() => { flash.className = ""; }, 200);
+  }
+
+  showGameOverOverlay(state: GameState): void {
+    const overlay = document.getElementById("gameover-overlay");
+    if (!overlay) return;
+
+    const isVictory = state.victory;
+    const logsFound = state.logs.filter(l => l.source !== "system" && l.source !== "sensor").length;
+    const totalTerminals = Array.from(state.entities.values()).filter(e => e.type === EntityType.LogTerminal).length;
+    const terminalsRead = Array.from(state.entities.values()).filter(e =>
+      e.type === EntityType.LogTerminal && state.logs.some(l => l.id === `log_terminal_${e.id}`)
+    ).length;
+    let relaysActivated = 0;
+    let totalRelays = 0;
+    for (const [, e] of state.entities) {
+      if (e.type === EntityType.Relay && e.props["locked"] !== true) {
+        totalRelays++;
+        if (e.props["activated"] === true) relaysActivated++;
+      }
+    }
+    const breachesSealed = Array.from(state.entities.values()).filter(e =>
+      e.type === EntityType.Breach && e.props["sealed"] === true
+    ).length;
+    const totalBreaches = Array.from(state.entities.values()).filter(e => e.type === EntityType.Breach).length;
+    const hpPercent = Math.round((state.player.hp / state.player.maxHp) * 100);
+    const hpClass = hpPercent > 60 ? "good" : hpPercent > 30 ? "warn" : "bad";
+
+    const title = isVictory ? "TRANSMISSION COMPLETE" : "CONNECTION LOST";
+    const titleClass = isVictory ? "victory" : "defeat";
+    const subtitle = isVictory
+      ? "The crew's research data streams through the low-band relay.<br>Nine months of work, preserved."
+      : "Rover A3 signal lost. The data core remains sealed.<br>CORVUS-7 drifts on, silent.";
+
+    // Crew evacuation stats
+    const evac = state.mystery?.evacuation;
+    const crewEvacuated = evac?.crewEvacuated.length || 0;
+    const crewDead = evac?.crewDead.length || 0;
+    let totalCrewNPCs = 0;
+    for (const [, e] of state.entities) {
+      if (e.type === EntityType.CrewNPC) totalCrewNPCs++;
+    }
+    const crewStatHtml = totalCrewNPCs > 0 || crewEvacuated > 0 || crewDead > 0
+      ? `<div class="gameover-stat"><span class="stat-label">Crew Evacuated:</span> <span class="stat-value ${crewEvacuated > 0 && crewDead === 0 ? 'good' : crewEvacuated > 0 ? 'warn' : 'bad'}">${crewEvacuated}/${crewEvacuated + crewDead + totalCrewNPCs}</span></div>`
+      : "";
+
+    const epilogue = isVictory
+      ? (crewEvacuated > 0 && crewDead === 0 && totalCrewNPCs === 0
+        ? "Recovery teams en route. Every soul accounted for."
+        : "Recovery teams en route. The record is preserved.")
+      : "Another rover may reach the station. The data endures, waiting.";
+
+    overlay.innerHTML = `
+      <div class="gameover-box ${titleClass}">
+        <div class="gameover-title ${titleClass}">${title}</div>
+        <div class="gameover-subtitle">${subtitle}</div>
+        <div class="gameover-stats">
+          <div class="gameover-stat"><span class="stat-label">Turns:</span> <span class="stat-value">${state.turn}</span></div>
+          <div class="gameover-stat"><span class="stat-label">Hull Integrity:</span> <span class="stat-value ${hpClass}">${state.player.hp}/${state.player.maxHp} (${hpPercent}%)</span></div>
+          <div class="gameover-stat"><span class="stat-label">Relays Rerouted:</span> <span class="stat-value ${relaysActivated >= totalRelays ? 'good' : 'warn'}">${relaysActivated}/${totalRelays}</span></div>
+          <div class="gameover-stat"><span class="stat-label">Breaches Sealed:</span> <span class="stat-value ${breachesSealed >= totalBreaches ? 'good' : 'warn'}">${breachesSealed}/${totalBreaches}</span></div>
+          ${crewStatHtml}
+          <div class="gameover-stat"><span class="stat-label">Terminals Read:</span> <span class="stat-value">${terminalsRead}/${totalTerminals}</span></div>
+          <div class="gameover-stat"><span class="stat-label">Logs Recovered:</span> <span class="stat-value">${logsFound}</span></div>
+        </div>
+        <div class="gameover-epilogue">${epilogue}</div>
+        <div class="gameover-restart">Press [R] to restart</div>
+      </div>`;
+    overlay.classList.add("active");
+  }
+
+  destroy(): void {
+    window.removeEventListener("resize", this.resizeHandler);
+    if (this.roomFlashTimer) clearTimeout(this.roomFlashTimer);
+    const canvas = this.display.getContainer();
+    if (canvas && canvas.parentElement) {
+      canvas.parentElement.removeChild(canvas);
+    }
+    // Clean up overlays
+    const overlay = document.getElementById("gameover-overlay");
+    if (overlay) overlay.classList.remove("active");
   }
 
   // ── Responsive resize ──────────────────────────────────────────
@@ -400,6 +520,11 @@ export class BrowserDisplay {
       // Hidden crew items: only show if cleanliness sensor is active or item was revealed
       if (entity.type === EntityType.CrewItem && entity.props["hidden"] === true) {
         if (this.sensorMode !== SensorType.Cleanliness) continue;
+      }
+      // Don't render evacuated or dead crew NPCs
+      if (entity.type === EntityType.CrewNPC &&
+          (entity.props["evacuated"] === true || entity.props["dead"] === true)) {
+        continue;
       }
       const key = `${entity.pos.x},${entity.pos.y}`;
       entityAt.set(key, {
@@ -794,7 +919,13 @@ export class BrowserDisplay {
     const filledBlocks = Math.round((state.player.hp / state.player.maxHp) * hpBarWidth);
     const emptyBlocks = hpBarWidth - filledBlocks;
     const hpBar = "\u2588".repeat(filledBlocks) + "\u2591".repeat(emptyBlocks);
-    const hpTag = ` | <span class="label">HP:</span><span style="color:${hpColor}">${hpBar} ${state.player.hp}/${state.player.maxHp}</span>`;
+    const hpCriticalClass = hpPercent <= 25 ? " hp-critical" : "";
+    const hpWarning = hpPercent <= 25 ? " ⚠ CRITICAL" : hpPercent <= 50 ? " ⚠" : "";
+    const hpTag = ` | <span class="label">HP:</span><span class="${hpCriticalClass}" style="color:${hpColor}; font-size:${hpPercent <= 25 ? '14px' : '13px'}">${hpBar} ${state.player.hp}/${state.player.maxHp}${hpWarning}</span>`;
+    // Stun indicator
+    const stunTag = state.player.stunTurns > 0
+      ? ` | <span style="color:#44f; font-weight:bold">⚡ STUNNED (${state.player.stunTurns})</span>`
+      : "";
 
     // ── Unread log count ─────────────────────────────────────────
     const unreadCount = state.logs.filter(l => l.read === false).length;
@@ -829,7 +960,7 @@ export class BrowserDisplay {
 
     const statusHtml = `<div class="status-bar">` +
       `<span class="label">T:</span><span class="value">${state.turn}</span>` +
-      roomLabel + sensorTag +
+      roomLabel + sensorTag + stunTag +
       `<br>` + hpTag.replace(/ \| /, '') +
       `<br>` + discoveryTag.replace(/ \| /, '') + unreadTag.replace(/ \| /g, '') +
       interactHint +
@@ -900,6 +1031,12 @@ export class BrowserDisplay {
       { glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
       { glyph: "\u26a0\ufe0f", color: "#f44", label: "Breach" },
       { glyph: "\ud83d\udcf7", color: "#4af", label: "Camera" },
+      { glyph: "\u2622\ufe0f", color: "#f22", label: "Hostile" },
+      { glyph: "\u2699\ufe0f", color: "#4ba", label: "Valve" },
+      { glyph: "\ud83d\udd0c", color: "#d80", label: "Fuse" },
+      { glyph: "\ud83d\udd0b", color: "#fd4", label: "Cell" },
+      { glyph: "\ud83d\ude80", color: "#4fa", label: "Pod" },
+      { glyph: "\ud83e\uddd1", color: "#fe6", label: "Crew" },
     ];
     const legendHtml = legendItems
       .map(l => `<span class="legend-glyph" style="color:${l.color}">${this.escapeHtml(l.glyph)}</span><span class="legend-name">${l.label}</span>`)

@@ -22,10 +22,14 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "rot-js": "^2.2.1"
+    "@types/three": "^0.182.0",
+    "rot-js": "^2.2.1",
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
+    "fbx2gltf": "^0.9.7-p1",
+    "three-stdlib": "^2.36.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",

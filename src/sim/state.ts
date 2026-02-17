@@ -1,5 +1,5 @@
 import type { GameState, Tile, TileType, Entity, EntityId, PlayerBot, Room, LogEntry, Attachment } from "../shared/types.js";
-import { PLAYER_MAX_HP, GLYPHS } from "../shared/constants.js";
+import { PLAYER_MAX_HP, GLYPHS, STATION_INTEGRITY_MAX } from "../shared/constants.js";
 import { AttachmentSlot, SensorType } from "../shared/types.js";
 
 export function createEmptyState(seed: number, width: number, height: number): GameState {
@@ -7,7 +7,7 @@ export function createEmptyState(seed: number, width: number, height: number): G
   for (let y = 0; y < height; y++) {
     tiles[y] = [];
     for (let x = 0; x < width; x++) {
-      tiles[y][x] = { type: "wall" as TileType, glyph: GLYPHS.wall, walkable: false, heat: 0, smoke: 0, dirt: 0, pressure: 100, explored: false, visible: false };
+      tiles[y][x] = { type: "wall" as TileType, glyph: GLYPHS.wall, walkable: false, heat: 0, smoke: 0, dirt: 0, pressure: 100, radiation: 0, stress: 0, stressTurns: 0, explored: false, visible: false };
     }
   }
 
@@ -31,6 +31,8 @@ export function createEmptyState(seed: number, width: number, height: number): G
     alive: true,
     hp: PLAYER_MAX_HP,
     maxHp: PLAYER_MAX_HP,
+    stunTurns: 0,
+    clearanceLevel: 0,
   };
 
   return {
@@ -45,5 +47,6 @@ export function createEmptyState(seed: number, width: number, height: number): G
     logs: [],
     gameOver: false,
     victory: false,
+    stationIntegrity: STATION_INTEGRITY_MAX,
   };
 }

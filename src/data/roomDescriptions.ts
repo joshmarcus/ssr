@@ -25,8 +25,8 @@ export const ROOM_DESCRIPTIONS: Record<string, string> = {
   "Life Support":
     "Climate regulation equipment covers every surface. Warning lights pulse red in sequence. The ambient temperature is wrong — too high, climbing. An open toolbox sits abandoned mid-repair.",
 
-  "Charging Bay":
-    "A row of bot cradles, most dark. One still shows a green charge indicator. Coolant puddles beneath a cracked feed line, reflecting the sole working light.",
+  "Bot Maintenance":
+    "A repair bay for station bots. Diagnostic cradles line the wall. One shows a green READY indicator — the auto-repair arm is still functional. Step into the cradle to initiate repairs.",
 
   "Robotics Bay":
     "Workbenches cluttered with actuator limbs and half-assembled chassis. A dormant service bot stands upright in its dock — powered down, intact, waiting. A note taped to it reads: PRIYA-7741.",
@@ -66,4 +66,7 @@ export const ROOM_DESCRIPTIONS: Record<string, string> = {
 
   "Emergency Shelter":
     "A reinforced safe room. Sealed water stores, ration kits, emergency blankets — standard issue, untouched. The door log shows it was accessed at 15:12, then sealed from inside.",
+
+  "Escape Pod Bay":
+    "Twelve standard-issue crew evacuation pods in two neat rows. Status panels glow amber — unpowered, waiting. The deployment rail tracks are clean. Nobody made it this far.",
 };

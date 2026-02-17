@@ -26,46 +26,8 @@
       position: relative;
       flex-shrink: 0;
     }
-    /* Scanlines overlay */
-    #rot-display::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background: repeating-linear-gradient(
-        to bottom,
-        transparent 0px,
-        transparent 2px,
-        rgba(0, 0, 0, 0.12) 2px,
-        rgba(0, 0, 0, 0.12) 4px
-      );
-      z-index: 10;
-    }
-    /* Vignette overlay */
-    #rot-display::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background: radial-gradient(
-        ellipse at center,
-        transparent 55%,
-        rgba(0, 0, 0, 0.35) 80%,
-        rgba(0, 0, 0, 0.7) 100%
-      );
-      z-index: 11;
-    }
     #rot-display canvas {
       display: block;
-      filter: drop-shadow(0 0 4px rgba(0, 255, 60, 0.3))
-              drop-shadow(0 0 12px rgba(0, 180, 40, 0.1));
-    }
-    /* Subtle CRT barrel distortion */
-    #rot-display {
-      perspective: 800px;
-    }
-    #rot-display canvas {
-      transform: perspective(800px) rotateX(0.3deg) rotateY(-0.3deg);
     }
     #ui-panel {
       font-family: monospace;
@@ -180,6 +142,117 @@
       border-bottom: 1px solid #222;
     }
 
+    /* ── 3D mode: disable CRT barrel distortion ──────── */
+    .mode-3d #rot-display canvas {
+      transform: none !important;
+      filter: none;
+    }
+    .mode-3d #rot-display {
+      perspective: none;
+    }
+
+    /* ── Game-over full-screen overlay ─────────────────── */
+    #gameover-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.92);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 90;
+      flex-direction: column;
+      font-family: monospace;
+    }
+    #gameover-overlay.active { display: flex; }
+    .gameover-box {
+      max-width: 600px;
+      padding: 2rem 3rem;
+      border: 1px solid #333;
+      text-align: center;
+    }
+    .gameover-box.victory { border-color: #0a4a0a; }
+    .gameover-box.defeat { border-color: #4a0a0a; }
+    .gameover-title {
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 12px;
+      letter-spacing: 4px;
+    }
+    .gameover-title.victory { color: #0f0; text-shadow: 0 0 20px rgba(0,255,0,0.4); }
+    .gameover-title.defeat { color: #f44; text-shadow: 0 0 20px rgba(255,0,0,0.3); }
+    .gameover-subtitle {
+      font-size: 14px;
+      color: #8a8;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+    .gameover-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 20px;
+      margin: 16px 0;
+      font-size: 13px;
+    }
+    .gameover-stat {
+      text-align: left;
+    }
+    .gameover-stat .stat-label { color: #666; }
+    .gameover-stat .stat-value { color: #aaa; font-weight: bold; }
+    .gameover-stat .stat-value.good { color: #0f0; }
+    .gameover-stat .stat-value.warn { color: #fa0; }
+    .gameover-stat .stat-value.bad { color: #f44; }
+    .gameover-epilogue {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #4a8;
+      line-height: 1.6;
+      font-style: italic;
+    }
+    .gameover-restart {
+      margin-top: 20px;
+      color: #555;
+      font-size: 12px;
+      animation: crawl-skip-pulse 1.5s ease-in-out infinite;
+    }
+
+    /* ── HP critical pulse on sidebar ──────────────────── */
+    .hp-critical {
+      animation: hp-pulse 0.8s ease-in-out infinite;
+    }
+    @keyframes hp-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Screen damage flash ───────────────────────────── */
+    #damage-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 80;
+      opacity: 0;
+      transition: opacity 0.15s ease-out;
+    }
+    #damage-flash.active {
+      opacity: 1;
+      transition: opacity 0.05s ease-in;
+    }
+    #damage-flash.damage { background: radial-gradient(ellipse at center, transparent 40%, rgba(255,0,0,0.3) 100%); }
+    #damage-flash.milestone { background: radial-gradient(ellipse at center, rgba(0,255,0,0.15) 0%, transparent 70%); }
+    #damage-flash.stun { background: radial-gradient(ellipse at center, rgba(0,100,255,0.2) 0%, transparent 70%); }
+
+    /* ── Narrative log highlight ────────────────────────── */
+    #ui-panel .log-narrative-terminal {
+      color: #4ec9b0;
+      font-style: normal;
+      border-left: 3px solid #2a7a6a;
+      padding: 4px 8px;
+      margin: 4px 0;
+      display: block;
+      background: rgba(42, 122, 106, 0.08);
+      line-height: 1.5;
+    }
+
     /* ── Opening crawl overlay ─────────────────────────── */
     #crawl-overlay {
       position: fixed;
@@ -219,6 +292,8 @@
   </style>
 </head>
 <body>
+  <div id="damage-flash"></div>
+  <div id="gameover-overlay"></div>
   <div id="crawl-overlay"></div>
   <div id="game-container">
     <div id="rot-display"></div>

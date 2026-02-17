@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { generate } from "../src/sim/procgen.js";
 import { step } from "../src/sim/step.js";
 import { GOLDEN_SEED, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT } from "../src/shared/constants.js";
-import { ActionType, Direction, TileType, AttachmentSlot, SensorType, EntityType } from "../src/shared/types.js";
+import { ActionType, Direction, TileType, AttachmentSlot, SensorType, EntityType, ObjectivePhase } from "../src/shared/types.js";
 import type { Action, GameState, Attachment } from "../src/shared/types.js";
 
 const move = (d: Direction): Action => ({ type: ActionType.Move, direction: d });
@@ -135,6 +135,29 @@ describe("Golden seed walkthrough (expanded station)", () => {
 
   it("data core interaction triggers victory", () => {
     let state = equipThermal({ ...initialState });
+
+    // Fast-forward past Clean phase to Investigate (test focuses on evidence→victory flow)
+    if (state.mystery) {
+      state = { ...state, mystery: { ...state.mystery, objectivePhase: ObjectivePhase.Investigate } };
+    }
+
+    // Gather enough evidence to unlock recovery phase
+    // Read log terminals to fill the journal
+    const logTerminals: string[] = [];
+    for (const [id, entity] of state.entities) {
+      if (entity.type === EntityType.LogTerminal) {
+        logTerminals.push(id);
+      }
+    }
+    const evidenceNeeded = state.mystery?.evidenceThreshold || 3;
+    for (let i = 0; i < evidenceNeeded && i < logTerminals.length; i++) {
+      const terminal = state.entities.get(logTerminals[i])!;
+      state.player = {
+        ...state.player,
+        entity: { ...state.player.entity, pos: { ...terminal.pos } },
+      };
+      state = step(state, interact(logTerminals[i]));
+    }
 
     // Activate all relays
     for (const relayId of ["relay_p01", "relay_p03", "relay_p04"]) {

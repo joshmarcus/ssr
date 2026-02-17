@@ -4,6 +4,36 @@
  * Displayed after the game concludes — either by successful data core
  * transmission (victory) or bot destruction / relay trip (defeat).
  */
+import type { MysteryState } from "../shared/types.js";
+import { CrewRole } from "../shared/types.js";
+
+/**
+ * Generate dynamic victory text using mystery crew names.
+ * Falls back to hardcoded names if mystery state is not available.
+ */
+export function getVictoryText(mystery?: MysteryState): string[] {
+  const engineer = mystery?.crew.find(c => c.role === CrewRole.Engineer);
+  const scientist = mystery?.crew.find(c => c.role === CrewRole.Scientist);
+  const captain = mystery?.crew.find(c => c.role === CrewRole.Captain);
+  const eName = engineer?.lastName || "Vasquez";
+  const sName = scientist?.lastName || "Tanaka";
+  const cName = captain?.lastName || "Okafor";
+
+  return [
+    `The data core hums to life. Nine months of classified signal analysis`,
+    `— ${sName}'s careful work, every long shift in isolation — streams`,
+    `through the low-band uplink. Slow, but steady. Somewhere far away,`,
+    `a receiving dish locks on. The research bundle is preserved.`,
+    ``,
+    `${eName} was right about the coolant loop. Filed three maintenance requests`,
+    `and wrote a backup procedure nobody asked for. A janitor bot and a`,
+    `fragile terminal link — that's all it took to prove them right.`,
+    ``,
+    `In the cargo hold, the crew feels the lights come back on.`,
+    `Recovery teams are already en route. The crew of CORVUS-7 will`,
+    `see home again. Their work survives.`,
+  ];
+}
 
 // ── Victory ─────────────────────────────────────────────────
 

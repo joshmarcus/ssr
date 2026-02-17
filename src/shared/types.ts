@@ -21,6 +21,9 @@ export interface Tile {
   smoke: number; // 0-100 smoke density
   dirt: number; // 0-100 cleanliness value (crew activity traces)
   pressure: number; // 0-100 atmospheric pressure (100 = normal, 0 = vacuum)
+  radiation: number; // 0-100 radiation level
+  stress: number; // 0-100 structural stress (collapse at 80+ for 3 turns)
+  stressTurns: number; // turns spent above 80 stress
   explored: boolean; // true if tile has ever been visible
   visible: boolean; // true if tile is currently visible
 }
@@ -42,6 +45,19 @@ export enum EntityType {
   Breach = "breach",
   ClosedDoor = "closed_door",
   SecurityTerminal = "security_terminal",
+  PatrolDrone = "patrol_drone",
+  PressureValve = "pressure_valve",
+  FuseBox = "fuse_box",
+  PowerCell = "power_cell",
+  EvidenceTrace = "evidence_trace",
+  RadiationSource = "radiation_source",
+  ShieldGenerator = "shield_generator",
+  ReinforcementPanel = "reinforcement_panel",
+  SignalBooster = "signal_booster",
+  HiddenDevice = "hidden_device",
+  EscapePod = "escape_pod",
+  CrewNPC = "crew_npc",
+  RepairCradle = "repair_cradle",
 }
 
 export interface Entity {
@@ -49,6 +65,14 @@ export interface Entity {
   type: EntityType;
   pos: Position;
   props: Record<string, unknown>;
+}
+
+// ── Door keying ─────────────────────────────────────────────
+export enum DoorKeyType {
+  Power = "power",                 // existing: relay reroute opens it
+  Clearance = "clearance",         // deduction reward opens it
+  Physical = "physical",           // tool/interaction opens it (existing ClosedDoor)
+  Environmental = "environmental", // blocked by hazard — clear the hazard to pass
 }
 
 // ── Attachments ──────────────────────────────────────────────
@@ -80,6 +104,8 @@ export interface PlayerBot {
   alive: boolean;
   hp: number;
   maxHp: number;
+  stunTurns: number; // turns remaining where player cannot act
+  clearanceLevel: number; // security clearance from solving deductions
 }
 
 // ── Actions ──────────────────────────────────────────────────
@@ -90,6 +116,7 @@ export enum ActionType {
   Clean = "clean",
   Wait = "wait",
   Look = "look",
+  Journal = "journal",
 }
 
 export enum Direction {
@@ -128,6 +155,8 @@ export interface GameState {
   logs: LogEntry[];
   gameOver: boolean;
   victory: boolean;
+  mystery?: MysteryState;
+  stationIntegrity: number; // 0-100, big visible danger meter
 }
 
 // ── Logs / evidence ──────────────────────────────────────────
@@ -137,6 +166,166 @@ export interface LogEntry {
   source: string;
   text: string;
   read: boolean;
+}
+
+// ── Mystery / Crew ──────────────────────────────────────────
+export enum CrewRole {
+  Captain = "captain",
+  Engineer = "engineer",
+  Medic = "medic",
+  Security = "security",
+  Scientist = "scientist",
+  Robotics = "robotics",
+  LifeSupport = "life_support",
+  Comms = "comms",
+}
+
+export enum PersonalityTrait {
+  Cautious = "cautious",
+  Ambitious = "ambitious",
+  Loyal = "loyal",
+  Secretive = "secretive",
+  Pragmatic = "pragmatic",
+}
+
+export enum CrewSecret {
+  Smuggling = "smuggling",
+  FalseIdentity = "false_identity",
+  Sabotage = "sabotage",
+  Whistleblower = "whistleblower",
+}
+
+export enum CrewFate {
+  Survived = "survived",
+  Missing = "missing",
+  Dead = "dead",
+  Escaped = "escaped",
+  InCryo = "in_cryo",
+}
+
+export interface Relationship {
+  targetId: string;
+  type: "ally" | "rival" | "romantic" | "blackmail";
+}
+
+export interface CrewMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: CrewRole;
+  badgeId: string;
+  personality: PersonalityTrait;
+  relationships: Relationship[];
+  secret?: CrewSecret;
+  fate: CrewFate;
+  lastKnownRoom: string;
+}
+
+export enum IncidentArchetype {
+  CoolantCascade = "coolant_cascade",
+  HullBreach = "hull_breach",
+  ReactorScram = "reactor_scram",
+  Sabotage = "sabotage",
+  SignalAnomaly = "signal_anomaly",
+  ContainmentBreach = "containment_breach",
+}
+
+export enum TimelinePhase {
+  NormalOps = "normal_ops",
+  Trigger = "trigger",
+  Escalation = "escalation",
+  Collapse = "collapse",
+  Aftermath = "aftermath",
+}
+
+export interface TimelineEvent {
+  phase: TimelinePhase;
+  timestamp: string;
+  actorId: string;
+  action: string;
+  location: string;
+  logText?: string;
+}
+
+export interface IncidentTimeline {
+  archetype: IncidentArchetype;
+  events: TimelineEvent[];
+  culpritId?: string;
+  primaryHazard: string;
+  sensorBias: SensorType;
+}
+
+export enum DeductionCategory {
+  What = "what",    // What happened?
+  Why = "why",      // Why did it happen?
+  Who = "who",      // Who is responsible/involved?
+}
+
+export interface Deduction {
+  id: string;
+  category: DeductionCategory;
+  question: string;
+  options: { label: string; key: string; correct: boolean }[];
+  evidenceRequired: number;  // journal entries needed to unlock
+  solved: boolean;
+  answeredCorrectly?: boolean;
+  rewardType: "clearance" | "room_reveal" | "drone_disable" | "sensor_hint";
+  rewardDescription: string;
+}
+
+export interface MysteryChoice {
+  id: string;
+  prompt: string;
+  options: { label: string; key: string }[];
+  chosen?: string;
+  turnPresented: number;
+  consequence: string; // which ending aspect this affects
+}
+
+export interface JournalEntry {
+  id: string;
+  turnDiscovered: number;
+  category: "log" | "item" | "trace" | "access" | "crew";
+  summary: string;        // short one-line summary for the journal list
+  detail: string;         // full text when expanded
+  crewMentioned: string[]; // crew IDs referenced — for cross-referencing
+  roomFound: string;
+}
+
+export enum ObjectivePhase {
+  Clean = "clean",           // primary directive: clean rooms
+  Investigate = "investigate", // subgoal: investigate what happened
+  Recover = "recover",        // investigation overrides cleaning
+  Evacuate = "evacuate",      // rescue surviving crew
+}
+
+export interface EvacuationState {
+  active: boolean;           // true once Recover phase + crew found
+  crewFound: string[];       // crew IDs that have been discovered
+  crewEvacuated: string[];   // crew IDs that reached pods
+  crewDead: string[];        // crew IDs killed by hazards during evac
+  podsPowered: string[];     // pod entity IDs that are powered
+  evacuationStartTurn: number;
+}
+
+export interface MysteryState {
+  crew: CrewMember[];
+  timeline: IncidentTimeline;
+  generatedLogs: { terminalId: string; title: string; text: string; source: string }[];
+  discoveredEvidence: Set<string>;
+  choices: MysteryChoice[];
+  pendingChoice?: MysteryChoice;
+  journal: JournalEntry[];
+  deductions: Deduction[];
+  objectivePhase: ObjectivePhase;
+  roomsCleanedCount: number; // rooms cleaned to goal threshold
+  investigationTrigger: number; // rooms to clean before investigation subgoal appears
+  evidenceThreshold: number; // how many journal entries to unlock recovery phase
+  cleaningDirective: boolean; // true until overridden by investigation
+  roomCleanlinessGoal: number; // percentage (default 80)
+  directiveOverrideTurn?: number; // turn when directive was overridden
+  directiveViolationTurns: number; // turns in dirty room without cleaning
+  evacuation?: EvacuationState;
 }
 
 // ── Observation (harness) ────────────────────────────────────

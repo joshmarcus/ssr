@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { tickHazards, applyHazardDamage } from "../src/sim/hazards.js";
 import { createEmptyState } from "../src/sim/state.js";
 import { TileType } from "../src/shared/types.js";
-import { HEAT_SPREAD_RATE, SMOKE_SPREAD_RATE, HEAT_DECAY_RATE, HEAT_PAIN_THRESHOLD, PLAYER_MAX_HP } from "../src/shared/constants.js";
+import { HEAT_SPREAD_RATE, SMOKE_SPREAD_RATE, HEAT_DECAY_RATE, HEAT_PAIN_THRESHOLD, HEAT_SPREAD_MIN, PLAYER_MAX_HP } from "../src/shared/constants.js";
 
 function makeFloorState(width = 5, height = 5) {
   const state = createEmptyState(1, width, height);
@@ -16,6 +16,9 @@ function makeFloorState(width = 5, height = 5) {
         smoke: 0,
         dirt: 0,
         pressure: 100,
+        radiation: 0,
+        stress: 0,
+        stressTurns: 0,
         explored: true,
         visible: true,
       };
@@ -28,14 +31,18 @@ function makeFloorState(width = 5, height = 5) {
 describe("Hazard system", () => {
   it("spreads heat to adjacent floor tiles", () => {
     const state = makeFloorState();
-    state.tiles[2][2].heat = 20;
+    // Use high heat so proportional spread is meaningful
+    // spreadAmount = ceil(HEAT_SPREAD_RATE * (heat / 100))
+    const initialHeat = 80;
+    state.tiles[2][2].heat = initialHeat;
 
     const next = tickHazards(state);
 
     // Source decays by HEAT_DECAY_RATE
-    expect(next.tiles[2][2].heat).toBe(20 - HEAT_DECAY_RATE);
-    // Adjacent tiles get spread but also decay: net = max(0, HEAT_SPREAD_RATE - HEAT_DECAY_RATE)
-    const expectedAdj = Math.max(0, HEAT_SPREAD_RATE - HEAT_DECAY_RATE);
+    expect(next.tiles[2][2].heat).toBe(initialHeat - HEAT_DECAY_RATE);
+    // Adjacent tiles get proportional spread minus decay
+    const spreadAmount = Math.ceil(HEAT_SPREAD_RATE * (initialHeat / 100));
+    const expectedAdj = Math.max(0, spreadAmount - HEAT_DECAY_RATE);
     expect(next.tiles[1][2].heat).toBe(expectedAdj);
     expect(next.tiles[3][2].heat).toBe(expectedAdj);
     expect(next.tiles[2][1].heat).toBe(expectedAdj);
@@ -54,19 +61,28 @@ describe("Hazard system", () => {
 
   it("does not spread heat through walls", () => {
     const state = makeFloorState();
-    state.tiles[2][2].heat = 30;
+    const initialHeat = 80;
+    state.tiles[2][2].heat = initialHeat;
     state.tiles[1][2] = {
       type: TileType.Wall,
       glyph: "#",
       walkable: false,
       heat: 0,
       smoke: 0,
+      dirt: 0,
+      pressure: 100,
+      radiation: 0,
+      stress: 0,
+      stressTurns: 0,
+      explored: true,
+      visible: true,
     };
 
     const next = tickHazards(state);
 
+    const spreadAmount = Math.ceil(HEAT_SPREAD_RATE * (initialHeat / 100));
     expect(next.tiles[1][2].heat).toBe(0); // wall blocks spread
-    expect(next.tiles[3][2].heat).toBe(Math.max(0, HEAT_SPREAD_RATE - HEAT_DECAY_RATE));
+    expect(next.tiles[3][2].heat).toBe(Math.max(0, spreadAmount - HEAT_DECAY_RATE));
   });
 
   it("caps heat at 100", () => {
