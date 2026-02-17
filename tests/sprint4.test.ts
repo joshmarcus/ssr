@@ -617,23 +617,23 @@ describe("Cleaning directive", () => {
     return state;
   }
 
-  it("directive violation warning appears after 5 turns in dirty room", () => {
+  it("directive violation warning appears after 8 turns in dirty room", () => {
     let state = makeDirectiveState();
 
-    // Step 5 turns (Wait actions) in a dirty room
-    for (let i = 0; i < 5; i++) {
+    // Step 8 turns (Wait actions) in a dirty room
+    for (let i = 0; i < 8; i++) {
       state = step(state, { type: ActionType.Wait });
     }
 
-    // After 5 violation turns, should have a warning log
+    // After 8 violation turns, should have a warning log
     expect(state.logs.some(l => l.text.includes("DIRECTIVE VIOLATION"))).toBe(true);
   });
 
-  it("directive stun at 10 violation turns", () => {
+  it("directive stun at 20 violation turns", () => {
     let state = makeDirectiveState();
 
-    // Step 10 turns in a dirty room
-    for (let i = 0; i < 10; i++) {
+    // Step 20 turns in a dirty room
+    for (let i = 0; i < 20; i++) {
       state = step(state, { type: ActionType.Wait });
     }
 

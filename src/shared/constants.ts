@@ -72,9 +72,9 @@ export const VISION_RADIUS_EM = 10;
 
 // ── Station Integrity ───────────────────────────────────────
 export const STATION_INTEGRITY_MAX = 100;
-export const STATION_INTEGRITY_DECAY_RATE = 0.15; // per turn base decay
+export const STATION_INTEGRITY_DECAY_RATE = 0.03; // per turn base decay (slow — ~3% per 100 turns)
 export const STATION_INTEGRITY_RELAY_BONUS = 10; // restored per relay rerouted
-export const STATION_INTEGRITY_BREACH_PENALTY = 0.5; // extra decay per unsealed breach
+export const STATION_INTEGRITY_BREACH_PENALTY = 0.1; // extra decay per unsealed breach
 export const STATION_INTEGRITY_CRITICAL = 25; // below this, hazards accelerate
 export const STATION_INTEGRITY_LOSS = 0; // game over if integrity reaches 0
 

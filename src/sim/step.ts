@@ -272,8 +272,8 @@ function checkCleaningDirective(state: GameState): GameState {
     },
   };
 
-  // At 10 violation turns, stun the player and reset counter
-  if (newViolationTurns >= 10) {
+  // At 20 violation turns, stun the player and reset counter
+  if (newViolationTurns >= 20) {
     next = {
       ...next,
       player: {
@@ -295,8 +295,8 @@ function checkCleaningDirective(state: GameState): GameState {
         },
       ],
     };
-  } else if (newViolationTurns % 5 === 0) {
-    // Every 5 violation turns, add a warning
+  } else if (newViolationTurns % 8 === 0) {
+    // Every 8 violation turns, add a warning
     next = {
       ...next,
       logs: [

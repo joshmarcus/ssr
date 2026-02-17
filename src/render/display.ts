@@ -493,6 +493,42 @@ export class BrowserDisplay implements IGameDisplay {
     return null;
   }
 
+  /**
+   * Determine exit directions from a room by checking for walkable tiles
+   * just outside the room boundary.
+   */
+  private getRoomExits(state: GameState, room: Room): string[] {
+    const exits: string[] = [];
+    const { x, y, width, height } = room;
+
+    // Check north edge (y - 1)
+    if (y > 0) {
+      for (let rx = x; rx < x + width; rx++) {
+        if (state.tiles[y - 1]?.[rx]?.walkable) { exits.push("N"); break; }
+      }
+    }
+    // Check south edge (y + height)
+    if (y + height < state.height) {
+      for (let rx = x; rx < x + width; rx++) {
+        if (state.tiles[y + height]?.[rx]?.walkable) { exits.push("S"); break; }
+      }
+    }
+    // Check west edge (x - 1)
+    if (x > 0) {
+      for (let ry = y; ry < y + height; ry++) {
+        if (state.tiles[ry]?.[x - 1]?.walkable) { exits.push("W"); break; }
+      }
+    }
+    // Check east edge (x + width)
+    if (x + width < state.width) {
+      for (let ry = y; ry < y + height; ry++) {
+        if (state.tiles[ry]?.[x + width]?.walkable) { exits.push("E"); break; }
+      }
+    }
+
+    return exits;
+  }
+
   // ── Track room entry for flash message ─────────────────────────
   updateRoomFlash(state: GameState): void {
     const room = this.getPlayerRoom(state);
@@ -762,11 +798,13 @@ export class BrowserDisplay implements IGameDisplay {
       this.renderGameOverOverlay(state);
     }
 
-    // ── Persistent room name header (row 0) ────────────────────────
+    // ── Persistent room name header (row 0) with exits ─────────────
     if (!state.gameOver) {
       const currentRoom = this.getPlayerRoom(state);
       if (currentRoom) {
-        this.renderCenteredText(currentRoom.name, 0, "#6cf", COLORS.background);
+        const exits = this.getRoomExits(state, currentRoom);
+        const exitStr = exits.length > 0 ? `  [exits: ${exits.join(" ")}]` : "";
+        this.renderCenteredText(currentRoom.name + exitStr, 0, "#6cf", COLORS.background);
       } else {
         this.renderCenteredText("-- Corridor --", 0, "#456", COLORS.background);
       }
