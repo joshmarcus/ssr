@@ -1,7 +1,6 @@
 import { generate } from "./sim/procgen.js";
 import { step } from "./sim/step.js";
 import { BrowserDisplay } from "./render/display.js";
-import { BrowserDisplay3D } from "./render/display3d.js";
 import type { IGameDisplay } from "./render/displayInterface.js";
 import type { LogType } from "./render/display.js";
 import { InputHandler } from "./render/input.js";
@@ -100,7 +99,11 @@ function showOpeningCrawl(): void {
 // ── Game initialization ─────────────────────────────────────────
 let state = generate(seed);
 let display: IGameDisplay;
-let is3D = true;
+let is3D = false;
+
+// Lazy-loaded 3D renderer constructor — only populated when user first presses F3
+let BrowserDisplay3D: (new (container: HTMLElement, w: number, h: number) => IGameDisplay) | null = null;
+let display3dLoadFailed = false;
 let inputHandler: InputHandler;
 let lastPlayerRoomId = "";
 const visitedRoomIds = new Set<string>();
@@ -263,7 +266,7 @@ function classifySimLog(logText: string, logSource: string): LogType {
 }
 
 function initGame(): void {
-  display = is3D
+  display = (is3D && BrowserDisplay3D)
     ? new BrowserDisplay3D(containerEl, state.width, state.height)
     : new BrowserDisplay(containerEl, state.width, state.height);
 
@@ -363,7 +366,7 @@ function handleRestartKey(e: KeyboardEvent): void {
     if (gameoverEl) { gameoverEl.classList.remove("active"); gameoverEl.innerHTML = ""; }
     display.destroy();
     containerEl.innerHTML = "";
-    display = is3D
+    display = (is3D && BrowserDisplay3D)
       ? new BrowserDisplay3D(containerEl, state.width, state.height)
       : new BrowserDisplay(containerEl, state.width, state.height);
 
@@ -378,14 +381,48 @@ function handleRestartKey(e: KeyboardEvent): void {
 }
 
 // ── Renderer toggle (F3) ─────────────────────────────────────
-function toggleRenderer(): void {
+let toggleInProgress = false;
+
+async function toggleRenderer(): Promise<void> {
+  if (toggleInProgress) return;
+
+  const wantingToSwitch3D = !is3D;
+
+  // If switching to 3D and we haven't loaded the module yet, do so now
+  if (wantingToSwitch3D && !BrowserDisplay3D) {
+    if (display3dLoadFailed) {
+      display.addLog("[3D renderer unavailable — load failed previously]", "warning");
+      renderAll();
+      return;
+    }
+    toggleInProgress = true;
+    display.addLog("[Loading 3D renderer...]", "system");
+    renderAll();
+    try {
+      const mod = await import("./render/display3d.js");
+      BrowserDisplay3D = mod.BrowserDisplay3D;
+    } catch (err) {
+      console.warn("Failed to load 3D renderer module:", err);
+      display3dLoadFailed = true;
+      display.addLog("[ERROR: 3D renderer failed to load — staying in 2D mode]", "warning");
+      renderAll();
+      toggleInProgress = false;
+      return;
+    }
+    toggleInProgress = false;
+  }
+
   const logs = display.getLogHistory();
   display.destroy();
   containerEl.innerHTML = "";
   is3D = !is3D;
-  display = is3D
+  display = (is3D && BrowserDisplay3D)
     ? new BrowserDisplay3D(containerEl, state.width, state.height)
     : new BrowserDisplay(containerEl, state.width, state.height);
+  // If we wanted 3D but constructor wasn't available, correct the flag
+  if (is3D && !BrowserDisplay3D) {
+    is3D = false;
+  }
   for (const log of logs) display.addLog(log.text, log.type);
   display.addLog(is3D ? "[3D MODE]" : "[2D MODE]", "system");
   renderAll();

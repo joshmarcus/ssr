@@ -4,7 +4,7 @@ import { createEmptyState } from "../src/sim/state.js";
 import { tickHazards, tickRadiation, tickStructuralStress, applyHazardDamage } from "../src/sim/hazards.js";
 import {
   ActionType, EntityType, TileType, AttachmentSlot, SensorType,
-  DoorKeyType, ObjectivePhase,
+  DoorKeyType, ObjectivePhase, Direction,
 } from "../src/shared/types.js";
 import {
   GLYPHS,
@@ -12,8 +12,10 @@ import {
   STRESS_COLLAPSE_THRESHOLD, STRESS_COLLAPSE_TURNS,
   STATION_INTEGRITY_DECAY_RATE, STATION_INTEGRITY_BREACH_PENALTY,
   STATION_INTEGRITY_RELAY_BONUS,
+  PATROL_DRONE_DAMAGE, PLAYER_MAX_HP,
 } from "../src/shared/constants.js";
 import type { Entity } from "../src/shared/types.js";
+import { isValidAction } from "../src/sim/actions.js";
 
 /**
  * Helper: create a small all-floor test state with one room.
@@ -769,5 +771,259 @@ describe("Station integrity", () => {
 
     // Decay should be roughly the base rate (no breach penalty)
     expect(decay).toBeLessThanOrEqual(STATION_INTEGRITY_DECAY_RATE + 0.1);
+  });
+});
+
+// ========================================================================
+// 3.1 Diagonal Movement + Corner-Cutting Prevention
+// ========================================================================
+
+describe("Diagonal movement and corner-cutting prevention", () => {
+  it("diagonal move to open floor is valid", () => {
+    const state = makeTestState();
+    // Player at (5,5), all floor — NorthEast goes to (6,4)
+    const action = { type: ActionType.Move, direction: Direction.NorthEast };
+    expect(isValidAction(state, action)).toBe(true);
+  });
+
+  it("diagonal blocked by wall at target", () => {
+    const state = makeTestState();
+    // Put a wall at the diagonal target (6,4)
+    state.tiles[4][6] = {
+      type: TileType.Wall, glyph: "#", walkable: false,
+      heat: 0, smoke: 0, dirt: 0, pressure: 100,
+      radiation: 0, stress: 0, stressTurns: 0,
+      explored: true, visible: true,
+    };
+    const action = { type: ActionType.Move, direction: Direction.NorthEast };
+    expect(isValidAction(state, action)).toBe(false);
+  });
+
+  it("diagonal blocked by corner-cutting (wall on one adjacent cardinal tile)", () => {
+    const state = makeTestState();
+    // Player at (5,5). NorthEast target is (6,4).
+    // The two cardinal tiles that must be open are (6,5) [east] and (5,4) [north].
+    // Place a wall at (6,5) to block corner-cutting through the east cardinal tile.
+    state.tiles[5][6] = {
+      type: TileType.Wall, glyph: "#", walkable: false,
+      heat: 0, smoke: 0, dirt: 0, pressure: 100,
+      radiation: 0, stress: 0, stressTurns: 0,
+      explored: true, visible: true,
+    };
+    const action = { type: ActionType.Move, direction: Direction.NorthEast };
+    expect(isValidAction(state, action)).toBe(false);
+  });
+
+  it("diagonal blocked by corner-cutting (wall on the other adjacent cardinal tile)", () => {
+    const state = makeTestState();
+    // Player at (5,5). NorthEast target is (6,4).
+    // Place a wall at (5,4) [north] to block corner-cutting through the north cardinal tile.
+    state.tiles[4][5] = {
+      type: TileType.Wall, glyph: "#", walkable: false,
+      heat: 0, smoke: 0, dirt: 0, pressure: 100,
+      radiation: 0, stress: 0, stressTurns: 0,
+      explored: true, visible: true,
+    };
+    const action = { type: ActionType.Move, direction: Direction.NorthEast };
+    expect(isValidAction(state, action)).toBe(false);
+  });
+
+  it("Direction enum has all 8 values", () => {
+    const directions = [
+      Direction.North, Direction.South, Direction.East, Direction.West,
+      Direction.NorthEast, Direction.NorthWest, Direction.SouthEast, Direction.SouthWest,
+    ];
+    expect(directions).toHaveLength(8);
+    // All should be unique string values
+    const unique = new Set(directions);
+    expect(unique.size).toBe(8);
+  });
+
+  it("cardinal move still works normally", () => {
+    const state = makeTestState();
+    const action = { type: ActionType.Move, direction: Direction.East };
+    expect(isValidAction(state, action)).toBe(true);
+  });
+});
+
+// ========================================================================
+// 3.2 Clean Already-Clean Guard
+// ========================================================================
+
+describe("Clean already-clean guard", () => {
+  it("cleaning a tile with dirt=0, smoke=0, no relay, no hidden items logs 'already clean' and does not deep-clone tiles", () => {
+    const state = makeTestState();
+    // Ensure the player's tile is completely clean
+    state.tiles[5][5].dirt = 0;
+    state.tiles[5][5].smoke = 0;
+    // No entities near player (no relays, no hidden crew items)
+
+    const next = step(state, { type: ActionType.Clean });
+
+    // Should log "already clean"
+    expect(next.logs.some(l => l.text.includes("already clean"))).toBe(true);
+
+    // Dirt should still be 0 — no tile mutation occurred
+    expect(next.tiles[5][5].dirt).toBe(0);
+  });
+
+  it("cleaning a tile with dirt > 0 still works normally", () => {
+    const state = makeTestState();
+    state.tiles[5][5].dirt = 50;
+
+    const next = step(state, { type: ActionType.Clean });
+
+    // Dirt should have been reduced
+    expect(next.tiles[5][5].dirt).toBeLessThan(50);
+
+    // Should NOT log "already clean"
+    expect(next.logs.some(l => l.text.includes("already clean"))).toBe(false);
+  });
+
+  it("cleaning a tile with smoke > 0 but dirt=0 still cleans (not 'already clean')", () => {
+    const state = makeTestState();
+    state.tiles[5][5].dirt = 0;
+    state.tiles[5][5].smoke = 30;
+
+    const next = step(state, { type: ActionType.Clean });
+
+    // Should NOT log "already clean" because smoke > 0
+    expect(next.logs.some(l => l.text.includes("already clean"))).toBe(false);
+
+    // Smoke should be cleared
+    expect(next.tiles[5][5].smoke).toBe(0);
+  });
+});
+
+// ========================================================================
+// 3.3 Repair Cradle
+// ========================================================================
+
+describe("Repair cradle", () => {
+  function makeCradleState() {
+    const state = makeTestState();
+    // Place a repair cradle adjacent to the player at (5,4)
+    state.entities.set("repair_cradle_0", {
+      id: "repair_cradle_0",
+      type: EntityType.RepairCradle,
+      pos: { x: 5, y: 4 },
+      props: {},
+    });
+    return state;
+  }
+
+  it("heals player when HP < maxHp (heals 30, capped at maxHp)", () => {
+    const state = makeCradleState();
+    state.player = { ...state.player, hp: 50 };
+
+    const next = step(state, { type: ActionType.Interact, targetId: "repair_cradle_0" });
+
+    // Should heal 30 HP: 50 + 30 = 80
+    expect(next.player.hp).toBe(80);
+    // Should have a repair log
+    expect(next.logs.some(l => l.text.includes("Repair cradle activated"))).toBe(true);
+  });
+
+  it("healing is capped at maxHp", () => {
+    const state = makeCradleState();
+    state.player = { ...state.player, hp: 90, maxHp: PLAYER_MAX_HP };
+
+    const next = step(state, { type: ActionType.Interact, targetId: "repair_cradle_0" });
+
+    // Should cap at maxHp: min(100, 90 + 30) = 100
+    expect(next.player.hp).toBe(PLAYER_MAX_HP);
+  });
+
+  it("does nothing at full HP", () => {
+    const state = makeCradleState();
+    state.player = { ...state.player, hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP };
+
+    const next = step(state, { type: ActionType.Interact, targetId: "repair_cradle_0" });
+
+    // HP should remain at max
+    expect(next.player.hp).toBe(PLAYER_MAX_HP);
+    // Should have a "no repairs needed" log
+    expect(next.logs.some(l => l.text.includes("No repairs needed"))).toBe(true);
+  });
+
+  it("cooldown: after use, second use within 15 turns shows cooldown message", () => {
+    const state = makeCradleState();
+    state.player = { ...state.player, hp: 50 };
+
+    // First use: heals
+    const afterFirst = step(state, { type: ActionType.Interact, targetId: "repair_cradle_0" });
+    expect(afterFirst.player.hp).toBe(80);
+
+    // The cradle should have a cooldown set (turn inside step is state.turn+1, so cooldown = state.turn + 1 + 15)
+    const cradle = afterFirst.entities.get("repair_cradle_0")!;
+    expect(cradle.props["cooldown"]).toBe(state.turn + 1 + 15);
+
+    // Damage player again for a second attempt
+    const damaged = { ...afterFirst, player: { ...afterFirst.player, hp: 50 } };
+
+    // Second use immediately: should show cooldown message
+    const afterSecond = step(damaged, { type: ActionType.Interact, targetId: "repair_cradle_0" });
+
+    // HP should NOT be healed
+    expect(afterSecond.player.hp).toBe(50);
+    // Should have cooldown log
+    expect(afterSecond.logs.some(l => l.text.includes("cradle cycling"))).toBe(true);
+  });
+});
+
+// ========================================================================
+// 3.4 Non-Hostile Patrol Drones
+// ========================================================================
+
+describe("Patrol drones hostile vs non-hostile", () => {
+  it("drone with hostile: false does NOT damage player when adjacent", () => {
+    const state = makeTestState();
+    const initialHp = state.player.hp;
+
+    // Place a non-hostile patrol drone adjacent to the player
+    // Drone at (6,5), player at (5,5) — drone will try to move toward player
+    state.entities.set("patrol_drone_0", {
+      id: "patrol_drone_0",
+      type: EntityType.PatrolDrone,
+      pos: { x: 6, y: 5 },
+      props: { hostile: false, patrolIndex: 0 },
+    });
+
+    // Run multiple turns to let the drone move around the player
+    let current = state;
+    for (let i = 0; i < 20; i++) {
+      current = step(current, { type: ActionType.Wait });
+    }
+
+    // Player HP should remain unchanged (no drone damage logs)
+    expect(current.player.hp).toBe(initialHp);
+    // No "Rogue drone attack" logs
+    expect(current.logs.some(l => l.text.includes("Rogue drone attack"))).toBe(false);
+  });
+
+  it("drone with hostile: true DOES damage player when adjacent", () => {
+    const state = makeTestState();
+    state.player = { ...state.player, hp: PLAYER_MAX_HP };
+
+    // Place a hostile patrol drone adjacent to the player
+    // Drone at (6,5), player at (5,5) — hostile drone will hunt player
+    state.entities.set("patrol_drone_0", {
+      id: "patrol_drone_0",
+      type: EntityType.PatrolDrone,
+      pos: { x: 6, y: 5 },
+      props: { hostile: true, patrolIndex: 0, lastAttackTurn: -999 },
+    });
+
+    // Run enough turns for the drone to move and attack
+    // Drones move every PATROL_DRONE_SPEED turns
+    let current = state;
+    for (let i = 0; i < 20; i++) {
+      current = step(current, { type: ActionType.Wait });
+    }
+
+    // Player should have taken damage at some point
+    expect(current.player.hp).toBeLessThan(PLAYER_MAX_HP);
+    // Should have a "Rogue drone attack" log
+    expect(current.logs.some(l => l.text.includes("Rogue drone attack"))).toBe(true);
   });
 });

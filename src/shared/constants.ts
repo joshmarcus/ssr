@@ -46,7 +46,7 @@ export const PATROL_DRONE_SPEED = 3; // drone moves every N turns
 export const PATROL_DRONE_ATTACK_COOLDOWN = 4; // turns between attacks (drone retreats after hitting)
 
 // ── Radiation ───────────────────────────────────────────────
-export const RADIATION_SPREAD_RATE = 0.5; // very slow spread
+export const RADIATION_SPREAD_RATE = 0.2; // very slow spread
 export const RADIATION_SPREAD_RANGE = 2; // spread distance
 export const RADIATION_DAMAGE_THRESHOLD = 70; // need high radiation to hurt
 export const RADIATION_DAMAGE_PER_TURN = 2; // mild damage with sensor
