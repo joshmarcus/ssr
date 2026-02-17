@@ -1,7 +1,7 @@
 import * as ROT from "rot-js";
 import type { GameState, Entity, Room } from "../shared/types.js";
 import { TileType, EntityType, AttachmentSlot, SensorType } from "../shared/types.js";
-import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
+import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
 import type { IGameDisplay } from "./displayInterface.js";
 
 // ── Log entry types for color-coding ────────────────────────────
@@ -265,10 +265,12 @@ export class BrowserDisplay implements IGameDisplay {
     this.container = container;
     this.mapWidth = mapWidth ?? DEFAULT_MAP_WIDTH;
     this.mapHeight = mapHeight ?? DEFAULT_MAP_HEIGHT;
-    const fontSize = computeFontSize(this.mapWidth, this.mapHeight);
+    const vw = Math.min(VIEWPORT_WIDTH, this.mapWidth);
+    const vh = Math.min(VIEWPORT_HEIGHT, this.mapHeight);
+    const fontSize = computeFontSize(vw, vh);
     this.display = new ROT.Display({
-      width: this.mapWidth,
-      height: this.mapHeight,
+      width: vw,
+      height: vh,
       fontSize,
       fontFamily: "monospace",
       bg: COLORS.background,
@@ -405,7 +407,9 @@ export class BrowserDisplay implements IGameDisplay {
 
   // ── Responsive resize ──────────────────────────────────────────
   private handleResize(): void {
-    const fontSize = computeFontSize(this.mapWidth, this.mapHeight);
+    const vw = Math.min(VIEWPORT_WIDTH, this.mapWidth);
+    const vh = Math.min(VIEWPORT_HEIGHT, this.mapHeight);
+    const fontSize = computeFontSize(vw, vh);
     const opts = this.display.getOptions();
     if (opts.fontSize !== fontSize) {
       this.display.setOptions({ fontSize });
@@ -502,10 +506,26 @@ export class BrowserDisplay implements IGameDisplay {
     this.lastRoomId = roomId;
   }
 
+  /** Compute the top-left corner of the viewport, centered on the player with edge clamping. */
+  private getViewportOrigin(state: GameState): { vx: number; vy: number } {
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+    const vw = Math.min(VIEWPORT_WIDTH, state.width);
+    const vh = Math.min(VIEWPORT_HEIGHT, state.height);
+    let vx = px - Math.floor(vw / 2);
+    let vy = py - Math.floor(vh / 2);
+    vx = Math.max(0, Math.min(state.width - vw, vx));
+    vy = Math.max(0, Math.min(state.height - vh, vy));
+    return { vx, vy };
+  }
+
   render(state: GameState): void {
     this.display.clear();
 
     const curPos = { x: state.player.entity.pos.x, y: state.player.entity.pos.y };
+    const { vx, vy } = this.getViewportOrigin(state);
+    const vw = Math.min(VIEWPORT_WIDTH, state.width);
+    const vh = Math.min(VIEWPORT_HEIGHT, state.height);
 
     // Determine if we should show a movement trail this frame
     let trailPos: { x: number; y: number } | null = null;
@@ -541,14 +561,16 @@ export class BrowserDisplay implements IGameDisplay {
       });
     }
 
-    // Draw tiles, entities, and player
-    for (let y = 0; y < state.height; y++) {
-      for (let x = 0; x < state.width; x++) {
+    // Draw tiles, entities, and player (viewport only)
+    for (let y = vy; y < vy + vh; y++) {
+      for (let x = vx; x < vx + vw; x++) {
         const tile = state.tiles[y][x];
+        const sx = x - vx; // screen x
+        const sy = y - vy; // screen y
 
         // Fog-of-war: unexplored tiles are black
         if (!tile.explored) {
-          this.display.draw(x, y, " ", "#000", "#000");
+          this.display.draw(sx, sy, " ", "#000", "#000");
           continue;
         }
 
@@ -562,7 +584,7 @@ export class BrowserDisplay implements IGameDisplay {
           } else if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
             memFg = "#332210";
           }
-          this.display.draw(x, y, memGlyph, memFg, "#050505");
+          this.display.draw(sx, sy, memGlyph, memFg, "#050505");
           continue;
         }
 
@@ -726,7 +748,7 @@ export class BrowserDisplay implements IGameDisplay {
           bg = "#0a1a0a";
         }
 
-        this.display.draw(x, y, glyph, fg, bg);
+        this.display.draw(sx, sy, glyph, fg, bg);
       }
     }
 
@@ -760,16 +782,18 @@ export class BrowserDisplay implements IGameDisplay {
   }
 
   private renderGameOverOverlay(state: GameState): void {
-    // Fill the center of the screen with a dark box
-    const centerY = Math.floor(state.height / 2);
+    // Fill the center of the viewport with a dark box
+    const vw = Math.min(VIEWPORT_WIDTH, state.width);
+    const vh = Math.min(VIEWPORT_HEIGHT, state.height);
+    const centerY = Math.floor(vh / 2);
     const boxTop = centerY - 5;
     const boxBottom = centerY + 5;
-    const boxLeft = Math.floor(this.mapWidth * 0.15);
-    const boxRight = Math.floor(this.mapWidth * 0.85);
+    const boxLeft = Math.floor(vw * 0.15);
+    const boxRight = Math.floor(vw * 0.85);
 
     for (let y = boxTop; y <= boxBottom; y++) {
       for (let x = boxLeft; x <= boxRight; x++) {
-        if (x >= 0 && x < this.mapWidth && y >= 0 && y < state.height) {
+        if (x >= 0 && x < vw && y >= 0 && y < vh) {
           const isBorder = y === boxTop || y === boxBottom || x === boxLeft || x === boxRight;
           const borderColor = state.victory ? "#0a4a0a" : "#4a0a0a";
           this.display.draw(x, y, isBorder ? "#" : " ", isBorder ? borderColor : "#000", "#000");
@@ -805,10 +829,11 @@ export class BrowserDisplay implements IGameDisplay {
     fg: string,
     bg: string
   ): void {
-    const startX = Math.floor((this.mapWidth - text.length) / 2);
+    const vw = Math.min(VIEWPORT_WIDTH, this.mapWidth);
+    const startX = Math.floor((vw - text.length) / 2);
     for (let i = 0; i < text.length; i++) {
       const x = startX + i;
-      if (x >= 0 && x < this.mapWidth) {
+      if (x >= 0 && x < vw) {
         this.display.draw(x, y, text[i], fg, bg);
       }
     }
@@ -822,7 +847,7 @@ export class BrowserDisplay implements IGameDisplay {
         : { text: "CONNECTION LOST", detail: "Refresh to try again." };
     }
 
-    const hasThermal = state.player.attachments[AttachmentSlot.Sensor]?.sensorType === SensorType.Thermal;
+    const hasThermal = state.player.sensors?.includes(SensorType.Thermal) ?? false;
     const sensorExists = Array.from(state.entities.values()).some(e => e.type === EntityType.SensorPickup);
 
     // Count relay status
@@ -965,11 +990,24 @@ export class BrowserDisplay implements IGameDisplay {
     }
     const discoveryTag = ` | <span class="label">Discoveries:</span> <span style="color:#ca8">${discovered}/${totalDiscoverables}</span>`;
 
+    // ── Report ready indicator ──────────────────────────────────
+    let reportTag = "";
+    if (state.mystery) {
+      const jCount = state.mystery.journal.length;
+      const thresholds = [3, 6, 10];
+      const hasAvailable = state.mystery.choices.some((c, i) =>
+        i < thresholds.length && jCount >= thresholds[i] && !c.chosen
+      );
+      if (hasAvailable) {
+        reportTag = ` | <span style="color:#ff0">[REPORT READY]</span>`;
+      }
+    }
+
     const statusHtml = `<div class="status-bar">` +
       `<span class="label">T:</span><span class="value">${state.turn}</span>` +
       roomLabel + sensorTag + stunTag +
       `<br>` + hpTag.replace(/ \| /, '') +
-      `<br>` + discoveryTag.replace(/ \| /, '') + unreadTag.replace(/ \| /g, '') +
+      `<br>` + discoveryTag.replace(/ \| /, '') + unreadTag.replace(/ \| /g, '') + reportTag.replace(/ \| /, '') +
       interactHint +
       `</div>`;
 
@@ -1043,6 +1081,7 @@ export class BrowserDisplay implements IGameDisplay {
       `<span class="key">i</span> interact ` +
       `<span class="key">t</span> sensor ` +
       `<span class="key">c</span> clean ` +
+      `<span class="key">b</span> report ` +
       `<span class="key">?</span> help`;
 
     const infoHtml = `<div class="info-bar">` +

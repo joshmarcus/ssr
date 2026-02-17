@@ -16,10 +16,12 @@ const thermalSensor: Attachment = {
 };
 
 function equipThermal(state: GameState): GameState {
+  const sensors = state.player.sensors ?? [];
   return {
     ...state,
     player: {
       ...state.player,
+      sensors: sensors.includes(SensorType.Thermal) ? sensors : [...sensors, SensorType.Thermal],
       attachments: { ...state.player.attachments, [AttachmentSlot.Sensor]: thermalSensor },
     },
   };
@@ -90,7 +92,7 @@ describe("Golden seed walkthrough (expanded station)", () => {
       entity: { ...state.player.entity, pos: { ...sensor.pos } },
     };
     state = step(state, interact("sensor_thermal"));
-    expect(state.player.attachments[AttachmentSlot.Sensor]?.sensorType).toBe(SensorType.Thermal);
+    expect(state.player.sensors).toContain(SensorType.Thermal);
     expect(state.entities.has("sensor_thermal")).toBe(false);
   });
 

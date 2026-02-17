@@ -54,6 +54,7 @@ describe("Scan action", () => {
       name: "thermal sensor",
       sensorType: SensorType.Thermal,
     };
+    state.player.sensors = [...(state.player.sensors ?? []), SensorType.Thermal];
     state.player.attachments = { [AttachmentSlot.Sensor]: thermalSensor };
 
     const relay: Entity = {
@@ -78,6 +79,7 @@ describe("Scan action", () => {
       name: "thermal sensor",
       sensorType: SensorType.Thermal,
     };
+    state.player.sensors = [...(state.player.sensors ?? []), SensorType.Thermal];
     state.player.attachments = { [AttachmentSlot.Sensor]: thermalSensor };
 
     const relay: Entity = {

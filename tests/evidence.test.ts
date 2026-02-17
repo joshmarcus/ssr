@@ -14,10 +14,12 @@ const thermalSensor: Attachment = {
 };
 
 function equipThermal(state: GameState): GameState {
+  const sensors = state.player.sensors ?? [];
   return {
     ...state,
     player: {
       ...state.player,
+      sensors: sensors.includes(SensorType.Thermal) ? sensors : [...sensors, SensorType.Thermal],
       attachments: { ...state.player.attachments, [AttachmentSlot.Sensor]: thermalSensor },
     },
   };

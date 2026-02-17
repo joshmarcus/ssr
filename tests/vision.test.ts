@@ -115,6 +115,7 @@ describe("Vision system", () => {
       name: "thermal sensor",
       sensorType: SensorType.Thermal,
     };
+    state.player.sensors = [...(state.player.sensors ?? []), SensorType.Thermal];
     state.player.attachments = { [AttachmentSlot.Sensor]: thermalSensor };
 
     const withSensor = updateVision(state);
@@ -146,6 +147,7 @@ describe("Vision system", () => {
       name: "atmospheric sensor",
       sensorType: SensorType.Atmospheric,
     };
+    state.player.sensors = [...(state.player.sensors ?? []), SensorType.Atmospheric];
     state.player.attachments = { [AttachmentSlot.Sensor]: atmosSensor };
 
     const withSensor = updateVision(state);

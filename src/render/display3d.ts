@@ -1554,7 +1554,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         : { text: "CONNECTION LOST", detail: "Refresh to try again." };
     }
 
-    const hasThermal = state.player.attachments[AttachmentSlot.Sensor]?.sensorType === SensorType.Thermal;
+    const hasThermal = state.player.sensors?.includes(SensorType.Thermal) ?? false;
     const sensorExists = Array.from(state.entities.values()).some(e => e.type === EntityType.SensorPickup);
 
     let totalRelays = 0;

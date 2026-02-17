@@ -1,5 +1,5 @@
 import type { GameState, Tile } from "../shared/types.js";
-import { TileType, EntityType, AttachmentSlot, SensorType } from "../shared/types.js";
+import { TileType, EntityType, SensorType } from "../shared/types.js";
 import {
   HEAT_SPREAD_RATE, SMOKE_SPREAD_RATE, HEAT_DECAY_RATE, HEAT_SOURCE_RATE, HEAT_SOURCE_CAP,
   HEAT_DAMAGE_PER_TURN, HEAT_PAIN_THRESHOLD, COOL_RECOVERY_RATE, HEAT_SPREAD_MIN,
@@ -425,11 +425,11 @@ export function applyHazardDamage(inputState: GameState): GameState {
 
   if (!state.player.alive) return state;
 
-  // Sensor-based damage reduction
-  const equippedSensor = state.player.attachments[AttachmentSlot.Sensor];
-  const hasThermal = equippedSensor?.sensorType === SensorType.Thermal;
-  const hasAtmospheric = equippedSensor?.sensorType === SensorType.Atmospheric;
-  const hasRadiation = equippedSensor?.sensorType === SensorType.Radiation;
+  // Sensor-based damage reduction — all collected sensors apply simultaneously
+  const sensors = state.player.sensors ?? [];
+  const hasThermal = sensors.includes(SensorType.Thermal);
+  const hasAtmospheric = sensors.includes(SensorType.Atmospheric);
+  const hasRadiation = sensors.includes(SensorType.Radiation);
 
   // Pressure damage: low-pressure tiles damage the bot
   // Atmospheric sensor halves pressure damage (better seals awareness)

@@ -437,42 +437,31 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
 
   switch (target.type) {
     case EntityType.SensorPickup: {
-      // Pick up sensor and equip it
+      // Pick up sensor and add it to collection
       const sensorType = (target.props["sensorType"] as SensorType) || SensorType.Thermal;
-      const currentSensor = state.player.attachments[AttachmentSlot.Sensor];
+      const currentSensors = state.player.sensors ?? [];
 
-      // Sensor choice: if player already has a non-cleanliness sensor, warn before replacing
-      if (currentSensor && currentSensor.sensorType !== SensorType.Cleanliness &&
-          currentSensor.sensorType !== sensorType &&
-          target.props["confirmReplace"] !== true) {
-        // First interact: show warning
-        const newEntities = new Map(state.entities);
-        newEntities.set(targetId, {
-          ...target,
-          props: { ...target.props, confirmReplace: true },
-        });
-        next.entities = newEntities;
+      // Already have this sensor — skip
+      if (currentSensors.includes(sensorType)) {
         next.logs = [
           ...state.logs,
           {
-            id: `log_sensor_warn_${targetId}_${next.turn}`,
+            id: `log_sensor_dup_${targetId}_${next.turn}`,
             timestamp: next.turn,
             source: "system",
-            text: `WARNING: Equipping ${sensorType} sensor will replace your ${currentSensor.sensorType} sensor. Press [i] again to confirm.`,
+            text: `${sensorType} sensor already installed.`,
             read: false,
           },
         ];
         break;
       }
 
-      const attachment: Attachment = {
-        slot: AttachmentSlot.Sensor,
-        name: `${sensorType} sensor`,
-        sensorType,
-      };
+      // Add new sensor to the collection
+      const newSensors = [...currentSensors, sensorType];
       next.player = {
         ...state.player,
-        attachments: { ...state.player.attachments, [AttachmentSlot.Sensor]: attachment },
+        sensors: newSensors,
+        attachments: { ...state.player.attachments, [AttachmentSlot.Sensor]: { slot: AttachmentSlot.Sensor, name: `${sensorType} sensor`, sensorType } },
       };
       // Remove the pickup entity
       const newEntities = new Map(state.entities);
@@ -509,8 +498,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
 
       // Require thermal sensor to interact with overheating relays
       if (target.props["overheating"] === true) {
-        const sensor = state.player.attachments[AttachmentSlot.Sensor];
-        if (!sensor || sensor.sensorType !== SensorType.Thermal) {
+        const sensors = state.player.sensors ?? [];
+        if (!sensors.includes(SensorType.Thermal)) {
           next.logs = [
             ...state.logs,
             {
@@ -916,8 +905,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           },
         ];
       } else {
-        const sensor = state.player.attachments[AttachmentSlot.Sensor];
-        if (!sensor || sensor.sensorType !== SensorType.Atmospheric) {
+        const sensors = state.player.sensors ?? [];
+        if (!sensors.includes(SensorType.Atmospheric)) {
           next.logs = [
             ...state.logs,
             {
@@ -1259,8 +1248,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         ];
       } else {
         // Require atmospheric sensor
-        const sensor = state.player.attachments[AttachmentSlot.Sensor];
-        if (!sensor || sensor.sensorType !== SensorType.Atmospheric) {
+        const sensors = state.player.sensors ?? [];
+        if (!sensors.includes(SensorType.Atmospheric)) {
           next.logs = [
             ...state.logs,
             {
@@ -1499,8 +1488,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         ];
       } else {
         // Check sensor requirement
-        const sensor = state.player.attachments[AttachmentSlot.Sensor];
-        const hasSensor = !sensorReq || sensor?.sensorType === sensorReq;
+        const sensors = state.player.sensors ?? [];
+        const hasSensor = !sensorReq || sensors.includes(sensorReq as SensorType);
 
         if (!hasSensor) {
           next.logs = [
@@ -1665,8 +1654,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
 
     case EntityType.HiddenDevice: {
       // Only interactable if player has EM sensor
-      const sensor = state.player.attachments[AttachmentSlot.Sensor];
-      if (!sensor || sensor.sensorType !== SensorType.EMSignal) {
+      const sensors = state.player.sensors ?? [];
+      if (!sensors.includes(SensorType.EMSignal)) {
         next.logs = [
           ...state.logs,
           {
@@ -2278,8 +2267,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
  * Sets a "thermalScan" flag on nearby tiles to indicate they've been scanned.
  */
 function handleScan(state: GameState): GameState {
-  const sensor = state.player.attachments[AttachmentSlot.Sensor];
-  if (!sensor || sensor.sensorType !== SensorType.Thermal) {
+  const sensors = state.player.sensors ?? [];
+  if (!sensors.includes(SensorType.Thermal)) {
     // No thermal sensor equipped - scan does nothing meaningful
     return state;
   }

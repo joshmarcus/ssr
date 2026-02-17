@@ -731,6 +731,7 @@ describe("Station integrity", () => {
     state.stationIntegrity = 70;
 
     // Equip thermal sensor
+    state.player.sensors = [...(state.player.sensors ?? []), SensorType.Thermal];
     state.player.attachments[AttachmentSlot.Sensor] = {
       slot: AttachmentSlot.Sensor,
       name: "thermal sensor",

@@ -28,6 +28,7 @@ export function createEmptyState(seed: number, width: number, height: number): G
   const player: PlayerBot = {
     entity: playerEntity,
     attachments: { [AttachmentSlot.Sensor]: cleanlinessSensor },
+    sensors: [SensorType.Cleanliness],
     alive: true,
     hp: PLAYER_MAX_HP,
     maxHp: PLAYER_MAX_HP,

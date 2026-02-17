@@ -313,6 +313,23 @@ function initGame(): void {
       }
       return;
     }
+    // B key broadcasts report to base (mystery choices)
+    if (e.key === "b" && !journalOpen && !state.gameOver) {
+      e.preventDefault();
+      const available = getAvailableChoices();
+      if (available.length > 0) {
+        presentChoice(available[0]);
+      } else {
+        const allAnswered = state.mystery?.choices.every(c => c.chosen);
+        if (allAnswered) {
+          display.addLog("All reports transmitted.", "system");
+        } else {
+          display.addLog("Nothing to report yet. Gather more evidence.", "system");
+        }
+        renderAll();
+      }
+      return;
+    }
     // M key toggles station map
     if ((e.key === "m" || e.key === "M") && !journalOpen) {
       e.preventDefault();
@@ -523,9 +540,7 @@ function handleAction(action: Action): void {
 
   // Item 1: Cleanliness sensor dirt trail hints
   if (action.type === ActionType.Move && state.turn !== prevTurn) {
-    const sensor = state.player.attachments[AttachmentSlot.Sensor];
-    const hasCleanliness = !sensor || sensor.sensorType === SensorType.Cleanliness;
-    // Default sensor is cleanliness, or if no sensor equipped, it's the base sensor
+    const hasCleanliness = state.player.sensors?.includes(SensorType.Cleanliness) ?? true;
     const px = state.player.entity.pos.x;
     const py = state.player.entity.pos.y;
     const tile = state.tiles[py]?.[px];
@@ -645,8 +660,7 @@ function handleAction(action: Action): void {
     }
   }
 
-  // Check if mystery choices should be presented
-  checkMysteryChoices();
+  // Mystery choices no longer auto-trigger — player presses [b] to broadcast
 
   // Detect damage taken this turn for screen flash
   if (state.turn !== prevTurn && !state.gameOver) {
@@ -824,27 +838,22 @@ function getTotalDiscoverables(): number {
   return count;
 }
 
-// ── Scan callback (cycles through available sensor overlays) ──
+// ── Scan callback (cycles through all collected sensor overlays) ──
 function handleScan(): void {
-  const sensor = state.player.attachments[AttachmentSlot.Sensor];
-  const hasThermal = sensor?.sensorType === SensorType.Thermal;
-  const hasAtmospheric = sensor?.sensorType === SensorType.Atmospheric;
+  const sensors = state.player.sensors ?? [SensorType.Cleanliness];
   const currentMode = display.activeSensorMode;
 
-  // Cycle: off -> cleanliness -> thermal (if equipped) -> atmospheric (if equipped) -> off
+  // Cycle: off -> sensors[0] -> sensors[1] -> ... -> off
   let nextMode: SensorType | null;
   if (currentMode === null) {
-    nextMode = SensorType.Cleanliness;
-  } else if (currentMode === SensorType.Cleanliness && hasThermal) {
-    nextMode = SensorType.Thermal;
-  } else if (currentMode === SensorType.Cleanliness && hasAtmospheric) {
-    nextMode = SensorType.Atmospheric;
-  } else if (currentMode === SensorType.Thermal) {
-    nextMode = null;
-  } else if (currentMode === SensorType.Atmospheric) {
-    nextMode = null;
+    nextMode = sensors[0] ?? null;
   } else {
-    nextMode = null;
+    const idx = sensors.indexOf(currentMode);
+    if (idx >= 0 && idx < sensors.length - 1) {
+      nextMode = sensors[idx + 1];
+    } else {
+      nextMode = null;
+    }
   }
 
   // Apply the mode change via toggleSensor
@@ -855,14 +864,19 @@ function handleScan(): void {
     display.toggleSensor(nextMode); // turn on next
   }
 
+  const sensorLabels: Record<string, string> = {
+    [SensorType.Cleanliness]: "[CLEANLINESS OVERLAY ON] — Dirt trails reveal crew movement patterns.",
+    [SensorType.Thermal]: "[THERMAL OVERLAY ON]",
+    [SensorType.Atmospheric]: "[ATMOSPHERIC OVERLAY ON] — Pressure differentials visible. Breaches glow red.",
+    [SensorType.Radiation]: "[RADIATION OVERLAY ON] — Ionizing radiation sources visible.",
+    [SensorType.Structural]: "[STRUCTURAL OVERLAY ON] — Stress fractures visible.",
+    [SensorType.EMSignal]: "[EM/SIGNAL OVERLAY ON] — Hidden electromagnetic sources visible.",
+  };
+
   if (nextMode === null) {
     display.addLog("[SENSOR OVERLAY OFF]", "sensor");
-  } else if (nextMode === SensorType.Thermal) {
-    display.addLog("[THERMAL OVERLAY ON]", "sensor");
-  } else if (nextMode === SensorType.Cleanliness) {
-    display.addLog("[CLEANLINESS OVERLAY ON] — Dirt trails reveal crew movement patterns.", "sensor");
-  } else if (nextMode === SensorType.Atmospheric) {
-    display.addLog("[ATMOSPHERIC OVERLAY ON] — Pressure differentials visible. Breaches glow red.", "sensor");
+  } else {
+    display.addLog(sensorLabels[nextMode] || `[${nextMode.toUpperCase()} OVERLAY ON]`, "sensor");
   }
 
   audio.playScan();
@@ -884,6 +898,7 @@ function showHelp(): void {
   display.addLog("  x                    Look (examine surroundings)", "system");
   display.addLog("  .  Space  5          Wait one turn", "system");
   display.addLog("── Menus ──", "system");
+  display.addLog("  b                    Broadcast report to base", "system");
   display.addLog("  ;                    Open journal / notes", "system");
   display.addLog("  m                    Toggle station map", "system");
   display.addLog("  ?                    Toggle this help", "system");
@@ -1259,7 +1274,7 @@ function presentChoice(choice: MysteryChoice): void {
   activeChoice = choice;
   choiceSelectedIdx = 0;
   display.addLog("", "system");
-  display.addLog("═══ DECISION REQUIRED ═══", "milestone");
+  display.addLog("═══ BROADCAST REPORT ═══", "milestone");
   display.addLog(choice.prompt, "narrative");
   display.addLog("", "system");
   for (let i = 0; i < choice.options.length; i++) {
@@ -1304,7 +1319,7 @@ function handleChoiceInput(e: KeyboardEvent): boolean {
   }
   if (e.key === "Escape") {
     e.preventDefault();
-    display.addLog("Decision deferred. You can revisit at another terminal.", "system");
+    display.addLog("Report deferred. Press [b] when ready.", "system");
     activeChoice = null;
     renderAll();
     return true;
@@ -1333,22 +1348,19 @@ function handleChoiceInput(e: KeyboardEvent): boolean {
   return true; // consume all input while choice is active
 }
 
-// Check if we should present a mystery choice based on evidence count
-function checkMysteryChoices(): void {
-  if (!state.mystery) return;
-  if (activeChoice) return; // already showing one
-
+// Get mystery choices that are available (threshold met, not yet answered)
+function getAvailableChoices(): MysteryChoice[] {
+  if (!state.mystery) return [];
   const journalCount = state.mystery.journal.length;
   const choices = state.mystery.choices;
-
-  // Present choices at evidence thresholds: 3, 6, 10 pieces
   const thresholds = [3, 6, 10];
+  const available: MysteryChoice[] = [];
   for (let i = 0; i < Math.min(choices.length, thresholds.length); i++) {
-    if (journalCount >= thresholds[i] && !choicesPresented.has(choices[i].id) && !choices[i].chosen) {
-      presentChoice(choices[i]);
-      return;
+    if (journalCount >= thresholds[i] && !choices[i].chosen) {
+      available.push(choices[i]);
     }
   }
+  return available;
 }
 
 // ── Start with opening crawl ────────────────────────────────────

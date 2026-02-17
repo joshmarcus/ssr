@@ -2,6 +2,10 @@
 export const DEFAULT_MAP_WIDTH = 70;
 export const DEFAULT_MAP_HEIGHT = 35;
 
+// ── Viewport (scrolling window) ─────────────────────────────
+export const VIEWPORT_WIDTH = 40;
+export const VIEWPORT_HEIGHT = 25;
+
 // ── Golden seed ──────────────────────────────────────────────
 export const GOLDEN_SEED = 184201;
 
@@ -13,16 +17,16 @@ export const HEAT_SOURCE_RATE = 5; // heat injected per turn at relay sources
 export const HEAT_SOURCE_CAP = 95; // max heat at source tiles
 export const HEAT_SPREAD_MIN = 15; // tiles spread heat if they have at least this much
 export const HEAT_DAMAGE_THRESHOLD = 200; // legacy — unused
-export const PLAYER_MAX_HP = 100;
+export const PLAYER_MAX_HP = 1000;
 export const HEAT_DAMAGE_PER_TURN = 3; // base HP lost per turn on tiles with heat >= HEAT_PAIN_THRESHOLD
 export const HEAT_PAIN_THRESHOLD = 40; // heat level at which the player starts taking damage
 export const COOL_RECOVERY_RATE = 0; // no passive recovery — use Bot Maintenance room
 export const HOT_ZONE_SLOW_THRESHOLD = 60; // heat level that costs extra movement
 
 // ── Station deterioration ────────────────────────────────────
-export const DETERIORATION_INTERVAL = 12; // turns between station deterioration events
-export const DETERIORATION_HEAT_BOOST = 3; // extra heat added to source tiles each deterioration tick
-export const DETERIORATION_SMOKE_SPAWN = 15; // smoke added to random corridor tiles
+export const DETERIORATION_INTERVAL = 25; // turns between station deterioration events
+export const DETERIORATION_HEAT_BOOST = 2; // extra heat added to source tiles each deterioration tick
+export const DETERIORATION_SMOKE_SPAWN = 8; // smoke added to random corridor tiles
 
 // ── Vision / fog-of-war ─────────────────────────────────────
 export const VISION_RADIUS_BASE = 6;
@@ -57,9 +61,9 @@ export const RADIATION_DECAY_RATE = 0.8; // fast decay away from source
 export const SHIELD_GENERATOR_RADIUS = 5;
 
 // ── Structural stress ──────────────────────────────────────
-export const STRESS_COLLAPSE_THRESHOLD = 80;
-export const STRESS_COLLAPSE_TURNS = 3; // turns above threshold before collapse
-export const STRESS_SPREAD_RATE = 1;
+export const STRESS_COLLAPSE_THRESHOLD = 90;
+export const STRESS_COLLAPSE_TURNS = 8; // turns above threshold before collapse
+export const STRESS_SPREAD_RATE = 0.3;
 
 // ── Vision radii for new sensors ───────────────────────────
 export const VISION_RADIUS_RADIATION = 8;
@@ -68,7 +72,7 @@ export const VISION_RADIUS_EM = 10;
 
 // ── Station Integrity ───────────────────────────────────────
 export const STATION_INTEGRITY_MAX = 100;
-export const STATION_INTEGRITY_DECAY_RATE = 0.3; // per turn base decay
+export const STATION_INTEGRITY_DECAY_RATE = 0.15; // per turn base decay
 export const STATION_INTEGRITY_RELAY_BONUS = 10; // restored per relay rerouted
 export const STATION_INTEGRITY_BREACH_PENALTY = 0.5; // extra decay per unsealed breach
 export const STATION_INTEGRITY_CRITICAL = 25; // below this, hazards accelerate

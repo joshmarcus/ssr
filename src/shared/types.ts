@@ -102,6 +102,7 @@ export interface Attachment {
 export interface PlayerBot {
   entity: Entity;
   attachments: Partial<Record<AttachmentSlot, Attachment>>;
+  sensors: SensorType[]; // all collected sensors (starts with [Cleanliness])
   alive: boolean;
   hp: number;
   maxHp: number;

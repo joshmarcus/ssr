@@ -51,8 +51,7 @@ describe("Interact action", () => {
 
     const next = step(state, { type: ActionType.Interact, targetId: "sensor_t" });
 
-    expect(next.player.attachments[AttachmentSlot.Sensor]).toBeDefined();
-    expect(next.player.attachments[AttachmentSlot.Sensor]!.sensorType).toBe(SensorType.Thermal);
+    expect(next.player.sensors).toContain(SensorType.Thermal);
     expect(next.entities.has("sensor_t")).toBe(false); // removed after pickup
     expect(next.logs.length).toBeGreaterThan(0);
   });
@@ -69,7 +68,7 @@ describe("Interact action", () => {
 
     const next = step(state, { type: ActionType.Interact, targetId: "sensor_t" });
 
-    expect(next.player.attachments[AttachmentSlot.Sensor]).toBeDefined();
+    expect(next.player.sensors).toContain(SensorType.Thermal);
   });
 
   it("does not interact with distant entity", () => {
@@ -85,13 +84,14 @@ describe("Interact action", () => {
     const next = step(state, { type: ActionType.Interact, targetId: "sensor_t" });
 
     // Player still has starting cleanliness sensor (distant thermal sensor not picked up)
-    expect(next.player.attachments[AttachmentSlot.Sensor]?.sensorType).not.toBe(SensorType.Thermal);
+    expect(next.player.sensors).not.toContain(SensorType.Thermal);
     expect(next.entities.has("sensor_t")).toBe(true); // still there
   });
 
   it("activates relay and powers locked door", () => {
     const state = makeTestState();
     // Equip thermal sensor (required to interact with overheating relays)
+    state.player.sensors = [...state.player.sensors, SensorType.Thermal];
     state.player.attachments[AttachmentSlot.Sensor] = {
       slot: AttachmentSlot.Sensor,
       name: "thermal sensor",

@@ -1,5 +1,5 @@
 import type { GameState } from "../shared/types.js";
-import { AttachmentSlot, SensorType, EntityType } from "../shared/types.js";
+import { SensorType, EntityType } from "../shared/types.js";
 import {
   VISION_RADIUS_BASE,
   VISION_RADIUS_THERMAL,
@@ -82,11 +82,11 @@ export function updateVision(state: GameState): GameState {
     }
   }
 
-  // 3. Sensor-based extended vision (through walls)
-  const sensor = state.player.attachments[AttachmentSlot.Sensor];
+  // 3. Sensor-based extended vision (through walls) — all collected sensors apply
+  const sensors = state.player.sensors ?? [];
 
   // Thermal radar: reveal tiles with significant heat within extended radius
-  if (sensor?.sensorType === SensorType.Thermal) {
+  if (sensors.includes(SensorType.Thermal)) {
     for (let dy = -VISION_RADIUS_THERMAL; dy <= VISION_RADIUS_THERMAL; dy++) {
       for (let dx = -VISION_RADIUS_THERMAL; dx <= VISION_RADIUS_THERMAL; dx++) {
         if (Math.abs(dx) + Math.abs(dy) > VISION_RADIUS_THERMAL) continue;
@@ -102,7 +102,7 @@ export function updateVision(state: GameState): GameState {
   }
 
   // Atmospheric radar: reveal tiles with low pressure within extended radius
-  if (sensor?.sensorType === SensorType.Atmospheric) {
+  if (sensors.includes(SensorType.Atmospheric)) {
     for (let dy = -VISION_RADIUS_ATMOSPHERIC; dy <= VISION_RADIUS_ATMOSPHERIC; dy++) {
       for (let dx = -VISION_RADIUS_ATMOSPHERIC; dx <= VISION_RADIUS_ATMOSPHERIC; dx++) {
         if (Math.abs(dx) + Math.abs(dy) > VISION_RADIUS_ATMOSPHERIC) continue;
@@ -118,7 +118,7 @@ export function updateVision(state: GameState): GameState {
   }
 
   // Radiation sensor: reveal tiles with radiation and RadiationSource/ShieldGenerator entities
-  if (sensor?.sensorType === SensorType.Radiation) {
+  if (sensors.includes(SensorType.Radiation)) {
     for (let dy = -VISION_RADIUS_RADIATION; dy <= VISION_RADIUS_RADIATION; dy++) {
       for (let dx = -VISION_RADIUS_RADIATION; dx <= VISION_RADIUS_RADIATION; dx++) {
         if (Math.abs(dx) + Math.abs(dy) > VISION_RADIUS_RADIATION) continue;
@@ -144,7 +144,7 @@ export function updateVision(state: GameState): GameState {
   }
 
   // Structural sensor: reveal tiles with stress and ReinforcementPanel entities
-  if (sensor?.sensorType === SensorType.Structural) {
+  if (sensors.includes(SensorType.Structural)) {
     for (let dy = -VISION_RADIUS_STRUCTURAL; dy <= VISION_RADIUS_STRUCTURAL; dy++) {
       for (let dx = -VISION_RADIUS_STRUCTURAL; dx <= VISION_RADIUS_STRUCTURAL; dx++) {
         if (Math.abs(dx) + Math.abs(dy) > VISION_RADIUS_STRUCTURAL) continue;
@@ -169,7 +169,7 @@ export function updateVision(state: GameState): GameState {
   }
 
   // EM/Signal sensor: reveal HiddenDevice and SignalBooster entities
-  if (sensor?.sensorType === SensorType.EMSignal) {
+  if (sensors.includes(SensorType.EMSignal)) {
     for (const [, entity] of state.entities) {
       if (entity.type === EntityType.HiddenDevice || entity.type === EntityType.SignalBooster) {
         const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);

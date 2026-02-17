@@ -142,12 +142,7 @@ describe("Edge cases", () => {
     it("scan with cleanliness sensor (wrong type) produces no scan log", () => {
       const state = makeFloorState();
       state.player.entity.pos = { x: 5, y: 5 };
-      const sensor: Attachment = {
-        slot: AttachmentSlot.Sensor,
-        name: "cleanliness sensor",
-        sensorType: SensorType.Cleanliness,
-      };
-      state.player.attachments = { [AttachmentSlot.Sensor]: sensor };
+      // Default state already has cleanliness sensor in sensors array
 
       const next = step(state, { type: ActionType.Scan });
 
@@ -157,6 +152,7 @@ describe("Edge cases", () => {
     it("scan with thermal sensor equipped produces scan log", () => {
       const state = makeFloorState();
       state.player.entity.pos = { x: 5, y: 5 };
+      state.player.sensors = [...(state.player.sensors ?? []), SensorType.Thermal];
       const sensor: Attachment = {
         slot: AttachmentSlot.Sensor,
         name: "thermal sensor",
