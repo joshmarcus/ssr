@@ -985,20 +985,7 @@ export class BrowserDisplay implements IGameDisplay {
   }
 
   renderUI(state: GameState, panel: HTMLElement, visitedRoomIds?: Set<string>): void {
-    let sensorTag = "";
-    if (this.sensorMode) {
-      const sensorColors: Record<string, string> = {
-        [SensorType.Thermal]: "#f44",
-        [SensorType.Cleanliness]: "#4f4",
-        [SensorType.Atmospheric]: "#4af",
-        [SensorType.Radiation]: "#ff0",
-        [SensorType.Structural]: "#fa0",
-        [SensorType.EMSignal]: "#c4f",
-      };
-      const color = sensorColors[this.sensorMode] ?? "#aaa";
-      const label = this.sensorMode.toUpperCase();
-      sensorTag = ` <span style="color:${color};font-weight:bold">[${label}]</span>`;
-    }
+    // Sensor overlay indicator is now a dedicated line (see overlayLine below)
 
     // ── Objective ────────────────────────────────────────────────
     const objective = this.getObjective(state);
@@ -1098,13 +1085,33 @@ export class BrowserDisplay implements IGameDisplay {
       }
     }
 
+    // ── Overlay indicator line ─────────────────────────────────
+    const overlayColors: Record<string, string> = {
+      [SensorType.Thermal]: "#f44",
+      [SensorType.Cleanliness]: "#4f4",
+      [SensorType.Atmospheric]: "#4af",
+      [SensorType.Radiation]: "#ff0",
+      [SensorType.Structural]: "#fa0",
+      [SensorType.EMSignal]: "#c4f",
+    };
+    let overlayLine = "";
+    if (this.sensorMode) {
+      const color = overlayColors[this.sensorMode] ?? "#aaa";
+      const label = this.sensorMode.toUpperCase();
+      overlayLine = `<div style="color:${color};font-weight:bold;padding:2px 0;border-bottom:1px solid #222">` +
+        `OVERLAY: ${label}  <span style="color:#666;font-weight:normal">[t] cycle  [q] off</span></div>`;
+    } else {
+      overlayLine = `<div style="color:#555;padding:2px 0;border-bottom:1px solid #222">` +
+        `OVERLAY: off  <span style="color:#666">[t] to activate</span></div>`;
+    }
+
     const statusHtml = `<div class="status-bar">` +
       `<span class="label">T:</span><span class="value">${state.turn}</span>` +
-      roomLabel + sensorTag + stunTag +
+      roomLabel + stunTag +
       `<br>` + hpTag.replace(/ \| /, '') +
       `<br>` + discoveryTag.replace(/ \| /, '') + unreadTag.replace(/ \| /g, '') + reportTag.replace(/ \| /, '') +
       interactHint +
-      `</div>`;
+      `</div>` + overlayLine;
 
     // Room list removed from main UI — available via [m] map command
     const roomListHtml = "";
