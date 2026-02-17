@@ -203,6 +203,7 @@ const ENTITY_NAMES: Record<string, string> = {
   [EntityType.CrewNPC]: "Crew NPC",
   [EntityType.RepairCradle]: "Repair Cradle",
   [EntityType.Rubble]: "Rubble",
+  [EntityType.Console]: "Console",
 };
 
 export function entityDisplayName(entity: Entity): string {
@@ -221,6 +222,8 @@ export function isEntityExhausted(entity: Entity): boolean {
       return entity.props["activated"] === true || entity.props["locked"] === true;
     case EntityType.ClosedDoor:
       return entity.props["closed"] === false;
+    case EntityType.Console:
+      return entity.props["read"] === true;
     case EntityType.CrewItem:
       return entity.props["examined"] === true || entity.props["hidden"] === true;
     case EntityType.PressureValve:

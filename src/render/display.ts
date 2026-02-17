@@ -49,15 +49,32 @@ const COLORS = {
 
 // ── Room color tints for walls ────────────────────────────────────
 const ROOM_WALL_TINTS: Record<string, string> = {
-  "Engineering Storage": "#665850",
-  "Power Relay Junction": "#665540",
-  "Life Support": "#506066",
-  "Vent Control Room": "#505866",
+  // Command zone — blue-grey tint
+  "Bridge": "#505868",
   "Communications Hub": "#505866",
-  "Research Lab": "#506650",
+  "Signal Room": "#505060",
+  // Engineering zone — warm amber/brown
+  "Engine Core": "#665540",
+  "Power Relay Junction": "#665540",
+  "Auxiliary Power": "#605838",
+  "Engineering Storage": "#665850",
+  // Habitation zone — warmer, lived-in
+  "Crew Quarters": "#605855",
+  "Cargo Hold": "#585550",
   "Med Bay": "#605060",
+  "Emergency Shelter": "#585858",
+  // Research zone — cool green tint
+  "Research Lab": "#506650",
   "Data Core": "#604868",
   "Robotics Bay": "#585858",
+  "Server Annex": "#505860",
+  // Infrastructure zone — neutral grey
+  "Life Support": "#506066",
+  "Arrival Bay": "#555858",
+  "Observation Deck": "#484858",
+  "Escape Pod Bay": "#505855",
+  "Maintenance Corridor": "#555555",
+  "Armory": "#585050",
 };
 
 // ── Box-drawing wall characters ──────────────────────────────────
@@ -124,6 +141,7 @@ const ENTITY_COLORS: Record<string, string> = {
   [EntityType.CrewNPC]: "#ffee66",
   [EntityType.RepairCradle]: "#44ddff",
   [EntityType.Rubble]: "#998877",
+  [EntityType.Console]: "#66aacc",
 };
 
 // Entity background glow colors (subtle tint behind entities)
@@ -144,6 +162,7 @@ const ENTITY_BG_GLOW: Record<string, string> = {
   [EntityType.CrewNPC]: "#1a1800",
   [EntityType.RepairCradle]: "#081820",
   [EntityType.Rubble]: "#1a1510",
+  [EntityType.Console]: "#0a1520",
 };
 
 const ENTITY_GLYPHS: Record<string, string> = {
@@ -170,6 +189,7 @@ const ENTITY_GLYPHS: Record<string, string> = {
   [EntityType.Rubble]: "\ud83e\udea8",         // 🪨
   [EntityType.ShieldGenerator]: "\ud83d\udee1\ufe0f", // 🛡️
   [EntityType.EvidenceTrace]: "\ud83d\udc63",  // 👣
+  [EntityType.Console]: "\ud83d\udcbb",  // 💻 (terminal)
 };
 
 // ── Thermal color interpolation ─────────────────────────────────
@@ -868,8 +888,9 @@ export class BrowserDisplay implements IGameDisplay {
 
     // ── Status bar ───────────────────────────────────────────────
     const room = this.getPlayerRoom(state);
+    const zoneTag = room?.zone ? ` <span class="label">[${this.escapeHtml(room.zone)}]</span>` : "";
     const roomLabel = room
-      ? ` | <span class="value">${this.escapeHtml(room.name)}</span>`
+      ? ` | <span class="value">${this.escapeHtml(room.name)}</span>${zoneTag}`
       : "";
 
     // ── HP bar with visual blocks ─────────────────────────────────
@@ -994,6 +1015,7 @@ export class BrowserDisplay implements IGameDisplay {
       { key: EntityType.ShieldGenerator, glyph: ENTITY_GLYPHS[EntityType.ShieldGenerator] || "⊛", color: "#4f4", label: "Shield Gen" },
       { key: EntityType.EvidenceTrace, glyph: ENTITY_GLYPHS[EntityType.EvidenceTrace] || "※", color: "#ca8", label: "Evidence" },
       { key: EntityType.Rubble, glyph: ENTITY_GLYPHS[EntityType.Rubble] || "▒", color: "#987", label: "Rubble" },
+      { key: EntityType.Console, glyph: ENTITY_GLYPHS[EntityType.Console] || "💻", color: "#6ac", label: "Console" },
       { key: "_heat", glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
       { key: "_locked", glyph: GLYPHS.lockedDoor, color: "#f00", label: "Locked" },
       { key: "_door", glyph: GLYPHS.door, color: "#a52", label: "Door" },

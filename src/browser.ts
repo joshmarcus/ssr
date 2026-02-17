@@ -125,6 +125,10 @@ let deductionSelectedIdx = 0;
 let pendingCrewDoor: { entityId: string; crewName: string } | null = null;
 let mapOpen = false;
 let helpOpen = false;
+let broadcastOpen = false;
+let broadcastSection: "evidence" | "what" | "why" | "who" = "evidence";
+let broadcastOptionIdx = 0;
+let broadcastEvidenceScroll = 0;
 
 // ── Wait message variety ────────────────────────────────────────
 const WAIT_MESSAGES_COOL = [
@@ -290,6 +294,10 @@ function initGame(): void {
   window.addEventListener("keydown", handleToggleKey);
   // Listen for choice/deduction/crew-door input
   window.addEventListener("keydown", (e) => {
+    if (broadcastOpen) {
+      handleBroadcastInput(e);
+      return;
+    }
     if (pendingCrewDoor) {
       handleCrewDoorInput(e);
       return;
@@ -314,20 +322,17 @@ function initGame(): void {
       }
       return;
     }
-    // B key broadcasts report to base (mystery choices)
+    // B key opens broadcast report modal
     if (e.key === "b" && !journalOpen && !state.gameOver) {
       e.preventDefault();
-      const available = getAvailableChoices();
-      if (available.length > 0) {
-        presentChoice(available[0]);
+      broadcastOpen = !broadcastOpen;
+      if (broadcastOpen) {
+        broadcastSection = "evidence";
+        broadcastOptionIdx = 0;
+        broadcastEvidenceScroll = 0;
+        renderBroadcastModal();
       } else {
-        const allAnswered = state.mystery?.choices.every(c => c.chosen);
-        if (allAnswered) {
-          display.addLog("All reports transmitted.", "system");
-        } else {
-          display.addLog("Nothing to report yet. Gather more evidence.", "system");
-        }
-        renderAll();
+        closeBroadcastModal();
       }
       return;
     }
@@ -377,6 +382,10 @@ function handleRestartKey(e: KeyboardEvent): void {
     visitedRoomIds.clear();
     journalOpen = false;
     activeChoice = null;
+    broadcastOpen = false;
+    // Close broadcast modal on restart
+    const broadcastEl = document.getElementById("broadcast-overlay");
+    if (broadcastEl) { broadcastEl.classList.remove("active"); broadcastEl.innerHTML = ""; }
     choicesPresented.clear();
 
     // Clear overlays and display, rebuild
@@ -1383,6 +1392,176 @@ function getAvailableChoices(): MysteryChoice[] {
     }
   }
   return available;
+}
+
+// ── Broadcast Report Modal ──────────────────────────────────────
+function renderBroadcastModal(): void {
+  const overlay = document.getElementById("broadcast-overlay");
+  if (!overlay || !state.mystery) return;
+
+  const journal = state.mystery.journal;
+  const deductions = state.mystery.deductions;
+  const journalCount = journal.length;
+
+  // Evidence list
+  let evidenceHtml = "";
+  if (journal.length === 0) {
+    evidenceHtml = `<div class="broadcast-evidence-item">No evidence collected yet.</div>`;
+  } else {
+    for (const entry of journal) {
+      const icon = entry.category === "log" ? "[log]" : entry.category === "item" ? "[item]" : entry.category === "trace" ? "[trace]" : "[crew]";
+      evidenceHtml += `<div class="broadcast-evidence-item">${icon} ${escapeHtmlBroadcast(entry.summary)} — ${escapeHtmlBroadcast(entry.detail.slice(0, 80))}...</div>`;
+    }
+  }
+
+  // Deduction sections
+  const categoryLabels: Record<string, string> = { what: "WHAT HAPPENED?", why: "WHY DID IT HAPPEN?", who: "WHO WAS RESPONSIBLE?" };
+  const categoryKeys: ("what" | "why" | "who")[] = ["what", "why", "who"];
+
+  let deductionHtml = "";
+  for (const catKey of categoryKeys) {
+    const deduction = deductions.find(d => d.category === catKey);
+    if (!deduction) continue;
+
+    const locked = journalCount < deduction.evidenceRequired;
+    const isActive = broadcastSection === catKey;
+    const needed = deduction.evidenceRequired - journalCount;
+
+    let sectionClass = "broadcast-deduction";
+    if (locked) sectionClass += " locked";
+    if (deduction.solved) sectionClass += " solved";
+    if (isActive) sectionClass += " active-section";
+
+    let reqText = `[${deduction.evidenceRequired}+ clues]`;
+    if (locked) reqText = `[${needed} more clues needed]`;
+
+    deductionHtml += `<div class="${sectionClass}">`;
+    deductionHtml += `<div class="broadcast-section-title">${categoryLabels[catKey]} <span style="color:#666;font-weight:normal;font-size:12px">${reqText}</span></div>`;
+
+    if (deduction.solved) {
+      const mark = deduction.answeredCorrectly ? "✓" : "✗";
+      const chosen = deduction.options.find(o => o.correct === deduction.answeredCorrectly) || deduction.options[0];
+      deductionHtml += `<div style="color:${deduction.answeredCorrectly ? '#0f0' : '#f44'}">${mark} ${escapeHtmlBroadcast(chosen.label)}</div>`;
+    } else if (locked) {
+      deductionHtml += `<div style="color:#555">(Locked — gather ${needed} more evidence)</div>`;
+    } else {
+      for (let i = 0; i < deduction.options.length; i++) {
+        const prefix = (isActive && i === broadcastOptionIdx) ? "▸ " : "  ";
+        const cls = (isActive && i === broadcastOptionIdx) ? "broadcast-option selected" : "broadcast-option";
+        deductionHtml += `<div class="${cls}">${prefix}${i + 1}. ${escapeHtmlBroadcast(deduction.options[i].label)}</div>`;
+      }
+    }
+
+    deductionHtml += `</div>`;
+  }
+
+  // Transmit button
+  const allSolved = deductions.every(d => d.solved);
+  const transmitHtml = allSolved
+    ? `<div class="broadcast-transmit">All deductions answered. Report ready for transmission.</div>`
+    : "";
+
+  overlay.innerHTML = `
+    <div class="broadcast-box">
+      <div class="broadcast-title">═══ BROADCAST REPORT TO BASE ═══</div>
+      <div class="broadcast-section-title">EVIDENCE COLLECTED (${journalCount})</div>
+      <div class="broadcast-evidence-list">${evidenceHtml}</div>
+      <div style="border-top:1px solid #444;margin:8px 0"></div>
+      ${deductionHtml}
+      ${transmitHtml}
+      <div class="broadcast-controls">[↑/↓] Navigate  [Enter] Answer  [Tab] Next section  [Esc] Close</div>
+    </div>`;
+  overlay.classList.add("active");
+}
+
+function closeBroadcastModal(): void {
+  const overlay = document.getElementById("broadcast-overlay");
+  if (overlay) {
+    overlay.classList.remove("active");
+    overlay.innerHTML = "";
+  }
+  broadcastOpen = false;
+  display.addLog("[Report closed]", "system");
+  renderAll();
+}
+
+function handleBroadcastInput(e: KeyboardEvent): void {
+  e.preventDefault();
+  if (!state.mystery) return;
+
+  const deductions = state.mystery.deductions;
+  const journalCount = state.mystery.journal.length;
+  const sections: ("evidence" | "what" | "why" | "who")[] = ["evidence", "what", "why", "who"];
+
+  if (e.key === "Escape" || e.key === "b") {
+    closeBroadcastModal();
+    return;
+  }
+
+  if (e.key === "Tab") {
+    const curIdx = sections.indexOf(broadcastSection);
+    broadcastSection = sections[(curIdx + 1) % sections.length];
+    broadcastOptionIdx = 0;
+    renderBroadcastModal();
+    return;
+  }
+
+  if (broadcastSection === "evidence") {
+    // Scroll evidence list (no selection needed)
+    return;
+  }
+
+  // Deduction sections
+  const deduction = deductions.find(d => d.category === broadcastSection);
+  if (!deduction || deduction.solved || journalCount < deduction.evidenceRequired) {
+    // Locked or solved — Tab to next section
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      // Do nothing on locked sections
+    }
+    return;
+  }
+
+  if (e.key === "ArrowUp" || e.key === "w") {
+    broadcastOptionIdx = Math.max(0, broadcastOptionIdx - 1);
+    renderBroadcastModal();
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "s") {
+    broadcastOptionIdx = Math.min(deduction.options.length - 1, broadcastOptionIdx + 1);
+    renderBroadcastModal();
+    return;
+  }
+  if (e.key === "Enter") {
+    const chosen = deduction.options[broadcastOptionIdx];
+    const { deduction: solved, correct } = solveDeduction(deduction, chosen.key);
+
+    state.mystery.deductions = state.mystery.deductions.map(d =>
+      d.id === solved.id ? solved : d
+    );
+
+    if (correct) {
+      display.addLog(`✓ CORRECT — ${solved.rewardDescription}`, "milestone");
+      display.triggerScreenFlash("milestone");
+      applyDeductionReward(solved);
+    } else {
+      display.addLog(`✗ Incorrect. The evidence doesn't support that conclusion.`, "warning");
+    }
+
+    renderBroadcastModal();
+    return;
+  }
+
+  // Number keys
+  const num = parseInt(e.key, 10);
+  if (num >= 1 && num <= deduction.options.length) {
+    broadcastOptionIdx = num - 1;
+    renderBroadcastModal();
+    return;
+  }
+}
+
+function escapeHtmlBroadcast(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // ── Start with opening crawl ────────────────────────────────────

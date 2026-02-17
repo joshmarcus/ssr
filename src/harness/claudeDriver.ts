@@ -269,6 +269,7 @@ function glyphForType(type: EntityType): string {
     [EntityType.CrewNPC]: "N",
     [EntityType.RepairCradle]: "c",
     [EntityType.Rubble]: "%",
+    [EntityType.Console]: "K",
   };
   return map[type] ?? "?";
 }

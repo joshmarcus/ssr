@@ -12,33 +12,61 @@ import { generateTimeline, generateLogs } from "./timeline.js";
 import { CrewRole } from "../shared/types.js";
 import { generateMysteryChoices } from "./mysteryChoices.js";
 import { generateDeductions } from "./deduction.js";
+import { LANDMARK_CONSOLES } from "../data/consoleText.js";
 
 /**
  * Room name assignments — enough for a large station.
  */
 const ROOM_NAMES = [
   "Arrival Bay",
-  "Engineering Storage",
-  "Power Relay Junction",
-  "Central Atrium",
-  "Robotics Bay",
-  "Life Support",
-  "Vent Control Room",
+  "Bridge",
+  "Engine Core",
   "Cargo Hold",
-  "Bot Maintenance",
-  "Communications Hub",
   "Crew Quarters",
-  "Research Lab",
   "Med Bay",
-  "Observation Deck",
-  "Maintenance Corridor",
+  "Research Lab",
+  "Life Support",
+  "Power Relay Junction",
+  "Engineering Storage",
+  "Communications Hub",
+  "Robotics Bay",
   "Data Core",
+  "Observation Deck",
+  "Escape Pod Bay",
+  "Auxiliary Power",
   "Signal Room",
   "Server Annex",
-  "Auxiliary Power",
+  "Maintenance Corridor",
   "Emergency Shelter",
-  "Escape Pod Bay",
+  "Armory",
 ];
+
+/**
+ * Zone assignments for station rooms.
+ */
+const ROOM_ZONES: Record<string, string> = {
+  "Bridge": "Command",
+  "Communications Hub": "Command",
+  "Signal Room": "Command",
+  "Engine Core": "Engineering",
+  "Power Relay Junction": "Engineering",
+  "Auxiliary Power": "Engineering",
+  "Engineering Storage": "Engineering",
+  "Crew Quarters": "Habitation",
+  "Cargo Hold": "Habitation",
+  "Med Bay": "Habitation",
+  "Emergency Shelter": "Habitation",
+  "Research Lab": "Research",
+  "Data Core": "Research",
+  "Robotics Bay": "Research",
+  "Server Annex": "Research",
+  "Life Support": "Infrastructure",
+  "Arrival Bay": "Infrastructure",
+  "Observation Deck": "Infrastructure",
+  "Escape Pod Bay": "Infrastructure",
+  "Maintenance Corridor": "Infrastructure",
+  "Armory": "Infrastructure",
+};
 
 type DiggerRoom = {
   getLeft(): number;
@@ -85,13 +113,15 @@ export function generate(seed: number): GameState {
   // Extract rooms
   const rooms = map.getRooms();
   rooms.forEach((room, i) => {
+    const roomName = ROOM_NAMES[i] || `Section ${i}`;
     state.rooms.push({
       id: `room_${i}`,
-      name: ROOM_NAMES[i] || `Section ${i}`,
+      name: roomName,
       x: room.getLeft(),
       y: room.getTop(),
       width: room.getRight() - room.getLeft() + 1,
       height: room.getBottom() - room.getTop() + 1,
+      zone: ROOM_ZONES[roomName],
     });
 
     room.getDoors((x, y) => {
@@ -170,6 +200,9 @@ export function generate(seed: number): GameState {
   // Place keyed doors (clearance + environmental)
   placeClearanceDoors(state, rooms);
   placeEnvironmentalDoors(state, rooms);
+
+  // Place landmark consoles in themed rooms
+  placeLandmarkConsoles(state, rooms);
 
   // Reveal starting room via vision system
   return updateVision(state);
@@ -481,8 +514,8 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
     });
   }
 
-  // ── Repair cradle in Bot Maintenance room ──────────────────
-  const botMaintIdx = state.rooms.findIndex(r => r.name === "Bot Maintenance");
+  // ── Repair cradle in Engine Core room ──────────────────
+  const botMaintIdx = state.rooms.findIndex(r => r.name === "Engine Core");
   if (botMaintIdx >= 0 && botMaintIdx < n) {
     const botMaintRoom = rooms[botMaintIdx];
     const cradlePos = getRoomCenter(botMaintRoom);
@@ -1167,8 +1200,13 @@ function placeSprintThreeSensors(state: GameState, rooms: DiggerRoom[]): void {
 /**
  * Place crew NPCs and escape pods for the evacuation mechanic.
  *
- * Escape Pod Bay: a single dedicated room with 12 organized pods.
- * Crew NPCs (3-5 survivors): sealed behind emergency doors in their rooms.
+ * All surviving crew are concentrated in the Cargo Hold behind an
+ * environmental protocol lock. The lock requires:
+ * 1. All hull breaches sealed
+ * 2. Station integrity > 50%
+ * 3. At least 2 power relays activated
+ *
+ * Escape Pod Bay: a single dedicated room with organized pods.
  */
 function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
   if (!state.mystery) return;
@@ -1178,10 +1216,8 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
   const crew = state.mystery.crew;
 
   // ── Escape Pod Bay ────────────────────────────────────────────────
-  // Find or designate the Escape Pod Bay room
   let podBayIdx = state.rooms.findIndex(r => r.name === "Escape Pod Bay");
   if (podBayIdx < 0) {
-    // Rename the last room to serve as the pod bay
     podBayIdx = n - 1;
     state.rooms[podBayIdx] = { ...state.rooms[podBayIdx], name: "Escape Pod Bay" };
   }
@@ -1194,16 +1230,13 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
   const bayW = bayRight - bayLeft + 1;
   const bayH = bayBottom - bayTop + 1;
 
-  // Place 12 pods in organized rows (2 rows along walls, center walkway)
   const podPositions: { x: number; y: number }[] = [];
   for (let row = 0; row < bayH && podPositions.length < 12; row++) {
     for (let col = 0; col < bayW && podPositions.length < 12; col++) {
       const x = bayLeft + col;
       const y = bayTop + row;
-      // Leave center column as walkway (skip middle column)
       const midCol = Math.floor(bayW / 2);
       if (col === midCol && bayW >= 3) continue;
-      // Don't place on doorways
       if (state.tiles[y][x].type === TileType.Door) continue;
       podPositions.push({ x, y });
     }
@@ -1218,7 +1251,16 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
     });
   }
 
-  // ── Crew NPCs (sealed behind emergency doors) ─────────────────
+  // ── Cargo Hold: place ALL surviving crew here ──────────────────────
+  let cargoHoldIdx = state.rooms.findIndex(r => r.name === "Cargo Hold");
+  if (cargoHoldIdx < 0) {
+    // Rename a mid-late room to serve as the Cargo Hold
+    cargoHoldIdx = Math.max(3, Math.floor(n * 0.6));
+    if (cargoHoldIdx === podBayIdx) cargoHoldIdx = Math.max(1, podBayIdx - 1);
+    state.rooms[cargoHoldIdx] = { ...state.rooms[cargoHoldIdx], name: "Cargo Hold" };
+  }
+
+  const cargoRoom = rooms[cargoHoldIdx];
   const survivors = crew.filter(c => c.fate === CrewFate.Survived || c.fate === CrewFate.InCryo);
   const npcCandidates = survivors.slice(0, 5);
   if (npcCandidates.length < 3) {
@@ -1229,19 +1271,12 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
     }
   }
 
+  // Place all crew NPCs inside the Cargo Hold
   let npcCount = 0;
   for (const member of npcCandidates) {
-    let roomIdx = state.rooms.findIndex(r => r.name === member.lastKnownRoom);
-    if (roomIdx < 0 || roomIdx >= n || roomIdx === podBayIdx) {
-      roomIdx = Math.min(n - 2, Math.max(1, Math.floor(n * 0.3) + npcCount));
-      if (roomIdx === podBayIdx) roomIdx = Math.max(1, podBayIdx - 1);
-    }
-
-    const room = rooms[roomIdx];
-    const offsetX = (npcCount % 2 === 0) ? 1 : -1;
-    const offsetY = (npcCount % 3 === 0) ? -1 : 1;
-    const pos = getRoomPos(room, offsetX, offsetY);
-
+    const offsetX = (npcCount % 3) - 1; // -1, 0, 1
+    const offsetY = Math.floor(npcCount / 3) === 0 ? -1 : 1;
+    const pos = getRoomPos(cargoRoom, offsetX, offsetY);
     const isUnconscious = member.fate === CrewFate.InCryo;
 
     state.entities.set(`crew_npc_${member.id}`, {
@@ -1254,7 +1289,7 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
         following: false,
         evacuated: false,
         dead: false,
-        sealed: true,
+        sealed: false, // no longer individually sealed — the room door is locked instead
         hp: 50,
         unconscious: isUnconscious,
         firstName: member.firstName,
@@ -1263,6 +1298,46 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
       },
     });
     npcCount++;
+  }
+
+  // ── Environmental protocol lock on Cargo Hold entrance ──────────
+  // Find a door tile at the Cargo Hold boundary
+  let envLockPlaced = false;
+  for (let x = cargoRoom.getLeft() - 1; x <= cargoRoom.getRight() + 1 && !envLockPlaced; x++) {
+    for (let y = cargoRoom.getTop() - 1; y <= cargoRoom.getBottom() + 1 && !envLockPlaced; y++) {
+      if (x < 0 || x >= state.width || y < 0 || y >= state.height) continue;
+      if (state.tiles[y][x].type !== TileType.Door) continue;
+
+      // Don't overwrite doors that already have entities
+      let hasEntity = false;
+      for (const [, entity] of state.entities) {
+        if (entity.pos.x === x && entity.pos.y === y) {
+          hasEntity = true;
+          break;
+        }
+      }
+      if (hasEntity) continue;
+
+      // Convert to a closed environmental-lock door
+      state.tiles[y][x] = {
+        ...state.tiles[y][x],
+        type: TileType.Door,
+        glyph: GLYPHS.closedDoor,
+        walkable: false,
+      };
+
+      state.entities.set("cargo_hold_env_lock", {
+        id: "cargo_hold_env_lock",
+        type: EntityType.ClosedDoor,
+        pos: { x, y },
+        props: {
+          closed: true,
+          environmentalLock: true,
+          locked: true,
+        },
+      });
+      envLockPlaced = true;
+    }
   }
 }
 
@@ -1344,6 +1419,52 @@ function placeClearanceDoors(state: GameState, rooms: DiggerRoom[]): void {
         });
         placed++;
       }
+    }
+  }
+}
+
+/**
+ * Place landmark console entities in rooms that have definitions in LANDMARK_CONSOLES.
+ */
+function placeLandmarkConsoles(state: GameState, rooms: DiggerRoom[]): void {
+  const n = rooms.length;
+  for (let ri = 0; ri < n; ri++) {
+    const roomName = state.rooms[ri]?.name;
+    if (!roomName) continue;
+    const consoleDefs = LANDMARK_CONSOLES[roomName];
+    if (!consoleDefs || consoleDefs.length === 0) continue;
+
+    const room = rooms[ri];
+    for (let ci = 0; ci < consoleDefs.length; ci++) {
+      const def = consoleDefs[ci];
+      // Spread consoles across the room with deterministic offsets
+      const offsetX = ci === 0 ? -1 : ci === 1 ? 1 : 0;
+      const offsetY = ci === 0 ? 0 : ci === 1 ? 0 : -1;
+      const pos = getRoomPos(room, offsetX, offsetY);
+
+      // Don't place on top of existing entities
+      let occupied = false;
+      for (const [, entity] of state.entities) {
+        if (entity.pos.x === pos.x && entity.pos.y === pos.y) {
+          occupied = true;
+          break;
+        }
+      }
+      if (occupied) continue;
+
+      state.entities.set(def.id, {
+        id: def.id,
+        type: EntityType.Console,
+        pos,
+        props: {
+          name: def.name,
+          text: def.text,
+          read: false,
+          journalSummary: def.journal?.summary || null,
+          journalDetail: def.journal?.detail || null,
+          journalCategory: def.journal?.category || null,
+        },
+      });
     }
   }
 }

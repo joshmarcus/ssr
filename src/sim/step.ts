@@ -105,6 +105,8 @@ function isEntityExhausted(entity: Entity, state: GameState): boolean {
       return (entity.props["boarded"] as number || 0) >= (entity.props["capacity"] as number || 3);
     case EntityType.RepairCradle:
       return false; // always interactable
+    case EntityType.Console:
+      return entity.props["read"] === true;
     default:
       return false;
   }
@@ -982,6 +984,67 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             timestamp: next.turn,
             source: "system",
             text: "Hazard cleared. Environmental seal released. Door opening.",
+            read: false,
+          },
+        ];
+        break;
+      }
+
+      // ── Environmental protocol lock: station conditions must be met ──
+      if (target.props["environmentalLock"] === true) {
+        // Check conditions: all breaches sealed, integrity > 50%, 2+ relays activated
+        let allBreachesSealed = true;
+        let unsealedBreachCount = 0;
+        let activatedRelayCount = 0;
+        let totalRelayCount = 0;
+        for (const [, e] of state.entities) {
+          if (e.type === EntityType.Breach && e.props["sealed"] !== true) {
+            allBreachesSealed = false;
+            unsealedBreachCount++;
+          }
+          if (e.type === EntityType.Relay && e.props["locked"] !== true) {
+            totalRelayCount++;
+            if (e.props["activated"] === true) activatedRelayCount++;
+          }
+        }
+        const integrityOk = state.stationIntegrity > 50;
+        const relaysOk = activatedRelayCount >= 2;
+
+        if (!allBreachesSealed || !integrityOk || !relaysOk) {
+          const conditions: string[] = [];
+          if (!allBreachesSealed) conditions.push(`breach containment [${unsealedBreachCount} unsealed]`);
+          if (!relaysOk) conditions.push(`power restoration [${activatedRelayCount}/2 relays]`);
+          if (!integrityOk) conditions.push(`hull integrity [${Math.round(state.stationIntegrity)}%/50%]`);
+          next.logs = [
+            ...state.logs,
+            {
+              id: `log_env_lock_deny_${targetId}_${next.turn}`,
+              timestamp: next.turn,
+              source: "system",
+              text: `Environmental protocol lock active. Required: ${conditions.join(", ")}`,
+              read: false,
+            },
+          ];
+          break;
+        }
+
+        // All conditions met — open the door
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, closed: false, locked: false, environmentalLock: false },
+        });
+        const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
+        newTiles[target.pos.y][target.pos.x].walkable = true;
+        next.entities = newEntities;
+        next.tiles = newTiles;
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_env_lock_open_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: "Environmental protocols satisfied. Emergency bulkhead opening — crew shelter accessible.",
             read: false,
           },
         ];
@@ -2148,6 +2211,59 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             read: false,
           },
         ];
+      }
+      break;
+    }
+
+    case EntityType.Console: {
+      const consoleName = (target.props["name"] as string) || "Console";
+      const consoleText = (target.props["text"] as string) || "The console is offline.";
+      const alreadyRead = target.props["read"] === true;
+
+      if (alreadyRead) {
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_console_reread_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: `${consoleName}: Already accessed.`,
+            read: false,
+          },
+        ];
+      } else {
+        // Mark as read
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, read: true },
+        });
+        next.entities = newEntities;
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_console_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "narrative",
+            text: `[${consoleName}] ${consoleText}`,
+            read: false,
+          },
+        ];
+
+        // Add journal entry if this console has one
+        const journalSummary = target.props["journalSummary"] as string | null;
+        const journalDetail = target.props["journalDetail"] as string | null;
+        const journalCategory = (target.props["journalCategory"] as string | null) as "log" | "item" | "trace" | null;
+        if (journalSummary && journalDetail && journalCategory) {
+          next = addJournalEntry(
+            next,
+            `journal_console_${targetId}`,
+            journalCategory,
+            journalSummary,
+            journalDetail,
+            getPlayerRoomName(state),
+          );
+        }
       }
       break;
     }

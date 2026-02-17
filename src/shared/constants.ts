@@ -50,14 +50,14 @@ export const PATROL_DRONE_SPEED = 3; // drone moves every N turns
 export const PATROL_DRONE_ATTACK_COOLDOWN = 4; // turns between attacks (drone retreats after hitting)
 
 // ── Radiation ───────────────────────────────────────────────
-export const RADIATION_SPREAD_RATE = 0.1; // glacial spread
+export const RADIATION_SPREAD_RATE = 0.05; // glacial spread
 export const RADIATION_SPREAD_RANGE = 1; // only immediate neighbors
-export const RADIATION_DAMAGE_THRESHOLD = 70; // need high radiation to hurt
+export const RADIATION_DAMAGE_THRESHOLD = 80; // need high radiation to hurt
 export const RADIATION_DAMAGE_PER_TURN = 1; // -1 HP per turn
 export const RADIATION_DAMAGE_NO_SENSOR = 1; // -1 HP per turn (same, just no warning)
-export const RADIATION_SOURCE_RATE = 1; // slow buildup at source
+export const RADIATION_SOURCE_RATE = 0.5; // slow buildup at source
 export const RADIATION_SOURCE_CAP = 85;
-export const RADIATION_DECAY_RATE = 0.8; // fast decay away from source
+export const RADIATION_DECAY_RATE = 0.8; // decay away from source — tuned with Math.max(1) spread minimum
 export const SHIELD_GENERATOR_RADIUS = 5;
 
 // ── Structural stress ──────────────────────────────────────
@@ -72,9 +72,9 @@ export const VISION_RADIUS_EM = 10;
 
 // ── Station Integrity ───────────────────────────────────────
 export const STATION_INTEGRITY_MAX = 100;
-export const STATION_INTEGRITY_DECAY_RATE = 0.03; // per turn base decay (slow — ~3% per 100 turns)
+export const STATION_INTEGRITY_DECAY_RATE = 0.01; // per turn base decay (~1% per 100 turns)
 export const STATION_INTEGRITY_RELAY_BONUS = 10; // restored per relay rerouted
-export const STATION_INTEGRITY_BREACH_PENALTY = 0.1; // extra decay per unsealed breach
+export const STATION_INTEGRITY_BREACH_PENALTY = 0.05; // extra decay per unsealed breach
 export const STATION_INTEGRITY_CRITICAL = 25; // below this, hazards accelerate
 export const STATION_INTEGRITY_LOSS = 0; // game over if integrity reaches 0
 
@@ -117,4 +117,5 @@ export const GLYPHS = {
   rubble: "▒",       // medium shade — debris/rubble
   crewNPC: "🙋",      // person raising hand — living crew member
   repairCradle: "⚕️",  // medical — bot repair station
+  console: "▣",       // terminal — interactable console
 } as const;

@@ -59,6 +59,7 @@ export enum EntityType {
   CrewNPC = "crew_npc",
   RepairCradle = "repair_cradle",
   Rubble = "rubble",
+  Console = "console",
 }
 
 export interface Entity {
@@ -146,6 +147,7 @@ export interface Room {
   y: number;
   width: number;
   height: number;
+  zone?: string;
 }
 
 // ── Game state ───────────────────────────────────────────────

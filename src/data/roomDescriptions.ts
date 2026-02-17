@@ -10,8 +10,8 @@ export const ROOM_DESCRIPTIONS: Record<string, string> = {
   "Arrival Bay":
     "A cramped airlock vestibule. Boot prints in the dust lead inward but none lead back. The emergency terminal handshake originated here.",
 
-  "Central Atrium":
-    "The station's main crossroads. A status board flickers overhead — most readouts frozen at 15:03. Someone knocked over a coffee mug; the stain has long since dried.",
+  "Bridge":
+    "The station's command center. A status board flickers overhead — most readouts frozen at 15:03. The captain's chair faces a wide viewscreen showing the planet below. Navigation and comms consoles line the walls.",
 
   "Data Core":
     "Archive racks hum behind a heavy pressure door. The core bundle terminal blinks READY, waiting for a transmission that never came. Nine months of research, sealed and silent.",
@@ -25,17 +25,17 @@ export const ROOM_DESCRIPTIONS: Record<string, string> = {
   "Life Support":
     "Climate regulation equipment covers every surface. Warning lights pulse red in sequence. The ambient temperature is wrong — too high, climbing. An open toolbox sits abandoned mid-repair.",
 
-  "Bot Maintenance":
-    "A repair bay for station bots. Diagnostic cradles line the wall. One shows a green READY indicator — the auto-repair arm is still functional. Step into the cradle to initiate repairs.",
+  "Engine Core":
+    "The heart of the station's power systems. Reactor status displays line the walls. A repair cradle shows a green READY indicator — the auto-repair arm is still functional. Coolant pipes hum overhead.",
 
   "Robotics Bay":
     "Workbenches cluttered with actuator limbs and half-assembled chassis. A dormant service bot stands upright in its dock — powered down, intact, waiting. A note taped to it reads: PRIYA-7741.",
 
-  "Vent Control Room":
-    "Manual overrides for the station ventilation network line the far wall. Every panel reads SEALED. The air is stale and warm — nothing has moved through these ducts since the cascade.",
+  "Armory":
+    "Station security equipment storage. Weapon racks mostly empty — standard protocol for a research station. An equipment manifest terminal glows on the wall. A security log terminal blinks in the corner.",
 
   "Cargo Hold":
-    "A long, low-ceilinged hold. Shipping containers shoved aside to clear floor space — makeshift bedding, empty ration packs, a first aid kit with the seal broken. The crew sheltered here.",
+    "Emergency bulkhead sealed. Environmental protocols active — atmosphere containment in effect. The crew sheltered here. Shipping containers shoved aside, makeshift bedding on the floor, empty ration packs scattered.",
 
   "Communications Hub":
     "Banks of radio equipment, most dark. The primary uplink reads OFFLINE. A low-band emergency beacon pulses once every four seconds — the only signal leaving this station.",
