@@ -24,6 +24,7 @@ import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
 import { ActionType, AttachmentSlot, SensorType, EntityType, ObjectivePhase, DeductionCategory, TileType } from "./shared/types.js";
 import { computeChoiceEndings } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction } from "./sim/deduction.js";
+import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 
 // ── Parse seed from URL params or use golden seed ───────────────
 const params = new URLSearchParams(window.location.search);
@@ -530,6 +531,24 @@ function handleAction(action: Action): void {
       }
     }
   } else {
+    // Check if blocked by cleaning directive
+    if (action.type === ActionType.Move && state.mystery?.cleaningDirective) {
+      const playerPos = state.player.entity.pos;
+      const currentRoom = getRoomAt(state, playerPos);
+      if (currentRoom) {
+        const cleanliness = getRoomCleanliness(state, currentRoom.name);
+        const goal = state.mystery.roomCleanlinessGoal;
+        if (cleanliness < goal) {
+          display.addLog(
+            `Maintenance subroutine override — primary directive requires ${currentRoom.name} at ${goal}% cleanliness before departure (currently ${cleanliness}%). Press [c] to clean. Press [t] to toggle cleanliness overlay.`,
+            "warning"
+          );
+          audio.playError();
+          renderAll();
+          return;
+        }
+      }
+    }
     display.addLog("Path blocked -- bulkhead or sealed door. Find another route.", "system");
     audio.playError();
   }

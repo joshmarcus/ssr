@@ -623,8 +623,8 @@ describe("Cleaning directive", () => {
     // Step 1 turn in a dirty room
     state = step(state, { type: ActionType.Wait });
 
-    // Should have the directive warning mentioning cleaning and overlay
-    expect(state.logs.some(l => l.text.includes("DIRECTIVE") && l.text.includes("cleaning"))).toBe(true);
+    // Should have the narrative directive warning
+    expect(state.logs.some(l => l.text.includes("Primary directive") && l.text.includes("cleanliness reaches 80%"))).toBe(true);
   });
 
   it("blocks movement out of dirty room", () => {
