@@ -887,8 +887,8 @@ export class BrowserDisplay implements IGameDisplay {
         : { text: "CONNECTION LOST", detail: "Refresh to try again." };
     }
 
-    const hasThermal = state.player.sensors?.includes(SensorType.Thermal) ?? false;
-    const sensorExists = Array.from(state.entities.values()).some(e => e.type === EntityType.SensorPickup);
+    const phase = state.mystery?.objectivePhase;
+    const sensors = state.player.sensors ?? [];
 
     // Count relay status
     let totalRelays = 0;
@@ -899,39 +899,88 @@ export class BrowserDisplay implements IGameDisplay {
         if (e.props["activated"] === true) activatedRelays++;
       }
     }
-    const remaining = totalRelays - activatedRelays;
+    const remainingRelays = totalRelays - activatedRelays;
+
+    // Count sensor pickups still on the map
+    const sensorPickups = Array.from(state.entities.values()).filter(e => e.type === EntityType.SensorPickup);
+
+    // Data core status
+    const dataCore = Array.from(state.entities.values()).find(e => e.type === EntityType.DataCore);
     const hasLockedDoor = state.tiles.some(row => row.some(t => t.type === TileType.LockedDoor));
 
-    // Phase 1: Get the thermal sensor
-    if (!hasThermal && sensorExists) {
+    // ── Phase: Clean ──────────────────────────────────────
+    if (phase === "clean") {
+      const cleaned = state.mystery?.roomsCleanedCount ?? 0;
+      const trigger = state.mystery?.investigationTrigger ?? 3;
       return {
-        text: "Step 1: Find the Thermal Sensor",
-        detail: "Explore rooms until you find the cyan S glyph. Walk next to it and press [i] to equip it.",
-      };
-    }
-    if (!hasThermal && !sensorExists) {
-      return { text: "Explore the station", detail: "Search rooms for useful equipment." };
-    }
-
-    // Phase 2: Activate all relays
-    if (remaining > 0) {
-      return {
-        text: `Step 2: Reroute ${remaining} overheating relay${remaining > 1 ? "s" : ""}`,
-        detail: `Press [t] to toggle thermal vision — hot zones glow red. Find the yellow R relays and press [i] next to each one. ${activatedRelays}/${totalRelays} done.`,
+        text: `Clean the station (${cleaned}/${trigger} rooms)`,
+        detail: "Clean each room to 80%. You can't leave until the room is clean. Press [c] to clean, [t] to toggle cleanliness overlay.",
       };
     }
 
-    // Phase 3: Reach data core
-    if (hasLockedDoor) {
+    // ── Phase: Investigate ────────────────────────────────
+    if (phase === "investigate") {
+      const journalCount = state.mystery?.journal.length ?? 0;
+      const threshold = state.mystery?.evidenceThreshold ?? 5;
+
+      // Sub-objectives within investigation
+      if (sensorPickups.length > 0 && sensors.length <= 1) {
+        return {
+          text: `Investigate: find sensors and evidence (${journalCount}/${threshold})`,
+          detail: "Explore rooms. Pick up sensor upgrades (S) and interact with terminals (T), crew items (*), and evidence traces (?) to learn what happened.",
+        };
+      }
+
+      if (remainingRelays > 0) {
+        return {
+          text: `Investigate: reroute relays and gather evidence (${journalCount}/${threshold})`,
+          detail: `Reroute overheating relays (R) with [i] — ${activatedRelays}/${totalRelays} done. Read logs and examine evidence to piece together the mystery.`,
+        };
+      }
+
       return {
-        text: "Step 3: Reach the Data Core",
-        detail: "All relays rerouted but door is still locked. Look for another way in.",
+        text: `Investigate: gather evidence (${journalCount}/${threshold})`,
+        detail: "Interact with terminals, crew items, and evidence traces. Press [b] to broadcast a report when ready.",
       };
     }
 
+    // ── Phase: Recover ────────────────────────────────────
+    if (phase === "recover") {
+      if (remainingRelays > 0) {
+        return {
+          text: `Restore station systems (${activatedRelays}/${totalRelays} relays)`,
+          detail: "Reroute remaining relays to stabilize the station. Seal hull breaches. Prepare for data transmission.",
+        };
+      }
+
+      if (dataCore && hasLockedDoor) {
+        return {
+          text: "Reach the Data Core",
+          detail: "All relays rerouted. Find a way past the locked door to reach the data core.",
+        };
+      }
+
+      return {
+        text: "Transmit from the Data Core",
+        detail: "Find the data core (D) and press [i] to transmit the research data and complete the mission.",
+      };
+    }
+
+    // ── Phase: Evacuate ───────────────────────────────────
+    if (phase === "evacuate") {
+      const evac = state.mystery?.evacuation;
+      const rescued = evac?.crewEvacuated?.length ?? 0;
+      const total = (evac?.crewFound?.length ?? 0) + rescued + (evac?.crewDead?.length ?? 0);
+      return {
+        text: `Evacuate crew (${rescued}/${total} rescued)`,
+        detail: "Guide surviving crew to escape pods. Interact with crew members to have them follow you, then lead them to escape pods (E).",
+      };
+    }
+
+    // ── Fallback: general exploration ─────────────────────
     return {
-      text: "Step 3: Transmit from the Data Core",
-      detail: "The locked door (X) is now open. Find the magenta D and press [i] to transmit the research data.",
+      text: "Explore the station",
+      detail: "Search rooms for equipment and clues about what happened.",
     };
   }
 
