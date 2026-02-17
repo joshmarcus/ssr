@@ -452,24 +452,6 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       // Skip locked-door tracking entities (they aren't real relays)
       if (target.props["locked"] === true) break;
 
-      // Require thermal sensor to interact with overheating relays
-      if (target.props["overheating"] === true) {
-        const sensors = state.player.sensors ?? [];
-        if (!sensors.includes(SensorType.Thermal)) {
-          next.logs = [
-            ...state.logs,
-            {
-              id: `log_relay_nosensor_${targetId}_${next.turn}`,
-              timestamp: next.turn,
-              source: "system",
-              text: "Relay housing too hot to identify safe reroute. Equip thermal sensor first.",
-              read: false,
-            },
-          ];
-          break;
-        }
-      }
-
       // Already activated — nothing to do
       if (target.props["activated"] === true) {
         next.logs = [
@@ -861,43 +843,29 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           },
         ];
       } else {
-        const sensors = state.player.sensors ?? [];
-        if (!sensors.includes(SensorType.Atmospheric)) {
-          next.logs = [
-            ...state.logs,
-            {
-              id: `log_breach_nosensor_${targetId}_${next.turn}`,
-              timestamp: next.turn,
-              source: "system",
-              text: "Hull breach detected. Cannot identify seal point without atmospheric sensor.",
-              read: false,
-            },
-          ];
-        } else {
-          // Seal the breach
-          const newEntities = new Map(state.entities);
-          newEntities.set(targetId, {
-            ...target,
-            props: { ...target.props, sealed: true },
-          });
-          next.entities = newEntities;
+        // Seal the breach (no sensor required — just can't see pressure overlay without atmospheric sensor)
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, sealed: true },
+        });
+        next.entities = newEntities;
 
-          // Restore pressure on breach tile
-          const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
-          newTiles[target.pos.y][target.pos.x].pressure = 80;
-          next.tiles = newTiles;
+        // Restore pressure on breach tile
+        const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
+        newTiles[target.pos.y][target.pos.x].pressure = 80;
+        next.tiles = newTiles;
 
-          next.logs = [
-            ...state.logs,
-            {
-              id: `log_breach_seal_${targetId}_${next.turn}`,
-              timestamp: next.turn,
-              source: "system",
-              text: "Breach sealed. Emergency patch holding. Pressure recovering.",
-              read: false,
-            },
-          ];
-        }
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_breach_seal_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: "Breach sealed. Emergency patch holding. Pressure recovering.",
+            read: false,
+          },
+        ];
       }
       break;
     }
@@ -1203,21 +1171,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           },
         ];
       } else {
-        // Require atmospheric sensor
-        const sensors = state.player.sensors ?? [];
-        if (!sensors.includes(SensorType.Atmospheric)) {
-          next.logs = [
-            ...state.logs,
-            {
-              id: `log_valve_nosensor_${targetId}_${next.turn}`,
-              timestamp: next.turn,
-              source: "system",
-              text: "Valve mechanism found but pressure readings needed. Equip atmospheric sensor to calibrate.",
-              read: false,
-            },
-          ];
-        } else {
-          const newEntities = new Map(state.entities);
+        // No sensor required — atmospheric sensor only affects visibility
+        const newEntities = new Map(state.entities);
           newEntities.set(targetId, {
             ...target,
             props: { ...target.props, turned: true },
@@ -1281,7 +1236,6 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
               },
             ];
           }
-        }
       }
       break;
     }
@@ -1609,20 +1563,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
     }
 
     case EntityType.HiddenDevice: {
-      // Only interactable if player has EM sensor
-      const sensors = state.player.sensors ?? [];
-      if (!sensors.includes(SensorType.EMSignal)) {
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_hidden_nosensor_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "system",
-            text: "Faint electromagnetic interference detected. EM sensor required for analysis.",
-            read: false,
-          },
-        ];
-      } else if (target.props["discovered"] === true) {
+      // No sensor required to interact — EM sensor only affects visibility
+      if (target.props["discovered"] === true) {
         next.logs = [
           ...state.logs,
           {
@@ -2218,19 +2160,13 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
 }
 
 /**
- * Handle scan action: reveals thermal overlay if player has thermal sensor.
- * Sets a "thermalScan" flag on nearby tiles to indicate they've been scanned.
+ * Handle scan action: activates sensor overlays based on equipped sensors.
+ * Always provides a basic scan; additional sensors reveal more data.
  */
 function handleScan(state: GameState): GameState {
   const sensors = state.player.sensors ?? [];
-  if (!sensors.includes(SensorType.Thermal)) {
-    // No thermal sensor equipped - scan does nothing meaningful
-    return state;
-  }
 
-  // Reveal thermal overlay: mark entities with thermal info
-  // In practice, the scan reveals heat values on tiles (already stored in tile.heat)
-  // and marks relay entities as hotspots if they're overheating.
+  // Mark overheating relays as scanned hotspots
   const newEntities = new Map(state.entities);
   for (const [id, entity] of newEntities) {
     if (entity.type === EntityType.Relay && entity.props["overheating"] === true) {
@@ -2239,6 +2175,27 @@ function handleScan(state: GameState): GameState {
         props: { ...entity.props, scannedHotspot: true },
       });
     }
+  }
+
+  // Build scan message based on equipped sensors
+  const scanParts: string[] = ["Scan complete."];
+  if (sensors.includes(SensorType.Thermal)) {
+    scanParts.push("Thermal overlay active — heat signatures visible.");
+  }
+  if (sensors.includes(SensorType.Atmospheric)) {
+    scanParts.push("Pressure differentials mapped.");
+  }
+  if (sensors.includes(SensorType.Radiation)) {
+    scanParts.push("Radiation sources highlighted.");
+  }
+  if (sensors.includes(SensorType.Structural)) {
+    scanParts.push("Structural stress points visible.");
+  }
+  if (sensors.includes(SensorType.EMSignal)) {
+    scanParts.push("EM anomalies detected.");
+  }
+  if (sensors.length <= 1) {
+    scanParts.push("Basic scan only — find sensor upgrades for more detail.");
   }
 
   const next: GameState = {
@@ -2250,7 +2207,7 @@ function handleScan(state: GameState): GameState {
         id: `log_scan_${state.turn}`,
         timestamp: state.turn,
         source: "sensor",
-        text: "Thermal overlay active. Heat signatures glow through walls — overheating relays burn white-hot on the display.",
+        text: scanParts.join(" "),
         read: false,
       },
     ],

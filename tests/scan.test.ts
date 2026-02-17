@@ -29,7 +29,7 @@ function makeTestState() {
 }
 
 describe("Scan action", () => {
-  it("does nothing without thermal sensor", () => {
+  it("scan without thermal sensor still marks hotspots and produces basic log", () => {
     const state = makeTestState();
     const relay: Entity = {
       id: "relay_1",
@@ -41,9 +41,11 @@ describe("Scan action", () => {
 
     const next = step(state, { type: ActionType.Scan });
 
-    // Without thermal sensor, relay should not be marked as scanned
+    // Scan always marks hotspots now
     const updatedRelay = next.entities.get("relay_1")!;
-    expect(updatedRelay.props["scannedHotspot"]).toBeUndefined();
+    expect(updatedRelay.props["scannedHotspot"]).toBe(true);
+    // Should have a basic scan log
+    expect(next.logs.some(l => l.text.includes("Scan complete"))).toBe(true);
   });
 
   it("reveals hotspot with thermal sensor equipped", () => {

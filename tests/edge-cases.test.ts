@@ -128,25 +128,25 @@ describe("Edge cases", () => {
     });
   });
 
-  describe("Scanning without thermal sensor", () => {
-    it("scan with no sensor equipped produces no scan log", () => {
+  describe("Scanning always works", () => {
+    it("scan with no extra sensors produces basic scan log", () => {
       const state = makeFloorState();
       state.player.entity.pos = { x: 5, y: 5 };
 
       const next = step(state, { type: ActionType.Scan });
 
-      // No thermal sensor means no scan log
-      expect(next.logs.some((l) => l.source === "sensor")).toBe(false);
+      // Scan always produces a log now
+      expect(next.logs.some((l) => l.source === "sensor")).toBe(true);
+      expect(next.logs.some((l) => l.text.includes("Scan complete"))).toBe(true);
     });
 
-    it("scan with cleanliness sensor (wrong type) produces no scan log", () => {
+    it("scan with only cleanliness sensor produces basic scan log", () => {
       const state = makeFloorState();
       state.player.entity.pos = { x: 5, y: 5 };
-      // Default state already has cleanliness sensor in sensors array
 
       const next = step(state, { type: ActionType.Scan });
 
-      expect(next.logs.some((l) => l.source === "sensor")).toBe(false);
+      expect(next.logs.some((l) => l.source === "sensor")).toBe(true);
     });
 
     it("scan with thermal sensor equipped produces scan log", () => {

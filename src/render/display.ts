@@ -986,12 +986,18 @@ export class BrowserDisplay implements IGameDisplay {
 
   renderUI(state: GameState, panel: HTMLElement, visitedRoomIds?: Set<string>): void {
     let sensorTag = "";
-    if (this.sensorMode === SensorType.Thermal) {
-      sensorTag = " <span class='thermal-active'>[THERMAL]</span>";
-    } else if (this.sensorMode === SensorType.Cleanliness) {
-      sensorTag = " <span class='thermal-active'>[CLEANLINESS]</span>";
-    } else if (this.sensorMode === SensorType.Atmospheric) {
-      sensorTag = " <span class='thermal-active'>[ATMOSPHERIC]</span>";
+    if (this.sensorMode) {
+      const sensorColors: Record<string, string> = {
+        [SensorType.Thermal]: "#f44",
+        [SensorType.Cleanliness]: "#4f4",
+        [SensorType.Atmospheric]: "#4af",
+        [SensorType.Radiation]: "#ff0",
+        [SensorType.Structural]: "#fa0",
+        [SensorType.EMSignal]: "#c4f",
+      };
+      const color = sensorColors[this.sensorMode] ?? "#aaa";
+      const label = this.sensorMode.toUpperCase();
+      sensorTag = ` <span style="color:${color};font-weight:bold">[${label}]</span>`;
     }
 
     // ── Objective ────────────────────────────────────────────────
