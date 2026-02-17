@@ -928,11 +928,11 @@ describe("Repair cradle", () => {
 
   it("healing is capped at maxHp", () => {
     const state = makeCradleState();
-    state.player = { ...state.player, hp: 90, maxHp: PLAYER_MAX_HP };
+    state.player = { ...state.player, hp: PLAYER_MAX_HP - 10, maxHp: PLAYER_MAX_HP };
 
     const next = step(state, { type: ActionType.Interact, targetId: "repair_cradle_0" });
 
-    // Should cap at maxHp: min(100, 90 + 30) = 100
+    // Should cap at maxHp: min(maxHp, (maxHp-10) + 30) = maxHp
     expect(next.player.hp).toBe(PLAYER_MAX_HP);
   });
 

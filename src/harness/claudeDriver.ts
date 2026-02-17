@@ -28,8 +28,9 @@ const API_ENDPOINT = "https://api.anthropic.com/v1/messages";
 const API_VERSION = "2023-06-01";
 const MAX_TOKENS = 200;
 const CONVERSATION_WINDOW = 5; // keep last N turns of context
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 5;
 const INITIAL_BACKOFF_MS = 1000;
+const TURN_DELAY_MS = 500; // delay between turns to avoid rate limiting
 
 // ── Result types ─────────────────────────────────────────────
 
@@ -459,10 +460,13 @@ STRATEGY TIPS:
 11. Clean dirty rooms when the objective phase is "clean".
 12. INTERACT with Closed Doors to open them for further exploration.
 
-RESPONSE FORMAT:
-Respond with ONLY a valid JSON object. No explanation, no markdown, no extra text.
-Example responses:
-{"action":"MOVE","params":{"dir":"E"}}
+CRITICAL RULES:
+1. ONLY choose actions from the "VALID ACTIONS" list in your observation. Do NOT try directions not listed.
+2. Respond with ONLY a valid JSON object. No explanation, no markdown, no extra text.
+3. For MOVE, only use directions shown in the valid actions list (e.g. if only N and S are listed, do NOT try E or W).
+
+RESPONSE FORMAT — copy one of these exactly, filling in the values:
+{"action":"MOVE","params":{"dir":"N"}}
 {"action":"INTERACT","params":{"target":"relay_01"}}
 {"action":"SCAN"}
 {"action":"CLEAN"}
@@ -621,9 +625,15 @@ export async function playGame(options: {
         );
       }
 
+      // Build a concise list of what IS valid
+      const validList = obs.validActions.map(a => {
+        const p = a.params ? ` ${JSON.stringify(a.params)}` : "";
+        return `{"action":"${a.type}"${a.params ? `,"params":${JSON.stringify(a.params)}` : ""}}`;
+      }).join("\n");
+
       const errorMsg = action
-        ? `Your action ${JSON.stringify(action)} is not valid this turn. Choose from the VALID ACTIONS list. Respond with ONLY a JSON object.`
-        : `Could not parse your response as a valid action. Respond with ONLY a JSON object like {"action":"MOVE","params":{"dir":"E"}}. Valid action types: MOVE, INTERACT, SCAN, CLEAN, WAIT.`;
+        ? `Your action is NOT valid this turn (probably blocked by a wall or missing target). You MUST pick from ONLY these valid actions:\n${validList}\nRespond with ONLY one of the above JSON objects, nothing else.`
+        : `Could not parse your response. Respond with ONLY a JSON object. Here are the valid actions this turn:\n${validList}\nPick one and respond with ONLY that JSON object.`;
 
       conversation.push({ role: "assistant", content: responseText });
       conversation.push({ role: "user", content: errorMsg });
@@ -670,6 +680,9 @@ export async function playGame(options: {
     // Track visited rooms
     const currentRoom = getRoomAt(state, state.player.entity.pos);
     if (currentRoom) visitedRooms.add(currentRoom.id);
+
+    // Delay between turns to avoid rate limiting
+    if (TURN_DELAY_MS > 0) await sleep(TURN_DELAY_MS);
   }
 
   return {
