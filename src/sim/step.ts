@@ -2980,7 +2980,10 @@ export function step(state: GameState, action: Action): GameState {
         const hasHiddenItems = [...state.entities.values()].some(
           e => e.type === EntityType.CrewItem && e.pos.x === px && e.pos.y === py && e.props["hidden"] === true
         );
-        if (tile.dirt === 0 && tile.smoke === 0 && !nearRelay && !hasHiddenItems) {
+        const hasNearbyRubble = [...state.entities.values()].some(
+          e => e.type === EntityType.Rubble && Math.abs(e.pos.x - px) + Math.abs(e.pos.y - py) <= 1
+        );
+        if (tile.dirt === 0 && tile.smoke === 0 && !nearRelay && !hasHiddenItems && !hasNearbyRubble) {
           next.logs = [...next.logs, {
             id: `log_clean_none_${next.turn}`,
             timestamp: next.turn,
@@ -3043,10 +3046,37 @@ export function step(state: GameState, action: Action): GameState {
             });
           }
         }
+        // Clear rubble on player tile and adjacent tiles
+        let rubbleCleared = 0;
+        const adjacentRubbleDeltas = [
+          { x: 0, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
+        ];
+        for (const [id, entity] of newEntities) {
+          if (entity.type === EntityType.Rubble) {
+            const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+            if (dist <= 1) {
+              newEntities.delete(id);
+              // Restore tile walkability
+              newTiles[entity.pos.y][entity.pos.x].walkable = true;
+              rubbleCleared++;
+            }
+          }
+        }
         next.entities = newEntities;
 
         // Item 5: Contextual cleaning log messages
         const cleanLogs: LogEntry[] = [];
+        if (rubbleCleared > 0) {
+          cleanLogs.push({
+            id: `log_clean_rubble_${next.turn}`,
+            timestamp: next.turn,
+            source: "system" as const,
+            text: rubbleCleared === 1
+              ? "Clearing debris. Passage restored."
+              : `Clearing debris. ${rubbleCleared} passages restored.`,
+            read: false,
+          });
+        }
         const oldSmoke = state.tiles[py][px].smoke;
         const oldDirt = state.tiles[py][px].dirt;
         if (oldSmoke > 0) {

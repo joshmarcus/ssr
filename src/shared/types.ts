@@ -58,6 +58,7 @@ export enum EntityType {
   EscapePod = "escape_pod",
   CrewNPC = "crew_npc",
   RepairCradle = "repair_cradle",
+  Rubble = "rubble",
 }
 
 export interface Entity {

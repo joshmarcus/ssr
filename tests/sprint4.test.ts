@@ -503,9 +503,10 @@ describe("Structural stress system", () => {
       current = tickStructuralStress(current);
     }
 
-    // Tile should have collapsed to wall
-    expect(current.tiles[2][2].type).toBe(TileType.Wall);
+    // Tile should be blocked by rubble (not a wall — rubble is cleanable)
     expect(current.tiles[2][2].walkable).toBe(false);
+    expect(current.entities.has("rubble_2_2")).toBe(true);
+    expect(current.entities.get("rubble_2_2")!.type).toBe(EntityType.Rubble);
   });
 
   it("does not collapse before 3 turns above threshold", () => {

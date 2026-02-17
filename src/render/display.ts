@@ -120,6 +120,7 @@ const ENTITY_COLORS: Record<string, string> = {
   [EntityType.EscapePod]: "#44ffaa",
   [EntityType.CrewNPC]: "#ffee66",
   [EntityType.RepairCradle]: "#44ddff",
+  [EntityType.Rubble]: "#998877",
 };
 
 // Entity background glow colors (subtle tint behind entities)
@@ -139,6 +140,7 @@ const ENTITY_BG_GLOW: Record<string, string> = {
   [EntityType.EscapePod]: "#081a10",
   [EntityType.CrewNPC]: "#1a1800",
   [EntityType.RepairCradle]: "#081820",
+  [EntityType.Rubble]: "#1a1510",
 };
 
 const ENTITY_GLYPHS: Record<string, string> = {
@@ -154,13 +156,15 @@ const ENTITY_GLYPHS: Record<string, string> = {
   [EntityType.Breach]: "\u26a0\ufe0f",       // ⚠️
   [EntityType.ClosedDoor]: "\ud83d\udeaa",   // 🚪
   [EntityType.SecurityTerminal]: "\ud83d\udcf7", // 📷
-  [EntityType.PatrolDrone]: "\u2622\ufe0f",     // ☢️
+  [EntityType.PatrolDrone]: "\ud83e\udd16",     // 🤖
+  [EntityType.RadiationSource]: "\u2622\ufe0f", // ☢️
   [EntityType.PressureValve]: "\u2699\ufe0f", // ⚙️
   [EntityType.FuseBox]: "\ud83d\udd0c",       // 🔌
   [EntityType.PowerCell]: "\ud83d\udd0b",     // 🔋 (reuse battery glyph)
   [EntityType.EscapePod]: "\ud83d\ude80",     // 🚀
   [EntityType.CrewNPC]: "\ud83e\uddd1",       // 🧑
   [EntityType.RepairCradle]: "\ud83d\udd27",  // 🔧
+  [EntityType.Rubble]: "\ud83e\udea8",         // 🪨
 };
 
 // ── Thermal color interpolation ─────────────────────────────────
@@ -202,6 +206,7 @@ const ENTITY_NAMES: Record<string, string> = {
   [EntityType.EscapePod]: "Escape Pod",
   [EntityType.CrewNPC]: "Crew Survivor",
   [EntityType.RepairCradle]: "Repair Cradle",
+  [EntityType.Rubble]: "Rubble",
 };
 
 // ── Smoke color interpolation ───────────────────────────────────
@@ -1012,7 +1017,7 @@ export class BrowserDisplay implements IGameDisplay {
       { key: EntityType.RepairCradle, glyph: ENTITY_GLYPHS[EntityType.RepairCradle] || "⚕", color: "#4df", label: "Repair Cradle" },
       { key: EntityType.Breach, glyph: ENTITY_GLYPHS[EntityType.Breach] || "⊘", color: "#f44", label: "Breach" },
       { key: EntityType.SecurityTerminal, glyph: ENTITY_GLYPHS[EntityType.SecurityTerminal] || "◫", color: "#4af", label: "Security" },
-      { key: EntityType.PatrolDrone, glyph: ENTITY_GLYPHS[EntityType.PatrolDrone] || "⊕", color: "#f22", label: "Patrol" },
+      { key: EntityType.PatrolDrone, glyph: ENTITY_GLYPHS[EntityType.PatrolDrone] || "🤖", color: "#f22", label: "Patrol" },
       { key: EntityType.PressureValve, glyph: ENTITY_GLYPHS[EntityType.PressureValve] || "◉", color: "#4ba", label: "Valve" },
       { key: EntityType.FuseBox, glyph: ENTITY_GLYPHS[EntityType.FuseBox] || "▦", color: "#d80", label: "Fuse Box" },
       { key: EntityType.PowerCell, glyph: ENTITY_GLYPHS[EntityType.PowerCell] || "⬡", color: "#fd4", label: "Power Cell" },
@@ -1021,6 +1026,7 @@ export class BrowserDisplay implements IGameDisplay {
       { key: EntityType.RadiationSource, glyph: ENTITY_GLYPHS[EntityType.RadiationSource] || "☢", color: "#4f4", label: "Radiation" },
       { key: EntityType.ShieldGenerator, glyph: ENTITY_GLYPHS[EntityType.ShieldGenerator] || "⊛", color: "#4f4", label: "Shield Gen" },
       { key: EntityType.EvidenceTrace, glyph: ENTITY_GLYPHS[EntityType.EvidenceTrace] || "※", color: "#ca8", label: "Evidence" },
+      { key: EntityType.Rubble, glyph: ENTITY_GLYPHS[EntityType.Rubble] || "▒", color: "#987", label: "Rubble" },
       { key: "_heat", glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
       { key: "_locked", glyph: GLYPHS.lockedDoor, color: "#f00", label: "Locked" },
       { key: "_door", glyph: GLYPHS.door, color: "#a52", label: "Door" },

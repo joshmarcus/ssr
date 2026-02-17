@@ -79,7 +79,7 @@ export const PA_INTERVAL = 15; // turns between PA announcements
 
 // ── Glyphs ───────────────────────────────────────────────────
 export const GLYPHS = {
-  player: "🖲",    // trackball — your bot
+  player: "@",     // classic roguelike player
   floor: "·",     // middle dot — subtle floor
   wall: "█",      // full block — solid wall
   door: "▯",      // open rectangle — doorway
@@ -99,7 +99,7 @@ export const GLYPHS = {
   breach: "⊘",    // circle with slash — hull breach
   closedDoor: "▯", // same as door but non-walkable
   securityTerminal: "◫", // security camera terminal
-  patrolDrone: "⊕", // circled plus — hostile patrol drone
+  patrolDrone: "🤖", // robot — patrol drone
   pressureValve: "◉", // filled circle — pressure valve
   fuseBox: "▦",  // grid — fuse box / junction
   powerCell: "⬡", // hexagon — power cell
@@ -110,6 +110,7 @@ export const GLYPHS = {
   signalBooster: "⊡", // squared dot — signal booster
   hiddenDevice: "◇", // diamond outline — hidden device (EM sensor only)
   escapePod: "⬡",    // hexagon — escape pod
+  rubble: "▒",       // medium shade — debris/rubble
   crewNPC: "☺",      // smiley face — living crew member
   repairCradle: "⚕",  // medical — bot repair station
 } as const;

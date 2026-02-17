@@ -115,6 +115,7 @@ export function tickRadiation(state: GameState): GameState {
 export function tickStructuralStress(state: GameState): GameState {
   const oldTiles = state.tiles;
   const newTiles = cloneTiles(oldTiles);
+  const newEntities = new Map(state.entities);
 
   // Collect reinforced positions (tile + adjacent tiles)
   const reinforcedPositions = new Set<string>();
@@ -158,12 +159,24 @@ export function tickStructuralStress(state: GameState): GameState {
         newTiles[y][x].stressTurns++;
 
         if (newTiles[y][x].stressTurns >= STRESS_COLLAPSE_TURNS) {
-          // Tile collapses — becomes wall
-          newTiles[y][x].type = TileType.Wall;
+          // Tile collapses — drop rubble (blocks movement, cleanable)
           newTiles[y][x].walkable = false;
-          newTiles[y][x].glyph = GLYPHS.wall;
           newTiles[y][x].stress = 0;
           newTiles[y][x].stressTurns = 0;
+          // Place rubble entity (if not already present and not player's tile)
+          const px = state.player.entity.pos.x;
+          const py = state.player.entity.pos.y;
+          if (!(x === px && y === py)) {
+            const rubbleId = `rubble_${x}_${y}`;
+            if (!newEntities.has(rubbleId)) {
+              newEntities.set(rubbleId, {
+                id: rubbleId,
+                type: EntityType.Rubble,
+                pos: { x, y },
+                props: {},
+              });
+            }
+          }
         }
       } else {
         // Below threshold — reset counter
@@ -172,7 +185,7 @@ export function tickStructuralStress(state: GameState): GameState {
     }
   }
 
-  return { ...state, tiles: newTiles };
+  return { ...state, tiles: newTiles, entities: newEntities };
 }
 
 /**
@@ -332,7 +345,7 @@ export function tickHazards(state: GameState): GameState {
   // Tick radiation system
   result = tickRadiation(result);
 
-  // Tick structural stress system
+  // Structural stress: drops rubble (cleanable) instead of walls
   result = tickStructuralStress(result);
 
   return result;
