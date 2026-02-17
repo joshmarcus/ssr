@@ -44,23 +44,48 @@ export class InputHandler {
 
   private mapKeyToAction(key: string): Action | null {
     switch (key) {
-      // Arrow keys + WASD for movement
+      // Cardinal: Arrow keys + WASD + vi keys (hjkl) + numpad
       case "ArrowUp":
       case "w":
       case "W":
+      case "k":
+      case "8":
         return { type: ActionType.Move, direction: Direction.North };
       case "ArrowDown":
       case "s":
       case "S":
+      case "j":
+      case "2":
         return { type: ActionType.Move, direction: Direction.South };
       case "ArrowLeft":
       case "a":
       case "A":
+      case "h":
+      case "4":
         return { type: ActionType.Move, direction: Direction.West };
       case "ArrowRight":
       case "d":
       case "D":
+      case "l":
+      case "6":
         return { type: ActionType.Move, direction: Direction.East };
+      // Diagonal: roguelike yubn + numpad
+      case "y":
+      case "Y":
+      case "7":
+        return { type: ActionType.Move, direction: Direction.NorthWest };
+      case "u":
+      case "U":
+      case "9":
+        return { type: ActionType.Move, direction: Direction.NorthEast };
+      case "b":
+      case "B":
+      case "1":
+        return { type: ActionType.Move, direction: Direction.SouthWest };
+      case "n":
+      case "N":
+      case "3":
+        return { type: ActionType.Move, direction: Direction.SouthEast };
       // Interact
       case "e":
       case "E":
@@ -78,16 +103,18 @@ export class InputHandler {
       case "C":
         return { type: ActionType.Clean };
       // Look
-      case "l":
-      case "L":
+      case "x":
+      case "X":
         return { type: ActionType.Look };
       // Wait
       case ".":
+      case "5":
+        return { type: ActionType.Wait };
+      // Wait
       case " ":
         return { type: ActionType.Wait };
-      // Journal (evidence review)
-      case "j":
-      case "J":
+      // Journal / notes
+      case ";":
         return { type: ActionType.Journal };
       default:
         return null;

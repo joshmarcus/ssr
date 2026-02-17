@@ -124,6 +124,10 @@ export enum Direction {
   South = "south",
   East = "east",
   West = "west",
+  NorthEast = "northeast",
+  NorthWest = "northwest",
+  SouthEast = "southeast",
+  SouthWest = "southwest",
 }
 
 export interface Action {

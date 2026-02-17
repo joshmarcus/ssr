@@ -966,89 +966,76 @@ export class BrowserDisplay implements IGameDisplay {
       interactHint +
       `</div>`;
 
-    // ── Room list (minimap) ──────────────────────────────────────
-    // Build set of camera-revealed room indices (explored but not visited)
-    const cameraRevealedRoomIds = new Set<string>();
-    for (let ri = 0; ri < state.rooms.length; ri++) {
-      const room = state.rooms[ri];
-      if (visitedRoomIds && visitedRoomIds.has(room.id)) continue;
-      // Check if any tile in the room is explored (camera reveal)
-      let anyExplored = false;
-      for (let ry = room.y; ry < room.y + room.height && !anyExplored; ry++) {
-        for (let rx = room.x; rx < room.x + room.width && !anyExplored; rx++) {
-          if (rx >= 0 && rx < state.width && ry >= 0 && ry < state.height) {
-            if (state.tiles[ry][rx].explored) anyExplored = true;
+    // Room list removed from main UI — available via [m] map command
+    const roomListHtml = "";
+
+    // ── Dynamic legend — only entities visible in current room ────
+    const currentRoom = this.getPlayerRoom(state);
+    const visibleEntityTypes = new Set<string>();
+    if (currentRoom) {
+      for (const [, entity] of state.entities) {
+        if (entity.pos.x >= currentRoom.x && entity.pos.x < currentRoom.x + currentRoom.width &&
+            entity.pos.y >= currentRoom.y && entity.pos.y < currentRoom.y + currentRoom.height) {
+          visibleEntityTypes.add(entity.type);
+        }
+      }
+      // Also check for tile-based features in the room
+      for (let ry = currentRoom.y; ry < currentRoom.y + currentRoom.height; ry++) {
+        for (let rx = currentRoom.x; rx < currentRoom.x + currentRoom.width; rx++) {
+          if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+            const t = state.tiles[ry][rx];
+            if (t.heat > 20) visibleEntityTypes.add("_heat");
+            if (t.type === TileType.LockedDoor) visibleEntityTypes.add("_locked");
+            if (t.type === TileType.Door) visibleEntityTypes.add("_door");
           }
         }
       }
-      if (anyExplored) cameraRevealedRoomIds.add(room.id);
+    }
+    // Also include entities within 3 tiles of the player (corridor encounters)
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+    for (const [, entity] of state.entities) {
+      const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+      if (dist <= 3) visibleEntityTypes.add(entity.type);
     }
 
-    let roomListHtml = "";
-    if (state.rooms.length > 0 && visitedRoomIds) {
-      const roomItems = state.rooms.map(r => {
-        const visited = visitedRoomIds.has(r.id);
-        const cameraRevealed = cameraRevealedRoomIds.has(r.id);
-        const mark = visited
-          ? `<span style="color:#0f0">\u2713</span>`
-          : cameraRevealed
-            ? `<span style="color:#4af">\u25cb</span>`
-            : `<span class="label">\u00b7</span>`;
-        const label = visited
-          ? `<span style="color:#8b8">${this.escapeHtml(r.name)}</span>`
-          : cameraRevealed
-            ? `<span style="color:#4a8">${this.escapeHtml(r.name)}</span>`
-            : `<span class="label">???</span>`;
-        return `${mark} ${label}`;
-      });
-      // Lay out in 2 columns
-      const half = Math.ceil(roomItems.length / 2);
-      const col1 = roomItems.slice(0, half);
-      const col2 = roomItems.slice(half);
-      let rows = "";
-      for (let i = 0; i < half; i++) {
-        const left = col1[i] || "";
-        const right = col2[i] || "";
-        rows += `<div class="room-row"><span class="room-col">${left}</span><span class="room-col">${right}</span></div>`;
-      }
-      roomListHtml = `<div class="room-list-panel"><span class="label">STATION MAP:</span>${rows}</div>`;
-    }
-
-    // ── Legend + Controls (side by side) ──────────────────────────
-    const legendItems = [
-      { glyph: "\ud83e\udd16", color: "#0f0", label: "You" },
-      { glyph: "\ud83d\udce1", color: "#0ff", label: "Sensor" },
-      { glyph: "\u26a1", color: "#ff0", label: "Relay" },
-      { glyph: "\ud83d\udc8e", color: "#f0f", label: "Core" },
-      { glyph: "\ud83d\udcbb", color: "#6cf", label: "Terminal" },
-      { glyph: "\ud83d\udd0b", color: "#fa0", label: "SvcBot" },
-      { glyph: "\ud83d\udce6", color: "#ca8", label: "Item" },
-      { glyph: "\ud83d\udd35", color: "#8a8", label: "Drone" },
-      { glyph: "\ud83d\udc8a", color: "#f88", label: "MedKit" },
-      { glyph: "\ud83d\udd27", color: "#fa8", label: "Repair" },
-      { glyph: GLYPHS.lockedDoor, color: "#f00", label: "Locked" },
-      { glyph: GLYPHS.door, color: "#a52", label: "Door" },
-      { glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
-      { glyph: "\u26a0\ufe0f", color: "#f44", label: "Breach" },
-      { glyph: "\ud83d\udcf7", color: "#4af", label: "Camera" },
-      { glyph: "\u2622\ufe0f", color: "#f22", label: "Hostile" },
-      { glyph: "\u2699\ufe0f", color: "#4ba", label: "Valve" },
-      { glyph: "\ud83d\udd0c", color: "#d80", label: "Fuse" },
-      { glyph: "\ud83d\udd0b", color: "#fd4", label: "Cell" },
-      { glyph: "\ud83d\ude80", color: "#4fa", label: "Pod" },
-      { glyph: "\ud83e\uddd1", color: "#fe6", label: "Crew" },
+    const allLegendItems: { key: string; glyph: string; color: string; label: string }[] = [
+      { key: EntityType.SensorPickup, glyph: ENTITY_GLYPHS[EntityType.SensorPickup] || "◈", color: "#0ff", label: "Sensor" },
+      { key: EntityType.Relay, glyph: ENTITY_GLYPHS[EntityType.Relay] || "⚡", color: "#ff0", label: "Relay" },
+      { key: EntityType.DataCore, glyph: ENTITY_GLYPHS[EntityType.DataCore] || "◆", color: "#f0f", label: "Data Core" },
+      { key: EntityType.LogTerminal, glyph: ENTITY_GLYPHS[EntityType.LogTerminal] || "▣", color: "#6cf", label: "Terminal" },
+      { key: EntityType.ServiceBot, glyph: ENTITY_GLYPHS[EntityType.ServiceBot] || "♦", color: "#fa0", label: "Service Bot" },
+      { key: EntityType.CrewItem, glyph: ENTITY_GLYPHS[EntityType.CrewItem] || "✦", color: "#ca8", label: "Crew Item" },
+      { key: EntityType.Drone, glyph: ENTITY_GLYPHS[EntityType.Drone] || "○", color: "#8a8", label: "Drone" },
+      { key: EntityType.MedKit, glyph: ENTITY_GLYPHS[EntityType.MedKit] || "✚", color: "#f88", label: "Med Kit" },
+      { key: EntityType.RepairBot, glyph: ENTITY_GLYPHS[EntityType.RepairBot] || "◎", color: "#fa8", label: "Repair Bot" },
+      { key: EntityType.RepairCradle, glyph: ENTITY_GLYPHS[EntityType.RepairCradle] || "⚕", color: "#4df", label: "Repair Cradle" },
+      { key: EntityType.Breach, glyph: ENTITY_GLYPHS[EntityType.Breach] || "⊘", color: "#f44", label: "Breach" },
+      { key: EntityType.SecurityTerminal, glyph: ENTITY_GLYPHS[EntityType.SecurityTerminal] || "◫", color: "#4af", label: "Security" },
+      { key: EntityType.PatrolDrone, glyph: ENTITY_GLYPHS[EntityType.PatrolDrone] || "⊕", color: "#f22", label: "Patrol" },
+      { key: EntityType.PressureValve, glyph: ENTITY_GLYPHS[EntityType.PressureValve] || "◉", color: "#4ba", label: "Valve" },
+      { key: EntityType.FuseBox, glyph: ENTITY_GLYPHS[EntityType.FuseBox] || "▦", color: "#d80", label: "Fuse Box" },
+      { key: EntityType.PowerCell, glyph: ENTITY_GLYPHS[EntityType.PowerCell] || "⬡", color: "#fd4", label: "Power Cell" },
+      { key: EntityType.EscapePod, glyph: ENTITY_GLYPHS[EntityType.EscapePod] || "⬡", color: "#4fa", label: "Escape Pod" },
+      { key: EntityType.CrewNPC, glyph: ENTITY_GLYPHS[EntityType.CrewNPC] || "☺", color: "#fe6", label: "Crew" },
+      { key: EntityType.RadiationSource, glyph: ENTITY_GLYPHS[EntityType.RadiationSource] || "☢", color: "#4f4", label: "Radiation" },
+      { key: EntityType.ShieldGenerator, glyph: ENTITY_GLYPHS[EntityType.ShieldGenerator] || "⊛", color: "#4f4", label: "Shield Gen" },
+      { key: EntityType.EvidenceTrace, glyph: ENTITY_GLYPHS[EntityType.EvidenceTrace] || "※", color: "#ca8", label: "Evidence" },
+      { key: "_heat", glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
+      { key: "_locked", glyph: GLYPHS.lockedDoor, color: "#f00", label: "Locked" },
+      { key: "_door", glyph: GLYPHS.door, color: "#a52", label: "Door" },
     ];
-    const legendHtml = legendItems
-      .map(l => `<span class="legend-glyph" style="color:${l.color}">${this.escapeHtml(l.glyph)}</span><span class="legend-name">${l.label}</span>`)
-      .join(" ");
+    const activeLegend = allLegendItems.filter(l => visibleEntityTypes.has(l.key));
+    const legendHtml = activeLegend.length > 0
+      ? activeLegend.map(l => `<span class="legend-glyph" style="color:${l.color}">${this.escapeHtml(l.glyph)}</span><span class="legend-name">${l.label}</span>`).join(" ")
+      : `<span class="label">No notable objects nearby.</span>`;
 
     const controlsHtml = `<span class="label">Keys:</span> ` +
-      `<span class="key">WASD</span> move ` +
+      `<span class="key">hjkl</span>/<span class="key">yubn</span> move ` +
       `<span class="key">i</span> interact ` +
       `<span class="key">t</span> sensor ` +
       `<span class="key">c</span> clean ` +
-      `<span class="key">l</span> look ` +
-      `<span class="key">Space</span> wait`;
+      `<span class="key">?</span> help`;
 
     const infoHtml = `<div class="info-bar">` +
       `${legendHtml}<br>${controlsHtml}</div>`;

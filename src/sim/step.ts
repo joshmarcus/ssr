@@ -2967,6 +2967,30 @@ export function step(state: GameState, action: Action): GameState {
       {
         const px = next.player.entity.pos.x;
         const py = next.player.entity.pos.y;
+        const tile = state.tiles[py][px];
+
+        // Check if there's anything to clean
+        let nearRelay = false;
+        for (const [, entity] of state.entities) {
+          if (entity.type === EntityType.Relay) {
+            const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+            if (dist <= 2) { nearRelay = true; break; }
+          }
+        }
+        const hasHiddenItems = [...state.entities.values()].some(
+          e => e.type === EntityType.CrewItem && e.pos.x === px && e.pos.y === py && e.props["hidden"] === true
+        );
+        if (tile.dirt === 0 && tile.smoke === 0 && !nearRelay && !hasHiddenItems) {
+          next.logs = [...next.logs, {
+            id: `log_clean_none_${next.turn}`,
+            timestamp: next.turn,
+            source: "system" as const,
+            text: "This area is already clean.",
+            read: false,
+          }];
+          break;
+        }
+
         const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
 
         // If smoke > 0, fully clear it (Item 2: cleaning fully clears smoke)
@@ -2992,16 +3016,6 @@ export function step(state: GameState, action: Action): GameState {
         }
 
         // Item 2: Cleaning near a relay reduces heat by 10 on adjacent tiles
-        let nearRelay = false;
-        for (const [, entity] of state.entities) {
-          if (entity.type === EntityType.Relay) {
-            const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
-            if (dist <= 2) {
-              nearRelay = true;
-              break;
-            }
-          }
-        }
         if (nearRelay) {
           for (const d of adjacentDeltas) {
             const nx = px + d.x;

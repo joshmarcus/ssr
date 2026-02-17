@@ -119,6 +119,8 @@ let lastObjectivePhase: ObjectivePhase | null = null;
 let activeDeduction: Deduction | null = null;
 let deductionSelectedIdx = 0;
 let pendingCrewDoor: { entityId: string; crewName: string } | null = null;
+let mapOpen = false;
+let helpOpen = false;
 
 // ── Wait message variety ────────────────────────────────────────
 const WAIT_MESSAGES_COOL = [
@@ -294,6 +296,30 @@ function initGame(): void {
     }
     if (activeChoice) {
       handleChoiceInput(e);
+      return;
+    }
+    // ? key toggles help
+    if (e.key === "?" && !journalOpen) {
+      e.preventDefault();
+      helpOpen = !helpOpen;
+      if (helpOpen) {
+        showHelp();
+      } else {
+        display.addLog("[Help closed]", "system");
+        renderAll();
+      }
+      return;
+    }
+    // M key toggles station map
+    if ((e.key === "m" || e.key === "M") && !journalOpen) {
+      e.preventDefault();
+      mapOpen = !mapOpen;
+      if (mapOpen) {
+        showStationMap();
+      } else {
+        display.addLog("[Map closed]", "system");
+        renderAll();
+      }
       return;
     }
     // Tab to switch journal tabs
@@ -803,6 +829,65 @@ function handleScan(): void {
   }
 
   audio.playScan();
+  renderAll();
+}
+
+// ── Help display ────────────────────────────────────────────────
+function showHelp(): void {
+  display.addLog("═══ CONTROLS ═══", "milestone");
+  display.addLog("── Movement ──", "system");
+  display.addLog("  Arrow keys / WASD    Cardinal movement", "system");
+  display.addLog("  h j k l              West South North East (vi keys)", "system");
+  display.addLog("  y u b n              NW   NE    SW    SE   (diagonal)", "system");
+  display.addLog("  Numpad 1-9           8-way movement (5 = wait)", "system");
+  display.addLog("── Actions ──", "system");
+  display.addLog("  i / e                Interact with adjacent entity", "system");
+  display.addLog("  c                    Clean current tile", "system");
+  display.addLog("  t / q                Cycle sensor overlay", "system");
+  display.addLog("  x                    Look (examine surroundings)", "system");
+  display.addLog("  .  Space  5          Wait one turn", "system");
+  display.addLog("── Menus ──", "system");
+  display.addLog("  ;                    Open journal / notes", "system");
+  display.addLog("  m                    Toggle station map", "system");
+  display.addLog("  ?                    Toggle this help", "system");
+  display.addLog("  Tab                  Switch journal tabs (in journal)", "system");
+  display.addLog("  Enter                Attempt deduction (in journal)", "system");
+  display.addLog("  F3                   Toggle 2D / 3D renderer", "system");
+  renderAll();
+}
+
+// ── Station map display (room checklist) ─────────────────────────
+function showStationMap(): void {
+  display.addLog("═══ STATION MAP ═══", "milestone");
+
+  const visited = visitedRoomIds;
+  for (const room of state.rooms) {
+    const isVisited = visited.has(room.id);
+
+    // Check if camera-revealed (explored but not visited)
+    let cameraRevealed = false;
+    if (!isVisited) {
+      for (let ry = room.y; ry < room.y + room.height; ry++) {
+        for (let rx = room.x; rx < room.x + room.width; rx++) {
+          if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+            if (state.tiles[ry][rx].explored) { cameraRevealed = true; break; }
+          }
+        }
+        if (cameraRevealed) break;
+      }
+    }
+
+    if (isVisited) {
+      display.addLog(`  ✓ ${room.name}`, "milestone");
+    } else if (cameraRevealed) {
+      display.addLog(`  ○ ${room.name}`, "sensor");
+    } else {
+      display.addLog(`  · ???`, "system");
+    }
+  }
+
+  const visitedCount = state.rooms.filter(r => visited.has(r.id)).length;
+  display.addLog(`${visitedCount}/${state.rooms.length} rooms explored. [M] close map.`, "system");
   renderAll();
 }
 
