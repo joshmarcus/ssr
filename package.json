@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "harness": "tsx src/harness/cli.ts",
+    "harness:claude": "tsx src/harness/claudeDriver.ts",
     "lint": "tsc --noEmit"
   },
   "keywords": [
