@@ -478,6 +478,9 @@ function handleAction(action: Action): void {
   const prevLogs = state.logs.length;
   const prevHp = state.player.hp;
   const prevStun = state.player.stunTurns;
+  const ppx = state.player.entity.pos.x;
+  const ppy = state.player.entity.pos.y;
+  const prevDirt = state.tiles[ppy]?.[ppx]?.dirt ?? 0;
   state = step(state, action);
 
   // Show sim-generated log messages (from interactions) with proper classification
@@ -531,8 +534,8 @@ function handleAction(action: Action): void {
     audio.playError();
   }
 
-  // Item 12: Cleaning narrative flavor
-  if (action.type === ActionType.Clean && state.turn !== prevTurn) {
+  // Item 12: Cleaning narrative flavor (only when there was actual dirt/smoke to clean)
+  if (action.type === ActionType.Clean && state.turn !== prevTurn && prevDirt > 0) {
     const cleanMsg = CLEANING_MESSAGES[cleanMsgIndex % CLEANING_MESSAGES.length];
     display.addLog(cleanMsg, "narrative");
     cleanMsgIndex++;

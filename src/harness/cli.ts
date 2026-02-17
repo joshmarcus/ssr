@@ -106,10 +106,7 @@ function buildFallbackObservation(state: GameState, visibility: "full" | "player
   }
 
   // Sensors
-  const sensors: string[] = [];
-  for (const [, att] of Object.entries(p.attachments)) {
-    if (att?.sensorType) sensors.push(att.sensorType);
-  }
+  const sensors = p.sensors ?? [];
   if (sensors.length > 0) {
     lines.push(`Sensors: ${sensors.join(", ")}`);
   }

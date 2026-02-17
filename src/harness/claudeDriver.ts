@@ -16,7 +16,7 @@ import type {
   GameState, Action, Entity, Room, Position,
 } from "../shared/types.js";
 import {
-  ActionType, Direction, EntityType, AttachmentSlot, SensorType,
+  ActionType, Direction, EntityType,
 } from "../shared/types.js";
 import type { HarnessObservation, PoiEntry, ValidAction } from "./types.js";
 
@@ -130,15 +130,9 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
   const currentRoom = room ? room.name : "Corridor";
 
   // Sensors
-  const sensors: string[] = [];
-  let activeSensor: string | null = null;
-  for (const slot of Object.values(AttachmentSlot)) {
-    const att = state.player.attachments[slot];
-    if (att?.sensorType) {
-      sensors.push(att.sensorType);
-      activeSensor = activeSensor ?? att.sensorType;
-    }
-  }
+  const playerSensors = state.player.sensors ?? [];
+  const sensors: string[] = playerSensors.map(s => s as string);
+  const activeSensor: string | null = playerSensors.length > 0 ? playerSensors[playerSensors.length - 1] : null;
 
   // Map rendering — centered on player, 21x15 viewport
   const viewW = 21;

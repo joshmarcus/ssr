@@ -1,7 +1,7 @@
 import type { GameState, Entity } from "../shared/types.js";
 import {
   ActionType, Direction, EntityType, TileType,
-  AttachmentSlot, SensorType, ObjectivePhase,
+  ObjectivePhase,
 } from "../shared/types.js";
 import {
   HEAT_PAIN_THRESHOLD,
@@ -311,15 +311,9 @@ export function buildObservation(
   const currentRoom = roomNameAt(state, px, py);
 
   // ── Sensors ──
-  const sensorNames: string[] = [];
-  let activeSensor: string | null = null;
-  for (const slot of Object.values(AttachmentSlot)) {
-    const att = state.player.attachments[slot];
-    if (att?.sensorType) {
-      sensorNames.push(att.sensorType);
-      activeSensor = att.sensorType;
-    }
-  }
+  const sensors = state.player.sensors ?? [];
+  const sensorNames: string[] = sensors.map(s => s as string);
+  const activeSensor: string | null = sensors.length > 0 ? sensors[sensors.length - 1] : null;
 
   // ── Objective phase ──
   const objectivePhase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
