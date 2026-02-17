@@ -617,28 +617,30 @@ describe("Cleaning directive", () => {
     return state;
   }
 
-  it("directive violation warning appears after 8 turns in dirty room", () => {
+  it("warns player on first turn in dirty room", () => {
     let state = makeDirectiveState();
 
-    // Step 8 turns (Wait actions) in a dirty room
-    for (let i = 0; i < 8; i++) {
-      state = step(state, { type: ActionType.Wait });
-    }
+    // Step 1 turn in a dirty room
+    state = step(state, { type: ActionType.Wait });
 
-    // After 8 violation turns, should have a warning log
-    expect(state.logs.some(l => l.text.includes("DIRECTIVE VIOLATION"))).toBe(true);
+    // Should have the directive warning mentioning cleaning and overlay
+    expect(state.logs.some(l => l.text.includes("DIRECTIVE") && l.text.includes("cleaning"))).toBe(true);
   });
 
-  it("directive stun at 20 violation turns", () => {
-    let state = makeDirectiveState();
+  it("blocks movement out of dirty room", () => {
+    const state = makeDirectiveState();
 
-    // Step 20 turns in a dirty room
-    for (let i = 0; i < 20; i++) {
-      state = step(state, { type: ActionType.Wait });
-    }
+    // Player is at (5,4) in a room spanning (0,0)-(10,10) with dirt=30 (70% clean < 80% goal)
+    // Try moving to a tile outside the room — should be blocked
+    const moveAction = { type: ActionType.Move, direction: Direction.North } as const;
 
-    // Should have the compliance stun log
-    expect(state.logs.some(l => l.text.includes("forcing compliance"))).toBe(true);
+    // The player is in the middle of the room, so north should be valid (still in room)
+    // But we need to position the player near the room edge to test the block
+    const edgeState = { ...state, player: { ...state.player, entity: { ...state.player.entity, pos: { x: 5, y: 0 } } } };
+
+    // Moving north from y=0 would leave the room (if y-1 is walkable)
+    // isValidAction should block this due to cleaning directive
+    expect(isValidAction(edgeState, moveAction)).toBe(false);
   });
 
   it("cleaning resets violation counter", () => {

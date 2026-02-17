@@ -228,7 +228,7 @@ function smokeToBgColor(smoke: number): string {
 }
 
 // ── Responsive font size calculation ────────────────────────────
-const SIDEBAR_WIDTH_PX = 340; // reserve space for the sidebar panel
+const SIDEBAR_WIDTH_PX = 420; // reserve space for the sidebar panel (left side)
 
 function computeFontSize(cellsW: number, cellsH: number): number {
   const availW = window.innerWidth - SIDEBAR_WIDTH_PX;

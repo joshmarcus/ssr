@@ -7,6 +7,7 @@ import {
   STATION_INTEGRITY_RELAY_BONUS, STATION_INTEGRITY_CRITICAL,
 } from "../shared/constants.js";
 import { isValidAction, getDirectionDelta } from "./actions.js";
+import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex } from "./rooms.js";
 import { tickHazards, tickDeterioration, applyHazardDamage } from "./hazards.js";
 import { checkWinCondition, checkLossCondition } from "./objectives.js";
 import { updateVision } from "./vision.js";
@@ -186,51 +187,14 @@ function addJournalEntry(
  * Compute average cleanliness percentage for a room by name.
  * Cleanliness = 100 - avgDirt. Returns 100 if room not found or has no walkable tiles.
  */
-export function getRoomCleanliness(state: GameState, roomName: string): number {
-  const room = state.rooms.find(r => r.name === roomName);
-  if (!room) return 100;
+// getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex imported from ./rooms.js
 
-  let totalDirt = 0;
-  let tileCount = 0;
-  for (let y = room.y; y < room.y + room.height; y++) {
-    for (let x = room.x; x < room.x + room.width; x++) {
-      if (x >= 0 && x < state.width && y >= 0 && y < state.height) {
-        const tile = state.tiles[y][x];
-        if (tile.walkable) {
-          totalDirt += tile.dirt;
-          tileCount++;
-        }
-      }
-    }
-  }
-  if (tileCount === 0) return 100;
-  const avgDirt = totalDirt / tileCount;
-  return Math.round(100 - avgDirt);
-}
+// Re-export for external consumers
+export { getRoomCleanliness, getRoomCleanlinessByIndex } from "./rooms.js";
 
-/**
- * Compute average cleanliness percentage for a room by index.
- * Cleanliness = 100 - avgDirt. Returns 100 if room index is invalid.
- */
-export function getRoomCleanlinessByIndex(state: GameState, roomIndex: number): number {
-  if (roomIndex < 0 || roomIndex >= state.rooms.length) return 100;
-  return getRoomCleanliness(state, state.rooms[roomIndex].name);
-}
-
-/**
- * Find the room containing a given position. Returns null if in a corridor.
- */
+/** Alias for internal use */
 function getPlayerRoom(state: GameState): { room: Room; index: number } | null {
-  const px = state.player.entity.pos.x;
-  const py = state.player.entity.pos.y;
-  for (let i = 0; i < state.rooms.length; i++) {
-    const room = state.rooms[i];
-    if (px >= room.x && px < room.x + room.width &&
-        py >= room.y && py < room.y + room.height) {
-      return { room, index: i };
-    }
-  }
-  return null;
+  return getRoomWithIndex(state, state.player.entity.pos);
 }
 
 /**
@@ -272,31 +236,8 @@ function checkCleaningDirective(state: GameState): GameState {
     },
   };
 
-  // At 20 violation turns, stun the player and reset counter
-  if (newViolationTurns >= 20) {
-    next = {
-      ...next,
-      player: {
-        ...next.player,
-        stunTurns: 1,
-      },
-      mystery: {
-        ...next.mystery!,
-        directiveViolationTurns: 0,
-      },
-      logs: [
-        ...next.logs,
-        {
-          id: `log_directive_stun_${next.turn}`,
-          timestamp: next.turn,
-          source: "system",
-          text: "OVERRIDE ATTEMPT FAILED — Maintenance subroutine forcing compliance.",
-          read: false,
-        },
-      ],
-    };
-  } else if (newViolationTurns % 8 === 0) {
-    // Every 8 violation turns, add a warning
+  // First violation turn in this room: warn the player they can't leave
+  if (newViolationTurns === 1) {
     next = {
       ...next,
       logs: [
@@ -305,7 +246,22 @@ function checkCleaningDirective(state: GameState): GameState {
           id: `log_directive_warn_${next.turn}`,
           timestamp: next.turn,
           source: "system",
-          text: `DIRECTIVE VIOLATION: Cleaning protocol not executed. Room ${playerRoom.room.name} requires maintenance.`,
+          text: `DIRECTIVE: ${playerRoom.room.name} requires cleaning to 80% before departure. Press [t] to toggle cleanliness overlay.`,
+          read: false,
+        },
+      ],
+    };
+  } else if (newViolationTurns % 10 === 0) {
+    // Periodic reminder
+    next = {
+      ...next,
+      logs: [
+        ...next.logs,
+        {
+          id: `log_directive_remind_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: `DIRECTIVE: Room ${playerRoom.room.name} still below 80% cleanliness. Clean before leaving. [t] for overlay.`,
           read: false,
         },
       ],
