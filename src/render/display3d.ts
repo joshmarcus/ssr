@@ -389,8 +389,6 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   showGameOverOverlay(state: GameState): void {
-    // Delegate to the same DOM overlay as 2D — import the logic from display.ts would be ideal
-    // but for now just trigger the overlay directly
     const overlay = document.getElementById("gameover-overlay");
     if (!overlay) return;
 
@@ -404,20 +402,76 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (e.props["activated"] === true) relaysActivated++;
       }
     }
+    const breachesSealed = Array.from(state.entities.values()).filter(e =>
+      e.type === EntityType.Breach && e.props["sealed"] === true
+    ).length;
+    const totalBreaches = Array.from(state.entities.values()).filter(e => e.type === EntityType.Breach).length;
+
     const title = isVictory ? "TRANSMISSION COMPLETE" : "CONNECTION LOST";
     const titleClass = isVictory ? "victory" : "defeat";
     const subtitle = isVictory
-      ? "The crew's research data streams through the low-band relay."
-      : "Rover A3 signal lost. CORVUS-7 drifts on, silent.";
+      ? "The crew's research data streams through the low-band relay.<br>Nine months of work, preserved."
+      : "Rover A3 signal lost. The data core remains sealed.<br>CORVUS-7 drifts on, silent.";
+
+    // Deduction and evidence stats
+    const deductions = state.mystery?.deductions ?? [];
+    const deductionsCorrect = deductions.filter(d => d.answeredCorrectly).length;
+    const evidenceCount = state.mystery?.journal.length ?? 0;
+    const roomsExplored = state.rooms.filter(r => {
+      for (let ry = r.y; ry < r.y + r.height; ry++) {
+        for (let rx = r.x; rx < r.x + r.width; rx++) {
+          if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+            if (state.tiles[ry][rx].explored) return true;
+          }
+        }
+      }
+      return false;
+    }).length;
+
+    // Performance rating
+    let score = 0;
+    if (isVictory) score += 40;
+    score += Math.min(20, deductionsCorrect * (20 / Math.max(deductions.length, 1)));
+    score += Math.min(15, (roomsExplored / Math.max(state.rooms.length, 1)) * 15);
+    score += Math.min(15, (hpPercent / 100) * 15);
+    score += Math.min(10, isVictory && state.turn < 200 ? 10 : isVictory && state.turn < 350 ? 5 : 0);
+    const rating = score >= 90 ? "S" : score >= 75 ? "A" : score >= 55 ? "B" : score >= 35 ? "C" : "D";
+    const ratingColor = rating === "S" ? "#ff0" : rating === "A" ? "#0f0" : rating === "B" ? "#6cf" : rating === "C" ? "#fa0" : "#f44";
+
+    // Crew evacuation
+    const evac = state.mystery?.evacuation;
+    const crewEvacuated = evac?.crewEvacuated.length || 0;
+    const crewDead = evac?.crewDead.length || 0;
+    let crewHtml = "";
+    if (crewEvacuated > 0 || crewDead > 0) {
+      crewHtml = `<div class="gameover-stat"><span class="stat-label">Crew Evacuated:</span> <span class="stat-value ${crewDead === 0 ? 'good' : 'warn'}">${crewEvacuated}/${crewEvacuated + crewDead}</span></div>`;
+    }
+
+    // Mystery choices
+    const choices = state.mystery?.choices ?? [];
+    const choicesMade = choices.filter(c => c.chosen).length;
+    const choicesHtml = choicesMade > 0
+      ? `<div class="gameover-stat"><span class="stat-label">Decisions Made:</span> <span class="stat-value">${choicesMade}/${choices.length}</span></div>`
+      : "";
 
     overlay.innerHTML = `
       <div class="gameover-box ${titleClass}">
         <div class="gameover-title ${titleClass}">${title}</div>
         <div class="gameover-subtitle">${subtitle}</div>
+        <div class="gameover-rating" style="text-align:center;margin:8px 0">
+          <span style="color:${ratingColor};font-size:32px;font-weight:bold;text-shadow:0 0 10px ${ratingColor}">${rating}</span>
+          <div style="color:#888;font-size:12px">PERFORMANCE RATING</div>
+        </div>
         <div class="gameover-stats">
           <div class="gameover-stat"><span class="stat-label">Turns:</span> <span class="stat-value">${state.turn}</span></div>
-          <div class="gameover-stat"><span class="stat-label">Hull:</span> <span class="stat-value ${hpClass}">${state.player.hp}/${state.player.maxHp}</span></div>
-          <div class="gameover-stat"><span class="stat-label">Relays:</span> <span class="stat-value">${relaysActivated}/${totalRelays}</span></div>
+          <div class="gameover-stat"><span class="stat-label">Hull Integrity:</span> <span class="stat-value ${hpClass}">${state.player.hp}/${state.player.maxHp} (${hpPercent}%)</span></div>
+          <div class="gameover-stat"><span class="stat-label">Rooms Explored:</span> <span class="stat-value ${roomsExplored >= state.rooms.length ? 'good' : 'warn'}">${roomsExplored}/${state.rooms.length}</span></div>
+          <div class="gameover-stat"><span class="stat-label">Relays Rerouted:</span> <span class="stat-value ${relaysActivated >= totalRelays ? 'good' : 'warn'}">${relaysActivated}/${totalRelays}</span></div>
+          <div class="gameover-stat"><span class="stat-label">Breaches Sealed:</span> <span class="stat-value ${breachesSealed >= totalBreaches ? 'good' : 'warn'}">${breachesSealed}/${totalBreaches}</span></div>
+          ${crewHtml}
+          <div class="gameover-stat"><span class="stat-label">Evidence Collected:</span> <span class="stat-value">${evidenceCount}</span></div>
+          <div class="gameover-stat"><span class="stat-label">Deductions:</span> <span class="stat-value ${deductionsCorrect === deductions.length ? 'good' : deductionsCorrect > 0 ? 'warn' : 'bad'}">${deductionsCorrect}/${deductions.length} correct</span></div>
+          ${choicesHtml}
         </div>
         <div class="gameover-restart">Press [R] to restart</div>
       </div>`;
@@ -1406,6 +1460,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.modelsLoaded = true;
         this.addLog(`Loaded ${this.gltfCache.size}/${entries.length} 3D models.`, "system");
         this.swapPlayerModel();
+        this.rebuildEntityMeshes();
       }
     };
 

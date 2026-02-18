@@ -6,9 +6,10 @@ import type { LogType } from "./render/display.js";
 import { InputHandler } from "./render/input.js";
 import { AudioManager } from "./render/audio.js";
 import { GOLDEN_SEED } from "./shared/constants.js";
-import { OPENING_CRAWL, STATION_NAME, TAGLINE } from "./data/lore.js";
+import { OPENING_CRAWL, STATION_NAME, STATION_SUBTITLE, TAGLINE } from "./data/lore.js";
 import {
-  VICTORY_TITLE, VICTORY_TEXT, DEFEAT_TITLE, DEFEAT_TEXT,
+  VICTORY_TITLE, DEFEAT_TITLE, DEFEAT_TEXT,
+  DEFEAT_RELAY_TITLE, DEFEAT_RELAY_TEXT,
   VICTORY_EPILOGUE_MINIMAL, VICTORY_EPILOGUE_PARTIAL, VICTORY_EPILOGUE_COMPLETE,
   ENDING_BY_DISCOVERY, SPECIFIC_DISCOVERIES,
   CLASSIFIED_DIRECTIVE_LOG_FRAGMENT, CLASSIFIED_DIRECTIVE_TEXT,
@@ -45,7 +46,7 @@ function showOpeningCrawl(): void {
   crawlOverlay.style.display = "flex";
 
   const lines = [
-    `> ${STATION_NAME}`,
+    `> ${STATION_NAME} — ${STATION_SUBTITLE}`,
     `> ${TAGLINE}`,
     "",
     ...OPENING_CRAWL,
@@ -67,8 +68,8 @@ function showOpeningCrawl(): void {
   crawlOverlay.appendChild(preEl);
   crawlOverlay.appendChild(skipEl);
 
-  // Typewriter effect: ~60 chars/second
-  const CHARS_PER_SECOND = 60;
+  // Typewriter effect: ~120 chars/second
+  const CHARS_PER_SECOND = 120;
   const intervalMs = 1000 / CHARS_PER_SECOND;
   let charIndex = 0;
   let dismissed = false;
@@ -322,9 +323,10 @@ function initGame(): void {
   // ── Dramatic link establishment sequence ────────────────────────
   display.addLog("ESTABLISHING LINK...", "system");
   display.addLog("Carrier signal acquired. Handshake with Rover A3... OK.", "system");
-  display.addLog("LINK ACTIVE -- Low-bandwidth terminal feed. No video, no audio.", "milestone");
-  display.addLog("PRIMARY DIRECTIVE: Clean all station rooms to 80% standard.", "milestone");
-  display.addLog("You are a JR-3 Janitor Rover. Cleaning is your purpose. Use [c] to clean.", "system");
+  display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. No video, no audio.", "milestone");
+  display.addLog("Rover A3 responds. Battery 98%. Cleanliness sensor online.", "system");
+  display.addLog("The station is quiet. What happened here?", "narrative");
+  display.addLog("MAINTENANCE SUBROUTINE: Clean rooms to 80% standard. Use [c] to clean.", "system");
   lastObjectivePhase = ObjectivePhase.Clean;
 
   checkRoomEntry();
@@ -458,6 +460,34 @@ function handleRestartKey(e: KeyboardEvent): void {
     if (journalEl) { journalEl.classList.remove("active"); journalEl.innerHTML = ""; }
     choicesPresented.clear();
 
+    // Reset per-run narrative/tutorial state
+    firstDroneEncounterShown = false;
+    droneEncounterSet.clear();
+    triggeredBotIntrospections.clear();
+    triggeredTutorialHints.clear();
+    cleanMsgIndex = 0;
+    waitMsgIndex = 0;
+    lastAmbientRoomId = "";
+    mapOpen = false;
+    helpOpen = false;
+    activeDeduction = null;
+    deductionSelectedIdx = 0;
+    confirmingDeduction = false;
+    broadcastSection = "evidence";
+    broadcastOptionIdx = 0;
+    broadcastEvidenceScroll = 0;
+    broadcastLinkedEvidence = [];
+    broadcastDetailDeduction = null;
+    broadcastEvidenceIdx = 0;
+    broadcastConfirming = false;
+    broadcastChoiceConfirming = false;
+    pendingCrewDoor = null;
+    journalTab = "evidence";
+    choiceSelectedIdx = 0;
+    evidenceBrowserTab = "all";
+    evidenceBrowserIdx = 0;
+    evidenceBrowserScroll = 0;
+
     // Clear overlays and display, rebuild
     const gameoverEl = document.getElementById("gameover-overlay");
     if (gameoverEl) { gameoverEl.classList.remove("active"); gameoverEl.innerHTML = ""; }
@@ -469,7 +499,7 @@ function handleRestartKey(e: KeyboardEvent): void {
 
     display.addLog("RESTARTING LINK...", "system");
     display.addLog("Rover A3 rebooted. All systems reset.", "milestone");
-    display.addLog("PRIMARY DIRECTIVE: Clean all station rooms to 80% standard.", "milestone");
+    display.addLog("MAINTENANCE SUBROUTINE: Clean rooms to 80% standard. Use [c] to clean.", "system");
     lastObjectivePhase = ObjectivePhase.Clean;
 
     checkRoomEntry();
@@ -950,8 +980,18 @@ function handleAction(action: Action): void {
     } else {
       audio.playDefeat();
       display.addLog("", "system");
-      display.addLog("=== " + DEFEAT_TITLE + " ===", "critical");
-      DEFEAT_TEXT.forEach((line) => { if (line) display.addLog(line, "critical"); });
+      // Check if the defeat was heat/relay related
+      const px = state.player.entity.pos.x;
+      const py = state.player.entity.pos.y;
+      const deathTile = state.tiles[py]?.[px];
+      const isHeatDeath = deathTile && deathTile.heat >= 30;
+      if (isHeatDeath) {
+        display.addLog("=== " + DEFEAT_RELAY_TITLE + " ===", "critical");
+        DEFEAT_RELAY_TEXT.forEach((line) => { if (line) display.addLog(line, "critical"); });
+      } else {
+        display.addLog("=== " + DEFEAT_TITLE + " ===", "critical");
+        DEFEAT_TEXT.forEach((line) => { if (line) display.addLog(line, "critical"); });
+      }
     }
     flickerThenRender();
     // Show full-screen game-over overlay after the flicker
