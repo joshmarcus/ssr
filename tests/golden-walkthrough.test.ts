@@ -135,7 +135,7 @@ describe("Golden seed walkthrough (expanded station)", () => {
     }
   });
 
-  it("data core interaction triggers victory", () => {
+  it("data core interaction triggers victory after deductions solved", () => {
     let state = equipThermal({ ...initialState });
 
     // Fast-forward past Clean phase to Investigate (test focuses on evidence→victory flow)
@@ -171,14 +171,28 @@ describe("Golden seed walkthrough (expanded station)", () => {
       state = step(state, interact(relayId));
     }
 
-    // Transmit at data core
+    // Data core should NOT grant victory without deductions
     const dataCore = state.entities.get("data_core")!;
     state.player = {
       ...state.player,
       entity: { ...state.player.entity, pos: { ...dataCore.pos } },
     };
     state = step(state, interact("data_core"));
+    expect(state.victory).toBeFalsy();
+    expect(state.gameOver).toBeFalsy();
 
+    // Solve all deductions (pick correct answer for each)
+    if (state.mystery) {
+      const solvedDeductions = state.mystery.deductions.map(d => ({
+        ...d,
+        solved: true,
+        answeredCorrectly: true,
+      }));
+      state = { ...state, mystery: { ...state.mystery, deductions: solvedDeductions } };
+    }
+
+    // Now data core should grant victory
+    state = step(state, interact("data_core"));
     expect(state.victory).toBe(true);
     expect(state.gameOver).toBe(true);
   });

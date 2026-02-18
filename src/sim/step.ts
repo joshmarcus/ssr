@@ -6,7 +6,7 @@ import {
   STATION_INTEGRITY_DECAY_RATE, STATION_INTEGRITY_BREACH_PENALTY,
   STATION_INTEGRITY_RELAY_BONUS, STATION_INTEGRITY_CRITICAL,
 } from "../shared/constants.js";
-import { isValidAction, getDirectionDelta } from "./actions.js";
+import { isValidAction, getDirectionDelta, hasUnlockedDoorAt, isAutoSealedBulkhead } from "./actions.js";
 import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex } from "./rooms.js";
 import { tickHazards, tickDeterioration, applyHazardDamage } from "./hazards.js";
 import { checkWinCondition, checkLossCondition } from "./objectives.js";
@@ -207,6 +207,28 @@ function getPlayerRoom(state: GameState): { room: Room; index: number } | null {
  */
 function checkCleaningDirective(state: GameState): GameState {
   if (!state.mystery || !state.mystery.cleaningDirective) return state;
+
+  // Auto-expire cleaning directive after turn 75
+  if (state.turn >= 75) {
+    return {
+      ...state,
+      mystery: {
+        ...state.mystery,
+        cleaningDirective: false,
+        directiveViolationTurns: 0,
+      },
+      logs: [
+        ...state.logs,
+        {
+          id: `log_directive_expire_${state.turn}`,
+          timestamp: state.turn,
+          source: "system" as const,
+          text: ">> Maintenance protocols downgraded. Station conditions require full mobility. Cleaning directive suspended.",
+          read: false,
+        },
+      ],
+    };
+  }
 
   const playerRoom = getPlayerRoom(state);
   if (!playerRoom) return state; // in corridor, no directive pressure
@@ -572,7 +594,27 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         break;
       }
 
-      // Transmit: win condition
+      // Gate transmission behind deductions: all deductions must be answered
+      if (next.mystery?.deductions) {
+        const allSolved = next.mystery.deductions.every(d => d.solved);
+        if (!allSolved) {
+          const totalDeductions = next.mystery.deductions.length;
+          const solvedCount = next.mystery.deductions.filter(d => d.solved).length;
+          next.logs = [
+            ...state.logs,
+            {
+              id: `log_datacore_deductions_${next.turn}`,
+              timestamp: next.turn,
+              source: "data_core",
+              text: `Data core online. Uplink ready, but transmission protocol requires a complete incident report. Open the Broadcast Report [B] to submit your deductions. (${solvedCount}/${totalDeductions} answered)`,
+              read: false,
+            },
+          ];
+          break;
+        }
+      }
+
+      // Transmit: win condition — all deductions answered
       next.victory = true;
       next.gameOver = true;
 
@@ -2937,9 +2979,62 @@ export function step(state: GameState, action: Action): GameState {
         x: state.player.entity.pos.x + delta.x,
         y: state.player.entity.pos.y + delta.y,
       };
+
+      // Auto-open unlocked closed doors on bump
+      if (!state.tiles[newPos.y][newPos.x].walkable && hasUnlockedDoorAt(state, newPos.x, newPos.y)) {
+        const newTilesForDoor = state.tiles.map((row) => row.map((t) => ({ ...t })));
+        newTilesForDoor[newPos.y][newPos.x].walkable = true;
+        const doorEntities = new Map(state.entities);
+        for (const [id, entity] of doorEntities) {
+          if (
+            entity.type === EntityType.ClosedDoor &&
+            entity.pos.x === newPos.x &&
+            entity.pos.y === newPos.y &&
+            entity.props["closed"] === true &&
+            entity.props["locked"] !== true
+          ) {
+            doorEntities.set(id, {
+              ...entity,
+              props: { ...entity.props, closed: false },
+            });
+          }
+        }
+        next.tiles = newTilesForDoor;
+        next.entities = doorEntities;
+        next.logs = [
+          ...next.logs,
+          {
+            id: `log_door_bump_open_${next.turn}`,
+            timestamp: next.turn,
+            source: "system" as const,
+            text: "Bulkhead slides open as you approach.",
+            read: false,
+          },
+        ];
+      }
+      // Force open auto-sealed bulkheads (pressure-sealed doors with no entity)
+      if (!state.tiles[newPos.y][newPos.x].walkable && isAutoSealedBulkhead(state, newPos.x, newPos.y)) {
+        const newTilesForBulk = (next.tiles === state.tiles)
+          ? state.tiles.map((row) => row.map((t) => ({ ...t })))
+          : next.tiles;
+        newTilesForBulk[newPos.y][newPos.x].walkable = true;
+        newTilesForBulk[newPos.y][newPos.x].type = TileType.Door;
+        next.tiles = newTilesForBulk;
+        next.logs = [
+          ...next.logs,
+          {
+            id: `log_bulkhead_force_${next.turn}`,
+            timestamp: next.turn,
+            source: "system" as const,
+            text: "Emergency bulkhead forced open. Pressure differential detected.",
+            read: false,
+          },
+        ];
+      }
+
       next.player = {
-        ...state.player,
-        entity: { ...state.player.entity, pos: newPos },
+        ...next.player,
+        entity: { ...next.player.entity, pos: newPos },
       };
       // Also update the player entity in the entities map
       const newEntities = new Map(next.entities);
@@ -2998,9 +3093,21 @@ export function step(state: GameState, action: Action): GameState {
           e => e.type === EntityType.CrewItem && e.pos.x === px && e.pos.y === py && e.props["hidden"] === true
         );
         const hasNearbyRubble = [...state.entities.values()].some(
-          e => e.type === EntityType.Rubble && Math.abs(e.pos.x - px) + Math.abs(e.pos.y - py) <= 1
+          e => e.type === EntityType.Rubble && Math.abs(e.pos.x - px) <= 1 && Math.abs(e.pos.y - py) <= 1
         );
-        if (tile.dirt === 0 && tile.smoke === 0 && !nearRelay && !hasHiddenItems && !hasNearbyRubble) {
+        // Check if any tile in the 3x3 area has dirt or smoke
+        let areaHasDirt = false;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const cx = px + dx;
+            const cy = py + dy;
+            if (cx >= 0 && cx < state.width && cy >= 0 && cy < state.height) {
+              const t = state.tiles[cy][cx];
+              if (t.walkable && (t.dirt > 0 || t.smoke > 0)) { areaHasDirt = true; }
+            }
+          }
+        }
+        if (!areaHasDirt && !nearRelay && !hasHiddenItems && !hasNearbyRubble) {
           next.logs = [...next.logs, {
             id: `log_clean_none_${next.turn}`,
             timestamp: next.turn,
@@ -3013,39 +3120,42 @@ export function step(state: GameState, action: Action): GameState {
 
         const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
 
-        // If smoke > 0, fully clear it (Item 2: cleaning fully clears smoke)
-        if (newTiles[py][px].smoke > 0) {
-          newTiles[py][px].smoke = 0;
-        }
-
-        // Reduce dirt on player's tile (25-35 points, deterministic)
-        const dirtReduction = 25 + ((px * 7 + py * 13 + next.turn * 3) % 11); // 25-35
-        newTiles[py][px].dirt = Math.max(0, newTiles[py][px].dirt - dirtReduction);
-
-        // Reduce dirt on adjacent walkable tiles (10-15 points)
-        const adjacentDeltas = [
+        // All 8 surrounding squares + player's tile
+        const surroundingDeltas = [
+          { x: 0, y: 0 },
           { x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
+          { x: 1, y: -1 }, { x: 1, y: 1 }, { x: -1, y: -1 }, { x: -1, y: 1 },
         ];
-        for (const d of adjacentDeltas) {
-          const ax = px + d.x;
-          const ay = py + d.y;
-          if (ax >= 0 && ax < state.width && ay >= 0 && ay < state.height && newTiles[ay][ax].walkable) {
-            const adjDirtReduction = 10 + ((ax * 3 + ay * 11 + next.turn) % 6); // 10-15
-            newTiles[ay][ax].dirt = Math.max(0, newTiles[ay][ax].dirt - adjDirtReduction);
+
+        // Clean smoke and dirt on player's tile and all surrounding tiles
+        for (const d of surroundingDeltas) {
+          const tx = px + d.x;
+          const ty = py + d.y;
+          if (tx < 0 || tx >= state.width || ty < 0 || ty >= state.height) continue;
+          if (!newTiles[ty][tx].walkable) continue;
+
+          // Clear smoke fully
+          if (newTiles[ty][tx].smoke > 0) {
+            newTiles[ty][tx].smoke = 0;
           }
+
+          // Reduce dirt: full strength on player tile, slightly less on surrounding
+          const isCenter = d.x === 0 && d.y === 0;
+          const dirtAmt = isCenter
+            ? 25 + ((px * 7 + py * 13 + next.turn * 3) % 11) // 25-35
+            : 15 + ((tx * 3 + ty * 11 + next.turn) % 6); // 15-20
+          newTiles[ty][tx].dirt = Math.max(0, newTiles[ty][tx].dirt - dirtAmt);
         }
 
-        // Item 2: Cleaning near a relay reduces heat by 10 on adjacent tiles
+        // Cleaning near a relay reduces heat by 10 on all surrounding tiles
         if (nearRelay) {
-          for (const d of adjacentDeltas) {
+          for (const d of surroundingDeltas) {
             const nx = px + d.x;
             const ny = py + d.y;
             if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height) {
               newTiles[ny][nx].heat = Math.max(0, newTiles[ny][nx].heat - 10);
             }
           }
-          // Also reduce heat on player's tile
-          newTiles[py][px].heat = Math.max(0, newTiles[py][px].heat - 10);
         }
 
         next.tiles = newTiles;
@@ -3063,15 +3173,11 @@ export function step(state: GameState, action: Action): GameState {
             });
           }
         }
-        // Clear rubble on player tile and adjacent tiles
+        // Clear rubble on player tile and all surrounding tiles (3x3)
         let rubbleCleared = 0;
-        const adjacentRubbleDeltas = [
-          { x: 0, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
-        ];
         for (const [id, entity] of newEntities) {
           if (entity.type === EntityType.Rubble) {
-            const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
-            if (dist <= 1) {
+            if (Math.abs(entity.pos.x - px) <= 1 && Math.abs(entity.pos.y - py) <= 1) {
               newEntities.delete(id);
               // Restore tile walkability
               newTiles[entity.pos.y][entity.pos.x].walkable = true;

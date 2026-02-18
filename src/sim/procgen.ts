@@ -177,7 +177,7 @@ export function generate(seed: number): GameState {
     investigationTrigger: 1, // clean 1 room before yellow alert triggers investigation
     evidenceThreshold,
     cleaningDirective: true,
-    roomCleanlinessGoal: 80,
+    roomCleanlinessGoal: 60,
     directiveViolationTurns: 0,
   };
 

@@ -322,8 +322,9 @@ export function tickHazards(state: GameState): GameState {
     }
   }
 
-  // ── Emergency bulkhead auto-seal ───────────────────────────
-  // When pressure drops critically low, adjacent doors auto-lock
+  // ── Emergency bulkhead auto-seal / reopen ────────────────────
+  // When pressure drops critically low, adjacent doors auto-lock.
+  // When pressure recovers above threshold, auto-sealed doors reopen.
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       if (newTiles[y][x].pressure > 0 && newTiles[y][x].pressure < PRESSURE_BULKHEAD_THRESHOLD) {
@@ -336,6 +337,34 @@ export function tickHazards(state: GameState): GameState {
             newTiles[ny][nx].walkable = false;
           }
         }
+      }
+    }
+  }
+  // Reopen auto-sealed bulkheads when ALL adjacent tiles have safe pressure.
+  // Auto-sealed doors are bare LockedDoor tiles with no entity on them.
+  // Procgen-placed locked doors always have an entity (Relay, ClosedDoor, etc.).
+  const entityPositions = new Set<string>();
+  for (const [, entity] of state.entities) {
+    entityPositions.add(`${entity.pos.x},${entity.pos.y}`);
+  }
+  for (let y = 0; y < state.height; y++) {
+    for (let x = 0; x < state.width; x++) {
+      if (newTiles[y][x].type !== TileType.LockedDoor) continue;
+      if (entityPositions.has(`${x},${y}`)) continue; // entity-based door, don't auto-reopen
+      // Check if ALL adjacent walkable tiles have safe pressure
+      let allSafe = true;
+      for (const d of ADJACENT_DELTAS) {
+        const nx = x + d.x;
+        const ny = y + d.y;
+        if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
+        if (newTiles[ny][nx].walkable && newTiles[ny][nx].pressure < PRESSURE_BULKHEAD_THRESHOLD) {
+          allSafe = false;
+          break;
+        }
+      }
+      if (allSafe) {
+        newTiles[y][x].type = TileType.Door;
+        newTiles[y][x].walkable = true;
       }
     }
   }

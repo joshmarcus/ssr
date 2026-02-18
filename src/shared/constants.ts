@@ -37,11 +37,11 @@ export const PRESSURE_VISIBLE_THRESHOLD = 60;
 
 // ── Pressure / breach ───────────────────────────────────────
 export const PRESSURE_NORMAL = 100;
-export const PRESSURE_BREACH_DRAIN = 8; // pressure lost per turn on breach tile
-export const PRESSURE_SPREAD_RATE = 3; // pressure leaks to adjacent tiles per turn
+export const PRESSURE_BREACH_DRAIN = 4; // pressure lost per turn on breach tile
+export const PRESSURE_SPREAD_RATE = 1; // pressure leaks to adjacent tiles per turn
 export const PRESSURE_DAMAGE_THRESHOLD = 40; // below this, bot takes damage
 export const PRESSURE_DAMAGE_PER_TURN = 3; // HP lost per turn in low-pressure zone
-export const PRESSURE_BULKHEAD_THRESHOLD = 25; // below this, adjacent doors auto-seal
+export const PRESSURE_BULKHEAD_THRESHOLD = 10; // below this, adjacent doors auto-seal
 
 // ── Patrol drone ─────────────────────────────────────────────
 export const PATROL_DRONE_DAMAGE = 5; // HP lost on contact with hostile patrol drone
@@ -61,9 +61,9 @@ export const RADIATION_DECAY_RATE = 0.8; // decay away from source — tuned wit
 export const SHIELD_GENERATOR_RADIUS = 5;
 
 // ── Structural stress ──────────────────────────────────────
-export const STRESS_COLLAPSE_THRESHOLD = 90;
-export const STRESS_COLLAPSE_TURNS = 8; // turns above threshold before collapse
-export const STRESS_SPREAD_RATE = 0.3;
+export const STRESS_COLLAPSE_THRESHOLD = 98;
+export const STRESS_COLLAPSE_TURNS = 25; // turns above threshold before collapse
+export const STRESS_SPREAD_RATE = 0.02;
 
 // ── Vision radii for new sensors ───────────────────────────
 export const VISION_RADIUS_RADIATION = 8;
