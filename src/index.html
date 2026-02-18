@@ -413,12 +413,117 @@
     .tag-missing { background: #2a2a2a; color: #666; }
     .evidence-linked { color: #4a4; }
     .evidence-unlinked { color: #888; }
+
+    /* ── Journal / Evidence Browser overlay ───────────── */
+    #journal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.96);
+      z-index: 95;
+      display: none;
+      font-family: monospace;
+      overflow: hidden;
+    }
+    #journal-overlay.active { display: flex; }
+    .journal-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem 2rem;
+    }
+    .journal-header {
+      color: #0f0;
+      font-weight: bold;
+      font-size: 16px;
+      text-align: center;
+      letter-spacing: 2px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+    }
+    .journal-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 6px 0;
+      border-bottom: 1px solid #222;
+      flex-shrink: 0;
+    }
+    .journal-tab {
+      padding: 3px 12px;
+      color: #555;
+      border: 1px solid #333;
+      cursor: default;
+    }
+    .journal-tab.active {
+      color: #fa0;
+      border-color: #fa0;
+      font-weight: bold;
+    }
+    .journal-body {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      gap: 1px;
+    }
+    .journal-list {
+      width: 45%;
+      overflow-y: auto;
+      border-right: 1px solid #222;
+      padding-right: 8px;
+    }
+    .journal-entry {
+      padding: 4px 6px;
+      border-bottom: 1px solid #1a1a1a;
+      cursor: default;
+      color: #888;
+      font-size: 12px;
+    }
+    .journal-entry.selected {
+      background: #1a1a2a;
+      color: #fff;
+      border-left: 2px solid #fa0;
+    }
+    .journal-entry-icon { color: #6cf; margin-right: 4px; }
+    .journal-entry-turn { color: #555; font-size: 11px; }
+    .journal-entry-room { color: #4a8; font-size: 11px; }
+    .journal-detail {
+      width: 55%;
+      overflow-y: auto;
+      padding: 8px 12px;
+    }
+    .journal-detail-title { color: #fa0; font-weight: bold; margin-bottom: 6px; }
+    .journal-detail-meta { color: #555; font-size: 11px; margin-bottom: 8px; }
+    .journal-detail-content { color: #ccc; line-height: 1.6; font-size: 13px; white-space: pre-wrap; }
+    .journal-detail-tags { margin-top: 10px; }
+    .journal-detail-tags .tag-pill { font-size: 11px; }
+    .journal-detail-deductions { margin-top: 8px; color: #4a8; font-size: 12px; }
+    .journal-controls {
+      flex-shrink: 0;
+      color: #555;
+      font-size: 12px;
+      text-align: center;
+      border-top: 1px solid #222;
+      padding: 6px 0;
+    }
+    .journal-thread-header {
+      color: #6cf;
+      font-weight: bold;
+      font-size: 13px;
+      padding: 6px 0 2px;
+      border-bottom: 1px solid #1a3a4a;
+      margin-top: 4px;
+    }
+    .journal-empty { color: #555; text-align: center; padding: 2rem; }
   </style>
 </head>
 <body>
   <div id="damage-flash"></div>
   <div id="gameover-overlay"></div>
   <div id="broadcast-overlay"></div>
+  <div id="journal-overlay"></div>
   <div id="crawl-overlay"></div>
   <div id="game-container">
     <div id="ui-panel"></div>

@@ -124,6 +124,12 @@ All design docs live in `space_station_roguelike_docs_v10/`:
 9. **Auto-continue**: When a sprint is completed, automatically begin the next sprint — review state, identify priorities, plan, and execute without waiting for user prompt.
 10. **Design priority**: The game should be fun, interesting, and innovative — technical elegance is secondary
 
+## Autonomous Development
+
+- **Keep going**: Continue developing, sprinting, and iterating without asking the user for input unless absolutely critical (e.g., destructive action, ambiguous architectural direction). Make design decisions independently.
+- **Playtesting**: Use `npx tsx playtest_bot.ts [seed]` for automated playtesting. The harness CLI is `npm run harness`. The Claude API driver is at `src/harness/claudeDriver.ts` (requires ANTHROPIC_API_KEY in .env).
+- **Commit frequently**: After each feature or fix that passes tests, commit and push immediately.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)

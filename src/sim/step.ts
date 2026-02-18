@@ -6,7 +6,7 @@ import {
 } from "../shared/constants.js";
 import { isValidAction, getDirectionDelta, hasUnlockedDoorAt, isAutoSealedBulkhead } from "./actions.js";
 import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex } from "./rooms.js";
-import { tickHazards, tickDeterioration, applyHazardDamage } from "./hazards.js";
+import { tickHazards, tickDeterioration, tickPA, applyHazardDamage } from "./hazards.js";
 import { checkWinCondition, checkLossCondition } from "./objectives.js";
 import { updateVision } from "./vision.js";
 import { generateEvidenceTags, getUnlockedDeductions, solveDeduction, linkEvidence } from "./deduction.js";
@@ -2945,6 +2945,7 @@ export function step(state: GameState, action: Action): GameState {
     next = movePatrolDrones(next);
     next = tickHazards(next);
     next = tickDeterioration(next);
+    next = tickPA(next);
     next = applyHazardDamage(next);
     next = checkWinCondition(next);
     next = checkLossCondition(next);
@@ -3031,6 +3032,7 @@ export function step(state: GameState, action: Action): GameState {
         next = tickHazards(next);
         next = tickHazards(next);
         next = tickDeterioration(next);
+        next = tickPA(next);
         next.logs = [
           ...next.logs,
           {
@@ -3416,6 +3418,9 @@ export function step(state: GameState, action: Action): GameState {
 
   // Station deterioration: periodic escalation
   next = tickDeterioration(next);
+
+  // Ship computer PA announcements
+  next = tickPA(next);
 
   // Apply hazard damage to player
   next = applyHazardDamage(next);

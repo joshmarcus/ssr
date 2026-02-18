@@ -86,6 +86,36 @@ export const CLEANING_MESSAGES: string[] = [
 // ── Drone cleaning message (Sprint 2 Item 14) ───────────────
 export const DRONE_CLEANING_MESSAGE = "The drone sweeps past, leaving a slightly cleaner trail in its wake.";
 
+// ── Ship Computer PA Announcements ───────────────────────────
+// Periodic station-wide messages broadcast by the ship's AI.
+// Fragmented, delayed, atmospheric — like a low-bitrate telemetry feed.
+export const PA_ANNOUNCEMENTS_GENERAL: string[] = [
+  "CORVUS-7 CENTRAL: Maintenance schedule overdue by 847 days. All crew report to duty stations.",
+  "CORVUS-7 CENTRAL: Station integrity nominal. Automated systems operating within parameters.",
+  "CORVUS-7 CENTRAL: Crew manifest updated. Active personnel: 0. Autonomous units: operational.",
+  "CORVUS-7 CENTRAL: Air recycler cycle complete. Particulate count: elevated. Recommend manual filter check.",
+  "CORVUS-7 CENTRAL: Emergency beacon broadcasting. No response logged. Cycle 4,291.",
+  "CORVUS-7 CENTRAL: Scheduled resupply ETA: [DATA UNAVAILABLE]. Rationing protocols remain in effect.",
+  "CORVUS-7 CENTRAL: Power grid load balanced across backup conduits. Primary grid offline.",
+  "CORVUS-7 CENTRAL: Research data integrity at 94%. Recommend archival backup to core.",
+];
+
+export const PA_ANNOUNCEMENTS_WARNING: string[] = [
+  "CORVUS-7 CENTRAL: WARNING — Thermal anomaly detected in sectors 3-7. Investigate immediately.",
+  "CORVUS-7 CENTRAL: CAUTION — Hull pressure differential detected. Recommend breach inspection.",
+  "CORVUS-7 CENTRAL: ALERT — Unauthorized access attempt on Data Core. Security lockout engaged.",
+  "CORVUS-7 CENTRAL: WARNING — Relay cascade risk elevated. Manual intervention required.",
+  "CORVUS-7 CENTRAL: NOTICE — Fire suppression system offline in corridors. Low pressure may contain spread.",
+];
+
+export const PA_ANNOUNCEMENTS_ATMOSPHERIC: string[] = [
+  "CORVUS-7 CENTRAL: ...signal degraded... maintenance... overdue... all units...",
+  "CORVUS-7 CENTRAL: [STATIC] ...core temperature... nominal... [STATIC] ...crew? ...",
+  "CORVUS-7 CENTRAL: System log archived. Entry 14,823. Contents: silence.",
+  "CORVUS-7 CENTRAL: The last crew rotation was 2.3 years ago. All duty stations unmanned.",
+  "CORVUS-7 CENTRAL: Cleaning protocols resuming. Thank you for your patience, crew.",
+];
+
 // ── Cleanliness sensor trail hints (Item 1) ──────────────────
 // When cleanliness sensor is active, high-dirt areas reveal evacuation hints.
 export const DIRT_TRAIL_HINTS: string[] = [

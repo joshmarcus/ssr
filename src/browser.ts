@@ -156,6 +156,12 @@ let broadcastLinkedEvidence: string[] = [];
 let broadcastDetailDeduction: string | null = null; // deduction ID when in detail/evidence-linking view
 let broadcastEvidenceIdx = 0; // highlighted journal entry index in detail view
 
+// ── Evidence Browser state ──────────────────────────────────────
+let evidenceBrowserOpen = false;
+let evidenceBrowserTab: "all" | "threads" | "deductions" = "all";
+let evidenceBrowserIdx = 0; // selected entry index
+let evidenceBrowserScroll = 0; // scroll offset for list
+
 // ── Wait message variety ────────────────────────────────────────
 const WAIT_MESSAGES_COOL = [
   "Holding position. Systems nominal.",
@@ -262,6 +268,11 @@ function emitRoomEntryCues(room: { name: string; x: number; y: number; width: nu
 
 // ── Classify sim-generated log messages by source/content ────────
 function classifySimLog(logText: string, logSource: string): LogType {
+  // PA system announcements
+  if (logText.startsWith("CORVUS-7 CENTRAL:")) {
+    if (logText.includes("WARNING") || logText.includes("ALERT") || logText.includes("CAUTION")) return "warning";
+    return "system";
+  }
   // Critical warnings
   if (logText.includes("CRITICAL") || logText.includes("compromised") || logText.includes("failing")) {
     return "critical";
@@ -320,6 +331,10 @@ function initGame(): void {
   window.addEventListener("keydown", handleToggleKey);
   // Listen for choice/deduction/crew-door input
   window.addEventListener("keydown", (e) => {
+    if (evidenceBrowserOpen) {
+      handleEvidenceBrowserInput(e);
+      return;
+    }
     if (broadcastOpen) {
       handleBroadcastInput(e);
       return;
@@ -334,6 +349,14 @@ function initGame(): void {
     }
     if (activeChoice) {
       handleChoiceInput(e);
+      return;
+    }
+    // V key opens evidence browser (view evidence)
+    if (e.key === "v" && !journalOpen && !state.gameOver) {
+      e.preventDefault();
+      evidenceBrowserOpen = true;
+      evidenceBrowserIdx = 0;
+      renderEvidenceBrowser();
       return;
     }
     // ? key toggles help
@@ -409,9 +432,12 @@ function handleRestartKey(e: KeyboardEvent): void {
     journalOpen = false;
     activeChoice = null;
     broadcastOpen = false;
-    // Close broadcast modal on restart
+    evidenceBrowserOpen = false;
+    // Close overlays on restart
     const broadcastEl = document.getElementById("broadcast-overlay");
     if (broadcastEl) { broadcastEl.classList.remove("active"); broadcastEl.innerHTML = ""; }
+    const journalEl = document.getElementById("journal-overlay");
+    if (journalEl) { journalEl.classList.remove("active"); journalEl.innerHTML = ""; }
     choicesPresented.clear();
 
     // Clear overlays and display, rebuild
@@ -966,14 +992,15 @@ function showHelp(): void {
   display.addLog("  y u b n              NW   NE    SW    SE   (diagonal)", "system");
   display.addLog("  Numpad 1-9           8-way movement (5 = wait)", "system");
   display.addLog("── Actions ──", "system");
-  display.addLog("  i / e                Interact / open/close doors & airlocks", "system");
+  display.addLog("  i                    Interact / open/close doors & airlocks", "system");
   display.addLog("  c                    Clean current tile", "system");
   display.addLog("  t / q                Cycle sensor overlay", "system");
   display.addLog("  x                    Look (examine surroundings)", "system");
   display.addLog("  .  Space  5          Wait one turn", "system");
   display.addLog("── Menus ──", "system");
   display.addLog("  r                    Broadcast report to base", "system");
-  display.addLog("  ;                    Open journal / notes", "system");
+  display.addLog("  v                    Evidence browser (view journal)", "system");
+  display.addLog("  ;                    Quick journal / notes", "system");
   display.addLog("  m                    Toggle station map", "system");
   display.addLog("  ?                    Toggle this help", "system");
   display.addLog("  Tab                  Switch journal tabs (in journal)", "system");
@@ -1385,6 +1412,267 @@ function getAvailableChoices(): MysteryChoice[] {
     }
   }
   return available;
+}
+
+// ── Evidence Browser ─────────────────────────────────────────────
+
+function getEvidenceBrowserEntries(): { entries: Array<{ id: string; icon: string; summary: string; detail: string; room: string; turn: number; tags: string[]; category: string; thread?: string; crewMentioned: string[] }>; threads: Map<string, string[]> } {
+  if (!state.mystery) return { entries: [], threads: new Map() };
+  const journal = state.mystery.journal;
+  const entries = journal.map(j => ({
+    id: j.id,
+    icon: j.category === "log" ? "\u25a3" : j.category === "item" ? "\u2726" : j.category === "trace" ? "\u203b" : j.category === "crew" ? "\u2660" : "\u25c8",
+    summary: j.summary,
+    detail: j.detail,
+    room: j.roomFound,
+    turn: j.turnDiscovered,
+    tags: j.tags,
+    category: j.category,
+    thread: j.thread,
+    crewMentioned: j.crewMentioned,
+  }));
+
+  const threads = new Map<string, string[]>();
+  for (const e of entries) {
+    const t = e.thread || "Uncategorized";
+    if (!threads.has(t)) threads.set(t, []);
+    threads.get(t)!.push(e.id);
+  }
+
+  return { entries, threads };
+}
+
+function renderEvidenceBrowser(): void {
+  const overlay = document.getElementById("journal-overlay");
+  if (!overlay || !state.mystery) return;
+
+  const { entries, threads } = getEvidenceBrowserEntries();
+  const deductions = state.mystery.deductions;
+  const tabs: Array<"all" | "threads" | "deductions"> = ["all", "threads", "deductions"];
+
+  // Build tab bar
+  let tabsHtml = "";
+  for (const t of tabs) {
+    const label = t === "all" ? `ALL (${entries.length})` : t === "threads" ? "THREADS" : `DEDUCTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`;
+    const cls = t === evidenceBrowserTab ? "journal-tab active" : "journal-tab";
+    tabsHtml += `<div class="${cls}">${label}</div>`;
+  }
+
+  // Build list view based on active tab
+  let listHtml = "";
+  let detailHtml = "";
+
+  if (evidenceBrowserTab === "all") {
+    if (entries.length === 0) {
+      listHtml = `<div class="journal-empty">No evidence collected yet.<br>Read terminals [i] and examine items.</div>`;
+    } else {
+      for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
+        const cls = i === evidenceBrowserIdx ? "journal-entry selected" : "journal-entry";
+        listHtml += `<div class="${cls}">
+          <span class="journal-entry-icon">${escapeHtmlBroadcast(e.icon)}</span>
+          ${escapeHtmlBroadcast(e.summary)}
+          <div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${escapeHtmlBroadcast(e.room)}</span></div>
+        </div>`;
+      }
+      // Detail pane for selected entry
+      if (entries[evidenceBrowserIdx]) {
+        detailHtml = renderEvidenceDetail(entries[evidenceBrowserIdx]);
+      }
+    }
+  } else if (evidenceBrowserTab === "threads") {
+    let globalIdx = 0;
+    for (const [threadName, entryIds] of threads) {
+      listHtml += `<div class="journal-thread-header">${escapeHtmlBroadcast(threadName)} (${entryIds.length})</div>`;
+      for (const entryId of entryIds) {
+        const e = entries.find(x => x.id === entryId);
+        if (!e) continue;
+        const cls = globalIdx === evidenceBrowserIdx ? "journal-entry selected" : "journal-entry";
+        listHtml += `<div class="${cls}">
+          <span class="journal-entry-icon">${escapeHtmlBroadcast(e.icon)}</span>
+          ${escapeHtmlBroadcast(e.summary)}
+          <div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${escapeHtmlBroadcast(e.room)}</span></div>
+        </div>`;
+        globalIdx++;
+      }
+    }
+    // Show detail for selected
+    const flatEntries = getFlatThreadEntries(entries, threads);
+    if (flatEntries[evidenceBrowserIdx]) {
+      detailHtml = renderEvidenceDetail(flatEntries[evidenceBrowserIdx]);
+    }
+  } else {
+    // Deductions tab
+    const journal = state.mystery.journal;
+    const allTags = new Set(journal.flatMap(j => j.tags));
+    const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
+    const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
+    const categoryLabels: Record<string, string> = { what: "WHAT HAPPENED?", why: "WHY DID IT HAPPEN?", who: "WHO WAS RESPONSIBLE?" };
+
+    for (const d of deductions) {
+      const catLabel = categoryLabels[d.category] || d.category.toUpperCase();
+      const isUnlocked = unlockedSet.has(d.id);
+
+      let statusIcon: string;
+      let statusColor: string;
+      let statusText: string;
+
+      if (d.solved) {
+        statusIcon = d.answeredCorrectly ? "\u2713" : "\u2717";
+        statusColor = d.answeredCorrectly ? "#0f0" : "#f44";
+        const answer = d.options.find(o => o.correct === d.answeredCorrectly);
+        statusText = answer ? answer.label : "answered";
+      } else if (isUnlocked) {
+        statusIcon = "!";
+        statusColor = "#fa0";
+        statusText = "Ready to answer (use [r] Broadcast Report)";
+      } else {
+        statusIcon = "?";
+        statusColor = "#555";
+        const chainLocked = d.unlockAfter && !solvedIds.has(d.unlockAfter);
+        statusText = chainLocked ? "Solve previous deduction first" : "Need more evidence";
+      }
+
+      listHtml += `<div style="padding:8px 6px;border-bottom:1px solid #1a1a1a">
+        <div style="color:${statusColor};font-weight:bold">[${statusIcon}] ${catLabel}</div>
+        <div style="color:#aaa;font-size:12px;margin:2px 0">${escapeHtmlBroadcast(d.question)}</div>
+        <div style="color:${statusColor};font-size:12px">${escapeHtmlBroadcast(statusText)}</div>
+        <div style="margin-top:4px">`;
+
+      for (const tag of d.requiredTags) {
+        if (allTags.has(tag)) {
+          listHtml += `<span class="tag-pill tag-covered">${escapeHtmlBroadcast(tag)}</span>`;
+        } else {
+          listHtml += `<span class="tag-pill tag-missing">${escapeHtmlBroadcast(tag)}</span>`;
+        }
+      }
+
+      listHtml += `</div></div>`;
+    }
+
+    // For deductions tab, detail shows linked evidence
+    const solved = deductions.filter(d => d.solved);
+    const correct = deductions.filter(d => d.answeredCorrectly);
+    detailHtml = `<div class="journal-detail-title">Investigation Progress</div>
+      <div style="color:#aaa;margin:8px 0">Deductions: ${solved.length}/${deductions.length} answered</div>
+      <div style="color:#0f0;margin:4px 0">Correct: ${correct.length}</div>
+      <div style="color:#f44;margin:4px 0">Wrong: ${solved.length - correct.length}</div>
+      <div style="color:#888;margin:12px 0 4px">Evidence collected: ${entries.length} pieces</div>
+      <div style="color:#888;margin:4px 0">Tags discovered: ${new Set(entries.flatMap(e => e.tags)).size}</div>`;
+  }
+
+  const controlsText = evidenceBrowserTab === "deductions"
+    ? "[Tab] Switch tab  [Esc/v] Close"
+    : "[&uarr;/&darr;] Navigate  [Tab] Switch tab  [Esc/v] Close";
+
+  overlay.innerHTML = `
+    <div class="journal-container">
+      <div class="journal-header">\u2550\u2550\u2550 EVIDENCE JOURNAL \u2550\u2550\u2550</div>
+      <div class="journal-tabs">${tabsHtml}</div>
+      <div class="journal-body">
+        <div class="journal-list">${listHtml}</div>
+        <div class="journal-detail">${detailHtml || '<div class="journal-empty">Select an entry to view details.</div>'}</div>
+      </div>
+      <div class="journal-controls">${controlsText}</div>
+    </div>`;
+  overlay.classList.add("active");
+}
+
+function renderEvidenceDetail(entry: { id: string; summary: string; detail: string; room: string; turn: number; tags: string[]; category: string; thread?: string; crewMentioned: string[] }): string {
+  const deductions = state.mystery?.deductions ?? [];
+  const linkedDeductions = deductions.filter(d =>
+    d.requiredTags.some(t => entry.tags.includes(t))
+  );
+
+  let tagsHtml = "";
+  for (const tag of entry.tags) {
+    tagsHtml += `<span class="tag-pill tag-covered">${escapeHtmlBroadcast(tag)}</span>`;
+  }
+
+  let deductionLinks = "";
+  if (linkedDeductions.length > 0) {
+    deductionLinks = `<div class="journal-detail-deductions">Relevant to: ${linkedDeductions.map(d => escapeHtmlBroadcast(d.category.toUpperCase())).join(", ")}</div>`;
+  }
+
+  let crewHtml = "";
+  if (entry.crewMentioned.length > 0 && state.mystery) {
+    const names = entry.crewMentioned.map(id => {
+      const member = state.mystery!.crew.find(c => c.id === id);
+      return member ? `${member.firstName} ${member.lastName} (${member.role})` : id;
+    });
+    crewHtml = `<div style="color:#6cf;font-size:12px;margin-top:6px">Crew: ${names.map(n => escapeHtmlBroadcast(n)).join(", ")}</div>`;
+  }
+
+  return `
+    <div class="journal-detail-title">${escapeHtmlBroadcast(entry.summary)}</div>
+    <div class="journal-detail-meta">
+      ${escapeHtmlBroadcast(entry.category.toUpperCase())} | Turn ${entry.turn} | ${escapeHtmlBroadcast(entry.room)}
+      ${entry.thread ? ` | Thread: ${escapeHtmlBroadcast(entry.thread)}` : ""}
+    </div>
+    <div class="journal-detail-content">${escapeHtmlBroadcast(entry.detail)}</div>
+    ${crewHtml}
+    <div class="journal-detail-tags">${tagsHtml}</div>
+    ${deductionLinks}`;
+}
+
+type EvidenceEntry = { id: string; icon: string; summary: string; detail: string; room: string; turn: number; tags: string[]; category: string; thread?: string; crewMentioned: string[] };
+
+function getFlatThreadEntries(entries: EvidenceEntry[], threads: Map<string, string[]>): EvidenceEntry[] {
+  const flat: EvidenceEntry[] = [];
+  for (const [, entryIds] of threads) {
+    for (const entryId of entryIds) {
+      const e = entries.find(x => x.id === entryId);
+      if (e) flat.push(e);
+    }
+  }
+  return flat;
+}
+
+function closeEvidenceBrowser(): void {
+  const overlay = document.getElementById("journal-overlay");
+  if (overlay) {
+    overlay.classList.remove("active");
+    overlay.innerHTML = "";
+  }
+  evidenceBrowserOpen = false;
+  renderAll();
+}
+
+function handleEvidenceBrowserInput(e: KeyboardEvent): void {
+  e.preventDefault();
+
+  if (e.key === "Escape" || e.key === "v") {
+    closeEvidenceBrowser();
+    return;
+  }
+
+  if (e.key === "Tab") {
+    const tabs: Array<"all" | "threads" | "deductions"> = ["all", "threads", "deductions"];
+    const curIdx = tabs.indexOf(evidenceBrowserTab);
+    evidenceBrowserTab = tabs[(curIdx + 1) % tabs.length];
+    evidenceBrowserIdx = 0;
+    renderEvidenceBrowser();
+    return;
+  }
+
+  // Only navigate in all/threads tabs
+  if (evidenceBrowserTab === "deductions") return;
+
+  const { entries, threads } = getEvidenceBrowserEntries();
+  const maxIdx = evidenceBrowserTab === "threads"
+    ? getFlatThreadEntries(entries, threads).length - 1
+    : entries.length - 1;
+
+  if (e.key === "ArrowUp" || e.key === "w" || e.key === "k") {
+    evidenceBrowserIdx = Math.max(0, evidenceBrowserIdx - 1);
+    renderEvidenceBrowser();
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "s" || e.key === "ArrowDown") {
+    evidenceBrowserIdx = Math.min(maxIdx, evidenceBrowserIdx + 1);
+    renderEvidenceBrowser();
+    return;
+  }
 }
 
 // ── Broadcast Report Modal ──────────────────────────────────────

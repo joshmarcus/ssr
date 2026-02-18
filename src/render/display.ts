@@ -921,10 +921,23 @@ export class BrowserDisplay implements IGameDisplay {
     const disc = getDiscoveries(state);
     const discoveryTag = ` | <span class="label">Discoveries:</span> <span style="color:#ca8">${disc.discovered}/${disc.total}</span>`;
 
-    // ── Report ready indicator ──────────────────────────────────
+    // ── Evidence & deduction progress ─────────────────────────
+    let evidenceTag = "";
+    let deductionTag = "";
     let reportTag = "";
     if (state.mystery) {
       const jCount = state.mystery.journal.length;
+      if (jCount > 0) {
+        evidenceTag = ` | <span class="label">Evidence:</span> <span style="color:#6cf">${jCount}</span>`;
+      }
+      const deds = state.mystery.deductions;
+      const solved = deds.filter(d => d.solved).length;
+      const correct = deds.filter(d => d.answeredCorrectly).length;
+      if (deds.length > 0) {
+        const dedColor = correct === deds.length ? "#0f0" : solved > 0 ? "#fa0" : "#888";
+        deductionTag = ` | <span class="label">Deductions:</span> <span style="color:${dedColor}">${correct}/${deds.length}</span>`;
+      }
+
       const thresholds = [3, 6, 10];
       const hasAvailable = state.mystery.choices.some((c, i) =>
         i < thresholds.length && jCount >= thresholds[i] && !c.chosen
@@ -955,7 +968,8 @@ export class BrowserDisplay implements IGameDisplay {
       `<span class="label">T:</span><span class="value">${state.turn}</span>` +
       roomLabel + stunTag +
       `<br>` + hpTag.replace(/ \| /, '') +
-      `<br>` + discoveryTag.replace(/ \| /, '') + unreadTag.replace(/ \| /g, '') + reportTag.replace(/ \| /, '') +
+      `<br>` + discoveryTag.replace(/ \| /, '') + evidenceTag.replace(/ \| /, '') + deductionTag.replace(/ \| /, '') +
+      `<br>` + unreadTag.replace(/ \| /g, '').trim() + reportTag.replace(/ \| /, '') +
       interactHint +
       `</div>` + overlayLine;
 
@@ -1037,7 +1051,7 @@ export class BrowserDisplay implements IGameDisplay {
       `<span class="key">i</span> open/close doors &amp; interact ` +
       `<span class="key">t</span> sensor ` +
       `<span class="key">c</span> clean ` +
-      `<span class="key">;</span> journal ` +
+      `<span class="key">v</span> evidence ` +
       `<span class="key">r</span> report ` +
       `<span class="key">?</span> help`;
 

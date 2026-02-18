@@ -5,8 +5,11 @@ import {
   HEAT_DAMAGE_PER_TURN, HEAT_PAIN_THRESHOLD, COOL_RECOVERY_RATE, HEAT_SPREAD_MIN,
   PRESSURE_BREACH_DRAIN, PRESSURE_SPREAD_RATE, PRESSURE_DAMAGE_THRESHOLD, PRESSURE_DAMAGE_PER_TURN,
   PRESSURE_BULKHEAD_THRESHOLD, AIRLOCK_PRESSURE_DRAIN, DETERIORATION_INTERVAL, DETERIORATION_HEAT_BOOST, DETERIORATION_SMOKE_SPAWN,
-  GLYPHS,
+  PA_INTERVAL, GLYPHS,
 } from "../shared/constants.js";
+import {
+  PA_ANNOUNCEMENTS_GENERAL, PA_ANNOUNCEMENTS_WARNING, PA_ANNOUNCEMENTS_ATMOSPHERIC,
+} from "../data/narrative.js";
 
 /**
  * Adjacent deltas (4-directional: N, S, E, W)
@@ -287,6 +290,47 @@ export function tickDeterioration(state: GameState): GameState {
   });
 
   return { ...state, tiles: newTiles, logs: newLogs };
+}
+
+/**
+ * Ship computer PA announcements: periodic atmospheric messages.
+ * Fires every PA_INTERVAL turns, offset from deterioration so they don't overlap.
+ */
+export function tickPA(state: GameState): GameState {
+  // Offset by half the PA_INTERVAL so it doesn't coincide with deterioration ticks
+  const offset = Math.floor(PA_INTERVAL / 2);
+  if (state.turn < offset || (state.turn - offset) % PA_INTERVAL !== 0) return state;
+
+  // Don't announce during the opening cleaning phase (first 30 turns)
+  if (state.turn < 30) return state;
+
+  const newLogs = [...state.logs];
+
+  // Pick pool based on station conditions
+  const hasHotZone = state.tiles.some(row => row.some(t => t.heat > 40));
+  const hasLowPressure = state.tiles.some(row => row.some(t => t.pressure < 50));
+
+  let pool: string[];
+  const turnHash = (state.turn * 37) % 100;
+
+  if ((hasHotZone || hasLowPressure) && turnHash < 40) {
+    pool = PA_ANNOUNCEMENTS_WARNING;
+  } else if (turnHash < 25) {
+    pool = PA_ANNOUNCEMENTS_ATMOSPHERIC;
+  } else {
+    pool = PA_ANNOUNCEMENTS_GENERAL;
+  }
+
+  const msgIdx = (state.turn * 7 + 3) % pool.length;
+  newLogs.push({
+    id: `log_pa_${state.turn}`,
+    timestamp: state.turn,
+    source: "system",
+    text: pool[msgIdx],
+    read: false,
+  });
+
+  return { ...state, logs: newLogs };
 }
 
 /**
