@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 9 (Deduction UX + Broadcast Fix + Phase Indicator)
+- **Phase**: Sprint 10 (Mystery Choices + Reward Consolidation + Log Polish)
 - **Test status**: 189 tests passing across 17 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
@@ -28,6 +28,7 @@
 - ROT.js browser rendering with viewport scrolling
 - Harness CLI for AI playtesting (with deduction support)
 - Heuristic playtest bot (playtest_bot.ts)
+- Mystery choices: 3 narrative decisions in broadcast report (blame, data handling, incident-specific)
 
 ## Known Issues
 
@@ -58,6 +59,13 @@
 2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
 2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 10 Changes
+
+- Mystery choices wired into broadcast modal: 3 narrative decisions (blame, data handling, incident-specific) at evidence thresholds (3/6/10 journal entries)
+- Consolidated applyDeductionReward: single sim-side pure function used by both browser and harness
+- Log panel capacity increased from 16 to 24 entries
+- Pinned notification at top of log panel: shows "DEDUCTION READY" or recovery phase guidance
 
 ## Sprint 9 Changes
 

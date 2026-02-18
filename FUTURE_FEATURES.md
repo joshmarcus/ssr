@@ -8,6 +8,7 @@ Ideas and planned features for post-MVP development.
 ## ~~Save/Load System~~ (DONE — Sprint 8)
 ## ~~Mini-Map Widget~~ (DONE — Sprint 8)
 ## ~~Deduction Confirmation / Broadcast Fix~~ (DONE — Sprint 9)
+## ~~Mystery Choices in Broadcast~~ (DONE — Sprint 10)
 
 ## Other Deferred Features
 - Radiation/Structural/EM sensor systems (removed in Sprint 5, may revisit)
@@ -21,4 +22,4 @@ Ideas and planned features for post-MVP development.
 - Sound/audio system
 - Meta-progression between runs
 - Evacuation phase activation (crew rescue objective)
-- Mystery choices system (wiring up MysteryChoice prompts)
+- ~~Mystery choices system~~ (DONE — Sprint 10)
