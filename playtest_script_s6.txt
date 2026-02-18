@@ -1,0 +1,168 @@
+// Playtest script for seed 42 - full game loop through victory
+// Player starts at (36,19) in Arrival Bay
+// Strategy: interact with nearby evidence, then log terminals, gather tags, submit deductions, transmit
+
+// Step 1: Interact with evidence_trace_0 at (37,19) - 1 tile E
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"INTERACT","params":{"target":"evidence_trace_0"}}
+
+// Step 2: Move south to crew quarters area and interact with security terminal
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"INTERACT","params":{"target":"security_terminal_1"}}
+
+// Step 3: Move to log_terminal_9 at (35,24)
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"INTERACT","params":{"target":"log_terminal_9"}}
+
+// Step 4: Move to crew_item_family_photo at (39,24)
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"INTERACT","params":{"target":"crew_item_family_photo"}}
+
+// Step 5: Move to log_terminal_2 at (41,23)
+{"action":"MOVE","params":{"dir":"NE"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"INTERACT","params":{"target":"log_terminal_2"}}
+
+// Step 6: Head north to cargo hold area to find log_terminal_0 at (35,12)
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"NW"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+
+// Try interacting with things near (35,12) area
+{"action":"INTERACT","params":{"target":"log_terminal_0"}}
+
+// Step 7: Move to log_terminal_1 at (40,12)
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"INTERACT","params":{"target":"log_terminal_1"}}
+
+// Step 8: Interact with crew_item_tanaka_notes at (44,15)
+{"action":"MOVE","params":{"dir":"SE"}}
+{"action":"MOVE","params":{"dir":"SE"}}
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"INTERACT","params":{"target":"crew_item_tanaka_notes"}}
+
+// Step 9: Head to log_terminal_3 at (46,14)
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"NE"}}
+{"action":"INTERACT","params":{"target":"log_terminal_3"}}
+
+// Step 10: Head to log_terminal_4 at (54,13)
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"MOVE","params":{"dir":"E"}}
+{"action":"INTERACT","params":{"target":"log_terminal_4"}}
+
+// Step 11: Head to bridge area for sensor_thermal and log
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"NW"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"INTERACT","params":{"target":"bridge_captain_log"}}
+{"action":"INTERACT","params":{"target":"sensor_thermal"}}
+
+// Step 12: Head to log_terminal_5 at (26,7) - long trek west
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"SW"}}
+{"action":"INTERACT","params":{"target":"log_terminal_5"}}
+
+// Step 13: Interact with crew_item_okafor_badge at (24,8)
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"INTERACT","params":{"target":"crew_item_okafor_badge"}}
+
+// Step 14: Head to log_terminal_10 at (18,14)
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"MOVE","params":{"dir":"S"}}
+{"action":"MOVE","params":{"dir":"SW"}}
+{"action":"MOVE","params":{"dir":"SW"}}
+{"action":"MOVE","params":{"dir":"SW"}}
+{"action":"MOVE","params":{"dir":"SW"}}
+{"action":"MOVE","params":{"dir":"SW"}}
+{"action":"INTERACT","params":{"target":"log_terminal_10"}}
+
+// Step 15: Now check -- we should have many tags by now. Try submitting deductions.
+// The deduction chain: what -> sequence -> why -> hero -> responsibility
+// Use "correct" as the answer key for all
+{"action":"SUBMIT_DEDUCTION","params":{"deductionId":"deduction_what","answerKey":"correct"}}
+{"action":"SUBMIT_DEDUCTION","params":{"deductionId":"deduction_sequence","answerKey":"correct"}}
+{"action":"SUBMIT_DEDUCTION","params":{"deductionId":"deduction_why","answerKey":"correct"}}
+
+// For deduction_why, correct key might not be "correct" - it uses a named key
+// Let's try the specific keys based on reactor_scram archetype
+{"action":"SUBMIT_DEDUCTION","params":{"deductionId":"deduction_why","answerKey":"deadline_pressure"}}
+{"action":"SUBMIT_DEDUCTION","params":{"deductionId":"deduction_hero","answerKey":"correct"}}
+{"action":"SUBMIT_DEDUCTION","params":{"deductionId":"deduction_responsibility","answerKey":"correct"}}
+
+// Step 16: Head to data core at (15,2) - need to go NW
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"NW"}}
+{"action":"MOVE","params":{"dir":"NW"}}
+{"action":"MOVE","params":{"dir":"NW"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"N"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"MOVE","params":{"dir":"W"}}
+{"action":"INTERACT","params":{"target":"data_core"}}
+
+// If not victory, try more interactions and movements to data core
+{"action":"LOOK"}

@@ -6,3 +6,11 @@ dist/
 .env
 .DS_Store
 coverage/
+
+# Local output / temp files
+batch*.txt
+playtest.jsonl
+playtest_log.txt
+screenshots/
+public/
+space_station_roguelike_docs_v10.zip
