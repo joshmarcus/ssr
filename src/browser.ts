@@ -29,6 +29,7 @@ import { computeChoiceEndings } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave } from "./sim/saveLoad.js";
+import { generateWhatWeKnow, formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
 
 // ── Parse seed from URL params or use golden seed ───────────────
 const params = new URLSearchParams(window.location.search);
@@ -154,21 +155,18 @@ let pendingCrewDoor: { entityId: string; crewName: string } | null = null;
 let confirmingDeduction = false; // Y/N confirmation before locking in deduction answer
 let mapOpen = false;
 let helpOpen = false;
-let broadcastOpen = false;
-let broadcastSection: "evidence" | number | `choice_${number}` = "evidence"; // "evidence", deduction index, or "choice_N"
-let broadcastOptionIdx = 0;
-let broadcastEvidenceScroll = 0;
-let broadcastLinkedEvidence: string[] = [];
-let broadcastDetailDeduction: string | null = null; // deduction ID when in detail/evidence-linking view
-let broadcastEvidenceIdx = 0; // highlighted journal entry index in detail view
-let broadcastConfirming = false; // Y/N confirmation before locking in broadcast deduction
-let broadcastChoiceConfirming = false; // Y/N confirmation before locking in mystery choice
-
-// ── Evidence Browser state ──────────────────────────────────────
-let evidenceBrowserOpen = false;
-let evidenceBrowserTab: "all" | "threads" | "deductions" = "all";
-let evidenceBrowserIdx = 0; // selected entry index
-let evidenceBrowserScroll = 0; // scroll offset for list
+// ── Investigation Hub state ──────────────────────────────────────
+let investigationHubOpen = false;
+let hubSection: "evidence" | "connections" | "whatweknow" | "decisions" = "evidence";
+let hubIdx = 0;                       // selected item index within current section
+let hubOptionIdx = 0;                 // selected option within a deduction/choice
+let hubLinkedEvidence: string[] = [];  // evidence IDs linked to a deduction
+let hubDetailDeduction: string | null = null; // deduction ID in evidence-linking mode
+let hubEvidenceIdx = 0;               // evidence entry index in linking mode
+let hubConfirming = false;            // Y/N confirmation for deduction answer
+let hubChoiceConfirming = false;      // Y/N confirmation for mystery choice
+let hubDecisionDetailIdx: number | null = null; // which decision is expanded (null = list view)
+let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
 
 // ── Wait message variety ────────────────────────────────────────
 const WAIT_MESSAGES_COOL = [
@@ -356,12 +354,8 @@ function initGame(): void {
       }
       return; // swallow all input while map is open
     }
-    if (evidenceBrowserOpen) {
-      handleEvidenceBrowserInput(e);
-      return;
-    }
-    if (broadcastOpen) {
-      handleBroadcastInput(e);
+    if (investigationHubOpen) {
+      handleHubInput(e);
       return;
     }
     if (pendingCrewDoor) {
@@ -372,16 +366,14 @@ function initGame(): void {
       handleDeductionInput(e);
       return;
     }
-    if (activeChoice) {
-      handleChoiceInput(e);
-      return;
-    }
-    // V key opens evidence browser (view evidence)
+    // Mystery choices are handled via the Investigation Hub now
+    // V key opens Investigation Hub directly to EVIDENCE section
     if (e.key === "v" && !journalOpen && !state.gameOver) {
       e.preventDefault();
-      evidenceBrowserOpen = true;
-      evidenceBrowserIdx = 0;
-      renderEvidenceBrowser();
+      investigationHubOpen = true;
+      hubSection = "evidence";
+      hubIdx = 0;
+      renderInvestigationHub();
       return;
     }
     // ? key toggles help
@@ -391,22 +383,16 @@ function initGame(): void {
       showHelp();
       return;
     }
-    // R opens broadcast report modal — b is SW movement key
+    // R opens Investigation Hub (last-visited section)
     if (e.key === "r" && !journalOpen && !state.gameOver) {
       e.preventDefault();
-      broadcastOpen = !broadcastOpen;
-      if (broadcastOpen) {
-        broadcastSection = "evidence";
-        broadcastOptionIdx = 0;
-        broadcastEvidenceScroll = 0;
-        renderBroadcastModal();
-      } else {
-        closeBroadcastModal();
-      }
+      investigationHubOpen = true;
+      hubIdx = 0;
+      renderInvestigationHub();
       return;
     }
     // M key toggles station map (uses overlay, doesn't destroy log)
-    if ((e.key === "m" || e.key === "M") && !journalOpen && !evidenceBrowserOpen) {
+    if ((e.key === "m" || e.key === "M") && !journalOpen && !investigationHubOpen) {
       e.preventDefault();
       mapOpen = !mapOpen;
       if (mapOpen) {
@@ -451,8 +437,7 @@ function handleRestartKey(e: KeyboardEvent): void {
     visitedRoomIds.clear();
     journalOpen = false;
     activeChoice = null;
-    broadcastOpen = false;
-    evidenceBrowserOpen = false;
+    investigationHubOpen = false;
     // Close overlays on restart
     const broadcastEl = document.getElementById("broadcast-overlay");
     if (broadcastEl) { broadcastEl.classList.remove("active"); broadcastEl.innerHTML = ""; }
@@ -473,20 +458,18 @@ function handleRestartKey(e: KeyboardEvent): void {
     activeDeduction = null;
     deductionSelectedIdx = 0;
     confirmingDeduction = false;
-    broadcastSection = "evidence";
-    broadcastOptionIdx = 0;
-    broadcastEvidenceScroll = 0;
-    broadcastLinkedEvidence = [];
-    broadcastDetailDeduction = null;
-    broadcastEvidenceIdx = 0;
-    broadcastConfirming = false;
-    broadcastChoiceConfirming = false;
+    hubSection = "evidence";
+    hubOptionIdx = 0;
+    hubLinkedEvidence = [];
+    hubDetailDeduction = null;
+    hubEvidenceIdx = 0;
+    hubConfirming = false;
+    hubChoiceConfirming = false;
+    hubDecisionDetailIdx = null;
+    hubIdx = 0;
     pendingCrewDoor = null;
     journalTab = "evidence";
     choiceSelectedIdx = 0;
-    evidenceBrowserTab = "all";
-    evidenceBrowserIdx = 0;
-    evidenceBrowserScroll = 0;
 
     // Clear overlays and display, rebuild
     const gameoverEl = document.getElementById("gameover-overlay");
@@ -1133,8 +1116,8 @@ function showHelp(): void {
 
         <div>
           <div style="color:#4af;font-weight:bold;margin-bottom:6px">── Menus & Info ──</div>
-          <div><span style="color:#fff">[r]</span>  Broadcast Report (deductions + choices)</div>
-          <div><span style="color:#fff">[v]</span>  Evidence Browser (full journal)</div>
+          <div><span style="color:#fff">[r]</span>  Investigation Hub (evidence, deductions, narrative)</div>
+          <div><span style="color:#fff">[v]</span>  Investigation Hub → Evidence</div>
           <div><span style="color:#fff">[j] / [;]</span>  Quick journal toggle</div>
           <div><span style="color:#fff">[m]</span>  Station map overlay</div>
           <div><span style="color:#fff">[?]</span>  This help screen</div>
@@ -1192,9 +1175,9 @@ function showStationMap(): void {
     }
 
     if (isVisited) {
-      roomsHtml += `<div style="padding:3px 8px;color:#0f0">\u2713 ${escapeHtmlBroadcast(room.name)}</div>`;
+      roomsHtml += `<div style="padding:3px 8px;color:#0f0">\u2713 ${esc(room.name)}</div>`;
     } else if (cameraRevealed) {
-      roomsHtml += `<div style="padding:3px 8px;color:#6cf">\u25cb ${escapeHtmlBroadcast(room.name)}</div>`;
+      roomsHtml += `<div style="padding:3px 8px;color:#6cf">\u25cb ${esc(room.name)}</div>`;
     } else {
       roomsHtml += `<div style="padding:3px 8px;color:#555">\u00b7 ???</div>`;
     }
@@ -1493,33 +1476,11 @@ function handleCrewDoorInput(e: KeyboardEvent): void {
   }
 }
 
-// ── Mystery choice presentation (deprecated — replaced by broadcast modal) ──
-function presentChoice(_choice: MysteryChoice): void {
-  return;
-}
+// ── Investigation Hub ────────────────────────────────────────────
 
-function handleChoiceInput(_e: KeyboardEvent): boolean {
-  return false;
-}
+type EvidenceEntry = { id: string; icon: string; summary: string; detail: string; room: string; turn: number; tags: string[]; category: string; thread?: string; crewMentioned: string[] };
 
-// Get mystery choices that are available (threshold met, not yet answered)
-function getAvailableChoices(): MysteryChoice[] {
-  if (!state.mystery) return [];
-  const journalCount = state.mystery.journal.length;
-  const choices = state.mystery.choices;
-  const thresholds = [3, 6, 10];
-  const available: MysteryChoice[] = [];
-  for (let i = 0; i < Math.min(choices.length, thresholds.length); i++) {
-    if (journalCount >= thresholds[i] && !choices[i].chosen) {
-      available.push(choices[i]);
-    }
-  }
-  return available;
-}
-
-// ── Evidence Browser ─────────────────────────────────────────────
-
-function getEvidenceBrowserEntries(): { entries: Array<{ id: string; icon: string; summary: string; detail: string; room: string; turn: number; tags: string[]; category: string; thread?: string; crewMentioned: string[] }>; threads: Map<string, string[]> } {
+function getEvidenceEntries(): { entries: EvidenceEntry[]; threads: Map<string, string[]> } {
   if (!state.mystery) return { entries: [], threads: new Map() };
   const journal = state.mystery.journal;
   const entries = journal.map(j => ({
@@ -1545,480 +1506,754 @@ function getEvidenceBrowserEntries(): { entries: Array<{ id: string; icon: strin
   return { entries, threads };
 }
 
-function renderEvidenceBrowser(): void {
-  const overlay = document.getElementById("journal-overlay");
-  if (!overlay || !state.mystery) return;
-
-  const { entries, threads } = getEvidenceBrowserEntries();
-  const deductions = state.mystery.deductions;
-  const tabs: Array<"all" | "threads" | "deductions"> = ["all", "threads", "deductions"];
-
-  // Build tab bar
-  let tabsHtml = "";
-  for (const t of tabs) {
-    const label = t === "all" ? `ALL (${entries.length})` : t === "threads" ? "THREADS" : `DEDUCTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`;
-    const cls = t === evidenceBrowserTab ? "journal-tab active" : "journal-tab";
-    tabsHtml += `<div class="${cls}">${label}</div>`;
-  }
-
-  // Build list view based on active tab
-  let listHtml = "";
-  let detailHtml = "";
-
-  if (evidenceBrowserTab === "all") {
-    if (entries.length === 0) {
-      listHtml = `<div class="journal-empty">No evidence collected yet.<br>Read terminals [i] and examine items.</div>`;
-    } else {
-      for (let i = 0; i < entries.length; i++) {
-        const e = entries[i];
-        const cls = i === evidenceBrowserIdx ? "journal-entry selected" : "journal-entry";
-        listHtml += `<div class="${cls}">
-          <span class="journal-entry-icon">${escapeHtmlBroadcast(e.icon)}</span>
-          ${escapeHtmlBroadcast(e.summary)}
-          <div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${escapeHtmlBroadcast(e.room)}</span></div>
-        </div>`;
-      }
-      // Detail pane for selected entry
-      if (entries[evidenceBrowserIdx]) {
-        detailHtml = renderEvidenceDetail(entries[evidenceBrowserIdx]);
-      }
-    }
-  } else if (evidenceBrowserTab === "threads") {
-    let globalIdx = 0;
-    for (const [threadName, entryIds] of threads) {
-      listHtml += `<div class="journal-thread-header">${escapeHtmlBroadcast(threadName)} (${entryIds.length})</div>`;
-      for (const entryId of entryIds) {
-        const e = entries.find(x => x.id === entryId);
-        if (!e) continue;
-        const cls = globalIdx === evidenceBrowserIdx ? "journal-entry selected" : "journal-entry";
-        listHtml += `<div class="${cls}">
-          <span class="journal-entry-icon">${escapeHtmlBroadcast(e.icon)}</span>
-          ${escapeHtmlBroadcast(e.summary)}
-          <div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${escapeHtmlBroadcast(e.room)}</span></div>
-        </div>`;
-        globalIdx++;
-      }
-    }
-    // Show detail for selected
-    const flatEntries = getFlatThreadEntries(entries, threads);
-    if (flatEntries[evidenceBrowserIdx]) {
-      detailHtml = renderEvidenceDetail(flatEntries[evidenceBrowserIdx]);
-    }
-  } else {
-    // Deductions tab
-    const journal = state.mystery.journal;
-    const allTags = new Set(journal.flatMap(j => j.tags));
-    const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
-    const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
-    const categoryLabels: Record<string, string> = { what: "WHAT HAPPENED?", why: "WHY DID IT HAPPEN?", who: "WHO WAS RESPONSIBLE?" };
-
-    for (const d of deductions) {
-      const catLabel = categoryLabels[d.category] || d.category.toUpperCase();
-      const isUnlocked = unlockedSet.has(d.id);
-
-      let statusIcon: string;
-      let statusColor: string;
-      let statusText: string;
-
-      if (d.solved) {
-        statusIcon = d.answeredCorrectly ? "\u2713" : "\u2717";
-        statusColor = d.answeredCorrectly ? "#0f0" : "#f44";
-        const answer = d.options.find(o => o.correct === d.answeredCorrectly);
-        statusText = answer ? answer.label : "answered";
-      } else if (isUnlocked) {
-        statusIcon = "!";
-        statusColor = "#fa0";
-        statusText = "Ready to answer (use [r] Broadcast Report)";
-      } else {
-        statusIcon = "?";
-        statusColor = "#555";
-        const chainLocked = d.unlockAfter && !solvedIds.has(d.unlockAfter);
-        statusText = chainLocked ? "Solve previous deduction first" : "Need more evidence";
-      }
-
-      listHtml += `<div style="padding:8px 6px;border-bottom:1px solid #1a1a1a">
-        <div style="color:${statusColor};font-weight:bold">[${statusIcon}] ${catLabel}</div>
-        <div style="color:#aaa;font-size:12px;margin:2px 0">${escapeHtmlBroadcast(d.question)}</div>
-        <div style="color:${statusColor};font-size:12px">${escapeHtmlBroadcast(statusText)}</div>
-        <div style="margin-top:4px">`;
-
-      for (const tag of d.requiredTags) {
-        if (allTags.has(tag)) {
-          listHtml += `<span class="tag-pill tag-covered">${escapeHtmlBroadcast(tag)}</span>`;
-        } else {
-          listHtml += `<span class="tag-pill tag-missing">${escapeHtmlBroadcast(tag)}</span>`;
-        }
-      }
-
-      listHtml += `</div></div>`;
-    }
-
-    // For deductions tab, detail shows linked evidence
-    const solved = deductions.filter(d => d.solved);
-    const correct = deductions.filter(d => d.answeredCorrectly);
-    detailHtml = `<div class="journal-detail-title">Investigation Progress</div>
-      <div style="color:#aaa;margin:8px 0">Deductions: ${solved.length}/${deductions.length} answered</div>
-      <div style="color:#0f0;margin:4px 0">Correct: ${correct.length}</div>
-      <div style="color:#f44;margin:4px 0">Wrong: ${solved.length - correct.length}</div>
-      <div style="color:#888;margin:12px 0 4px">Evidence collected: ${entries.length} pieces</div>
-      <div style="color:#888;margin:4px 0">Tags discovered: ${new Set(entries.flatMap(e => e.tags)).size}</div>`;
-  }
-
-  const controlsText = evidenceBrowserTab === "deductions"
-    ? "[Tab] Switch tab  [Esc/v] Close"
-    : "[&uarr;/&darr;] Navigate  [Tab] Switch tab  [Esc/v] Close";
-
-  overlay.innerHTML = `
-    <div class="journal-container">
-      <div class="journal-header">\u2550\u2550\u2550 EVIDENCE JOURNAL \u2550\u2550\u2550</div>
-      <div class="journal-tabs">${tabsHtml}</div>
-      <div class="journal-body">
-        <div class="journal-list">${listHtml}</div>
-        <div class="journal-detail">${detailHtml || '<div class="journal-empty">Select an entry to view details.</div>'}</div>
-      </div>
-      <div class="journal-controls">${controlsText}</div>
-    </div>`;
-  overlay.classList.add("active");
-}
-
-function renderEvidenceDetail(entry: { id: string; summary: string; detail: string; room: string; turn: number; tags: string[]; category: string; thread?: string; crewMentioned: string[] }): string {
-  const deductions = state.mystery?.deductions ?? [];
-  const linkedDeductions = deductions.filter(d =>
-    d.requiredTags.some(t => entry.tags.includes(t))
-  );
-
-  let tagsHtml = "";
-  for (const tag of entry.tags) {
-    tagsHtml += `<span class="tag-pill tag-covered">${escapeHtmlBroadcast(tag)}</span>`;
-  }
-
-  let deductionLinks = "";
-  if (linkedDeductions.length > 0) {
-    deductionLinks = `<div class="journal-detail-deductions">Relevant to: ${linkedDeductions.map(d => escapeHtmlBroadcast(d.category.toUpperCase())).join(", ")}</div>`;
-  }
-
-  let crewHtml = "";
-  if (entry.crewMentioned.length > 0 && state.mystery) {
-    const names = entry.crewMentioned.map(id => {
-      const member = state.mystery!.crew.find(c => c.id === id);
-      return member ? `${member.firstName} ${member.lastName} (${member.role})` : id;
-    });
-    crewHtml = `<div style="color:#6cf;font-size:12px;margin-top:6px">Crew: ${names.map(n => escapeHtmlBroadcast(n)).join(", ")}</div>`;
-  }
-
-  return `
-    <div class="journal-detail-title">${escapeHtmlBroadcast(entry.summary)}</div>
-    <div class="journal-detail-meta">
-      ${escapeHtmlBroadcast(entry.category.toUpperCase())} | Turn ${entry.turn} | ${escapeHtmlBroadcast(entry.room)}
-      ${entry.thread ? ` | Thread: ${escapeHtmlBroadcast(entry.thread)}` : ""}
-    </div>
-    <div class="journal-detail-content">${escapeHtmlBroadcast(entry.detail)}</div>
-    ${crewHtml}
-    <div class="journal-detail-tags">${tagsHtml}</div>
-    ${deductionLinks}`;
-}
-
-type EvidenceEntry = { id: string; icon: string; summary: string; detail: string; room: string; turn: number; tags: string[]; category: string; thread?: string; crewMentioned: string[] };
-
-function getFlatThreadEntries(entries: EvidenceEntry[], threads: Map<string, string[]>): EvidenceEntry[] {
-  const flat: EvidenceEntry[] = [];
-  for (const [, entryIds] of threads) {
-    for (const entryId of entryIds) {
-      const e = entries.find(x => x.id === entryId);
-      if (e) flat.push(e);
-    }
-  }
-  return flat;
-}
-
-function closeEvidenceBrowser(): void {
-  const overlay = document.getElementById("journal-overlay");
-  if (overlay) {
-    overlay.classList.remove("active");
-    overlay.innerHTML = "";
-  }
-  evidenceBrowserOpen = false;
-  renderAll();
-}
-
-function handleEvidenceBrowserInput(e: KeyboardEvent): void {
-  e.preventDefault();
-
-  if (e.key === "Escape" || e.key === "v") {
-    closeEvidenceBrowser();
-    return;
-  }
-
-  if (e.key === "Tab") {
-    const tabs: Array<"all" | "threads" | "deductions"> = ["all", "threads", "deductions"];
-    const curIdx = tabs.indexOf(evidenceBrowserTab);
-    evidenceBrowserTab = tabs[(curIdx + 1) % tabs.length];
-    evidenceBrowserIdx = 0;
-    renderEvidenceBrowser();
-    return;
-  }
-
-  // Only navigate in all/threads tabs
-  if (evidenceBrowserTab === "deductions") return;
-
-  const { entries, threads } = getEvidenceBrowserEntries();
-  const maxIdx = evidenceBrowserTab === "threads"
-    ? getFlatThreadEntries(entries, threads).length - 1
-    : entries.length - 1;
-
-  if (e.key === "ArrowUp" || e.key === "w" || e.key === "k") {
-    evidenceBrowserIdx = Math.max(0, evidenceBrowserIdx - 1);
-    renderEvidenceBrowser();
-    return;
-  }
-  if (e.key === "ArrowDown" || e.key === "s" || e.key === "ArrowDown") {
-    evidenceBrowserIdx = Math.min(maxIdx, evidenceBrowserIdx + 1);
-    renderEvidenceBrowser();
-    return;
-  }
-}
-
-// ── Broadcast Report Modal ──────────────────────────────────────
-function renderBroadcastModal(): void {
+/** Render the unified Investigation Hub with 4 tab-sections. */
+function renderInvestigationHub(): void {
   const overlay = document.getElementById("broadcast-overlay");
   if (!overlay || !state.mystery) return;
 
-  const journal = state.mystery.journal;
+  const { entries } = getEvidenceEntries();
   const deductions = state.mystery.deductions;
-  const journalCount = journal.length;
+  const journal = state.mystery.journal;
 
-  // Evidence list
-  let evidenceHtml = "";
-  if (journal.length === 0) {
-    evidenceHtml = `<div class="broadcast-evidence-item">No evidence collected yet.</div>`;
-  } else {
-    for (const entry of journal) {
-      const icon = entry.category === "log" ? "[log]" : entry.category === "item" ? "[item]" : entry.category === "trace" ? "[trace]" : "[crew]";
-      evidenceHtml += `<div class="broadcast-evidence-item">${icon} ${escapeHtmlBroadcast(entry.summary)} — ${escapeHtmlBroadcast(entry.detail.slice(0, 80))}...</div>`;
-    }
+  // Tab bar
+  const tabs: Array<"evidence" | "connections" | "whatweknow" | "decisions"> = ["evidence", "connections", "whatweknow", "decisions"];
+  const tabLabels: Record<string, string> = {
+    evidence: `EVIDENCE (${entries.length})`,
+    connections: `CONNECTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`,
+    whatweknow: "WHAT WE KNOW",
+    decisions: "DECISIONS",
+  };
+  let tabsHtml = "";
+  for (const t of tabs) {
+    const cls = t === hubSection ? "journal-tab active" : "journal-tab";
+    tabsHtml += `<div class="${cls}">${tabLabels[t]}</div>`;
   }
 
-  // Deduction sections — iterate ALL deductions (not just one per category)
-  const categoryLabels: Record<string, string> = { what: "WHAT HAPPENED?", why: "WHY DID IT HAPPEN?", who: "WHO WAS RESPONSIBLE?" };
+  let bodyHtml = "";
 
-  const allTags = new Set(journal.flatMap(j => j.tags));
-  const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
-  const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
-
-  let deductionHtml = "";
-  for (let di = 0; di < deductions.length; di++) {
-    const deduction = deductions[di];
-
-    const isUnlocked = unlockedSet.has(deduction.id);
-    const locked = !deduction.solved && !isUnlocked;
-    const isActive = broadcastSection === di;
-    const isDetailView = broadcastDetailDeduction === deduction.id;
-
-    let sectionClass = "broadcast-deduction";
-    if (locked) sectionClass += " locked";
-    if (deduction.solved) sectionClass += " solved";
-    if (isActive) sectionClass += " active-section";
-
-    // Tag coverage display: show required tags as colored pills
-    let tagPillsHtml = "";
-    for (const tag of deduction.requiredTags) {
-      if (allTags.has(tag)) {
-        tagPillsHtml += `<span class="tag-pill tag-covered">${escapeHtmlBroadcast(tag)}</span>`;
-      } else {
-        tagPillsHtml += `<span class="tag-pill tag-missing">${escapeHtmlBroadcast(tag)}</span>`;
-      }
-    }
-
-    // Section header with status indicators
-    const catLabel = categoryLabels[deduction.category] || deduction.category.toUpperCase();
-    let headerPrefix: string;
-    let headerSuffix = "";
-    if (deduction.solved) {
-      headerPrefix = `<span style="color:#0f0">[&#10003;]</span>`;
-      headerSuffix = ` &mdash; <span style="color:#0f0;font-weight:normal;font-size:12px">SOLVED</span>`;
-    } else if (isUnlocked) {
-      const { missingTags } = validateEvidenceLink(deduction, broadcastLinkedEvidence, journal);
-      const cluesNeeded = missingTags.length;
-      headerPrefix = `<span style="color:#fa0">[&gt;]</span>`;
-      headerSuffix = cluesNeeded > 0
-        ? ` &mdash; <span style="color:#888;font-weight:normal;font-size:12px">${cluesNeeded} clue${cluesNeeded !== 1 ? "s" : ""} needed</span>`
-        : ` &mdash; <span style="color:#4a4;font-weight:normal;font-size:12px">ready to answer</span>`;
-    } else {
-      headerPrefix = `<span style="color:#555">[?]</span>`;
-      const chainLocked = deduction.unlockAfter && !solvedIds.has(deduction.unlockAfter);
-      if (chainLocked) {
-        headerSuffix = ` &mdash; <span style="color:#555;font-weight:normal;font-size:12px">solve previous first</span>`;
-      } else {
-        headerSuffix = ` &mdash; <span style="color:#555;font-weight:normal;font-size:12px">need more evidence</span>`;
-      }
-    }
-
-    deductionHtml += `<div class="${sectionClass}">`;
-    deductionHtml += `<div class="broadcast-section-title">${headerPrefix} ${catLabel}${headerSuffix}</div>`;
-    if (!locked) {
-      deductionHtml += `<div style="margin:2px 0 4px">${tagPillsHtml}</div>`;
-    }
-
-    if (deduction.solved) {
-      const mark = deduction.answeredCorrectly ? "&#10003;" : "&#10007;";
-      const chosen = deduction.options.find(o => o.correct === deduction.answeredCorrectly) || deduction.options[0];
-      deductionHtml += `<div style="color:${deduction.answeredCorrectly ? '#0f0' : '#f44'}">${mark} ${escapeHtmlBroadcast(chosen.label)}</div>`;
-    } else if (locked) {
-      const missingTags = deduction.requiredTags.filter(t => !allTags.has(t));
-      const chainLocked = deduction.unlockAfter && !solvedIds.has(deduction.unlockAfter);
-      const parts: string[] = [];
-      if (chainLocked) parts.push("solve previous deduction first");
-      if (missingTags.length > 0) parts.push(`need evidence with tags: ${missingTags.join(", ")}`);
-      deductionHtml += `<div style="color:#555">(Locked &mdash; ${parts.join("; ") || "locked"})</div>`;
-    } else if (isDetailView) {
-      // Detail view: show evidence linking list
-      deductionHtml += `<div style="margin:4px 0;color:#aaa;font-size:12px">Link evidence [Space] then answer [Enter]:</div>`;
-      for (let ji = 0; ji < journal.length; ji++) {
-        const entry = journal[ji];
-        const isLinked = broadcastLinkedEvidence.includes(entry.id);
-        const checkbox = isLinked ? "[x]" : "[ ]";
-        const cls = isLinked ? "evidence-linked" : "evidence-unlinked";
-        const highlight = (ji === broadcastEvidenceIdx) ? "color:#fff;font-weight:bold;" : "";
-        const pointer = (ji === broadcastEvidenceIdx) ? "&#9656; " : "  ";
-        const entryTagsHtml = entry.tags.map(t => escapeHtmlBroadcast(t)).join(", ");
-        deductionHtml += `<div class="${cls}" style="${highlight}padding:1px 0 1px 8px">${pointer}${checkbox} ${escapeHtmlBroadcast(entry.summary)}<div style="color:#555;font-size:11px;padding-left:24px">${entryTagsHtml}</div></div>`;
-      }
-      deductionHtml += `<div style="border-top:1px solid #333;margin:6px 0"></div>`;
-      // Show answer options below evidence
-      for (let i = 0; i < deduction.options.length; i++) {
-        const prefix = (i === broadcastOptionIdx) ? "&#9656; " : "  ";
-        const cls = (i === broadcastOptionIdx) ? "broadcast-option selected" : "broadcast-option";
-        deductionHtml += `<div class="${cls}">${prefix}${i + 1}. ${escapeHtmlBroadcast(deduction.options[i].label)}</div>`;
-      }
-    } else {
-      // List view: show options only
-      for (let i = 0; i < deduction.options.length; i++) {
-        const prefix = (isActive && i === broadcastOptionIdx) ? "&#9656; " : "  ";
-        const cls = (isActive && i === broadcastOptionIdx) ? "broadcast-option selected" : "broadcast-option";
-        deductionHtml += `<div class="${cls}">${prefix}${i + 1}. ${escapeHtmlBroadcast(deduction.options[i].label)}</div>`;
-      }
-    }
-
-    deductionHtml += `</div>`;
+  if (hubSection === "evidence") {
+    bodyHtml = renderHubEvidence(entries);
+  } else if (hubSection === "connections") {
+    bodyHtml = renderHubConnections(deductions, journal);
+  } else if (hubSection === "whatweknow") {
+    bodyHtml = renderHubWhatWeKnow();
+  } else if (hubSection === "decisions") {
+    bodyHtml = renderHubDecisions();
   }
 
-  // ── Mystery Choices section ──────────────────────────────────
-  const choices = state.mystery.choices;
-  const thresholds = [3, 6, 10];
-  let choicesHtml = "";
-  let anyChoiceAvailable = false;
-
-  for (let ci = 0; ci < choices.length && ci < thresholds.length; ci++) {
-    const choice = choices[ci];
-    const available = journalCount >= thresholds[ci];
-    const isActive = broadcastSection === `choice_${ci}`;
-
-    let choiceClass = "broadcast-deduction";
-    if (!available) choiceClass += " locked";
-    if (choice.chosen) choiceClass += " solved";
-    if (isActive) choiceClass += " active-section";
-
-    choicesHtml += `<div class="${choiceClass}">`;
-
-    if (choice.chosen) {
-      const chosenOption = choice.options.find(o => o.key === choice.chosen);
-      choicesHtml += `<div class="broadcast-section-title"><span style="color:#0f0">[&#10003;]</span> ${escapeHtmlBroadcast(choice.prompt.slice(0, 60))}...</div>`;
-      choicesHtml += `<div style="color:#0f0;padding:2px 8px">&#10003; ${escapeHtmlBroadcast(chosenOption?.label ?? choice.chosen)}</div>`;
-    } else if (!available) {
-      choicesHtml += `<div class="broadcast-section-title"><span style="color:#555">[?]</span> DECISION ${ci + 1} &mdash; <span style="color:#555;font-weight:normal;font-size:12px">need ${thresholds[ci]} evidence (have ${journalCount})</span></div>`;
-    } else {
-      anyChoiceAvailable = true;
-      choicesHtml += `<div class="broadcast-section-title"><span style="color:#fa0">[!]</span> DECISION: ${escapeHtmlBroadcast(choice.prompt)}</div>`;
-      for (let i = 0; i < choice.options.length; i++) {
-        const prefix = (isActive && i === broadcastOptionIdx) ? "&#9656; " : "  ";
-        const cls = (isActive && i === broadcastOptionIdx) ? "broadcast-option selected" : "broadcast-option";
-        choicesHtml += `<div class="${cls}">${prefix}${i + 1}. ${escapeHtmlBroadcast(choice.options[i].label)}</div>`;
-      }
-    }
-
-    choicesHtml += `</div>`;
-  }
-
-  if (choices.length > 0) {
-    choicesHtml = `<div style="border-top:1px solid #444;margin:8px 0"></div>
-      <div class="broadcast-section-title" style="color:#ca8">REPORT DECISIONS</div>` + choicesHtml;
-  }
-
-  // Evacuation status section
-  let evacHtml = "";
-  if (state.mystery.evacuation?.active) {
-    const evac = state.mystery.evacuation;
-    const found = evac.crewFound.length;
-    const evacuated = evac.crewEvacuated.length;
-    const dead = evac.crewDead.length;
-    const remaining = found - evacuated - dead;
-    const pods = evac.podsPowered.length;
-    const evacColor = dead > 0 ? "#f44" : evacuated > 0 ? "#4a4" : "#fa0";
-    evacHtml = `
-      <div style="border-top:1px solid #444;margin:8px 0"></div>
-      <div class="broadcast-section-title" style="color:#f0f">EVACUATION STATUS</div>
-      <div style="padding:4px 8px;color:#ccc">
-        <div>Crew found: <span style="color:#fff">${found}</span></div>
-        <div>Evacuated: <span style="color:#4a4">${evacuated}</span></div>
-        ${dead > 0 ? `<div>Lost: <span style="color:#f44">${dead}</span></div>` : ""}
-        ${remaining > 0 ? `<div>Still need rescue: <span style="color:#fa0">${remaining}</span></div>` : ""}
-        <div>Escape pods powered: <span style="color:#4af">${pods}</span></div>
-      </div>`;
-  }
-
-  // Transmit button
-  const allSolved = deductions.every(d => d.solved);
-  const allChoicesMade = choices.every((c, i) => i >= thresholds.length || !!(c.chosen) || journalCount < thresholds[i]);
-  const transmitHtml = allSolved
-    ? `<div class="broadcast-transmit">All deductions answered.${allChoicesMade ? " All decisions made." : ""} Report ready for transmission.</div>`
-    : "";
-
-  const controlsText = broadcastDetailDeduction
-    ? "[&#8593;/&#8595;] Navigate  [Space] Toggle link  [Enter] Answer  [Esc] Back"
-    : "[&#8593;/&#8595;] Navigate  [Enter] Select  [Tab] Next section  [Esc] Close";
+  const controlsText = hubDetailDeduction
+    ? "[&uarr;/&darr;] Navigate  [Space] Toggle link  [Enter] Answer  [Esc] Back"
+    : "[&uarr;/&darr;] Navigate  [Tab] Next section  [Enter] Select  [Esc] Close";
 
   overlay.innerHTML = `
     <div class="broadcast-box">
-      <div class="broadcast-title">&#9552;&#9552;&#9552; BROADCAST REPORT TO BASE &#9552;&#9552;&#9552;</div>
-      <div class="broadcast-section-title">EVIDENCE COLLECTED (${journalCount})</div>
-      <div class="broadcast-evidence-list">${evidenceHtml}</div>
-      <div style="border-top:1px solid #444;margin:8px 0"></div>
-      ${deductionHtml}
-      ${choicesHtml}
-      ${evacHtml}
-      ${transmitHtml}
+      <div class="broadcast-title">\u2550\u2550\u2550 INVESTIGATION HUB \u2550\u2550\u2550${devModeEnabled ? ' <span style="color:#f0f;font-size:11px">[DEV]</span>' : ''}</div>
+      <div class="journal-tabs" style="display:flex;gap:4px;padding:4px 8px;border-bottom:1px solid #333">${tabsHtml}</div>
+      ${bodyHtml}
       <div class="broadcast-controls">${controlsText}</div>
     </div>`;
   overlay.classList.add("active");
 }
 
-function closeBroadcastModal(): void {
+/** EVIDENCE section — two-panel: entry list (left) + full detail (right). */
+function renderHubEvidence(entries: EvidenceEntry[]): string {
+  if (entries.length === 0) {
+    return `<div class="journal-body"><div class="journal-list"><div class="journal-empty">No evidence collected yet.<br>Read terminals [i] and examine items.</div></div><div class="journal-detail"><div class="journal-empty">Explore the station to gather clues.</div></div></div>`;
+  }
+
+  let listHtml = "";
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    const cls = i === hubIdx ? "journal-entry selected" : "journal-entry";
+    listHtml += `<div class="${cls}">
+      <span class="journal-entry-icon">${esc(e.icon)}</span>
+      ${esc(e.summary)}
+      <div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div>
+    </div>`;
+  }
+
+  let detailHtml = "";
+  if (entries[hubIdx]) {
+    detailHtml = renderHubEvidenceDetail(entries[hubIdx]);
+  }
+
+  return `<div class="journal-body"><div class="journal-list">${listHtml}</div><div class="journal-detail">${detailHtml || '<div class="journal-empty">Select an entry to view details.</div>'}</div></div>`;
+}
+
+/** Render the full detail panel for a selected evidence entry. */
+function renderHubEvidenceDetail(entry: EvidenceEntry): string {
+  const deductions = state.mystery?.deductions ?? [];
+  const journal = state.mystery?.journal ?? [];
+  const crew = state.mystery?.crew ?? [];
+
+  let tagsHtml = "";
+  for (const tag of entry.tags) {
+    tagsHtml += `<span class="tag-pill tag-covered">${esc(tag)}</span>`;
+  }
+
+  // Linked deductions
+  const linkedDeductions = deductions.filter(d =>
+    d.requiredTags.some(t => entry.tags.includes(t))
+  );
+  let deductionLinks = "";
+  if (linkedDeductions.length > 0) {
+    deductionLinks = `<div class="journal-detail-deductions">Relevant to: ${linkedDeductions.map(d => esc(d.category.toUpperCase())).join(", ")}</div>`;
+  }
+
+  // Crew with relationships (Deliverable 3)
+  let crewHtml = "";
+  if (entry.crewMentioned.length > 0) {
+    crewHtml = `<div style="color:#6cf;font-size:12px;margin-top:8px;border-top:1px solid #222;padding-top:6px"><div style="font-weight:bold;margin-bottom:4px">CREW MENTIONED</div>`;
+    for (const crewId of entry.crewMentioned) {
+      const member = crew.find(c => c.id === crewId);
+      if (!member) continue;
+      crewHtml += `<div style="margin:4px 0"><span style="color:#fff">${esc(member.firstName)} ${esc(member.lastName)}</span> — ${esc(fmtRole(member.role))}`;
+      crewHtml += `<div style="color:#888;font-size:11px;padding-left:8px">Personality: ${esc(member.personality)} | Fate: ${esc(member.fate.replace(/_/g, " "))}</div>`;
+      if (member.relationships.length > 0) {
+        for (const rel of member.relationships) {
+          const relStr = formatRelationship(member, rel, crew);
+          if (relStr) {
+            crewHtml += `<div style="color:#ca8;font-size:11px;padding-left:8px">${esc(relStr)}</div>`;
+          }
+        }
+      }
+      crewHtml += `</div>`;
+    }
+    crewHtml += `</div>`;
+  }
+
+  // Minimap (Deliverable 6)
+  const minimapHtml = renderEvidenceMinimap(entry.room);
+
+  // Dev mode: clue graph (Deliverable 4)
+  let devHtml = "";
+  if (devModeEnabled) {
+    const clueGraph = getDeductionsForEntry(entry.id, journal, deductions);
+    if (clueGraph.length > 0) {
+      devHtml = `<div style="border-top:1px solid #f0f;margin-top:8px;padding-top:6px;color:#f0f;font-size:11px">
+        <div style="font-weight:bold">CLUE GRAPH (DEV)</div>`;
+      for (const cg of clueGraph) {
+        const missingStr = cg.missingTags.length > 0 ? ` | Missing: ${cg.missingTags.join(", ")}` : " | COMPLETE";
+        devHtml += `<div style="margin:2px 0">\u2192 ${esc(cg.category.toUpperCase())}: ${esc(cg.question.slice(0, 60))}... [tags: ${cg.contributingTags.join(", ")}${missingStr}]</div>`;
+      }
+      devHtml += `</div>`;
+    }
+  }
+
+  return `
+    <div class="journal-detail-title">${esc(entry.summary)}</div>
+    <div class="journal-detail-meta">
+      ${esc(entry.category.toUpperCase())} | Turn ${entry.turn} | ${esc(entry.room)}
+      ${entry.thread ? ` | Thread: ${esc(entry.thread)}` : ""}
+    </div>
+    <div class="journal-detail-content">${esc(entry.detail)}</div>
+    ${crewHtml}
+    <div class="journal-detail-tags">${tagsHtml}</div>
+    ${deductionLinks}
+    ${minimapHtml}
+    ${devHtml}`;
+}
+
+/** CONNECTIONS section — deduction list with evidence-linking. */
+function renderHubConnections(deductions: import("./shared/types.js").Deduction[], journal: import("./shared/types.js").JournalEntry[]): string {
+  const allTags = new Set(journal.flatMap(j => j.tags));
+  const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
+  const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
+  const categoryLabels: Record<string, string> = { what: "WHAT HAPPENED?", why: "WHY DID IT HAPPEN?", who: "WHO WAS RESPONSIBLE?" };
+
+  // If in detail/evidence-linking view for a specific deduction
+  if (hubDetailDeduction) {
+    const deduction = deductions.find(d => d.id === hubDetailDeduction);
+    if (deduction && !deduction.solved && unlockedSet.has(deduction.id)) {
+      return renderHubConnectionDetail(deduction, journal, allTags);
+    }
+    hubDetailDeduction = null;
+  }
+
+  let listHtml = "";
+  for (let di = 0; di < deductions.length; di++) {
+    const d = deductions[di];
+    const isUnlocked = unlockedSet.has(d.id);
+    const locked = !d.solved && !isUnlocked;
+    const isActive = di === hubIdx;
+
+    const catLabel = categoryLabels[d.category] || d.category.toUpperCase();
+    let statusIcon: string;
+    let statusColor: string;
+
+    if (d.solved) {
+      statusIcon = d.answeredCorrectly ? "\u2713" : "\u2717";
+      statusColor = d.answeredCorrectly ? "#0f0" : "#f44";
+    } else if (isUnlocked) {
+      statusIcon = "!";
+      statusColor = "#fa0";
+    } else {
+      statusIcon = "?";
+      statusColor = "#555";
+    }
+
+    let sectionClass = "broadcast-deduction";
+    if (locked) sectionClass += " locked";
+    if (d.solved) sectionClass += " solved";
+    if (isActive) sectionClass += " active-section";
+
+    listHtml += `<div class="${sectionClass}">`;
+    listHtml += `<div class="broadcast-section-title"><span style="color:${statusColor}">[${statusIcon}]</span> ${catLabel}</div>`;
+
+    if (d.solved) {
+      const answer = d.options.find(o => o.correct === d.answeredCorrectly) || d.options[0];
+      listHtml += `<div style="color:${statusColor};padding:2px 8px">${esc(answer.label)}</div>`;
+    } else if (locked) {
+      const chainLocked = d.unlockAfter && !solvedIds.has(d.unlockAfter);
+      listHtml += `<div style="color:#555;padding:2px 8px">${chainLocked ? "Solve previous deduction first" : "Need more evidence"}</div>`;
+    } else {
+      listHtml += `<div style="color:#aaa;padding:2px 8px;font-size:12px">${esc(d.question)}</div>`;
+      if (d.hintText) {
+        listHtml += `<div style="color:#6cf;padding:2px 8px;font-size:11px;font-style:italic">\u2139 ${esc(d.hintText)}</div>`;
+      }
+    }
+
+    // Tag pills
+    if (!locked) {
+      let tagPillsHtml = "";
+      for (const tag of d.requiredTags) {
+        tagPillsHtml += allTags.has(tag)
+          ? `<span class="tag-pill tag-covered">${esc(tag)}</span>`
+          : `<span class="tag-pill tag-missing">${esc(tag)}</span>`;
+      }
+      listHtml += `<div style="margin:2px 8px">${tagPillsHtml}</div>`;
+    }
+
+    // Dev mode: show full tag requirements for locked deductions
+    if (devModeEnabled && locked) {
+      let devTags = "";
+      for (const tag of d.requiredTags) {
+        devTags += allTags.has(tag)
+          ? `<span class="tag-pill tag-covered">${esc(tag)}</span>`
+          : `<span class="tag-pill tag-missing">${esc(tag)}</span>`;
+      }
+      listHtml += `<div style="margin:2px 8px;border-top:1px solid #f0f;padding-top:2px"><span style="color:#f0f;font-size:10px">DEV:</span> ${devTags}</div>`;
+      const partials = journal.filter(j => j.tags.some(t => d.requiredTags.includes(t)));
+      if (partials.length > 0) {
+        for (const p of partials.slice(0, 3)) {
+          listHtml += `<div style="color:#f0f;font-size:10px;padding:0 8px">\u2192 ${esc(p.summary)} [${p.tags.filter(t => d.requiredTags.includes(t)).join(", ")}]</div>`;
+        }
+      }
+    }
+
+    if (isActive && isUnlocked && !d.solved) {
+      listHtml += `<div style="color:#fa0;padding:4px 8px;font-size:11px">[Enter] Link evidence &amp; answer</div>`;
+    }
+
+    listHtml += `</div>`;
+  }
+
+  return `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:4px 8px">${listHtml}</div>`;
+}
+
+/** Detail view for evidence-linking within CONNECTIONS section. */
+function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduction, journal: import("./shared/types.js").JournalEntry[], _allTags: Set<string>): string {
+  const crew = state.mystery?.crew ?? [];
+  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:8px">`;
+  html += `<div style="color:#fa0;font-weight:bold;font-size:14px;margin-bottom:6px">${esc(deduction.question)}</div>`;
+  if (deduction.hintText) {
+    html += `<div style="color:#6cf;font-size:12px;font-style:italic;margin-bottom:8px">\u2139 ${esc(deduction.hintText)}</div>`;
+  }
+
+  // Evidence linking checkboxes
+  html += `<div style="color:#aaa;font-size:12px;margin-bottom:4px">Link evidence [Space] then select answer [Enter]:</div>`;
+  for (let ji = 0; ji < journal.length; ji++) {
+    const entry = journal[ji];
+    const isLinked = hubLinkedEvidence.includes(entry.id);
+    const checkbox = isLinked ? "[x]" : "[ ]";
+    const highlight = (ji === hubEvidenceIdx) ? "color:#fff;font-weight:bold;" : "";
+    const pointer = (ji === hubEvidenceIdx) ? "\u25b6 " : "  ";
+    const entryTagsHtml = entry.tags.map(t => esc(t)).join(", ");
+    // Show crew + relationships inline when highlighted (Deliverable 3)
+    let crewInline = "";
+    if (ji === hubEvidenceIdx && entry.crewMentioned.length > 0) {
+      const crewNames = entry.crewMentioned.map(id => {
+        const member = crew.find(c => c.id === id);
+        if (!member) return id;
+        const rels = member.relationships.map(r => formatRelationship(member, r, crew)).filter(Boolean);
+        return `${member.firstName} ${member.lastName} (${member.role})${rels.length > 0 ? " — " + rels.join("; ") : ""}`;
+      });
+      crewInline = `<div style="color:#6cf;font-size:10px;padding-left:24px">${crewNames.map(n => esc(n)).join(", ")}</div>`;
+    }
+    html += `<div style="${highlight}padding:1px 0 1px 8px">${pointer}${checkbox} ${esc(entry.summary)}<div style="color:#555;font-size:11px;padding-left:24px">${entryTagsHtml}</div>${crewInline}</div>`;
+  }
+
+  // Answer options below evidence
+  html += `<div style="border-top:1px solid #333;margin:8px 0;padding-top:6px"><div style="color:#aaa;font-size:12px;margin-bottom:4px">Select your answer:</div>`;
+  for (let i = 0; i < deduction.options.length; i++) {
+    const prefix = (i === hubOptionIdx) ? "\u25b6 " : "  ";
+    const cls = (i === hubOptionIdx) ? "broadcast-option selected" : "broadcast-option";
+    html += `<div class="${cls}">${prefix}${i + 1}. ${esc(deduction.options[i].label)}</div>`;
+  }
+  html += `</div></div>`;
+
+  return html;
+}
+
+/** WHAT WE KNOW section — auto-generated narrative prose. */
+function renderHubWhatWeKnow(): string {
+  if (!state.mystery) return `<div style="padding:16px;color:#888">No mystery data available.</div>`;
+
+  const wwk = generateWhatWeKnow(state.mystery);
+  const confidenceColors: Record<string, string> = {
+    none: "#555", low: "#ca8", medium: "#fa0", high: "#4a4", complete: "#0f0",
+  };
+  const confidenceColor = confidenceColors[wwk.confidence] || "#888";
+
+  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:12px 16px">`;
+  html += `<div style="color:${confidenceColor};font-weight:bold;margin-bottom:12px">CONFIDENCE: ${wwk.confidence.toUpperCase()}</div>`;
+
+  for (const para of wwk.paragraphs) {
+    html += `<div style="color:#ccc;margin-bottom:10px;line-height:1.5">${esc(para)}</div>`;
+  }
+
+  // Dev mode: show correct answers alongside narrative
+  if (devModeEnabled) {
+    const deductions = state.mystery.deductions;
+    html += `<div style="border-top:1px solid #f0f;margin-top:12px;padding-top:8px;color:#f0f;font-size:11px">`;
+    html += `<div style="font-weight:bold;margin-bottom:4px">DEV: CORRECT ANSWERS</div>`;
+    for (const d of deductions) {
+      const correct = d.options.find(o => o.correct);
+      const statusMark = d.solved ? (d.answeredCorrectly ? "\u2713" : "\u2717") : "?";
+      html += `<div>[${statusMark}] ${esc(d.category.toUpperCase())}: ${esc(correct?.label ?? "N/A")}</div>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+/** DECISIONS section — mystery choices with spoiler protection. */
+function renderHubDecisions(): string {
+  if (!state.mystery) return `<div style="padding:16px;color:#888">No decisions available.</div>`;
+
+  const choices = state.mystery.choices;
+  const journalCount = state.mystery.journal.length;
+  const thresholds = [3, 6, 10];
+
+  // If viewing a specific decision's detail
+  if (hubDecisionDetailIdx !== null) {
+    const ci = hubDecisionDetailIdx;
+    const choice = choices[ci];
+    if (choice && !choice.chosen && journalCount >= (thresholds[ci] ?? Infinity)) {
+      return renderHubDecisionDetail(choice, ci);
+    }
+    hubDecisionDetailIdx = null;
+  }
+
+  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:8px">`;
+
+  for (let ci = 0; ci < choices.length && ci < thresholds.length; ci++) {
+    const choice = choices[ci];
+    const available = journalCount >= thresholds[ci];
+    const isActive = ci === hubIdx;
+
+    let sectionClass = "broadcast-deduction";
+    if (!available) sectionClass += " locked";
+    if (choice.chosen) sectionClass += " solved";
+    if (isActive) sectionClass += " active-section";
+
+    html += `<div class="${sectionClass}">`;
+
+    if (choice.chosen) {
+      const chosenOption = choice.options.find(o => o.key === choice.chosen);
+      html += `<div class="broadcast-section-title"><span style="color:#0f0">[\u2713]</span> DECISION ${ci + 1}</div>`;
+      html += `<div style="color:#0f0;padding:2px 8px">\u2713 ${esc(chosenOption?.label ?? choice.chosen)}</div>`;
+    } else if (!available) {
+      html += `<div class="broadcast-section-title"><span style="color:#555">[?]</span> DECISION ${ci + 1}</div>`;
+      html += `<div style="color:#555;padding:2px 8px">Gather more evidence (need ${thresholds[ci]}, have ${journalCount})</div>`;
+    } else {
+      html += `<div class="broadcast-section-title"><span style="color:#fa0">[!]</span> DECISION ${ci + 1}</div>`;
+      html += `<div style="color:#aaa;padding:2px 8px;font-size:12px">A decision is available. [Enter] to review.</div>`;
+    }
+
+    html += `</div>`;
+  }
+
+  // Evacuation status
+  if (state.mystery.evacuation?.active) {
+    const evac = state.mystery.evacuation;
+    html += `<div style="border-top:1px solid #444;margin:8px 0;padding-top:8px">`;
+    html += `<div class="broadcast-section-title" style="color:#f0f">EVACUATION STATUS</div>`;
+    html += `<div style="padding:4px 8px;color:#ccc">`;
+    html += `<div>Crew found: <span style="color:#fff">${evac.crewFound.length}</span></div>`;
+    html += `<div>Evacuated: <span style="color:#4a4">${evac.crewEvacuated.length}</span></div>`;
+    if (evac.crewDead.length > 0) html += `<div>Lost: <span style="color:#f44">${evac.crewDead.length}</span></div>`;
+    const remaining = evac.crewFound.length - evac.crewEvacuated.length - evac.crewDead.length;
+    if (remaining > 0) html += `<div>Still need rescue: <span style="color:#fa0">${remaining}</span></div>`;
+    html += `<div>Escape pods powered: <span style="color:#4af">${evac.podsPowered.length}</span></div>`;
+    html += `</div></div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+/** Detail view for a single decision — prompt text + options revealed here. */
+function renderHubDecisionDetail(choice: import("./shared/types.js").MysteryChoice, ci: number): string {
+  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:12px 16px">`;
+  html += `<div style="color:#ca8;font-weight:bold;font-size:14px;margin-bottom:8px">DECISION ${ci + 1}</div>`;
+  html += `<div style="color:#fff;font-size:13px;margin-bottom:12px;line-height:1.4">${esc(choice.prompt)}</div>`;
+
+  for (let i = 0; i < choice.options.length; i++) {
+    const prefix = (i === hubOptionIdx) ? "\u25b6 " : "  ";
+    const cls = (i === hubOptionIdx) ? "broadcast-option selected" : "broadcast-option";
+    html += `<div class="${cls}">${prefix}${i + 1}. ${esc(choice.options[i].label)}</div>`;
+  }
+
+  html += `<div style="color:#888;font-size:12px;margin-top:12px">[&uarr;/&darr;] Select  [Enter] Confirm  [Esc] Back to list</div>`;
+  html += `</div>`;
+  return html;
+}
+
+/** Render a proportional ASCII minimap showing where evidence was found. */
+function renderEvidenceMinimap(roomName: string): string {
+  if (!state.rooms || state.rooms.length === 0) return "";
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const room of state.rooms) {
+    minX = Math.min(minX, room.x);
+    minY = Math.min(minY, room.y);
+    maxX = Math.max(maxX, room.x + room.width);
+    maxY = Math.max(maxY, room.y + room.height);
+  }
+  const mapW = 24;
+  const mapH = 8;
+  const scaleX = (maxX - minX) || 1;
+  const scaleY = (maxY - minY) || 1;
+
+  const grid: string[][] = [];
+  for (let y = 0; y < mapH; y++) {
+    grid.push(new Array(mapW).fill(" "));
+  }
+
+  for (const room of state.rooms) {
+    const isVisited = visitedRoomIds.has(room.id);
+    const cx = Math.floor(((room.x + room.width / 2 - minX) / scaleX) * (mapW - 1));
+    const cy = Math.floor(((room.y + room.height / 2 - minY) / scaleY) * (mapH - 1));
+    const gx = Math.max(0, Math.min(mapW - 1, cx));
+    const gy = Math.max(0, Math.min(mapH - 1, cy));
+
+    if (!isVisited) {
+      if (grid[gy][gx] === " ") grid[gy][gx] = ".";
+    } else {
+      grid[gy][gx] = room.name.charAt(0).toUpperCase();
+    }
+  }
+
+  const discoveryRoom = state.rooms.find(r => r.name === roomName);
+  let discoveryMark = "";
+  if (discoveryRoom) {
+    const cx = Math.floor(((discoveryRoom.x + discoveryRoom.width / 2 - minX) / scaleX) * (mapW - 1));
+    const cy = Math.floor(((discoveryRoom.y + discoveryRoom.height / 2 - minY) / scaleY) * (mapH - 1));
+    const gx = Math.max(0, Math.min(mapW - 1, cx));
+    const gy = Math.max(0, Math.min(mapH - 1, cy));
+    grid[gy][gx] = "*";
+    discoveryMark = ` (* = ${esc(roomName)})`;
+  }
+
+  const gridStr = grid.map(row => row.join("")).join("\n");
+  return `<div style="border-top:1px solid #222;margin-top:8px;padding-top:6px">
+    <div style="color:#ca8;font-size:11px;font-weight:bold">FOUND IN: ${esc(roomName)}${discoveryMark}</div>
+    <pre style="color:#4a4;font-size:10px;line-height:1.2;margin:4px 0;font-family:monospace">${gridStr}</pre>
+  </div>`;
+}
+
+function fmtRole(role: string): string {
+  return role.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function closeInvestigationHub(): void {
   const overlay = document.getElementById("broadcast-overlay");
   if (overlay) {
     overlay.classList.remove("active");
     overlay.innerHTML = "";
   }
-  broadcastOpen = false;
-  display.addLog("[Report closed]", "system");
+  investigationHubOpen = false;
+  hubDetailDeduction = null;
+  hubDecisionDetailIdx = null;
+  display.addLog("[Investigation Hub closed]", "system");
   renderAll();
 }
 
-/** Commit broadcast deduction answer after Y/N confirmation. */
-function commitBroadcastDeductionAnswer(): void {
-  if (!state.mystery || !broadcastDetailDeduction) return;
+/** Handle all keyboard input while the Investigation Hub is open. */
+function handleHubInput(e: KeyboardEvent): void {
+  e.preventDefault();
+  if (!state.mystery) return;
+
+  // F5 toggles dev mode
+  if (e.key === "F5") {
+    devModeEnabled = !devModeEnabled;
+    renderInvestigationHub();
+    return;
+  }
+
+  // Confirmation step: Y/N for deduction or choice
+  if (hubConfirming || hubChoiceConfirming) {
+    if (e.key === "y" || e.key === "Y") {
+      if (hubConfirming) {
+        hubConfirming = false;
+        commitHubDeductionAnswer();
+      } else {
+        hubChoiceConfirming = false;
+        commitHubChoiceAnswer();
+      }
+      return;
+    }
+    if (e.key === "n" || e.key === "N" || e.key === "Escape") {
+      hubConfirming = false;
+      hubChoiceConfirming = false;
+      renderInvestigationHub();
+      return;
+    }
+    return;
+  }
+
+  // Escape from detail views first
+  if (hubDetailDeduction && e.key === "Escape") {
+    hubDetailDeduction = null;
+    hubLinkedEvidence = [];
+    hubEvidenceIdx = 0;
+    renderInvestigationHub();
+    return;
+  }
+  if (hubDecisionDetailIdx !== null && e.key === "Escape") {
+    hubDecisionDetailIdx = null;
+    hubOptionIdx = 0;
+    renderInvestigationHub();
+    return;
+  }
+
+  // Close hub
+  if (e.key === "Escape" || (e.key === "r" && !hubDetailDeduction && hubDecisionDetailIdx === null) || (e.key === "v" && hubSection === "evidence" && !hubDetailDeduction)) {
+    closeInvestigationHub();
+    return;
+  }
+
+  // Tab cycles sections
+  if (e.key === "Tab" && !hubDetailDeduction && hubDecisionDetailIdx === null) {
+    const tabs: Array<"evidence" | "connections" | "whatweknow" | "decisions"> = ["evidence", "connections", "whatweknow", "decisions"];
+    const curIdx = tabs.indexOf(hubSection);
+    hubSection = tabs[(curIdx + 1) % tabs.length];
+    hubIdx = 0;
+    hubOptionIdx = 0;
+    renderInvestigationHub();
+    return;
+  }
+
+  // Section-specific input handling
+  if (hubSection === "evidence") {
+    handleHubEvidenceInput(e);
+  } else if (hubSection === "connections") {
+    handleHubConnectionsInput(e);
+  } else if (hubSection === "whatweknow") {
+    // No interactive elements in What We Know
+    return;
+  } else if (hubSection === "decisions") {
+    handleHubDecisionsInput(e);
+  }
+}
+
+function handleHubEvidenceInput(e: KeyboardEvent): void {
+  const { entries } = getEvidenceEntries();
+  const maxIdx = entries.length - 1;
+
+  if (e.key === "ArrowUp" || e.key === "w" || e.key === "k") {
+    hubIdx = Math.max(0, hubIdx - 1);
+    renderInvestigationHub();
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "s" || e.key === "j") {
+    hubIdx = Math.min(maxIdx, hubIdx + 1);
+    renderInvestigationHub();
+    return;
+  }
+}
+
+function handleHubConnectionsInput(e: KeyboardEvent): void {
+  const deductions = state.mystery?.deductions ?? [];
+  const journal = state.mystery?.journal ?? [];
+  const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
+
+  // If in detail/evidence-linking view
+  if (hubDetailDeduction) {
+    const deduction = deductions.find(d => d.id === hubDetailDeduction);
+    if (!deduction || deduction.solved || !unlockedSet.has(deduction.id)) {
+      hubDetailDeduction = null;
+      renderInvestigationHub();
+      return;
+    }
+
+    if (e.key === "ArrowUp" || e.key === "w") {
+      hubEvidenceIdx = Math.max(0, hubEvidenceIdx - 1);
+      renderInvestigationHub();
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "s") {
+      hubEvidenceIdx = Math.min(journal.length - 1, hubEvidenceIdx + 1);
+      renderInvestigationHub();
+      return;
+    }
+    if (e.key === " ") {
+      if (journal.length > 0 && hubEvidenceIdx < journal.length) {
+        const entryId = journal[hubEvidenceIdx].id;
+        if (hubLinkedEvidence.includes(entryId)) {
+          hubLinkedEvidence = hubLinkedEvidence.filter(id => id !== entryId);
+        } else {
+          hubLinkedEvidence = [...hubLinkedEvidence, entryId];
+        }
+      }
+      renderInvestigationHub();
+      return;
+    }
+    if (e.key === "Enter") {
+      const chosenOption = deduction.options[hubOptionIdx];
+      hubConfirming = true;
+      const overlay = document.getElementById("broadcast-overlay");
+      if (overlay) {
+        overlay.innerHTML = `
+          <div class="broadcast-box">
+            <div class="broadcast-title">\u2550\u2550\u2550 CONFIRM DEDUCTION \u2550\u2550\u2550</div>
+            <div style="padding:20px;text-align:center">
+              <div style="color:#fa0;font-size:16px;margin-bottom:12px">${esc(deduction.question)}</div>
+              <div style="color:#fff;font-size:14px;margin-bottom:16px">Your answer: <span style="color:#6cf">${esc(chosenOption.label)}</span></div>
+              <div style="color:#f44;font-size:13px;margin-bottom:8px">This answer is permanent.</div>
+              <div style="color:#aaa;font-size:14px">Are you sure? [Y] Confirm  [N] Go back</div>
+            </div>
+          </div>`;
+      }
+      return;
+    }
+    const num = parseInt(e.key, 10);
+    if (num >= 1 && num <= deduction.options.length) {
+      hubOptionIdx = num - 1;
+      renderInvestigationHub();
+      return;
+    }
+    return;
+  }
+
+  // List view navigation
+  if (e.key === "ArrowUp" || e.key === "w") {
+    hubIdx = Math.max(0, hubIdx - 1);
+    renderInvestigationHub();
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "s") {
+    hubIdx = Math.min(deductions.length - 1, hubIdx + 1);
+    renderInvestigationHub();
+    return;
+  }
+  if (e.key === "Enter") {
+    const d = deductions[hubIdx];
+    if (d && !d.solved && unlockedSet.has(d.id)) {
+      hubDetailDeduction = d.id;
+      hubLinkedEvidence = [];
+      hubEvidenceIdx = 0;
+      hubOptionIdx = 0;
+      renderInvestigationHub();
+    }
+    return;
+  }
+}
+
+function handleHubDecisionsInput(e: KeyboardEvent): void {
+  const choices = state.mystery?.choices ?? [];
+  const journalCount = state.mystery?.journal.length ?? 0;
+  const thresholds = [3, 6, 10];
+
+  // If viewing a decision detail
+  if (hubDecisionDetailIdx !== null) {
+    const choice = choices[hubDecisionDetailIdx];
+    if (!choice || choice.chosen) {
+      hubDecisionDetailIdx = null;
+      renderInvestigationHub();
+      return;
+    }
+
+    if (e.key === "ArrowUp" || e.key === "w") {
+      hubOptionIdx = Math.max(0, hubOptionIdx - 1);
+      renderInvestigationHub();
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "s") {
+      hubOptionIdx = Math.min(choice.options.length - 1, hubOptionIdx + 1);
+      renderInvestigationHub();
+      return;
+    }
+    if (e.key === "Enter") {
+      const chosenOption = choice.options[hubOptionIdx];
+      hubChoiceConfirming = true;
+      const overlay = document.getElementById("broadcast-overlay");
+      if (overlay) {
+        overlay.innerHTML = `
+          <div class="broadcast-box">
+            <div class="broadcast-title">\u2550\u2550\u2550 CONFIRM DECISION \u2550\u2550\u2550</div>
+            <div style="padding:20px;text-align:center">
+              <div style="color:#ca8;font-size:14px;margin-bottom:12px">${esc(choice.prompt.slice(0, 120))}${choice.prompt.length > 120 ? "..." : ""}</div>
+              <div style="color:#fff;font-size:14px;margin-bottom:16px">Your decision: <span style="color:#6cf">${esc(chosenOption.label)}</span></div>
+              <div style="color:#fa0;font-size:13px;margin-bottom:8px">This will be included in your report.</div>
+              <div style="color:#aaa;font-size:14px">Confirm? [Y] Yes  [N] Go back</div>
+            </div>
+          </div>`;
+      }
+      return;
+    }
+    const num = parseInt(e.key, 10);
+    if (num >= 1 && num <= choice.options.length) {
+      hubOptionIdx = num - 1;
+      renderInvestigationHub();
+      return;
+    }
+    return;
+  }
+
+  // List view
+  const maxIdx = Math.min(choices.length, thresholds.length) - 1;
+  if (e.key === "ArrowUp" || e.key === "w") {
+    hubIdx = Math.max(0, hubIdx - 1);
+    renderInvestigationHub();
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "s") {
+    hubIdx = Math.min(maxIdx, hubIdx + 1);
+    renderInvestigationHub();
+    return;
+  }
+  if (e.key === "Enter") {
+    const ci = hubIdx;
+    const choice = choices[ci];
+    if (choice && !choice.chosen && journalCount >= (thresholds[ci] ?? Infinity)) {
+      hubDecisionDetailIdx = ci;
+      hubOptionIdx = 0;
+      renderInvestigationHub();
+    }
+    return;
+  }
+}
+
+/** Commit deduction answer after Y/N confirmation. */
+function commitHubDeductionAnswer(): void {
+  if (!state.mystery || !hubDetailDeduction) return;
   const deductions = state.mystery.deductions;
   const journal = state.mystery.journal;
-  const deduction = deductions.find(d => d.id === broadcastDetailDeduction);
+  const deduction = deductions.find(d => d.id === hubDetailDeduction);
   if (!deduction) return;
 
-  const linked = linkEvidence(deduction, broadcastLinkedEvidence);
-  const chosen = linked.options[broadcastOptionIdx];
+  const linked = linkEvidence(deduction, hubLinkedEvidence);
+  const chosen = linked.options[hubOptionIdx];
   const { deduction: solved, correct, validLink } = solveDeduction(linked, chosen.key, journal);
 
   if (!validLink) {
     const { missingTags } = validateEvidenceLink(linked, linked.linkedEvidence, journal);
     display.addLog(`Cannot answer — evidence incomplete. Need: ${missingTags.join(", ")}`, "warning");
-    renderBroadcastModal();
+    renderInvestigationHub();
     return;
   }
 
@@ -2031,25 +2266,28 @@ function commitBroadcastDeductionAnswer(): void {
     display.triggerScreenFlash("milestone");
     audio.playDeductionCorrect();
     applyDeductionReward(solved);
+    if (devModeEnabled) {
+      display.addLog(`[DEV] Deduction ${solved.id} solved correctly`, "system");
+    }
   } else {
     display.addLog(`\u2717 Incorrect. The evidence doesn't support that conclusion.`, "warning");
     audio.playDeductionWrong();
   }
 
-  broadcastDetailDeduction = null;
-  broadcastLinkedEvidence = [];
-  broadcastEvidenceIdx = 0;
-  renderBroadcastModal();
+  hubDetailDeduction = null;
+  hubLinkedEvidence = [];
+  hubEvidenceIdx = 0;
+  renderInvestigationHub();
 }
 
-/** Commit mystery choice answer after Y/N confirmation. */
-function commitBroadcastChoiceAnswer(): void {
-  if (!state.mystery || typeof broadcastSection !== "string" || !broadcastSection.startsWith("choice_")) return;
-  const ci = parseInt(broadcastSection.split("_")[1], 10);
+/** Commit mystery choice after Y/N confirmation. */
+function commitHubChoiceAnswer(): void {
+  if (!state.mystery || hubDecisionDetailIdx === null) return;
+  const ci = hubDecisionDetailIdx;
   const choice = state.mystery.choices[ci];
   if (!choice || choice.chosen) return;
 
-  const chosenOption = choice.options[broadcastOptionIdx];
+  const chosenOption = choice.options[hubOptionIdx];
   state.mystery.choices[ci] = {
     ...choice,
     chosen: chosenOption.key,
@@ -2058,238 +2296,13 @@ function commitBroadcastChoiceAnswer(): void {
   display.addLog(`Decision recorded: ${chosenOption.label}`, "milestone");
   display.triggerScreenFlash("milestone");
   audio.playChoice();
-  renderBroadcastModal();
+  hubDecisionDetailIdx = null;
+  hubOptionIdx = 0;
+  renderInvestigationHub();
 }
 
-function handleBroadcastInput(e: KeyboardEvent): void {
-  e.preventDefault();
-  if (!state.mystery) return;
-
-  const deductions = state.mystery.deductions;
-  const journal = state.mystery.journal;
-  const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
-
-  // Broadcast confirmation step: Y/N before locking in (deduction or choice)
-  if (broadcastConfirming || broadcastChoiceConfirming) {
-    if (e.key === "y" || e.key === "Y") {
-      if (broadcastConfirming) {
-        broadcastConfirming = false;
-        commitBroadcastDeductionAnswer();
-      } else {
-        broadcastChoiceConfirming = false;
-        commitBroadcastChoiceAnswer();
-      }
-      return;
-    }
-    if (e.key === "n" || e.key === "N" || e.key === "Escape") {
-      broadcastConfirming = false;
-      broadcastChoiceConfirming = false;
-      renderBroadcastModal();
-      return;
-    }
-    return; // swallow other keys during confirm
-  }
-
-  // If in detail view, handle Escape to go back to list view
-  if (broadcastDetailDeduction && e.key === "Escape") {
-    broadcastDetailDeduction = null;
-    broadcastLinkedEvidence = [];
-    broadcastEvidenceIdx = 0;
-    renderBroadcastModal();
-    return;
-  }
-
-  if (e.key === "Escape" || e.key === "r") {
-    closeBroadcastModal();
-    return;
-  }
-
-  // If in detail view, handle evidence linking
-  if (broadcastDetailDeduction) {
-    const deduction = deductions.find(d => d.id === broadcastDetailDeduction);
-    if (!deduction || deduction.solved || !unlockedSet.has(deduction.id)) {
-      broadcastDetailDeduction = null;
-      renderBroadcastModal();
-      return;
-    }
-
-    if (e.key === "ArrowUp" || e.key === "w") {
-      broadcastEvidenceIdx = Math.max(0, broadcastEvidenceIdx - 1);
-      renderBroadcastModal();
-      return;
-    }
-    if (e.key === "ArrowDown" || e.key === "s") {
-      broadcastEvidenceIdx = Math.min(journal.length - 1, broadcastEvidenceIdx + 1);
-      renderBroadcastModal();
-      return;
-    }
-    if (e.key === " ") {
-      // Toggle evidence linking for the highlighted journal entry
-      if (journal.length > 0 && broadcastEvidenceIdx < journal.length) {
-        const entryId = journal[broadcastEvidenceIdx].id;
-        if (broadcastLinkedEvidence.includes(entryId)) {
-          broadcastLinkedEvidence = broadcastLinkedEvidence.filter(id => id !== entryId);
-        } else {
-          broadcastLinkedEvidence = [...broadcastLinkedEvidence, entryId];
-        }
-      }
-      renderBroadcastModal();
-      return;
-    }
-    if (e.key === "Enter") {
-      // Show confirmation instead of immediately solving
-      const chosenOption = deduction.options[broadcastOptionIdx];
-      broadcastConfirming = true;
-      // Update the broadcast modal to show the confirmation message
-      const overlay = document.getElementById("broadcast-overlay");
-      if (overlay) {
-        overlay.innerHTML = `
-          <div class="broadcast-box">
-            <div class="broadcast-title">\u2550\u2550\u2550 CONFIRM DEDUCTION \u2550\u2550\u2550</div>
-            <div style="padding:20px;text-align:center">
-              <div style="color:#fa0;font-size:16px;margin-bottom:12px">${escapeHtmlBroadcast(deduction.question)}</div>
-              <div style="color:#fff;font-size:14px;margin-bottom:16px">Your answer: <span style="color:#6cf">${escapeHtmlBroadcast(chosenOption.label)}</span></div>
-              <div style="color:#f44;font-size:13px;margin-bottom:8px">This answer is permanent.</div>
-              <div style="color:#aaa;font-size:14px">Are you sure? [Y] Confirm  [N] Go back</div>
-            </div>
-          </div>`;
-      }
-      return;
-    }
-    // Number keys to select answer option in detail view
-    const num = parseInt(e.key, 10);
-    if (num >= 1 && num <= deduction.options.length) {
-      broadcastOptionIdx = num - 1;
-      renderBroadcastModal();
-      return;
-    }
-    return;
-  }
-
-  if (e.key === "Tab") {
-    // Cycle: evidence → deduction[0] → ... → choice_0 → choice_1 → choice_2 → evidence
-    const choices = state.mystery.choices;
-    const choiceThresholds = [3, 6, 10];
-    const journalCount = journal.length;
-
-    if (broadcastSection === "evidence") {
-      broadcastSection = deductions.length > 0 ? 0 : "evidence";
-    } else if (typeof broadcastSection === "number") {
-      const nextIdx = broadcastSection + 1;
-      if (nextIdx < deductions.length) {
-        broadcastSection = nextIdx;
-      } else {
-        // Move to first choice section (if any available)
-        const firstAvailableChoice = choices.findIndex((c, i) =>
-          i < choiceThresholds.length && journalCount >= choiceThresholds[i] && !c.chosen
-        );
-        broadcastSection = firstAvailableChoice >= 0 ? `choice_${firstAvailableChoice}` : "evidence";
-      }
-    } else if (typeof broadcastSection === "string" && broadcastSection.startsWith("choice_")) {
-      const ci = parseInt(broadcastSection.split("_")[1], 10);
-      // Find next available choice
-      let nextChoice = -1;
-      for (let i = ci + 1; i < choices.length && i < choiceThresholds.length; i++) {
-        if (journalCount >= choiceThresholds[i] && !choices[i].chosen) {
-          nextChoice = i;
-          break;
-        }
-      }
-      broadcastSection = nextChoice >= 0 ? `choice_${nextChoice}` : "evidence";
-    } else {
-      broadcastSection = "evidence";
-    }
-    broadcastOptionIdx = 0;
-    renderBroadcastModal();
-    return;
-  }
-
-  if (broadcastSection === "evidence") {
-    // Scroll evidence list (no selection needed)
-    return;
-  }
-
-  // Handle choice sections
-  if (typeof broadcastSection === "string" && broadcastSection.startsWith("choice_")) {
-    const ci = parseInt(broadcastSection.split("_")[1], 10);
-    const choices = state.mystery.choices;
-    const choice = choices[ci];
-    if (!choice || choice.chosen) return;
-
-    if (e.key === "ArrowUp" || e.key === "w") {
-      broadcastOptionIdx = Math.max(0, broadcastOptionIdx - 1);
-      renderBroadcastModal();
-      return;
-    }
-    if (e.key === "ArrowDown" || e.key === "s") {
-      broadcastOptionIdx = Math.min(choice.options.length - 1, broadcastOptionIdx + 1);
-      renderBroadcastModal();
-      return;
-    }
-    if (e.key === "Enter") {
-      // Show confirmation before locking in choice
-      const chosenOption = choice.options[broadcastOptionIdx];
-      broadcastChoiceConfirming = true;
-      const overlay = document.getElementById("broadcast-overlay");
-      if (overlay) {
-        overlay.innerHTML = `
-          <div class="broadcast-box">
-            <div class="broadcast-title">\u2550\u2550\u2550 CONFIRM DECISION \u2550\u2550\u2550</div>
-            <div style="padding:20px;text-align:center">
-              <div style="color:#ca8;font-size:14px;margin-bottom:12px">${escapeHtmlBroadcast(choice.prompt.slice(0, 120))}${choice.prompt.length > 120 ? "..." : ""}</div>
-              <div style="color:#fff;font-size:14px;margin-bottom:16px">Your decision: <span style="color:#6cf">${escapeHtmlBroadcast(chosenOption.label)}</span></div>
-              <div style="color:#fa0;font-size:13px;margin-bottom:8px">This will be included in your broadcast report.</div>
-              <div style="color:#aaa;font-size:14px">Confirm? [Y] Yes  [N] Go back</div>
-            </div>
-          </div>`;
-      }
-      return;
-    }
-    const num = parseInt(e.key, 10);
-    if (num >= 1 && num <= choice.options.length) {
-      broadcastOptionIdx = num - 1;
-      renderBroadcastModal();
-      return;
-    }
-    return;
-  }
-
-  // Deduction sections — broadcastSection is a deduction index
-  const deduction = deductions[broadcastSection as number];
-  if (!deduction || deduction.solved || !unlockedSet.has(deduction.id)) {
-    // Locked or solved — Tab to next section
-    return;
-  }
-
-  if (e.key === "ArrowUp" || e.key === "w") {
-    broadcastOptionIdx = Math.max(0, broadcastOptionIdx - 1);
-    renderBroadcastModal();
-    return;
-  }
-  if (e.key === "ArrowDown" || e.key === "s") {
-    broadcastOptionIdx = Math.min(deduction.options.length - 1, broadcastOptionIdx + 1);
-    renderBroadcastModal();
-    return;
-  }
-  if (e.key === "Enter") {
-    // Enter detail view for evidence linking instead of immediately answering
-    broadcastDetailDeduction = deduction.id;
-    broadcastLinkedEvidence = [];
-    broadcastEvidenceIdx = 0;
-    renderBroadcastModal();
-    return;
-  }
-
-  // Number keys
-  const num = parseInt(e.key, 10);
-  if (num >= 1 && num <= deduction.options.length) {
-    broadcastOptionIdx = num - 1;
-    renderBroadcastModal();
-    return;
-  }
-}
-
-function escapeHtmlBroadcast(text: string): string {
+/** HTML-escape helper. */
+function esc(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 

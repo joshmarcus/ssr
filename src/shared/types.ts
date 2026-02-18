@@ -272,6 +272,7 @@ export interface Deduction {
   answeredCorrectly?: boolean;
   rewardType: "clearance" | "room_reveal" | "drone_disable" | "sensor_hint";
   rewardDescription: string;
+  hintText?: string;           // archetype-specific hint shown in CONNECTIONS section
 }
 
 export interface MysteryChoice {
@@ -335,6 +336,12 @@ export interface MysteryState {
   roomCleanlinessGoal: number; // percentage (default 80)
   directiveOverrideTurn?: number; // turn when directive was overridden
   evacuation?: EvacuationState;
+}
+
+// ── What We Know (narrative summary) ─────────────────────────
+export interface WhatWeKnow {
+  paragraphs: string[];
+  confidence: "none" | "low" | "medium" | "high" | "complete";
 }
 
 // ── Observation (harness) ────────────────────────────────────

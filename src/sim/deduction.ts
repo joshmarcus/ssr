@@ -106,6 +106,7 @@ function generateWhatDeduction(
     solved: false,
     rewardType: "room_reveal",
     rewardDescription: "Reveals the location of an unexplored room on the map",
+    hintText: getWhatHintText(timeline.archetype),
   };
 }
 
@@ -142,6 +143,7 @@ function generateSequenceDeduction(
     solved: false,
     rewardType: "sensor_hint",
     rewardDescription: "Reveals the location of the next sensor upgrade",
+    hintText: "Look for emergency logs and alarm records that describe the triggering event.",
   };
 }
 
@@ -211,6 +213,7 @@ function generateWhyDeduction(
     solved: false,
     rewardType: "drone_disable",
     rewardDescription: "Disables a patrol drone, clearing a safe route",
+    hintText: getWhyHintText(archetype),
   };
 }
 
@@ -243,6 +246,7 @@ function generateHeroDeduction(
     solved: false,
     rewardType: "clearance",
     rewardDescription: "Grants clearance to open a locked door elsewhere in the station",
+    hintText: "Find logs describing who took action during the crisis — look for response and rescue evidence.",
   };
 }
 
@@ -289,6 +293,7 @@ function generateResponsibilityDeduction(
     solved: false,
     rewardType: "room_reveal",
     rewardDescription: "Reveals a hidden section of the station",
+    hintText: "Look for aftermath logs and command decisions — who had the authority to act?",
   };
 }
 
@@ -323,6 +328,7 @@ function generateHiddenAgendaDeduction(
     solved: false,
     rewardType: "sensor_hint",
     rewardDescription: "Reveals the location of hidden evidence",
+    hintText: "Find classified documents and science logs — what was the station's real mission?",
   };
 }
 
@@ -463,6 +469,40 @@ export function solveDeduction(
     correct,
     validLink: true,
   };
+}
+
+function getWhatHintText(archetype: IncidentArchetype): string {
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade:
+      return "Look for thermal warnings and maintenance logs that describe overheating systems.";
+    case IncidentArchetype.HullBreach:
+      return "Search for structural inspection reports and pressure monitoring data.";
+    case IncidentArchetype.ReactorScram:
+      return "Find reactor containment readings and radiation monitoring logs.";
+    case IncidentArchetype.Sabotage:
+      return "Look for security logs showing unauthorized access and suspicious badge activity.";
+    case IncidentArchetype.SignalAnomaly:
+      return "Search for signal analysis reports and communications anomaly data.";
+    case IncidentArchetype.ContainmentBreach:
+      return "Find laboratory records and contamination readings from sealed areas.";
+  }
+}
+
+function getWhyHintText(archetype: IncidentArchetype): string {
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade:
+      return "Check maintenance request logs — were warnings ignored or deferred?";
+    case IncidentArchetype.HullBreach:
+      return "Look for hull inspection records — was damage accumulating over time?";
+    case IncidentArchetype.ReactorScram:
+      return "Find evidence of deadline pressure and containment field degradation.";
+    case IncidentArchetype.Sabotage:
+      return "Search for motive — who had a reason to disable station systems?";
+    case IncidentArchetype.SignalAnomaly:
+      return "Look for external signal data — was something unexpected interfering with electronics?";
+    case IncidentArchetype.ContainmentBreach:
+      return "Check experiment records — were protocols sufficient for what was being studied?";
+  }
 }
 
 /**

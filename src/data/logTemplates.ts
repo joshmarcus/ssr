@@ -308,6 +308,184 @@ export const LOG_TEMPLATES: LogTemplate[] = [
     text: "{medic}: Strange atmospheric readings from {room}. Several crew reporting headaches. Running blood work. Could be nothing. Could be contamination.",
     source: "{medic_last}",
   },
+
+  // ── Hull breach archetype ───────────────────────────────────────
+  {
+    id: "hull_inspection",
+    category: "hull_breach",
+    title: "Structural Inspection Report",
+    text: "{engineer}: Hull plating in section {room} showing micro-fracture patterns consistent with long-term fatigue. Recommended immediate reinforcement. Priority: HIGH.",
+    source: "{engineer_last}",
+  },
+  {
+    id: "hull_pressure_monitor",
+    category: "hull_breach",
+    title: "Pressure Monitoring Log",
+    text: "AUTOMATED: Pressure differential detected between {room} and {room2}. Delta: 4.7 kPa. {life_support_last} notified. Seal integrity at 87%.",
+    source: "system",
+  },
+  {
+    id: "hull_seal_status",
+    category: "hull_breach",
+    title: "Emergency Seal Status",
+    text: "Bulkhead seal {door} test results: DEGRADED. Polymer gasket compression below specification. {engineer_last}: 'We need replacement seals. These won't hold if there's a real breach.'",
+    source: "{engineer_last}",
+  },
+  {
+    id: "hull_crew_accounting",
+    category: "hull_breach",
+    title: "Post-Breach Crew Accounting",
+    text: "{security}: Head count after emergency seal activation. {room} sealed — crew status unknown. {medic_last} treating pressure injuries in cargo hold.",
+    source: "{security_last}",
+  },
+  {
+    id: "hull_personal",
+    category: "hull_breach",
+    title: "Personal Log — Before the Breach",
+    text: "{engineer}: I can hear the hull flexing at night. Thermal cycling. {captain_last} says it's normal for stations this age. It's not. I've filed the report.",
+    source: "{engineer_last}",
+  },
+
+  // ── Reactor scram archetype ─────────────────────────────────────
+  {
+    id: "reactor_containment",
+    category: "reactor_scram",
+    title: "Containment Field Reading",
+    text: "Reactor containment field strength: 91.3% (threshold: 95%). Degradation rate: 0.4%/hour. {scientist_last} and {engineer_last} monitoring. Automatic SCRAM at 85%.",
+    source: "system",
+  },
+  {
+    id: "reactor_dosimetry",
+    category: "reactor_scram",
+    title: "Radiation Dosimetry Report",
+    text: "{medic}: Crew dosimetry badges reviewed. {engineer_last} approaching quarterly limit — recommend reduced reactor-area shifts. {scientist_last} also elevated.",
+    source: "{medic_last}",
+  },
+  {
+    id: "reactor_restart",
+    category: "reactor_scram",
+    title: "Restart Procedure Notes",
+    text: "{engineer}: Post-SCRAM restart checklist: 1) Verify containment above 95%. 2) Coolant circulation confirmed. 3) Command authorization from {captain_last}. Estimated restart: 6-8 hours.",
+    source: "{engineer_last}",
+  },
+  {
+    id: "reactor_research",
+    category: "reactor_scram",
+    title: "Research Impact Assessment",
+    text: "{scientist}: Power loss means we lose the analysis window. Nine months of data collection — we can't afford another delay. {captain_last} promised the transmission deadline holds.",
+    source: "{scientist_last}",
+  },
+  {
+    id: "reactor_diagnostics",
+    category: "reactor_scram",
+    title: "Reactor Diagnostics Summary",
+    text: "Pre-SCRAM diagnostics: neutron flux fluctuation at 3.2% (nominal <1%). Control rod response time degraded. {engineer_last} recommends full shutdown for inspection.",
+    source: "system",
+  },
+
+  // ── Signal anomaly archetype ────────────────────────────────────
+  {
+    id: "signal_pattern",
+    category: "signal_anomaly",
+    title: "Signal Pattern Analysis",
+    text: "{comms}: The 7.4GHz signal has a 47-second repeating structure. Not any known protocol. {scientist_last} thinks it's artificial. I think we should stop listening.",
+    source: "{comms_last}",
+  },
+  {
+    id: "signal_paranoia",
+    category: "signal_anomaly",
+    title: "Personal Log — Growing Unease",
+    text: "{security}: Equipment glitches started three days after the signal appeared. Doors cycling, lights flickering. {comms_last} says it's coincidence. Nobody believes that.",
+    source: "{security_last}",
+  },
+  {
+    id: "signal_malfunction",
+    category: "signal_anomaly",
+    title: "Electronics Malfunction Report",
+    text: "AUTOMATED: Multiple system anomalies detected. Nav computer: intermittent resets. Medical monitors: phantom readings. Environmental controls: {room} temperature spike unexplained.",
+    source: "system",
+  },
+  {
+    id: "signal_decoded",
+    category: "signal_anomaly",
+    title: "Signal Decoding Fragment",
+    text: "{scientist}: Partial decode of the 7.4GHz signal. Binary header matches UN-ORC deep-space probe format, but the payload is... wrong. Like a reply to something we sent decades ago.",
+    source: "{scientist_last}",
+  },
+  {
+    id: "signal_jamming",
+    category: "signal_anomaly",
+    title: "Jamming Authorization Request",
+    text: "{comms}: Requesting authorization to jam the anomalous signal. It's interfering with critical systems. {captain_last} says we need to keep recording — orders from above. This is going to end badly.",
+    source: "{comms_last}",
+  },
+
+  // ── Containment breach archetype ────────────────────────────────
+  {
+    id: "containment_experiment",
+    category: "containment_breach",
+    title: "Experiment Record — Lab B",
+    text: "{scientist}: Sample 7-C showing unexpected growth patterns. Revised containment protocol submitted to {captain_last}. Current BSL-2 may be insufficient.",
+    source: "{scientist_last}",
+  },
+  {
+    id: "containment_readings",
+    category: "containment_breach",
+    title: "Contamination Readings",
+    text: "AUTOMATED: Atmospheric contamination detected in {room}. Particulate count: 340% above baseline. Bio-hazard filters engaged. {life_support_last} alerted.",
+    source: "system",
+  },
+  {
+    id: "containment_exposure",
+    category: "containment_breach",
+    title: "Exposure Protocol",
+    text: "{medic}: Exposure protocol initiated. {scientist_last} and lab tech quarantined in {room}. Blood samples drawn. No symptoms yet but we're being cautious.",
+    source: "{medic_last}",
+  },
+  {
+    id: "containment_seal",
+    category: "containment_breach",
+    title: "Seal Inspection — Lab Containment",
+    text: "{engineer}: Lab B containment door seal degraded. The gasket was never rated for the atmospheric mix in those experiments. {scientist_last} was told this three weeks ago.",
+    source: "{engineer_last}",
+  },
+
+  // ── Relationship-revealing logs ─────────────────────────────────
+  {
+    id: "rel_ally_support",
+    category: "relationship",
+    title: "Private Message",
+    text: "{engineer}: {medic_last} covered for me at the staff meeting again. Told {captain_last} the maintenance backlog was a shared problem, not just mine. I owe them.",
+    source: "{engineer_last}",
+  },
+  {
+    id: "rel_rivalry",
+    category: "relationship",
+    title: "Crew Friction Log",
+    text: "{security}: {scientist_last} and {engineer_last} had another argument in the mess hall about priorities. {scientist_last} says research comes first. {engineer_last} says the station falls apart without maintenance. {captain_last} stayed silent.",
+    source: "{security_last}",
+  },
+  {
+    id: "rel_romantic",
+    category: "relationship",
+    title: "Personal Message Fragment",
+    text: "...after this rotation, let's put in for the same assignment. Somewhere quieter. I know we said we'd keep things professional but I don't want to do another nine months apart. — unsigned",
+    source: "anonymous",
+  },
+  {
+    id: "rel_blackmail",
+    category: "relationship",
+    title: "Encrypted Note Fragment",
+    text: "I know what you did with the supply manifests. The numbers don't add up and I have the original logs. We can discuss this privately, or I can discuss it with {captain_last}. Your choice.",
+    source: "anonymous",
+  },
+  {
+    id: "rel_conflict",
+    category: "relationship",
+    title: "Crew Morale Assessment",
+    text: "{captain}: Crew tensions elevated. The isolation is getting to everyone. {medic_last} reports increased sick bay visits — mostly stress. I need to address the {engineer_last}/{scientist_last} situation before it affects operations.",
+    source: "{captain_last}",
+  },
 ];
 
 /**

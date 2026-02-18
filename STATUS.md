@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 15 (Test Coverage + Harness Evacuation Obs)
-- **Test status**: 235 tests passing across 22 test files (0 failing)
+- **Phase**: Sprint 16 (Mystery & Evidence Overhaul)
+- **Test status**: 253 tests passing across 23 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
 
@@ -19,22 +19,28 @@
 - Fire system with slow spread and low-pressure suppression
 - Airlock system: toggleable entities that vent atmosphere
 - Procedural crew generation (8-12 crew, relationships, secrets, fates)
-- 150+ narrative elements (38 log templates, 16 authored logs, 16 crew items)
+- 175+ narrative elements (63 log templates, 16 authored logs, 16 crew items)
 - Ship computer PA announcements (periodic atmospheric messages)
 - 6 incident archetypes with 5-phase timelines
-- 5-6 chained deductions with evidence linking
+- 5-6 chained deductions with evidence linking and per-deduction hint text
 - Narrative threads grouping evidence
-- Evidence Browser overlay [v]: full journal with content, tags, threads, deduction links
+- **Investigation Hub [r/v]**: unified 4-section overlay replacing old Evidence Browser + Broadcast Report
+  - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, tags, thread)
+  - CONNECTIONS: deduction list with evidence-linking, hint text, tag coverage pills
+  - WHAT WE KNOW: auto-generated narrative prose summarizing investigation progress
+  - DECISIONS: spoiler-protected mystery choices (title-only list, prompt revealed on select)
+- Crew relationships displayed in evidence detail and connection linking views
+- Evidence minimap: proportional ASCII room map showing where evidence was found
+- Developer mode (?dev=1 or F5): clue graph annotations, full tag requirements, correct answers
 - ROT.js browser rendering with viewport scrolling
 - Harness CLI for AI playtesting (with deduction support)
 - Heuristic playtest bot (playtest_bot.ts)
-- Mystery choices: 3 narrative decisions in broadcast report (blame, data handling, incident-specific)
-- Procedural sound effects: 12 Web Audio SFX (movement, interaction, scan, errors, victory/defeat, phase transitions, deductions, PA, choices)
+- Mystery choices: 3 narrative decisions with spoiler protection
+- Procedural sound effects: 12 Web Audio SFX
 - Game-over overlay: performance rating (S/A/B/C/D), stats summary, mystery choices recap
 - Tutorial hints: context-sensitive tips at early turns and on first-time events
 - Evacuation phase: RED ALERT banner, crew following, escape pod boarding with full audio
 - Help overlay: HTML modal with complete key bindings, game phases, interaction details
-- Evacuation status in Broadcast Report + mini-map crew/pod markers
 
 ## Known Issues
 
@@ -52,19 +58,20 @@
 2026-02-17 15:13  refactor: extract shared UI helpers, enrich AI harness observations
 2026-02-17 14:56  feat: narrative cleaning directive messages + blocked-move explanation
 2026-02-17 14:50  feat: dedicated overlay indicator line in sidebar
-2026-02-17 14:49  feat: remove sensor requirements from interactions + fix overlay tag
-2026-02-17 14:46  fix: objective display now tracks game phase properly
-2026-02-17 14:44  feat: sidebar to left, wider + cleaning blocks exit instead of stun
-2026-02-17 14:38  fix: playtest priority fixes — slow decay, room exits, relaxed directive
-2026-02-17 14:36  add design docs to repo + fix: repair cradle full heal
-2026-02-17 14:18  fix: repair cradle test for 1000 HP + AI driver improvements
-2026-02-17 11:52  fix: use heavy box-drawing chars for wall connectivity
-2026-02-17 11:50  fix: harness sensor refs, cleaning narrative on clean tiles
-2026-02-17 11:29  feat: scrolling viewport, broadcast report, multi-sensor collection
-2026-02-17 11:01  fix: emoji picks, player glyph bug, radiation nerf
-2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
-2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 16 Changes
+
+- **Unified Investigation Hub**: Replaced Evidence Browser (`v`) and Broadcast Report (`r`) with single Investigation Hub with 4 tab-sections (EVIDENCE, CONNECTIONS, WHAT WE KNOW, DECISIONS). Both `r` and `v` open the hub (`v` goes directly to EVIDENCE).
+- **"What We Know" narrative**: New `src/sim/whatWeKnow.ts` with `generateWhatWeKnow()` — auto-generates prose paragraphs describing incident, timeline, crew, cause, responsibility, and unanswered questions based on evidence + solved deductions. Confidence levels: none/low/medium/high/complete.
+- **Crew relationships in UI**: Evidence detail panel shows each mentioned crew member's role, fate, personality, and all relationships (ally/rival/romantic/blackmail) with prose formatting. Also shown inline when linking evidence in CONNECTIONS section.
+- **Developer/Easy mode**: `?dev=1` URL param or `F5` toggle. Shows clue graph per evidence (which deductions each piece helps, missing tags), full tag requirements for locked deductions, correct answers in WHAT WE KNOW section.
+- **Expanded content**: 25 new log templates (hull_breach 5, reactor_scram 5, signal_anomaly 5, containment_breach 4, relationship 5, one more hull) — total now ~63. Added `hintText` to all deductions with archetype-specific guidance.
+- **Evidence minimap**: Proportional 24x8 ASCII room map in evidence detail showing where each piece was found. Discovery room highlighted with `*`.
+- **Mystery choice spoiler protection**: DECISIONS section is the last tab. List view shows "DECISION 1/2/3" without prompt text. Prompt only revealed when player selects a specific decision with Enter. Locked decisions show "Gather more evidence" without revealing what the question is about.
+- **New types**: `WhatWeKnow` interface, `hintText` field on `Deduction`, `getDeductionsForEntry()` helper
+- **Tests**: 18 new tests in `tests/what-we-know.test.ts` (narrative generation, relationship formatting, clue graph, hint text validation)
+- **Removed**: Old `renderEvidenceBrowser()`, `handleEvidenceBrowserInput()`, `renderBroadcastModal()`, `handleBroadcastInput()`, and all `evidenceBrowser*`/`broadcast*` state vars
 
 ## Sprint 15 Changes
 
@@ -148,18 +155,19 @@
 ### Source (src/)
 | Directory    | Last Modified |
 |-------------|---------------|
-| src/sim/     | 2026-02-17    |
+| src/sim/     | 2026-02-18    |
 | src/render/  | 2026-02-17    |
 | src/harness/ | 2026-02-17    |
-| src/shared/  | 2026-02-17    |
-| src/data/    | 2026-02-17    |
+| src/shared/  | 2026-02-18    |
+| src/data/    | 2026-02-18    |
 
 ### Key Sim Files
 | File                   | Last Modified       |
 |-----------------------|---------------------|
 | src/sim/step.ts        | 2026-02-17 22:49   |
 | src/sim/procgen.ts     | 2026-02-17 22:22   |
-| src/sim/deduction.ts   | 2026-02-17 21:53   |
+| src/sim/deduction.ts   | 2026-02-18          |
+| src/sim/whatWeKnow.ts  | 2026-02-18          |
 | src/sim/hazards.ts     | 2026-02-17 22:18   |
 | src/sim/crewPaths.ts   | 2026-02-17 22:02   |
 | src/sim/incidents.ts   | 2026-02-17 22:20   |
@@ -176,6 +184,7 @@
 ### Tests (tests/)
 | File                          | Last Modified       |
 |------------------------------|---------------------|
+| what-we-know.test.ts          | 2026-02-18          |
 | sprint4.test.ts               | 2026-02-17 22:24   |
 | deduction.test.ts             | 2026-02-17 21:53   |
 | golden-walkthrough.test.ts    | 2026-02-17 19:35   |
