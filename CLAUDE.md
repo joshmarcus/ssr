@@ -121,7 +121,8 @@ All design docs live in `space_station_roguelike_docs_v10/`:
 6. **Always commit and push** after changes are verified
 7. Update `STATUS.md` after each sprint with changes and new findings
 8. **After major sprints**: Update critical docs, run a full playtest (harness or manual), share a playtest report before the next planning cycle. The whole team can propose priorities.
-9. **Design priority**: The game should be fun, interesting, and innovative — technical elegance is secondary
+9. **Auto-continue**: When a sprint is completed, automatically begin the next sprint — review state, identify priorities, plan, and execute without waiting for user prompt.
+10. **Design priority**: The game should be fun, interesting, and innovative — technical elegance is secondary
 
 ## Development Conventions
 
