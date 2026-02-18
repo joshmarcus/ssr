@@ -211,6 +211,19 @@ function printSummary(state: GameState): void {
   console.log(`Evidence found: ${evidenceFound}`);
   console.log(`Journal entries: ${journalCount}`);
   console.log(`Deductions: ${deductionsSolved}/${deductions.length} answered, ${deductionsCorrect} correct`);
+
+  // Mystery choices
+  const choices = state.mystery?.choices ?? [];
+  const choicesMade = choices.filter(c => c.chosen).length;
+  if (choices.length > 0) {
+    console.log(`Mystery choices: ${choicesMade}/${choices.length} decided`);
+    for (const c of choices) {
+      if (c.chosen) {
+        const opt = c.options.find(o => o.key === c.chosen);
+        console.log(`  ${c.id}: ${opt?.label ?? c.chosen}`);
+      }
+    }
+  }
 }
 
 // ── Script mode ──────────────────────────────────────────────

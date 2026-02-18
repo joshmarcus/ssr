@@ -218,6 +218,23 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
+  // Phase 2b: Submit available mystery choices (pick first option)
+  if (state.mystery) {
+    const choiceThresholds = [3, 6, 10];
+    const jCount = state.mystery.journal.length;
+    for (let ci = 0; ci < state.mystery.choices.length && ci < choiceThresholds.length; ci++) {
+      const choice = state.mystery.choices[ci];
+      if (choice.chosen) continue;
+      if (jCount < choiceThresholds[ci]) continue;
+      // Pick the first option
+      return {
+        type: ActionType.SubmitChoice,
+        choiceId: choice.id,
+        answerKey: choice.options[0].key,
+      };
+    }
+  }
+
   // Phase 3: Interact with adjacent entities (prioritized)
   const interactables = getAdjacentInteractables(state);
   const prioritized = interactables
@@ -345,6 +362,7 @@ for (let turn = 0; turn < MAX_TURNS; turn++) {
   const actionStr = action.type === ActionType.Move ? `MOVE ${action.direction}` :
     action.type === ActionType.Interact ? `INTERACT ${action.targetId}` :
     action.type === ActionType.SubmitDeduction ? `SUBMIT_DEDUCTION ${action.deductionId}=${action.answerKey}` :
+    action.type === ActionType.SubmitChoice ? `SUBMIT_CHOICE ${action.choiceId}=${action.answerKey}` :
     action.type.toUpperCase();
 
   const pos = `(${state.player.entity.pos.x},${state.player.entity.pos.y})`;
@@ -373,7 +391,8 @@ for (let turn = 0; turn < MAX_TURNS; turn++) {
       log.text.includes("following") ||
       log.text.includes("boarded") ||
       log.text.includes("EVACUATION") ||
-      log.text.includes("evacuation")
+      log.text.includes("evacuation") ||
+      log.text.includes("Decision recorded")
     )) {
       console.log(`  >> ${log.text}`);
     }
@@ -411,6 +430,21 @@ for (const [id, entity] of state.entities) {
 if (uninteracted.length > 0) {
   console.log(`\nUninteracted entities (${uninteracted.length}):`);
   for (const u of uninteracted.slice(0, 20)) console.log(u);
+}
+
+// Show mystery choice status
+const choices = state.mystery?.choices ?? [];
+const choicesMade = choices.filter(c => c.chosen).length;
+if (choices.length > 0) {
+  console.log(`Mystery choices: ${choicesMade}/${choices.length} decided`);
+  for (const c of choices) {
+    if (c.chosen) {
+      const opt = c.options.find(o => o.key === c.chosen);
+      console.log(`  ${c.id}: ${opt?.label ?? c.chosen}`);
+    } else {
+      console.log(`  ${c.id}: UNDECIDED`);
+    }
+  }
 }
 
 // Show deduction status

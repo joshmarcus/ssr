@@ -3397,6 +3397,84 @@ export function step(state: GameState, action: Action): GameState {
       // Free action — no turn advance
       return next;
     }
+    case ActionType.SubmitChoice: {
+      // Submit a mystery choice answer — used by harness for AI playtesting
+      if (!next.mystery || !action.choiceId || !action.answerKey) {
+        next.logs = [...next.logs, {
+          id: `log_choice_invalid_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Invalid choice submission.",
+          read: false,
+        }];
+        break;
+      }
+
+      const choiceIdx = next.mystery.choices.findIndex(c => c.id === action.choiceId);
+      const choice = choiceIdx >= 0 ? next.mystery.choices[choiceIdx] : undefined;
+      if (!choice || choice.chosen) {
+        next.logs = [...next.logs, {
+          id: `log_choice_notfound_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: choice?.chosen
+            ? "That decision has already been made."
+            : `Unknown choice: ${action.choiceId}`,
+          read: false,
+        }];
+        break;
+      }
+
+      // Check journal threshold (choices unlock at 3, 6, 10 entries)
+      const thresholds = [3, 6, 10];
+      const journalCount = next.mystery.journal.length;
+      if (choiceIdx < thresholds.length && journalCount < thresholds[choiceIdx]) {
+        next.logs = [...next.logs, {
+          id: `log_choice_locked_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "That decision is not yet available. Gather more evidence.",
+          read: false,
+        }];
+        break;
+      }
+
+      // Validate answer key
+      const validOption = choice.options.find(o => o.key === action.answerKey);
+      if (!validOption) {
+        next.logs = [...next.logs, {
+          id: `log_choice_badoption_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: `Invalid answer key: ${action.answerKey}`,
+          read: false,
+        }];
+        break;
+      }
+
+      // Apply choice
+      const updatedChoices = next.mystery.choices.map((c, i) =>
+        i === choiceIdx ? { ...c, chosen: action.answerKey!, turnPresented: next.turn } : c
+      );
+      next = {
+        ...next,
+        mystery: {
+          ...next.mystery,
+          choices: updatedChoices,
+        },
+      };
+
+      next.logs = [...next.logs, {
+        id: `log_choice_result_${choice.id}_${next.turn}`,
+        timestamp: next.turn,
+        source: "data_core",
+        text: `Decision recorded: ${validOption.label}`,
+        read: false,
+      }];
+
+      // Free action — no turn advance
+      return next;
+    }
     default:
       break;
   }

@@ -284,6 +284,18 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
     deductions,
     deductionProgress,
     transmissionReady,
+    mysteryChoices: (state.mystery?.choices ?? []).map((c, ci) => ({
+      id: c.id,
+      prompt: c.prompt,
+      options: c.options.map(o => ({ key: o.key, label: o.label })),
+      chosen: c.chosen,
+      available: ci < 3 && (state.mystery?.journal.length ?? 0) >= [3, 6, 10][ci] && !c.chosen,
+      consequence: c.consequence,
+    })),
+    choiceProgress: {
+      total: (state.mystery?.choices ?? []).length,
+      made: (state.mystery?.choices ?? []).filter(c => c.chosen).length,
+    },
   };
 }
 

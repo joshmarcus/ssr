@@ -38,9 +38,21 @@ export interface HarnessObservation {
     answeredCorrectly?: boolean;
     requiredTags: string[];
     missingTags: string[];
+    hintText?: string;
   }[];
   deductionProgress: { total: number; answered: number; correct: number };
   transmissionReady: boolean;
+
+  // Mystery choices
+  mysteryChoices: {
+    id: string;
+    prompt: string;
+    options: { key: string; label: string }[];
+    chosen?: string;
+    available: boolean;
+    consequence: string;
+  }[];
+  choiceProgress: { total: number; made: number };
 
   // Evacuation support
   evacuation?: {

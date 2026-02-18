@@ -111,8 +111,17 @@ export function parseAction(input: string): Action | { error: string } {
       return { type: ActionType.SubmitDeduction, deductionId: dedId, answerKey: ansKey };
     }
 
+    case "SUBMIT_CHOICE": {
+      const choiceId = parsed.params?.choiceId;
+      const choiceAnsKey = parsed.params?.answerKey;
+      if (typeof choiceId !== "string" || typeof choiceAnsKey !== "string") {
+        return { error: `SUBMIT_CHOICE requires params.choiceId and params.answerKey` };
+      }
+      return { type: ActionType.SubmitChoice, choiceId, answerKey: choiceAnsKey };
+    }
+
     default:
-      return { error: `Unknown action "${parsed.action}". Valid: MOVE, INTERACT, SCAN, CLEAN, WAIT, LOOK, SUBMIT_DEDUCTION.` };
+      return { error: `Unknown action "${parsed.action}". Valid: MOVE, INTERACT, SCAN, CLEAN, WAIT, LOOK, SUBMIT_DEDUCTION, SUBMIT_CHOICE.` };
   }
 }
 
@@ -244,6 +253,23 @@ export function getValidActionsForState(state: GameState): HarnessAction[] {
     }
   }
 
+  // 5. Mystery choice submissions — enumerate available choices
+  if (state.mystery) {
+    const thresholds = [3, 6, 10];
+    const journalCount = state.mystery.journal.length;
+    for (let ci = 0; ci < state.mystery.choices.length && ci < thresholds.length; ci++) {
+      const choice = state.mystery.choices[ci];
+      if (choice.chosen) continue;
+      if (journalCount < thresholds[ci]) continue;
+      for (const opt of choice.options) {
+        actions.push({
+          action: "SUBMIT_CHOICE",
+          params: { choiceId: choice.id, answerKey: opt.key },
+        });
+      }
+    }
+  }
+
   return actions;
 }
 
@@ -280,6 +306,8 @@ export function describeAction(ha: HarnessAction, state?: GameState): string {
       return "Look around (refresh vision)";
     case "SUBMIT_DEDUCTION":
       return `Submit deduction ${ha.params?.deductionId} with answer ${ha.params?.answerKey}`;
+    case "SUBMIT_CHOICE":
+      return `Submit choice ${ha.params?.choiceId} with answer ${ha.params?.answerKey}`;
     default:
       return ha.action;
   }

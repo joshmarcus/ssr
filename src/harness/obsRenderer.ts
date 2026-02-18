@@ -491,6 +491,7 @@ export function buildObservation(
     answeredCorrectly: d.answeredCorrectly,
     requiredTags: d.requiredTags,
     missingTags: d.requiredTags.filter(t => !allJournalTags.has(t)),
+    hintText: d.hintText,
   }));
 
   const answered = allDeductions.filter(d => d.solved).length;
@@ -505,6 +506,35 @@ export function buildObservation(
         type: "SUBMIT_DEDUCTION",
         params: { deductionId: d.id, answerKey: opt.key },
         description: `Answer "${d.question}" with "${opt.label}"`,
+      });
+    }
+  }
+
+  // ── Mystery choices ──
+  const allChoices = state.mystery?.choices ?? [];
+  const choiceThresholds = [3, 6, 10];
+  const jCount = journal.length;
+  const mysteryChoices = allChoices.map((c, ci) => ({
+    id: c.id,
+    prompt: c.prompt,
+    options: c.options.map(o => ({ key: o.key, label: o.label })),
+    chosen: c.chosen,
+    available: ci < choiceThresholds.length && jCount >= choiceThresholds[ci] && !c.chosen,
+    consequence: c.consequence,
+  }));
+  const choicesMade = allChoices.filter(c => c.chosen).length;
+  const choiceProgress = { total: allChoices.length, made: choicesMade };
+
+  // ── Add SUBMIT_CHOICE to valid actions ──
+  for (let ci = 0; ci < allChoices.length && ci < choiceThresholds.length; ci++) {
+    const c = allChoices[ci];
+    if (c.chosen) continue;
+    if (jCount < choiceThresholds[ci]) continue;
+    for (const opt of c.options) {
+      validActions.push({
+        type: "SUBMIT_CHOICE",
+        params: { choiceId: c.id, answerKey: opt.key },
+        description: `Decide "${c.prompt.slice(0, 60)}..." with "${opt.label}"`,
       });
     }
   }
@@ -535,6 +565,8 @@ export function buildObservation(
     deductions,
     deductionProgress,
     transmissionReady,
+    mysteryChoices,
+    choiceProgress,
     evacuation: state.mystery?.evacuation?.active ? (() => {
       const evac = state.mystery!.evacuation!;
       let followingCount = 0;
@@ -679,6 +711,28 @@ export function renderObservationAsText(obs: HarnessObservation): string {
       }
       if (d.missingTags.length > 0) {
         lines.push(`    missing tags: ${d.missingTags.join(", ")}`);
+      }
+      if (d.hintText && !d.solved) {
+        lines.push(`    hint: ${d.hintText}`);
+      }
+    }
+  }
+
+  // Mystery choices
+  if (obs.mysteryChoices.length > 0) {
+    lines.push("");
+    lines.push(`MYSTERY CHOICES: ${obs.choiceProgress.made}/${obs.choiceProgress.total} decided`);
+    for (const c of obs.mysteryChoices) {
+      if (c.chosen) {
+        const chosenOpt = c.options.find(o => o.key === c.chosen);
+        lines.push(`  ${c.id} [DECIDED] ${chosenOpt?.label ?? c.chosen}`);
+      } else if (c.available) {
+        lines.push(`  ${c.id} [AVAILABLE] ${c.prompt.slice(0, 80)}${c.prompt.length > 80 ? "..." : ""}`);
+        for (const o of c.options) {
+          lines.push(`    - ${o.key}: ${o.label}`);
+        }
+      } else {
+        lines.push(`  ${c.id} [LOCKED] Gather more evidence to unlock`);
       }
     }
   }
