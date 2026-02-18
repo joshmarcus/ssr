@@ -4,10 +4,12 @@
 
 ## Current State
 
-- **Phase**: Sprint 18 (Mystery Revelation System)
+- **Phase**: Sprint 19 (Storyline Overhaul + Writers Room Review)
 - **Test status**: 279 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
-- **Playtest**: Bot achieves VICTORY on seed 42 (178 turns, 5/5 deductions correct, 997 HP)
+- **Default archetype**: SignalAnomaly (locked for playtesting — highest-rated storyline)
+- **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
+- **Save key**: v3 (bumped due to archetype distribution change)
 
 ## What Works
 
@@ -21,13 +23,18 @@
 - Procedural crew generation (8-12 crew, relationships, secrets, fates)
 - 175+ narrative elements (63 log templates, 16 authored logs, 16 crew items)
 - Ship computer PA announcements (periodic atmospheric messages)
-- 6 incident archetypes with 5-phase timelines
+- **5 incident archetypes** with distinct human stories and 5-phase timelines:
+  - CoolantCascade — "The Whistleblower" (B-)
+  - HullBreach — "The Murder" (A-)
+  - ReactorScram — "The Rogue AI" (A)
+  - Sabotage — "The Stowaway" (B+)
+  - SignalAnomaly — "First Contact" (A)
 - 5-6 chained deductions with evidence linking, per-deduction hint text, and revelation cascade
 - **Revelation system**: linking evidence yields narrative sentences explaining HOW clues illuminate questions
   - Tag-specific revelations appear in a Revelation Board as evidence is linked
   - Gold synthesis paragraph crystallizes "what must be true" when all evidence is assembled
   - Post-answer narrative overlay (correct: revelation + reward + next unlock, incorrect: inconclusive)
-  - ~120 authored revelation/synthesis/conclusion strings across 6 archetypes x 5 deduction tiers
+  - ~100 authored revelation/synthesis/conclusion strings across 5 archetypes x 5-6 deduction tiers
 - Narrative threads grouping evidence
 - **Investigation Hub [r/v]**: unified 4-section overlay replacing old Evidence Browser + Broadcast Report
   - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, tags, thread)
@@ -55,10 +62,40 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+- `selectArchetype()` locked to SignalAnomaly — restore seed-based selection after polish pass
+
+## Sprint 19 Changes
+
+### ContainmentBreach Archetype Removed
+- Rated C+ by all three writers room reviewers — weakest storyline by significant margin
+- Structurally identical to CoolantCascade, no plot twist, indistinguishable captain villain
+- Removed from: types.ts enum, incidents.ts template, revelations.ts (~70 lines), lore.ts transmission, deduction.ts (STORY_ROLES + 7 switch blocks + wrong answer pool), threads.ts, logTemplates.ts (4 templates), 2 test files
+- Save key bumped v2 → v3
+- Zero remaining references in src/ or tests/
+
+### Storyline Rewrites (All 5 Archetypes)
+All incident beats and revelation content rewritten to follow distinct human stories:
+- **CoolantCascade**: "The Whistleblower" — engineer warned, was silenced, still fought the cascade
+- **HullBreach**: "The Murder" — hull breach was a murder disguised as structural failure; hero is the killer
+- **ReactorScram**: "The Rogue AI" — data core achieved sentience, SCRAM was self-preservation; no villain
+- **Sabotage**: "The Stowaway" — alien organism hunting in the dark; captain approved flagged cargo
+- **SignalAnomaly**: "First Contact" — station destroyed itself sending unauthorized reply to alien signal
+
+### Writers Room Review Completed
+Three independent review agents evaluated all storylines. Results captured in `WRITERS_BIBLE.md`.
+- SignalAnomaly and ReactorScram rated highest (A/A-)
+- ContainmentBreach rated lowest → removed
+- Cross-archetype variety improved from D to B
+- See `WRITERS_BIBLE.md` for full findings and priority actions
+
+### Default Archetype: SignalAnomaly
+- `selectArchetype()` temporarily locked to SignalAnomaly for playtesting
+- TODO: restore seed-based selection when other storylines are polished
 
 ## Recent Changes (Git History)
 
 ```
+2026-02-18        feat: sprint 19 — storyline overhaul, ContainmentBreach removed, writers room review
 2026-02-18        feat: sprint 18 — mystery revelation system (revelation cascade, split-pane UI, post-answer overlay)
 2026-02-17 22:36  fix: add missing crewPaths.ts and threads.ts to repo
 2026-02-17 22:31  refactor: remove radiation, structural, EM/signal systems and station integrity

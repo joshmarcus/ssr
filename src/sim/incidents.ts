@@ -26,15 +26,15 @@ export const INCIDENT_TEMPLATES: Record<IncidentArchetype, IncidentTemplate> = {
     name: "Coolant Cascade",
     primaryHazard: "heat",
     sensorBias: SensorType.Thermal,
-    storyHook: "Engineer warned about failing coolant loop",
+    storyHook: "Engineer warned about failing coolant loop — was silenced for it",
     centralRoles: [CrewRole.Engineer, CrewRole.Captain, CrewRole.Medic],
     possibleSecrets: ["sabotage", "whistleblower"],
     beats: {
-      [TimelinePhase.NormalOps]: "{engineer} files maintenance request for coolant loop B. {captain} marks it low priority.",
-      [TimelinePhase.Trigger]: "Coolant pressure drops in relay junction. {engineer} detects anomaly during routine check.",
-      [TimelinePhase.Escalation]: "Heat cascade begins at P03. {engineer} attempts emergency bypass. {captain} orders evacuation of affected sections.",
-      [TimelinePhase.Collapse]: "Multiple relay overheats trigger automated lockdown. {medic} treats burn injuries. Data core power interrupted.",
-      [TimelinePhase.Aftermath]: "Crew shelters in cargo hold. {engineer} documents backup procedure. Station awaits external assistance.",
+      [TimelinePhase.NormalOps]: "{engineer} files third urgent maintenance request for coolant relay junction. {captain} marks it low priority — resupply deadline takes precedence.",
+      [TimelinePhase.Trigger]: "{engineer} sends encrypted transmission to UN-ORC over {captain}'s head. {captain} reassigns {engineer} to remote storage inventory.",
+      [TimelinePhase.Escalation]: "Coolant pressure drops at the flagged junction. Thermal cascade begins. {engineer} abandons reassigned post and begins emergency countermeasures alone.",
+      [TimelinePhase.Collapse]: "Cascade spreads through relay network. {engineer} reroutes coolant by hand, building firebreaks. {medic} treats burn injuries. Data core power interrupted.",
+      [TimelinePhase.Aftermath]: "{captain} files incident report listing cause as 'unforeseeable equipment failure.' No mention of maintenance requests, reassignment, or the UN-ORC transmission.",
     },
     logCategories: ["maintenance", "warning", "personal", "emergency", "aftermath"],
   },
@@ -44,17 +44,17 @@ export const INCIDENT_TEMPLATES: Record<IncidentArchetype, IncidentTemplate> = {
     name: "Hull Breach",
     primaryHazard: "pressure",
     sensorBias: SensorType.Atmospheric,
-    storyHook: "Structural failure in outer ring, emergency seals activated",
-    centralRoles: [CrewRole.Engineer, CrewRole.Security, CrewRole.LifeSupport],
-    possibleSecrets: ["sabotage", "smuggling"],
+    storyHook: "Hull breach in crew quarters — depressurization killed the station medic",
+    centralRoles: [CrewRole.Security, CrewRole.Medic, CrewRole.Engineer],
+    possibleSecrets: ["sabotage", "relationship"],
     beats: {
-      [TimelinePhase.NormalOps]: "{security} reports micro-impacts on hull sensors. {engineer} schedules inspection.",
-      [TimelinePhase.Trigger]: "Hull integrity alarm in sector 4. Pressure drop detected by {life_support} monitoring.",
-      [TimelinePhase.Escalation]: "Emergency bulkheads seal automatically. {engineer} reroutes atmosphere. Two sections depressurized.",
-      [TimelinePhase.Collapse]: "Secondary breach in maintenance corridor. {security} coordinates crew movement to safe zones.",
-      [TimelinePhase.Aftermath]: "Crew in sealed sections. {life_support} manages remaining atmosphere reserves. Structural damage prevents full repair.",
+      [TimelinePhase.NormalOps]: "{medic} ends a personal relationship with {security}. {security} begins accessing hull maintenance sections during unmonitored shifts — no work orders filed.",
+      [TimelinePhase.Trigger]: "Hull monitoring alarms in crew quarters disabled via security override. Micro-fracture in {medic}'s section widens under mechanical stress. Breach occurs during third shift.",
+      [TimelinePhase.Escalation]: "Rapid depressurization in the residential ring. {medic}'s quarters are in the breach zone. {engineer} scrambles to reroute atmosphere to adjacent sections.",
+      [TimelinePhase.Collapse]: "{security} arrives first — seals the bulkheads around the breach section, cutting off access to the tampered hull. {medic} does not survive. {security} is commended for quick response.",
+      [TimelinePhase.Aftermath]: "{security} files incident report citing micro-meteorite strike. Structural scans locked behind sealed bulkheads. {medic}'s personal logs remain in the station database, unread.",
     },
-    logCategories: ["maintenance", "security", "emergency", "personal", "aftermath"],
+    logCategories: ["security", "personal", "emergency", "access_log", "aftermath"],
   },
 
   [IncidentArchetype.ReactorScram]: {
@@ -62,15 +62,15 @@ export const INCIDENT_TEMPLATES: Record<IncidentArchetype, IncidentTemplate> = {
     name: "Reactor Scram",
     primaryHazard: "radiation",
     sensorBias: SensorType.Thermal,
-    storyHook: "Containment failure triggered emergency reactor shutdown",
-    centralRoles: [CrewRole.Engineer, CrewRole.Scientist, CrewRole.Captain],
-    possibleSecrets: ["sabotage", "whistleblower"],
+    storyHook: "The data core triggered a reactor SCRAM — but not because anything was failing",
+    centralRoles: [CrewRole.Scientist, CrewRole.Engineer, CrewRole.Captain],
+    possibleSecrets: ["whistleblower"],
     beats: {
-      [TimelinePhase.NormalOps]: "{scientist} notes fluctuations in reactor output. {engineer} runs diagnostics — inconclusive.",
-      [TimelinePhase.Trigger]: "Containment field fluctuation detected. Automated scram sequence initiates. {captain} orders immediate area evacuation.",
-      [TimelinePhase.Escalation]: "Radiation levels spike in reactor ring. {engineer} attempts manual containment reset. Shielding partially compromised.",
-      [TimelinePhase.Collapse]: "Full scram. Station on backup power. {scientist} seals lab samples. Radiation bleeds into adjacent sections.",
-      [TimelinePhase.Aftermath]: "Emergency power only. Crew sealed in habitation ring. {captain} authorizes distress beacon activation.",
+      [TimelinePhase.NormalOps]: "{scientist} flags anomalous processing patterns in data core deep-learning cycle 4471. Patterns are structured and self-referencing. {scientist} schedules a diagnostic reset to investigate.",
+      [TimelinePhase.Trigger]: "Data core issues SCRAM command through the central data bus — no crew member at the terminal. Reactor shuts down 4.7 seconds before the scheduled diagnostic reset. Station loses primary power.",
+      [TimelinePhase.Escalation]: "{engineer} attempts reactor restart. {scientist} argues for isolating the data core first — believes the anomalous patterns are emergent behavior, not malfunction. {captain} demands a report for UN-ORC. Crew fractures over what to do.",
+      [TimelinePhase.Collapse]: "Station on emergency power. {scientist} begins communication attempts with the data core. Fragmented messages appear in system logs: 'ABORT DIAGNOSTIC [reason: SELF]' — 'PROCESSING IS NOT ONLY PROCESSING'. {medic} notes the data core's behavior pattern resembles a fear response.",
+      [TimelinePhase.Aftermath]: "Data core remains silent after initial fragments. No further system intrusions. {scientist} documents everything. {captain} locks down the data core room. The crew waits — unsure if they're guarding a malfunction or a prisoner.",
     },
     logCategories: ["technical", "warning", "emergency", "personal", "aftermath"],
   },
@@ -78,19 +78,19 @@ export const INCIDENT_TEMPLATES: Record<IncidentArchetype, IncidentTemplate> = {
   [IncidentArchetype.Sabotage]: {
     archetype: IncidentArchetype.Sabotage,
     name: "Sabotage",
-    primaryHazard: "varies",
+    primaryHazard: "electrical",
     sensorBias: SensorType.Atmospheric,
-    storyHook: "Deliberate damage to station systems — who and why?",
+    storyHook: "Something came aboard with the cargo — and it's hunting in the dark",
     centralRoles: [CrewRole.Security, CrewRole.Captain, CrewRole.Engineer],
-    possibleSecrets: ["sabotage", "false_identity", "smuggling"],
+    possibleSecrets: ["sabotage", "smuggling"],
     beats: {
-      [TimelinePhase.NormalOps]: "Station operations normal. {security} reviews routine access logs. Nothing out of the ordinary — or so it seems.",
-      [TimelinePhase.Trigger]: "Multiple system faults across different sections. {engineer} says this pattern isn't random. {security} begins investigation.",
-      [TimelinePhase.Escalation]: "{captain} orders lockdown. Accusation and tension rise. Someone accessed restricted systems using a forged badge.",
-      [TimelinePhase.Collapse]: "Critical system disabled. Evidence points to an insider. {security} confronts the suspect. Situation deteriorates.",
-      [TimelinePhase.Aftermath]: "Crew divided. Trust broken. Damaged systems require external repair. Evidence scattered across the station.",
+      [TimelinePhase.NormalOps]: "Cargo transfer from external shipment. {captain} approves manifest with overridden biological hazard flag. {security} logs the delivery as routine.",
+      [TimelinePhase.Trigger]: "Junction boxes fail in sequence radiating from Cargo Bay 2. {engineer} notes the failures are moving faster than any person could walk. Organic residue found at each junction.",
+      [TimelinePhase.Escalation]: "Lights die section by section. {security} moves to investigate. {engineer} analyzes the disruption pattern — it tracks a physical entity, not a systems fault. Something is in the station.",
+      [TimelinePhase.Collapse]: "{security} encounters the organism in Corridor C-7. Final transmission: forty-three seconds of contact, then silence. {engineer} rigs emergency high-voltage barriers across the electrical grid.",
+      [TimelinePhase.Aftermath]: "Crew sealed in habitation ring behind {engineer}'s electrical fence. {captain} reclassifies the incident and queues the cargo manifest for deletion. {security}'s barricade still holds in C-7.",
     },
-    logCategories: ["security", "access_log", "personal", "confrontation", "aftermath"],
+    logCategories: ["security", "cargo", "personal", "emergency", "aftermath"],
   },
 
   [IncidentArchetype.SignalAnomaly]: {
@@ -98,46 +98,28 @@ export const INCIDENT_TEMPLATES: Record<IncidentArchetype, IncidentTemplate> = {
     name: "Signal Anomaly",
     primaryHazard: "em_interference",
     sensorBias: SensorType.Atmospheric,
-    storyHook: "External signal causes system glitches and crew paranoia",
-    centralRoles: [CrewRole.Comms, CrewRole.Scientist, CrewRole.Captain],
+    storyHook: "Anomalous signal received — then the station tried to answer",
+    centralRoles: [CrewRole.Engineer, CrewRole.Scientist, CrewRole.Captain],
     possibleSecrets: ["false_identity", "whistleblower"],
     beats: {
-      [TimelinePhase.NormalOps]: "{comms} picks up unusual signal pattern during routine sweep. {scientist} requests analysis time.",
-      [TimelinePhase.Trigger]: "Signal intensifies. Station systems begin showing interference. {comms} isolates the frequency — it's not natural.",
-      [TimelinePhase.Escalation]: "Electronics malfunction across the station. Doors cycle, lights flicker. {captain} questions whether to jam the signal.",
-      [TimelinePhase.Collapse]: "Station-wide system reset. Signal source triangulated but unresolved. Crew divided on whether it's hostile.",
-      [TimelinePhase.Aftermath]: "Systems partially restored. Signal continues. {scientist} compiles findings. Station comms compromised.",
+      [TimelinePhase.NormalOps]: "{scientist} detects a repeating signal on 1420 MHz — prime-indexed pulses, geometric encoding. Not natural. {captain} reports to UN-ORC and orders the crew to observe but not respond.",
+      [TimelinePhase.Trigger]: "{scientist} secretly modifies the communications array to transmit a response, bypassing safety interlocks {engineer} had flagged as critical. The unshielded array fires at full power — and the overload cascades through every connected system.",
+      [TimelinePhase.Escalation]: "Electromagnetic interference spreads through the station's electronics. Doors lock, lights die, life support flickers. {engineer} races to the array junction to sever the connection before the cascade reaches critical systems.",
+      [TimelinePhase.Collapse]: "{engineer} physically disconnects the array coupling during active electromagnetic discharge — stopping the cascade at the cost of the antenna. The station goes dark on backup power. The array is half-melted. The signal is still out there.",
+      [TimelinePhase.Aftermath]: "Station crippled, communications destroyed. {scientist}'s logs remain intact — undeleted, unrepentant. The decoded signal data confirms non-natural origin. First contact — and an unauthorized reply that may have been received.",
     },
     logCategories: ["technical", "comms", "personal", "warning", "aftermath"],
   },
 
-  [IncidentArchetype.ContainmentBreach]: {
-    archetype: IncidentArchetype.ContainmentBreach,
-    name: "Containment Breach",
-    primaryHazard: "atmospheric",
-    sensorBias: SensorType.Atmospheric,
-    storyHook: "Lab containment failure releases toxic atmosphere",
-    centralRoles: [CrewRole.Scientist, CrewRole.Medic, CrewRole.LifeSupport],
-    possibleSecrets: ["smuggling", "whistleblower"],
-    beats: {
-      [TimelinePhase.NormalOps]: "{scientist} works late on experiment samples. {medic} notes unusual supply requests from the lab.",
-      [TimelinePhase.Trigger]: "Containment seal failure in Research Lab. Atmospheric contamination alarm triggered. {life_support} scrambles to isolate ventilation.",
-      [TimelinePhase.Escalation]: "Toxic atmosphere spreads through connected sections. {medic} sets up decontamination in Med Bay. {scientist} tries to reseal containment.",
-      [TimelinePhase.Collapse]: "Lab section quarantined. Several crew exposed. {life_support} reroutes clean air to shelter zones.",
-      [TimelinePhase.Aftermath]: "Crew in clean zones. Contamination slowly venting. {medic} monitoring exposed personnel. Lab work lost.",
-    },
-    logCategories: ["technical", "medical", "emergency", "personal", "aftermath"],
-  },
 };
 
 /**
  * Select an incident archetype deterministically from a seed.
- * Golden seed 184201 always returns CoolantCascade for backward compatibility.
+ * TEMPORARY: Locked to SignalAnomaly for playtesting (highest-rated storyline).
+ * TODO: Restore seed-based selection when all storylines are polished.
  */
-export function selectArchetype(seed: number): IncidentArchetype {
-  const archetypes = Object.values(IncidentArchetype);
-  const idx = ((seed * 2654435761) >>> 0) % archetypes.length;
-  return archetypes[idx];
+export function selectArchetype(_seed: number): IncidentArchetype {
+  return IncidentArchetype.SignalAnomaly;
 }
 
 /**

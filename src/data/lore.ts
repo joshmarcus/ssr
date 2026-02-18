@@ -59,12 +59,6 @@ const LAST_TRANSMISSIONS: Record<IncidentArchetype, string[]> = {
     `sent a response... the overload is spreading through every`,
     `connected system—" [EM INTERFERENCE — SIGNAL LOST]`,
   ],
-  [IncidentArchetype.ContainmentBreach]: [
-    `LAST TRANSMISSION [11:15:56 UTC]:`,
-    `"...containment breach in a section that's not on our plans...`,
-    `the symptoms don't match anything in the station inventory...`,
-    `what were they doing in there..." [SIGNAL LOST]`,
-  ],
 };
 
 /**

@@ -50,7 +50,6 @@ export function generateThreads(
       });
       break;
     case IncidentArchetype.HullBreach:
-    case IncidentArchetype.ContainmentBreach:
       threads.push({
         name: "The Breach",
         description: "Physical evidence of the catastrophic failure — structural damage, pressure loss, containment failure.",

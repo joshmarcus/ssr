@@ -154,14 +154,13 @@ describe("revelation generation", () => {
     expect(whatDed!.conclusionText!.length).toBeGreaterThan(0);
   });
 
-  it("generates revelations for all 6 archetypes", () => {
+  it("generates revelations for all 5 archetypes", () => {
     const archetypes = [
       IncidentArchetype.CoolantCascade,
       IncidentArchetype.HullBreach,
       IncidentArchetype.ReactorScram,
       IncidentArchetype.Sabotage,
       IncidentArchetype.SignalAnomaly,
-      IncidentArchetype.ContainmentBreach,
     ];
 
     for (const archetype of archetypes) {

@@ -420,36 +420,6 @@ export const LOG_TEMPLATES: LogTemplate[] = [
     source: "{comms_last}",
   },
 
-  // ── Containment breach archetype ────────────────────────────────
-  {
-    id: "containment_experiment",
-    category: "containment_breach",
-    title: "Experiment Record — Lab B",
-    text: "{scientist}: Sample 7-C showing unexpected growth patterns. Revised containment protocol submitted to {captain_last}. Current BSL-2 may be insufficient.",
-    source: "{scientist_last}",
-  },
-  {
-    id: "containment_readings",
-    category: "containment_breach",
-    title: "Contamination Readings",
-    text: "AUTOMATED: Atmospheric contamination detected in {room}. Particulate count: 340% above baseline. Bio-hazard filters engaged. {life_support_last} alerted.",
-    source: "system",
-  },
-  {
-    id: "containment_exposure",
-    category: "containment_breach",
-    title: "Exposure Protocol",
-    text: "{medic}: Exposure protocol initiated. {scientist_last} and lab tech quarantined in {room}. Blood samples drawn. No symptoms yet but we're being cautious.",
-    source: "{medic_last}",
-  },
-  {
-    id: "containment_seal",
-    category: "containment_breach",
-    title: "Seal Inspection — Lab Containment",
-    text: "{engineer}: Lab B containment door seal degraded. The gasket was never rated for the atmospheric mix in those experiments. {scientist_last} was told this three weeks ago.",
-    source: "{engineer_last}",
-  },
-
   // ── Relationship-revealing logs ─────────────────────────────────
   {
     id: "rel_ally_support",

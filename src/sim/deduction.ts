@@ -78,14 +78,6 @@ export const STORY_ROLES: Record<IncidentArchetype, StoryRoles> = {
     heroHint: "Find emergency action logs — who physically disconnected the array during the electromagnetic storm?",
     villainHint: "Check array modification logs and unauthorized transmission records — who sent the response?",
   },
-  [IncidentArchetype.ContainmentBreach]: {
-    hero: CrewRole.Medic,
-    villain: CrewRole.Captain,
-    heroQuestion: "Who exposed the truth to save the crew?",
-    villainQuestion: "Who put the crew at risk?",
-    heroHint: "Look for medical logs about unusual symptoms and unauthorized lab access — who investigated despite orders to stop?",
-    villainHint: "Search classified communications and restricted lab authorizations — who ran the secret program?",
-  },
 };
 
 /**
@@ -103,8 +95,6 @@ export function getArchetypeTags(archetype: IncidentArchetype): string[] {
       return ["electrical", "biological"];
     case IncidentArchetype.SignalAnomaly:
       return ["signal", "transmission"];
-    case IncidentArchetype.ContainmentBreach:
-      return ["containment", "classified"];
   }
 }
 
@@ -296,16 +286,6 @@ function generateWhyDeduction(
         "Natural electromagnetic interference from a nearby pulsar disrupted electronics",
       ];
       break;
-    case IncidentArchetype.ContainmentBreach:
-      correctLabel = "A classified program cut corners on containment to maintain secrecy — safety reviews were bypassed";
-      correctKey = "classified_program";
-      crewTagMember = medic;
-      wrongAnswers = [
-        "The containment field emitter failed due to age and wear",
-        "An unauthorized experiment exceeded the lab's safety parameters",
-        "A power fluctuation knocked the containment field offline momentarily",
-      ];
-      break;
     default:
       correctLabel = "System failure compounded by human error";
       correctKey = "compound_failure";
@@ -438,8 +418,6 @@ function getVillainDescription(archetype: IncidentArchetype): string {
       return "approved the flagged cargo transfer despite biological hazard warnings";
     case IncidentArchetype.SignalAnomaly:
       return "secretly modified the array and transmitted without authorization";
-    case IncidentArchetype.ContainmentBreach:
-      return "authorized a classified program that endangered the crew";
     default:
       return "had the authority to prevent this and chose not to act";
   }
@@ -451,32 +429,51 @@ function generateHiddenAgendaDeduction(
   scientist: CrewMember | undefined,
 ): Deduction {
   let correctLabel: string;
+  let question: string;
+  let requiredTags: string[];
+  let wrongAnswers: string[];
+  let hintText: string;
+
   if (timeline.archetype === IncidentArchetype.SignalAnomaly) {
-    correctLabel = "The station was secretly monitoring an anomalous signal — classified research the crew wasn't fully briefed on";
+    correctLabel = "A genuine non-human signal — first contact. The scientist's response may have been received.";
+    question = "What was the signal?";
+    requiredTags = ["signal", "transmission"];
+    wrongAnswers = [
+      "A classified military test signal that the crew was never supposed to detect",
+      "Natural electromagnetic interference from a pulsar — the 'patterns' were pareidolia",
+      "A signal planted by UN-ORC to test the crew's compliance with communication protocols",
+    ];
+    hintText = "Analyze the decoded signal data and the content of the outbound transmission — what was actually sent and received?";
   } else {
-    correctLabel = "Someone aboard had a hidden agenda that put the mission at risk";
+    correctLabel = "The cargo was a classified biological sample — the station was a waypoint for a covert xenobiology program";
+    question = "What was really in that cargo?";
+    requiredTags = ["biological", "cargo"];
+    wrongAnswers = [
+      "Standard research supplies — the biological hazard flag was a bureaucratic error",
+      "Classified weapons components being routed through civilian channels",
+      "Contraband the captain was smuggling for personal profit",
+    ];
+    hintText = "Find the real cargo manifest and classified communications — what was the station actually transporting?";
   }
 
   const options = [
     { label: correctLabel, key: "correct", correct: true },
-    { label: "The research was routine — nothing was hidden", key: "wrong_0", correct: false },
-    { label: "UN-ORC was planning to decommission the station and didn't tell the crew", key: "wrong_1", correct: false },
-    { label: "The station was a military outpost disguised as research", key: "wrong_2", correct: false },
+    ...wrongAnswers.map((label, i) => ({ label, key: `wrong_${i}`, correct: false })),
   ];
   shuffleArray(options);
 
   return {
     id: "deduction_agenda",
     category: DeductionCategory.Why,
-    question: "What was really going on aboard CORVUS-7?",
+    question,
     options,
-    requiredTags: ["signal", "scientist"],
+    requiredTags,
     unlockAfter: "deduction_responsibility",
     linkedEvidence: [],
     solved: false,
     rewardType: "sensor_hint",
     rewardDescription: "Reveals the location of hidden evidence",
-    hintText: "Find classified documents and science logs — what was the station's real mission?",
+    hintText,
   };
 }
 
@@ -494,8 +491,6 @@ function getIncidentDescription(archetype: IncidentArchetype): string {
       return "Station systems were deliberately sabotaged by someone aboard";
     case IncidentArchetype.SignalAnomaly:
       return "An anomalous external signal caused widespread system interference";
-    case IncidentArchetype.ContainmentBreach:
-      return "Lab containment failed, releasing toxic atmosphere into the station";
   }
 }
 
@@ -506,7 +501,6 @@ function getWrongIncidentDescriptions(archetype: IncidentArchetype): string[] {
     "The reactor underwent emergency shutdown after containment failure",
     "Station systems were deliberately sabotaged by someone aboard",
     "An anomalous external signal caused widespread system interference",
-    "Lab containment failed, releasing toxic atmosphere into the station",
   ];
   const correct = getIncidentDescription(archetype);
   const wrong = all.filter(d => d !== correct);
@@ -631,8 +625,6 @@ function getWhatHintText(archetype: IncidentArchetype): string {
       return "Look for the pattern of system failures — is the sequence consistent with human sabotage?";
     case IncidentArchetype.SignalAnomaly:
       return "Search for signal processing logs and electronic interference records.";
-    case IncidentArchetype.ContainmentBreach:
-      return "Find containment field logs and atmospheric contamination readings.";
   }
 }
 
@@ -648,8 +640,6 @@ function getWhyHintText(archetype: IncidentArchetype): string {
       return "Analyze the failure pattern and residue at junction points — is this really human sabotage?";
     case IncidentArchetype.SignalAnomaly:
       return "Check array power logs — was the station receiving, or was it transmitting?";
-    case IncidentArchetype.ContainmentBreach:
-      return "Look for classified communications and restricted lab access — what was really going on in that section?";
   }
 }
 
@@ -679,10 +669,6 @@ export function getTagExplanation(tag: string, archetype?: IncidentArchetype): s
       case IncidentArchetype.SignalAnomaly:
         if (tag === "signal") return "Evidence of the anomalous signal event";
         if (tag === "transmission") return "Evidence of outbound array transmission activity";
-        break;
-      case IncidentArchetype.ContainmentBreach:
-        if (tag === "containment") return "Evidence of the lab containment failure";
-        if (tag === "classified") return "Classified documents revealing the lab's true purpose";
         break;
     }
   }
