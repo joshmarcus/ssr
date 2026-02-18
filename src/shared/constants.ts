@@ -10,12 +10,12 @@ export const VIEWPORT_HEIGHT = 25;
 export const GOLDEN_SEED = 184201;
 
 // ── Hazards ──────────────────────────────────────────────────
-export const HEAT_SPREAD_RATE = 3; // heat units per turn to adjacent tiles
-export const SMOKE_SPREAD_RATE = 2;
-export const HEAT_DECAY_RATE = 1; // heat lost per turn on non-source tiles (lower than spread = zones grow)
-export const HEAT_SOURCE_RATE = 5; // heat injected per turn at relay sources
-export const HEAT_SOURCE_CAP = 95; // max heat at source tiles
-export const HEAT_SPREAD_MIN = 15; // tiles spread heat if they have at least this much
+export const HEAT_SPREAD_RATE = 2; // heat units per turn to adjacent tiles (was 3 — slowed)
+export const SMOKE_SPREAD_RATE = 1; // smoke spread per turn (was 2 — slowed)
+export const HEAT_DECAY_RATE = 2; // heat lost per turn on non-source tiles (matches spread = zones stabilize)
+export const HEAT_SOURCE_RATE = 3; // heat injected per turn at relay sources (was 5 — slowed)
+export const HEAT_SOURCE_CAP = 85; // max heat at source tiles (was 95 — capped lower)
+export const HEAT_SPREAD_MIN = 20; // tiles spread heat if they have at least this much (was 15 — higher threshold)
 export const HEAT_DAMAGE_THRESHOLD = 200; // legacy — unused
 export const PLAYER_MAX_HP = 1000;
 export const HEAT_DAMAGE_PER_TURN = 3; // base HP lost per turn on tiles with heat >= HEAT_PAIN_THRESHOLD

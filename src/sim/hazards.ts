@@ -59,14 +59,18 @@ export function tickHazards(state: GameState): GameState {
 
       if (tile.heat >= HEAT_SPREAD_MIN) {
         // Heat spread is proportional to how hot the source tile is
-        const spreadAmount = Math.ceil(HEAT_SPREAD_RATE * (tile.heat / 100));
-        for (const d of ADJACENT_DELTAS) {
-          const nx = x + d.x;
-          const ny = y + d.y;
-          if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
-          const neighbor = oldTiles[ny][nx];
-          if (!neighbor.walkable) continue;
-          newTiles[ny][nx].heat = Math.min(100, newTiles[ny][nx].heat + spreadAmount);
+        // Low pressure suppresses spread (fire needs oxygen)
+        const pressureMod = tile.pressure < 30 ? 0 : tile.pressure < 60 ? 0.5 : 1;
+        const spreadAmount = Math.ceil(HEAT_SPREAD_RATE * (tile.heat / 100) * pressureMod);
+        if (spreadAmount > 0) {
+          for (const d of ADJACENT_DELTAS) {
+            const nx = x + d.x;
+            const ny = y + d.y;
+            if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
+            const neighbor = oldTiles[ny][nx];
+            if (!neighbor.walkable) continue;
+            newTiles[ny][nx].heat = Math.min(100, newTiles[ny][nx].heat + spreadAmount);
+          }
         }
       }
 
@@ -84,16 +88,18 @@ export function tickHazards(state: GameState): GameState {
     }
   }
 
-  // Natural heat/smoke decay: non-source tiles slowly lose heat.
-  // Decay (1) < spread (3) means zones expand over time.
+  // Natural heat/smoke decay. Low pressure accelerates decay (fire needs oxygen).
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       if (heatSources.has(`${x},${y}`)) continue; // sources don't decay
+      const pressure = newTiles[y][x].pressure;
+      // Low pressure suppresses fire: vacuum tiles lose heat 3x faster
+      const pressureFactor = pressure < 30 ? 3 : pressure < 60 ? 2 : 1;
       if (newTiles[y][x].heat > 0) {
-        newTiles[y][x].heat = Math.max(0, newTiles[y][x].heat - HEAT_DECAY_RATE);
+        newTiles[y][x].heat = Math.max(0, newTiles[y][x].heat - HEAT_DECAY_RATE * pressureFactor);
       }
       if (newTiles[y][x].smoke > 0) {
-        newTiles[y][x].smoke = Math.max(0, newTiles[y][x].smoke - HEAT_DECAY_RATE);
+        newTiles[y][x].smoke = Math.max(0, newTiles[y][x].smoke - HEAT_DECAY_RATE * pressureFactor);
       }
     }
   }
