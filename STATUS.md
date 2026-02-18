@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 7 (Evidence Browser + PA Announcements + Sidebar Polish)
+- **Phase**: Sprint 8 (Save/Load + Phase PA + Mini-Map)
 - **Test status**: 189 tests passing across 17 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
@@ -32,7 +32,6 @@
 ## Known Issues
 
 - Controller/gamepad input not yet implemented
-- No save/load system
 - No CI pipeline deployed
 
 ## Recent Changes (Git History)
@@ -59,6 +58,13 @@
 2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
 2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 8 Changes
+
+- Save/load system: auto-saves every 5 turns to localStorage, resumes on page reload
+- Phase-aware PA announcements: investigation and recovery phase-specific messages
+- Mini-map widget in sidebar: compact ASCII room layout with player position
+- Updated FUTURE_FEATURES.md, marked completed items
 
 ## Sprint 7 Changes
 
