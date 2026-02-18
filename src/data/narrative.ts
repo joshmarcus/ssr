@@ -140,3 +140,34 @@ export const DIRT_TRAIL_HINTS: string[] = [
   "Thick residue. This corridor saw heavy use recently — crew movement, equipment dragging. The trail leads deeper into the station.",
   "The dirt concentration peaks here. A gathering point, or a bottleneck. People stopped, then moved on together.",
 ];
+
+// ── Tutorial hints (Sprint 11) ───────────────────────────────
+// Context-sensitive hints for new players. Each fires once.
+export interface TutorialHint {
+  id: string;
+  turn: number; // fires when state.turn >= this
+  text: string;
+}
+
+export const TUTORIAL_HINTS_EARLY: TutorialHint[] = [
+  {
+    id: "move_explore",
+    turn: 3,
+    text: "TIP: Use arrow keys to move. Explore rooms and look for terminals [i] to interact.",
+  },
+  {
+    id: "clean_rooms",
+    turn: 8,
+    text: "TIP: Press [c] to clean dirty tiles. Reach 80% cleanliness in each room to unlock the next phase.",
+  },
+  {
+    id: "scan_overlay",
+    turn: 15,
+    text: "TIP: Press [t] to toggle sensor overlays. Cleanliness overlay shows dirt levels across the station.",
+  },
+];
+
+// Event-triggered hints (fired once per event type)
+export const TUTORIAL_HINT_FIRST_EVIDENCE = "TIP: Evidence found! Press [v] to browse your journal. Collecting evidence unlocks deductions.";
+export const TUTORIAL_HINT_FIRST_DEDUCTION = "TIP: A deduction is ready! Press [r] to open the Broadcast Report and submit your findings.";
+export const TUTORIAL_HINT_INVESTIGATION = "TIP: Investigation phase — read terminals [i], examine items, and collect evidence to piece together what happened.";

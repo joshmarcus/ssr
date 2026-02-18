@@ -368,6 +368,46 @@ export class BrowserDisplay implements IGameDisplay {
       ? `<div class="gameover-stat"><span class="stat-label">Crew Evacuated:</span> <span class="stat-value ${crewEvacuated > 0 && crewDead === 0 ? 'good' : crewEvacuated > 0 ? 'warn' : 'bad'}">${crewEvacuated}/${crewEvacuated + crewDead + totalCrewNPCs}</span></div>`
       : "";
 
+    // Deduction and evidence stats
+    const deductions = state.mystery?.deductions ?? [];
+    const deductionsSolved = deductions.filter(d => d.solved).length;
+    const deductionsCorrect = deductions.filter(d => d.answeredCorrectly).length;
+    const evidenceCount = state.mystery?.journal.length ?? 0;
+    const roomsExplored = state.rooms.filter(r => {
+      for (let ry = r.y; ry < r.y + r.height; ry++) {
+        for (let rx = r.x; rx < r.x + r.width; rx++) {
+          if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+            if (state.tiles[ry][rx].explored) return true;
+          }
+        }
+      }
+      return false;
+    }).length;
+
+    // Performance rating based on composite score
+    let score = 0;
+    if (isVictory) score += 40;
+    score += Math.min(20, deductionsCorrect * (20 / Math.max(deductions.length, 1)));
+    score += Math.min(15, (roomsExplored / Math.max(state.rooms.length, 1)) * 15);
+    score += Math.min(15, (hpPercent / 100) * 15);
+    score += Math.min(10, isVictory && state.turn < 200 ? 10 : isVictory && state.turn < 350 ? 5 : 0);
+    const rating = score >= 90 ? "S" : score >= 75 ? "A" : score >= 55 ? "B" : score >= 35 ? "C" : "D";
+    const ratingColor = rating === "S" ? "#ff0" : rating === "A" ? "#0f0" : rating === "B" ? "#6cf" : rating === "C" ? "#fa0" : "#f44";
+
+    // Mystery choices summary
+    const choices = state.mystery?.choices ?? [];
+    const choicesMade = choices.filter(c => c.chosen).length;
+    let choicesHtml = "";
+    if (choicesMade > 0) {
+      const choiceLines = choices
+        .filter(c => c.chosen)
+        .map(c => {
+          const opt = c.options.find(o => o.key === c.chosen);
+          return opt ? opt.label : c.chosen;
+        });
+      choicesHtml = `<div class="gameover-stat"><span class="stat-label">Decisions Made:</span> <span class="stat-value">${choicesMade}/${choices.length}</span></div>`;
+    }
+
     const epilogue = isVictory
       ? (crewEvacuated > 0 && crewDead === 0 && totalCrewNPCs === 0
         ? "Recovery teams en route. Every soul accounted for."
@@ -378,14 +418,21 @@ export class BrowserDisplay implements IGameDisplay {
       <div class="gameover-box ${titleClass}">
         <div class="gameover-title ${titleClass}">${title}</div>
         <div class="gameover-subtitle">${subtitle}</div>
+        <div class="gameover-rating" style="text-align:center;margin:8px 0">
+          <span style="color:${ratingColor};font-size:32px;font-weight:bold;text-shadow:0 0 10px ${ratingColor}">${rating}</span>
+          <div style="color:#888;font-size:12px">PERFORMANCE RATING</div>
+        </div>
         <div class="gameover-stats">
           <div class="gameover-stat"><span class="stat-label">Turns:</span> <span class="stat-value">${state.turn}</span></div>
           <div class="gameover-stat"><span class="stat-label">Hull Integrity:</span> <span class="stat-value ${hpClass}">${state.player.hp}/${state.player.maxHp} (${hpPercent}%)</span></div>
+          <div class="gameover-stat"><span class="stat-label">Rooms Explored:</span> <span class="stat-value ${roomsExplored >= state.rooms.length ? 'good' : 'warn'}">${roomsExplored}/${state.rooms.length}</span></div>
           <div class="gameover-stat"><span class="stat-label">Relays Rerouted:</span> <span class="stat-value ${relaysActivated >= totalRelays ? 'good' : 'warn'}">${relaysActivated}/${totalRelays}</span></div>
           <div class="gameover-stat"><span class="stat-label">Breaches Sealed:</span> <span class="stat-value ${breachesSealed >= totalBreaches ? 'good' : 'warn'}">${breachesSealed}/${totalBreaches}</span></div>
           ${crewStatHtml}
           <div class="gameover-stat"><span class="stat-label">Terminals Read:</span> <span class="stat-value">${terminalsRead}/${totalTerminals}</span></div>
-          <div class="gameover-stat"><span class="stat-label">Logs Recovered:</span> <span class="stat-value">${logsFound}</span></div>
+          <div class="gameover-stat"><span class="stat-label">Evidence Collected:</span> <span class="stat-value">${evidenceCount}</span></div>
+          <div class="gameover-stat"><span class="stat-label">Deductions:</span> <span class="stat-value ${deductionsCorrect === deductions.length ? 'good' : deductionsCorrect > 0 ? 'warn' : 'bad'}">${deductionsCorrect}/${deductions.length} correct</span></div>
+          ${choicesHtml}
         </div>
         <div class="gameover-epilogue">${epilogue}</div>
         <div class="gameover-restart">Press [R] to restart</div>

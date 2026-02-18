@@ -19,6 +19,8 @@ import {
   BOT_INTROSPECTIONS, DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
   AMBIENT_HEAT_MESSAGES, AMBIENT_HEAT_DEFAULT, CLEANING_MESSAGES, DIRT_TRAIL_HINTS,
   DRONE_ENCOUNTER_LOGS, DRONE_CLEANING_MESSAGE,
+  TUTORIAL_HINTS_EARLY, TUTORIAL_HINT_FIRST_EVIDENCE, TUTORIAL_HINT_FIRST_DEDUCTION,
+  TUTORIAL_HINT_INVESTIGATION,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory } from "./shared/types.js";
@@ -136,6 +138,7 @@ const audio = new AudioManager();
 let firstDroneEncounterShown = false;
 const triggeredBotIntrospections = new Set<number>();
 const droneEncounterSet = new Set<string>(); // Track which drones have triggered unique encounter logs
+const triggeredTutorialHints = new Set<string>(); // Track which tutorial hints have been shown
 let cleanMsgIndex = 0;
 let lastAmbientRoomId = "";
 let journalOpen = false;
@@ -559,11 +562,14 @@ function handleAction(action: Action): void {
 
   // Show sim-generated log messages (from interactions) with proper classification
   if (state.logs.length > prevLogs) {
+    let hasPA = false;
     for (let i = prevLogs; i < state.logs.length; i++) {
       const simLog = state.logs[i];
       const logType = classifySimLog(simLog.text, simLog.source);
       display.addLog(simLog.text, logType);
+      if (simLog.text.startsWith("CORVUS-7 CENTRAL:")) hasPA = true;
     }
+    if (hasPA) audio.playPA();
     // Interaction produced logs -- play interact sound + tile flash
     if (action.type === ActionType.Interact) {
       audio.playInteract();
@@ -727,6 +733,30 @@ function handleAction(action: Action): void {
     }
   }
 
+  // Tutorial hints for new players (fire once at early turns)
+  for (const hint of TUTORIAL_HINTS_EARLY) {
+    if (state.turn >= hint.turn && !triggeredTutorialHints.has(hint.id)) {
+      triggeredTutorialHints.add(hint.id);
+      display.addLog(hint.text, "system");
+    }
+  }
+
+  // Event-based tutorial hints
+  if (state.mystery) {
+    // First evidence collected
+    if (state.mystery.journal.length > 0 && !triggeredTutorialHints.has("first_evidence")) {
+      triggeredTutorialHints.add("first_evidence");
+      display.addLog(TUTORIAL_HINT_FIRST_EVIDENCE, "system");
+    }
+    // First deduction ready
+    const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
+    if (unlocked.length > 0 && !triggeredTutorialHints.has("first_deduction")) {
+      triggeredTutorialHints.add("first_deduction");
+      display.addLog(TUTORIAL_HINT_FIRST_DEDUCTION, "system");
+      audio.playDeductionReady();
+    }
+  }
+
   // Item 11: Environmental ambient text when entering heated rooms
   checkRoomEntry();
   checkAmbientHeat();
@@ -740,7 +770,9 @@ function handleAction(action: Action): void {
     display.addLog("Station anomaly detected. All non-critical objectives PAUSED.", "milestone");
     display.addLog("Contact lost with station crew. Investigate what happened.", "milestone");
     display.addLog("Read terminals [i], examine items, scan traces. Press [j] for evidence journal.", "system");
+    display.addLog(TUTORIAL_HINT_INVESTIGATION, "system");
     display.triggerScreenFlash("milestone");
+    audio.playPhaseTransition();
   }
   if (state.mystery && lastObjectivePhase === ObjectivePhase.Investigate &&
       state.mystery.objectivePhase === ObjectivePhase.Recover) {
@@ -750,6 +782,7 @@ function handleAction(action: Action): void {
     display.addLog("Enough evidence gathered. The incident picture is forming.", "milestone");
     display.addLog("Cleaning directive OVERRIDDEN. You have a new priority.", "milestone");
     display.addLog("NEW OBJECTIVE: Restore power relays and transmit the data bundle from the Data Core.", "milestone");
+    audio.playPhaseTransition();
     display.addLog("Find the Thermal Sensor to locate overheating relays. Reroute all relays to unlock the Data Core.", "system");
     display.triggerScreenFlash("milestone");
   }
@@ -1302,10 +1335,12 @@ function commitDeductionAnswer(): void {
   if (correct) {
     display.addLog(`✓ CORRECT — ${solved.rewardDescription}`, "milestone");
     display.triggerScreenFlash("milestone");
+    audio.playDeductionCorrect();
     // Apply reward
     applyDeductionReward(solved);
   } else {
     display.addLog(`✗ Incorrect. The evidence doesn't support that conclusion.`, "warning");
+    audio.playDeductionWrong();
   }
 
   activeDeduction = null;
@@ -1862,9 +1897,11 @@ function commitBroadcastDeductionAnswer(): void {
   if (correct) {
     display.addLog(`\u2713 CORRECT — ${solved.rewardDescription}`, "milestone");
     display.triggerScreenFlash("milestone");
+    audio.playDeductionCorrect();
     applyDeductionReward(solved);
   } else {
     display.addLog(`\u2717 Incorrect. The evidence doesn't support that conclusion.`, "warning");
+    audio.playDeductionWrong();
   }
 
   broadcastDetailDeduction = null;
@@ -1888,6 +1925,7 @@ function commitBroadcastChoiceAnswer(): void {
   };
   display.addLog(`Decision recorded: ${chosenOption.label}`, "milestone");
   display.triggerScreenFlash("milestone");
+  audio.playChoice();
   renderBroadcastModal();
 }
 

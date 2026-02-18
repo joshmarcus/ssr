@@ -98,4 +98,54 @@ export class AudioManager {
   playDefeat(): void {
     this.tone(400, 0.5, 0.4, "sawtooth", 100);
   }
+
+  /** Ascending sweep for phase transitions (200->800Hz over 300ms). */
+  playPhaseTransition(): void {
+    this.tone(200, 0.3, 0.35, "sine", 800);
+  }
+
+  /** Two-note notification ping for deduction ready. */
+  playDeductionReady(): void {
+    this.tone(660, 0.08, 0.3, "sine");
+    setTimeout(() => this.tone(880, 0.12, 0.3, "sine"), 100);
+  }
+
+  /** Ascending major third for correct deduction (C5-E5). */
+  playDeductionCorrect(): void {
+    this.tone(523, 0.12, 0.35, "sine");
+    setTimeout(() => this.tone(659, 0.2, 0.35, "sine"), 130);
+  }
+
+  /** Low descending buzz for wrong deduction. */
+  playDeductionWrong(): void {
+    this.tone(200, 0.15, 0.3, "sawtooth", 100);
+    setTimeout(() => this.tone(150, 0.2, 0.25, "sawtooth", 80), 160);
+  }
+
+  /** Brief static burst for PA announcements. */
+  playPA(): void {
+    const { ctx, master } = this.ensure();
+    // White noise burst using buffer source
+    const duration = 0.08;
+    const sampleRate = ctx.sampleRate;
+    const bufferSize = Math.floor(sampleRate * duration);
+    const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.3;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    source.connect(gain);
+    gain.connect(master);
+    source.start(ctx.currentTime);
+  }
+
+  /** Sonar ping for choice confirmation. */
+  playChoice(): void {
+    this.tone(880, 0.1, 0.25, "sine", 440);
+  }
 }
