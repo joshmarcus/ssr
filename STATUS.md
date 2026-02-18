@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 11 (Sound Effects + Game-Over Polish + Tutorial Hints)
-- **Test status**: 189 tests passing across 17 test files (0 failing)
+- **Phase**: Sprint 12 (Evacuation Polish + Help Overlay + Evacuation Tests)
+- **Test status**: 202 tests passing across 18 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
 
@@ -32,6 +32,9 @@
 - Procedural sound effects: 12 Web Audio SFX (movement, interaction, scan, errors, victory/defeat, phase transitions, deductions, PA, choices)
 - Game-over overlay: performance rating (S/A/B/C/D), stats summary, mystery choices recap
 - Tutorial hints: context-sensitive tips at early turns and on first-time events
+- Evacuation phase: RED ALERT banner, crew following, escape pod boarding with full audio
+- Help overlay: HTML modal with complete key bindings, game phases, interaction details
+- Evacuation status in Broadcast Report + mini-map crew/pod markers
 
 ## Known Issues
 
@@ -62,6 +65,15 @@
 2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
 2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 12 Changes
+
+- Evacuation phase transition: dramatic RED ALERT banner with tutorial hints and alarm SFX
+- Help overlay: converted from log dump to HTML modal with complete bindings and game phase reference
+- Evacuation tests: 13 new tests (crew discovery, following, hazard damage, pod boarding, state tracking)
+- Broadcast Report: evacuation status section showing crew found/evacuated/dead, pods powered
+- Mini-map: cyan markers for escape pods, yellow ! for following crew during evacuation
+- 2 new audio SFX: evacuation alarm (descending tones), crew boarding confirmation
 
 ## Sprint 11 Changes
 
