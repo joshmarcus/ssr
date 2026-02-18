@@ -692,7 +692,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
               id: `log_datacore_deductions_${next.turn}`,
               timestamp: next.turn,
               source: "data_core",
-              text: `Data core online. Uplink ready, but transmission protocol requires a complete incident report. Open the Broadcast Report [B] to submit your deductions. (${solvedCount}/${totalDeductions} answered)`,
+              text: `Data core online. Uplink ready, but transmission protocol requires a complete incident report. Open the Broadcast Report [r] to submit your deductions. (${solvedCount}/${totalDeductions} answered)`,
               read: false,
             },
           ];

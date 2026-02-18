@@ -74,7 +74,7 @@ export function getObjective(state: GameState): Objective {
 
     return {
       text: `Investigate: gather evidence (${journalCount}/${threshold})`,
-      detail: "Interact with terminals, crew items, and evidence traces. Press [b] to broadcast a report when ready.",
+      detail: "Interact with terminals, crew items, and evidence traces. Press [r] to broadcast a report when ready.",
     };
   }
 

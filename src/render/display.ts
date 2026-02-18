@@ -1010,20 +1010,29 @@ export class BrowserDisplay implements IGameDisplay {
       { key: "_door", glyph: GLYPHS.door, color: "#a52", label: "Door" },
     ];
     const activeLegend = allLegendItems.filter(l => visibleEntityTypes.has(l.key));
-    const legendHtml = activeLegend.length > 0
-      ? activeLegend.map(l => `<span class="legend-glyph" style="color:${l.color}">${this.escapeHtml(l.glyph)}</span><span class="legend-name">${l.label}</span>`).join(" ")
-      : `<span class="label">No notable objects nearby.</span>`;
+
+    // Render legend beneath the map (larger, more central)
+    const mapLegendEl = document.getElementById("map-legend");
+    if (mapLegendEl) {
+      if (activeLegend.length > 0) {
+        mapLegendEl.innerHTML = activeLegend.map(l =>
+          `<span class="legend-item"><span class="legend-glyph" style="color:${l.color}">${this.escapeHtml(l.glyph)}</span><span class="legend-label">${l.label}</span></span>`
+        ).join("");
+      } else {
+        mapLegendEl.innerHTML = `<span class="legend-label">No notable objects nearby.</span>`;
+      }
+    }
 
     const controlsHtml = `<span class="label">Keys:</span> ` +
       `<span class="key">hjkl</span>/<span class="key">yubn</span> move ` +
       `<span class="key">i</span> interact ` +
       `<span class="key">t</span> sensor ` +
       `<span class="key">c</span> clean ` +
-      `<span class="key">b</span> report ` +
+      `<span class="key">;</span> journal ` +
+      `<span class="key">r</span> report ` +
       `<span class="key">?</span> help`;
 
-    const infoHtml = `<div class="info-bar">` +
-      `${legendHtml}<br>${controlsHtml}</div>`;
+    const infoHtml = `<div class="info-bar">${controlsHtml}</div>`;
 
     // ── Log panel (color-coded by type) ─────────────────────────
     const logEntries = this.logHistory.length > 0

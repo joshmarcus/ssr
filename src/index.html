@@ -19,12 +19,43 @@
       height: 100vh;
       width: 100%;
     }
+    #map-column {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
     #rot-display {
       display: flex;
       justify-content: center;
       align-items: center;
       position: relative;
       flex-shrink: 0;
+    }
+    #map-legend {
+      font-family: monospace;
+      font-size: 13px;
+      color: #888;
+      background: #0c0c0c;
+      padding: 6px 12px;
+      border-top: 1px solid #222;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px 12px;
+      max-width: 100%;
+    }
+    #map-legend .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    #map-legend .legend-glyph {
+      font-size: 15px;
+      font-weight: bold;
+    }
+    #map-legend .legend-label {
+      color: #666;
+      font-size: 12px;
     }
     #rot-display canvas {
       display: block;
@@ -391,7 +422,10 @@
   <div id="crawl-overlay"></div>
   <div id="game-container">
     <div id="ui-panel"></div>
-    <div id="rot-display"></div>
+    <div id="map-column">
+      <div id="rot-display"></div>
+      <div id="map-legend"></div>
+    </div>
   </div>
   <script type="module" src="./browser.ts"></script>
 </body>

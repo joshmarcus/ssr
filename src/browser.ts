@@ -348,8 +348,8 @@ function initGame(): void {
       }
       return;
     }
-    // B key opens broadcast report modal
-    if (e.key === "b" && !journalOpen && !state.gameOver) {
+    // R opens broadcast report modal — b is SW movement key
+    if (e.key === "r" && !journalOpen && !state.gameOver) {
       e.preventDefault();
       broadcastOpen = !broadcastOpen;
       if (broadcastOpen) {
@@ -737,7 +737,7 @@ function handleAction(action: Action): void {
     }
   }
 
-  // Mystery choices no longer auto-trigger — player presses [b] to broadcast
+  // Mystery choices no longer auto-trigger — player presses [r] to broadcast
 
   // Detect damage taken this turn for screen flash
   if (state.turn !== prevTurn && !state.gameOver) {
@@ -972,7 +972,7 @@ function showHelp(): void {
   display.addLog("  x                    Look (examine surroundings)", "system");
   display.addLog("  .  Space  5          Wait one turn", "system");
   display.addLog("── Menus ──", "system");
-  display.addLog("  b                    Broadcast report to base", "system");
+  display.addLog("  r                    Broadcast report to base", "system");
   display.addLog("  ;                    Open journal / notes", "system");
   display.addLog("  m                    Toggle station map", "system");
   display.addLog("  ?                    Toggle this help", "system");
@@ -1564,7 +1564,7 @@ function handleBroadcastInput(e: KeyboardEvent): void {
     return;
   }
 
-  if (e.key === "Escape" || e.key === "b") {
+  if (e.key === "Escape" || e.key === "r") {
     closeBroadcastModal();
     return;
   }
