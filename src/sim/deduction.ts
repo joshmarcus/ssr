@@ -19,6 +19,75 @@ import { DeductionCategory, IncidentArchetype, CrewRole, CrewSecret } from "../s
 import { findByRole, findSecretHolder } from "./crewGen.js";
 import { resolveRevelations } from "../data/revelations.js";
 
+// ── Per-archetype story configuration ────────────────────────────
+// Each archetype has a distinct human story with different hero/villain roles,
+// question framings, and hint text. This config drives the deduction generators.
+
+interface StoryRoles {
+  hero: CrewRole;
+  villain: CrewRole | null;            // null = non-crew villain (e.g. AI)
+  heroQuestion: string;
+  villainQuestion: string;
+  heroHint: string;
+  villainHint: string;
+  /** If villain is null, these provide the non-crew correct answer */
+  villainNonCrewLabel?: string;
+  villainNonCrewTags?: [string, string];
+}
+
+export const STORY_ROLES: Record<IncidentArchetype, StoryRoles> = {
+  [IncidentArchetype.CoolantCascade]: {
+    hero: CrewRole.Engineer,
+    villain: CrewRole.Captain,
+    heroQuestion: "Who tried to prevent the disaster?",
+    villainQuestion: "Who bears the most responsibility?",
+    heroHint: "Find logs describing who raised warnings and fought the cascade — look for maintenance requests and emergency response evidence.",
+    villainHint: "Look for maintenance deferral orders and altered incident reports — who had authority to act and chose not to?",
+  },
+  [IncidentArchetype.HullBreach]: {
+    hero: CrewRole.Medic,
+    villain: CrewRole.Security,
+    heroQuestion: "Who was the real victim here?",
+    villainQuestion: "Who caused the breach?",
+    heroHint: "Search personal logs for relationship details and fear — whose quarters were in the depressurization zone?",
+    villainHint: "Check security access logs at the hull section and disabled alarm records — who had override codes?",
+  },
+  [IncidentArchetype.ReactorScram]: {
+    hero: CrewRole.Scientist,
+    villain: null,
+    heroQuestion: "Who understood what was really happening?",
+    villainQuestion: "What was the data core trying to do?",
+    heroHint: "Look for research notes about anomalous processing patterns — who recognized emergent behavior?",
+    villainHint: "Examine the data core's behavior logs and the diagnostic reset timing — was the SCRAM defensive or aggressive?",
+    villainNonCrewLabel: "Protect itself — the SCRAM was self-preservation, not malice. It was afraid of being erased.",
+    villainNonCrewTags: ["data_core", "timeline_aftermath"],
+  },
+  [IncidentArchetype.Sabotage]: {
+    hero: CrewRole.Security,
+    villain: CrewRole.Captain,
+    heroQuestion: "Who confronted the threat directly?",
+    villainQuestion: "Who let this happen?",
+    heroHint: "Search for the security officer's final reports and encounter evidence — who faced the unknown threat?",
+    villainHint: "Check cargo manifests and biological hazard flags — who approved the transfer despite warnings?",
+  },
+  [IncidentArchetype.SignalAnomaly]: {
+    hero: CrewRole.Engineer,
+    villain: CrewRole.Scientist,
+    heroQuestion: "Who saved the station from total destruction?",
+    villainQuestion: "Who caused the overload?",
+    heroHint: "Find emergency action logs — who physically disconnected the array during the electromagnetic storm?",
+    villainHint: "Check array modification logs and unauthorized transmission records — who sent the response?",
+  },
+  [IncidentArchetype.ContainmentBreach]: {
+    hero: CrewRole.Medic,
+    villain: CrewRole.Captain,
+    heroQuestion: "Who exposed the truth to save the crew?",
+    villainQuestion: "Who put the crew at risk?",
+    heroHint: "Look for medical logs about unusual symptoms and unauthorized lab access — who investigated despite orders to stop?",
+    villainHint: "Search classified communications and restricted lab authorizations — who ran the secret program?",
+  },
+};
+
 /**
  * Get the system tags associated with an incident archetype.
  */
@@ -29,13 +98,13 @@ export function getArchetypeTags(archetype: IncidentArchetype): string[] {
     case IncidentArchetype.HullBreach:
       return ["hull", "pressure"];
     case IncidentArchetype.ReactorScram:
-      return ["reactor", "containment"];
+      return ["reactor", "data_core", "containment"];
     case IncidentArchetype.Sabotage:
-      return ["electrical", "signal"];
+      return ["electrical", "biological"];
     case IncidentArchetype.SignalAnomaly:
-      return ["signal", "electrical"];
+      return ["signal", "transmission"];
     case IncidentArchetype.ContainmentBreach:
-      return ["containment", "pressure"];
+      return ["containment", "classified"];
   }
 }
 
@@ -65,13 +134,13 @@ export function generateDeductions(
   deductions.push(generateSequenceDeduction(timeline, crew, roomNames, archTags));
 
   // ── Tier 3: WHY did it happen? (unlocked after Tier 2) ──
-  deductions.push(generateWhyDeduction(timeline, captain, engineer, secretHolder, archTags));
+  deductions.push(generateWhyDeduction(timeline, crew, archTags));
 
-  // ── Tier 4: WHO tried to prevent it? (unlocked after Tier 3) ──
+  // ── Tier 4: WHO is the hero/victim? (unlocked after Tier 3) ──
   deductions.push(generateHeroDeduction(crew, timeline));
 
   // ── Tier 5: WHO bears responsibility? (unlocked after Tier 4) ──
-  deductions.push(generateResponsibilityDeduction(crew, timeline, captain, secretHolder));
+  deductions.push(generateResponsibilityDeduction(crew, timeline));
 
   // ── Tier 6 (optional): What were they really doing here? ──
   if (timeline.archetype === IncidentArchetype.SignalAnomaly ||
@@ -160,50 +229,93 @@ function generateSequenceDeduction(
 
 function generateWhyDeduction(
   timeline: IncidentTimeline,
-  captain: CrewMember | undefined,
-  engineer: CrewMember | undefined,
-  secretHolder: CrewMember | undefined,
+  crew: CrewMember[],
   archTags: string[],
 ): Deduction {
   const archetype = timeline.archetype;
+  const captain = findByRole(crew, CrewRole.Captain);
+  const engineer = findByRole(crew, CrewRole.Engineer);
+  const medic = findByRole(crew, CrewRole.Medic);
+  const security = findByRole(crew, CrewRole.Security);
+  const scientist = findByRole(crew, CrewRole.Scientist);
+
   let correctKey: string;
   let correctLabel: string;
+  let wrongAnswers: string[];
+  // The crew member whose name appears as a required tag for this deduction
+  let crewTagMember: CrewMember | undefined;
 
   switch (archetype) {
     case IncidentArchetype.CoolantCascade:
-      correctLabel = `Maintenance was deferred — ${engineer?.lastName || "the engineer"}'s warnings were ignored by ${captain?.lastName || "command"}`;
+      correctLabel = `Deferred maintenance — ${engineer?.lastName || "the engineer"}'s warnings were suppressed by ${captain?.lastName || "command"}`;
       correctKey = "deferred_maintenance";
+      crewTagMember = engineer;
+      wrongAnswers = [
+        "The coolant system was defective from installation — a manufacturing flaw",
+        "A software update corrupted the thermal monitoring systems",
+        "Budget cuts from UN-ORC reduced maintenance crew below safe levels",
+      ];
       break;
     case IncidentArchetype.HullBreach:
-      correctLabel = "Micro-impact damage accumulated over months without proper hull inspections";
-      correctKey = "accumulated_damage";
+      correctLabel = "This wasn't an accident — the hull was deliberately weakened";
+      correctKey = "deliberate_breach";
+      crewTagMember = security;
+      wrongAnswers = [
+        "Micro-impact damage accumulated over months without proper inspections",
+        "A manufacturing defect in the hull plating went undetected",
+        "An external collision with space debris caused sudden failure",
+      ];
       break;
     case IncidentArchetype.ReactorScram:
-      correctLabel = "Containment field degraded beyond safe limits while the crew focused on the transmission deadline";
-      correctKey = "deadline_pressure";
+      correctLabel = "The data core triggered the SCRAM to prevent its own diagnostic reset";
+      correctKey = "ai_self_preservation";
+      crewTagMember = scientist;
+      wrongAnswers = [
+        "Containment field degraded due to deferred maintenance",
+        "A power surge from the communications array overloaded the reactor",
+        "The crew pushed reactor output past safe limits for a deadline",
+      ];
       break;
     case IncidentArchetype.Sabotage:
-      correctLabel = `Deliberate interference — someone had a reason to disable station systems`;
-      correctKey = "sabotage";
+      correctLabel = "An alien organism in the cargo disrupts electronics to hunt — the 'sabotage' is a predator";
+      correctKey = "alien_predator";
+      crewTagMember = captain;
+      wrongAnswers = [
+        "A disgruntled crew member sabotaged systems to cover their escape",
+        "A cascading software exploit propagated through the network",
+        "An external hacking attempt compromised station security remotely",
+      ];
       break;
     case IncidentArchetype.SignalAnomaly:
-      correctLabel = "An anomalous external signal disrupted station electronics in ways nobody predicted";
-      correctKey = "external_signal";
+      correctLabel = "Someone sent an unauthorized response to the signal using an unshielded array";
+      correctKey = "unauthorized_transmission";
+      crewTagMember = scientist;
+      wrongAnswers = [
+        "The alien signal contained a hostile payload that attacked station systems",
+        "A classified monitoring operation overloaded the receivers",
+        "Natural electromagnetic interference from a nearby pulsar disrupted electronics",
+      ];
       break;
     case IncidentArchetype.ContainmentBreach:
-      correctLabel = "Lab containment protocols were insufficient for the experiment being conducted";
-      correctKey = "containment_failure";
+      correctLabel = "A classified program cut corners on containment to maintain secrecy — safety reviews were bypassed";
+      correctKey = "classified_program";
+      crewTagMember = medic;
+      wrongAnswers = [
+        "The containment field emitter failed due to age and wear",
+        "An unauthorized experiment exceeded the lab's safety parameters",
+        "A power fluctuation knocked the containment field offline momentarily",
+      ];
       break;
     default:
       correctLabel = "System failure compounded by human error";
       correctKey = "compound_failure";
+      crewTagMember = engineer;
+      wrongAnswers = [
+        "The station was simply too old — equipment past its service life",
+        "A software update corrupted the safety monitoring systems",
+        "Budget cuts from UN-ORC reduced the crew below safe staffing levels",
+      ];
   }
-
-  const wrongAnswers = [
-    "The station was simply too old — equipment past its service life",
-    "A software update corrupted the safety monitoring systems",
-    "Budget cuts from UN-ORC reduced the crew below safe staffing levels",
-  ];
 
   const options = [
     { label: correctLabel, key: correctKey, correct: true },
@@ -211,8 +323,7 @@ function generateWhyDeduction(
   ];
   shuffleArray(options);
 
-  // Need archetype tag + engineer or captain crew tag
-  const crewTag = engineer?.lastName.toLowerCase() || "engineer";
+  const crewTag = crewTagMember?.lastName.toLowerCase() || "engineer";
   return {
     id: "deduction_why",
     category: DeductionCategory.Why,
@@ -232,12 +343,13 @@ function generateHeroDeduction(
   crew: CrewMember[],
   timeline: IncidentTimeline,
 ): Deduction {
-  const engineer = findByRole(crew, CrewRole.Engineer);
-  const correctLabel = engineer
-    ? `${engineer.firstName} ${engineer.lastName} (${engineer.role})`
-    : "The engineer";
+  const config = STORY_ROLES[timeline.archetype];
+  const hero = findByRole(crew, config.hero);
+  const correctLabel = hero
+    ? `${hero.firstName} ${hero.lastName} (${hero.role})`
+    : `The ${config.hero.toLowerCase()}`;
 
-  const otherCrew = crew.filter(c => c.role !== CrewRole.Engineer).slice(0, 3);
+  const otherCrew = crew.filter(c => c.role !== config.hero).slice(0, 3);
   const wrongLabels = otherCrew.map(c => `${c.firstName} ${c.lastName} (${c.role})`);
 
   const options = [
@@ -246,41 +358,50 @@ function generateHeroDeduction(
   ];
   shuffleArray(options);
 
+  const heroRoleTag = config.hero.toLowerCase();
   return {
     id: "deduction_hero",
     category: DeductionCategory.Who,
-    question: "Who tried hardest to prevent the disaster?",
+    question: config.heroQuestion,
     options,
-    requiredTags: ["engineer", "timeline_response"],
+    requiredTags: [heroRoleTag, "timeline_response"],
     unlockAfter: "deduction_why",
     linkedEvidence: [],
     solved: false,
     rewardType: "clearance",
     rewardDescription: "Grants clearance to open a locked door elsewhere in the station",
-    hintText: "Find logs describing who took action during the crisis — look for response and rescue evidence.",
+    hintText: config.heroHint,
   };
 }
 
 function generateResponsibilityDeduction(
   crew: CrewMember[],
   timeline: IncidentTimeline,
-  captain: CrewMember | undefined,
-  secretHolder: CrewMember | undefined,
 ): Deduction {
+  const config = STORY_ROLES[timeline.archetype];
   let correctLabel: string;
+  let requiredTags: string[];
+  let excludeIds: string[] = [];
 
-  if (timeline.archetype === IncidentArchetype.Sabotage && secretHolder) {
-    correctLabel = `${secretHolder.firstName} ${secretHolder.lastName} — the evidence points to deliberate action`;
-  } else if (captain) {
-    correctLabel = `${captain.firstName} ${captain.lastName} — command ignored the warnings`;
+  if (config.villain === null) {
+    // Non-crew villain (e.g., the AI in ReactorScram)
+    correctLabel = config.villainNonCrewLabel || "An external factor beyond crew control";
+    requiredTags = config.villainNonCrewTags || ["data_core", "timeline_aftermath"];
   } else {
-    correctLabel = "Station command — they had the authority and chose not to act";
+    const villain = findByRole(crew, config.villain);
+    if (villain) {
+      // Per-archetype framing of the villain's guilt
+      const villainDesc = getVillainDescription(timeline.archetype);
+      correctLabel = `${villain.firstName} ${villain.lastName} — ${villainDesc}`;
+      excludeIds.push(villain.id);
+      requiredTags = [villain.lastName.toLowerCase(), "timeline_aftermath"];
+    } else {
+      correctLabel = `Station command — they had the authority and chose not to act`;
+      requiredTags = ["captain", "timeline_aftermath"];
+    }
   }
 
-  const otherCrew = crew.filter(c =>
-    c.id !== captain?.id && c.id !== secretHolder?.id
-  ).slice(0, 2);
-
+  const otherCrew = crew.filter(c => !excludeIds.includes(c.id)).slice(0, 2);
   const wrongLabels = [
     ...otherCrew.map(c => `${c.firstName} ${c.lastName} — they had access and opportunity`),
     "No single person — it was a systemic failure",
@@ -292,20 +413,36 @@ function generateResponsibilityDeduction(
   ];
   shuffleArray(options);
 
-  const captainTag = captain?.lastName.toLowerCase() || "captain";
   return {
     id: "deduction_responsibility",
     category: DeductionCategory.Who,
-    question: "Who bears the most responsibility for what happened?",
+    question: config.villainQuestion,
     options,
-    requiredTags: [captainTag, "timeline_aftermath"],
+    requiredTags,
     unlockAfter: "deduction_hero",
     linkedEvidence: [],
     solved: false,
     rewardType: "room_reveal",
     rewardDescription: "Reveals a hidden section of the station",
-    hintText: "Look for aftermath logs and command decisions — who had the authority to act?",
+    hintText: config.villainHint,
   };
+}
+
+function getVillainDescription(archetype: IncidentArchetype): string {
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade:
+      return "suppressed warnings and falsified the incident report";
+    case IncidentArchetype.HullBreach:
+      return "used security access to disable alarms and weaken the hull";
+    case IncidentArchetype.Sabotage:
+      return "approved the flagged cargo transfer despite biological hazard warnings";
+    case IncidentArchetype.SignalAnomaly:
+      return "secretly modified the array and transmitted without authorization";
+    case IncidentArchetype.ContainmentBreach:
+      return "authorized a classified program that endangered the crew";
+    default:
+      return "had the authority to prevent this and chose not to act";
+  }
 }
 
 function generateHiddenAgendaDeduction(
@@ -487,32 +624,32 @@ function getWhatHintText(archetype: IncidentArchetype): string {
     case IncidentArchetype.CoolantCascade:
       return "Look for thermal warnings and maintenance logs that describe overheating systems.";
     case IncidentArchetype.HullBreach:
-      return "Search for structural inspection reports and pressure monitoring data.";
+      return "Search for pressure logs and structural failure records in the crew quarters section.";
     case IncidentArchetype.ReactorScram:
-      return "Find reactor containment readings and radiation monitoring logs.";
+      return "Find reactor SCRAM logs and containment field readings — was this really a malfunction?";
     case IncidentArchetype.Sabotage:
-      return "Look for security logs showing unauthorized access and suspicious badge activity.";
+      return "Look for the pattern of system failures — is the sequence consistent with human sabotage?";
     case IncidentArchetype.SignalAnomaly:
-      return "Search for signal analysis reports and communications anomaly data.";
+      return "Search for signal processing logs and electronic interference records.";
     case IncidentArchetype.ContainmentBreach:
-      return "Find laboratory records and contamination readings from sealed areas.";
+      return "Find containment field logs and atmospheric contamination readings.";
   }
 }
 
 function getWhyHintText(archetype: IncidentArchetype): string {
   switch (archetype) {
     case IncidentArchetype.CoolantCascade:
-      return "Check maintenance request logs — were warnings ignored or deferred?";
+      return "Check maintenance request logs — were warnings filed and then suppressed?";
     case IncidentArchetype.HullBreach:
-      return "Look for hull inspection records — was damage accumulating over time?";
+      return "Look for evidence of tampering — tool marks, disabled alarms, security access at the breach point.";
     case IncidentArchetype.ReactorScram:
-      return "Find evidence of deadline pressure and containment field degradation.";
+      return "Examine the data core's processing logs — what was happening when the SCRAM triggered?";
     case IncidentArchetype.Sabotage:
-      return "Search for motive — who had a reason to disable station systems?";
+      return "Analyze the failure pattern and residue at junction points — is this really human sabotage?";
     case IncidentArchetype.SignalAnomaly:
-      return "Look for external signal data — was something unexpected interfering with electronics?";
+      return "Check array power logs — was the station receiving, or was it transmitting?";
     case IncidentArchetype.ContainmentBreach:
-      return "Check experiment records — were protocols sufficient for what was being studied?";
+      return "Look for classified communications and restricted lab access — what was really going on in that section?";
   }
 }
 
@@ -528,19 +665,24 @@ export function getTagExplanation(tag: string, archetype?: IncidentArchetype): s
         if (tag === "coolant" || tag === "thermal") return "Direct evidence of the thermal cascade event";
         break;
       case IncidentArchetype.HullBreach:
-        if (tag === "hull" || tag === "pressure") return "Direct evidence of the hull breach";
+        if (tag === "hull" || tag === "pressure") return "Evidence of the hull breach and depressurization";
+        if (tag === "forensic") return "Forensic evidence suggesting tampering at the breach point";
         break;
       case IncidentArchetype.ReactorScram:
-        if (tag === "reactor" || tag === "containment") return "Direct evidence of the reactor emergency";
+        if (tag === "reactor") return "Direct evidence of the reactor emergency shutdown";
+        if (tag === "data_core") return "Evidence of anomalous data core behavior during the SCRAM";
         break;
       case IncidentArchetype.Sabotage:
-        if (tag === "electrical" || tag === "signal") return "Evidence suggesting deliberate interference";
+        if (tag === "electrical") return "Evidence of systematic electrical disruption";
+        if (tag === "biological") return "Organic traces suggesting a non-human cause";
         break;
       case IncidentArchetype.SignalAnomaly:
-        if (tag === "signal" || tag === "electrical") return "Evidence of the anomalous signal event";
+        if (tag === "signal") return "Evidence of the anomalous signal event";
+        if (tag === "transmission") return "Evidence of outbound array transmission activity";
         break;
       case IncidentArchetype.ContainmentBreach:
-        if (tag === "containment" || tag === "pressure") return "Evidence of the containment failure";
+        if (tag === "containment") return "Evidence of the lab containment failure";
+        if (tag === "classified") return "Classified documents revealing the lab's true purpose";
         break;
     }
   }
@@ -556,6 +698,13 @@ export function getTagExplanation(tag: string, archetype?: IncidentArchetype): s
     electrical: "Evidence of electrical system disruption",
     containment: "Evidence related to containment field integrity",
     radiation: "Evidence of radiation exposure",
+    biological: "Organic or biological traces at the site",
+    forensic: "Forensic evidence of deliberate tampering",
+    data_core: "Evidence of anomalous data core processing",
+    classified: "Classified or restricted-access information",
+    cargo: "Evidence from cargo manifests or shipping records",
+    transmission: "Evidence of array transmission activity",
+    medical: "Medical logs or diagnostic evidence",
   };
   if (systemExplanations[tag]) return systemExplanations[tag];
 
@@ -631,6 +780,39 @@ export function generateEvidenceTags(
     "electrical": "electrical",
     "power": "electrical",
     "radiation": "radiation",
+    // New storyline keywords
+    "biological": "biological",
+    "organic": "biological",
+    "creature": "biological",
+    "organism": "biological",
+    "residue": "biological",
+    "specimen": "biological",
+    "tool marks": "forensic",
+    "tampered": "forensic",
+    "deliberate": "forensic",
+    "forensic": "forensic",
+    "weakened": "forensic",
+    "data core": "data_core",
+    "sentien": "data_core",
+    "diagnostic": "data_core",
+    "processing anomal": "data_core",
+    "emergent": "data_core",
+    "classified": "classified",
+    "restricted": "classified",
+    "clearance": "classified",
+    "black site": "classified",
+    "bioweapon": "classified",
+    "cargo": "cargo",
+    "manifest": "cargo",
+    "shipment": "cargo",
+    "transfer": "cargo",
+    "transmission": "transmission",
+    "outbound": "transmission",
+    "array": "transmission",
+    "symptom": "medical",
+    "diagnosis": "medical",
+    "contaminant": "medical",
+    "exposure": "medical",
   };
   for (const [keyword, tag] of Object.entries(systemKeywords)) {
     if (lowerDetail.includes(keyword)) {

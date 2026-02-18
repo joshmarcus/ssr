@@ -51,7 +51,7 @@ describe("getTagExplanation", () => {
 
   it("provides archetype-specific flavor for sabotage", () => {
     const expl = getTagExplanation("electrical", IncidentArchetype.Sabotage);
-    expect(expl).toContain("deliberate");
+    expect(expl).toContain("electrical");
   });
 });
 
