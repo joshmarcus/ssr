@@ -12,6 +12,7 @@ import { generate } from "../sim/procgen.js";
 import { step } from "../sim/step.js";
 import { isValidAction } from "../sim/actions.js";
 import { getRoomCleanliness } from "../sim/rooms.js";
+import { getUnlockedDeductions } from "../sim/deduction.js";
 import { GOLDEN_SEED } from "../shared/constants.js";
 import { getObjective, getRoomExits, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import type {
@@ -212,6 +213,46 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
     }
   }
 
+  // ── Journal + Deductions ──
+  const journalEntries = (state.mystery?.journal ?? []).map(j => ({
+    id: j.id,
+    category: j.category,
+    summary: j.summary,
+    tags: j.tags,
+  }));
+
+  const allDeductions = state.mystery?.deductions ?? [];
+  const journal = state.mystery?.journal ?? [];
+  const allJournalTags = new Set(journal.flatMap(j => j.tags));
+  const deductions = allDeductions.map(d => ({
+    id: d.id,
+    category: d.category,
+    question: d.question,
+    options: d.options.map(o => ({ key: o.key, label: o.label })),
+    solved: d.solved,
+    answeredCorrectly: d.answeredCorrectly,
+    requiredTags: d.requiredTags,
+    missingTags: d.requiredTags.filter(t => !allJournalTags.has(t)),
+  }));
+  const answered = allDeductions.filter(d => d.solved).length;
+  const correct = allDeductions.filter(d => d.answeredCorrectly).length;
+  const deductionProgress = { total: allDeductions.length, answered, correct };
+  const transmissionReady = allDeductions.length > 0 && allDeductions.every(d => d.solved);
+
+  // Add deduction actions to valid actions
+  if (state.mystery) {
+    const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
+    for (const d of unlocked) {
+      for (const opt of d.options) {
+        validActions.push({
+          type: "SUBMIT_DEDUCTION",
+          params: { deductionId: d.id, answerKey: opt.key },
+          description: `Answer "${d.question}" with "${opt.label}"`,
+        });
+      }
+    }
+  }
+
   return {
     turn: state.turn,
     seed: state.seed,
@@ -234,6 +275,10 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
     validActions,
     recentLogs,
     alerts,
+    journalEntries,
+    deductions,
+    deductionProgress,
+    transmissionReady,
   };
 }
 
@@ -318,6 +363,34 @@ function renderObservationAsText(obs: HarnessObservation): string {
     }
   }
 
+  // Journal + Deductions
+  if (obs.journalEntries.length > 0) {
+    lines.push("");
+    lines.push(`--- JOURNAL (${obs.journalEntries.length} entries) ---`);
+    for (const j of obs.journalEntries.slice(-5)) {
+      lines.push(`  [${j.category}] ${j.summary} (tags: ${j.tags.join(", ")})`);
+    }
+  }
+
+  if (obs.deductions.length > 0) {
+    lines.push("");
+    lines.push(`--- DEDUCTIONS (${obs.deductionProgress.answered}/${obs.deductionProgress.total} answered, ${obs.deductionProgress.correct} correct) ---`);
+    if (obs.transmissionReady) {
+      lines.push("  >>> ALL DEDUCTIONS ANSWERED — INTERACT WITH DATACORE TO TRANSMIT AND WIN <<<");
+    }
+    for (const d of obs.deductions) {
+      const status = d.solved
+        ? (d.answeredCorrectly ? "[CORRECT]" : "[WRONG]")
+        : d.missingTags.length === 0 ? "[UNLOCKED]" : "[LOCKED]";
+      lines.push(`  ${d.id} ${status} ${d.question}`);
+      if (!d.solved && d.missingTags.length === 0) {
+        for (const o of d.options) {
+          lines.push(`    SUBMIT_DEDUCTION {"deductionId":"${d.id}","answerKey":"${o.key}"} — ${o.label}`);
+        }
+      }
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -383,6 +456,12 @@ function parseAction(responseText: string): Action | null {
         return { type: ActionType.Wait };
       case "LOOK":
         return { type: ActionType.Look };
+      case "SUBMIT_DEDUCTION": {
+        const dedId = (params.deductionId ?? "").toString();
+        const ansKey = (params.answerKey ?? "").toString();
+        if (!dedId || !ansKey) return null;
+        return { type: ActionType.SubmitDeduction, deductionId: dedId, answerKey: ansKey };
+      }
       default:
         return null;
     }
@@ -412,6 +491,7 @@ AVAILABLE ACTIONS:
 - SCAN: Scan surroundings with your active sensor.
 - CLEAN: Clean the current tile (reduces dirt).
 - WAIT: Do nothing for one turn.
+- SUBMIT_DEDUCTION: Answer a deduction question. Params: {"deductionId": "deduction_what", "answerKey": "correct"}
 
 STRATEGY TIPS:
 1. Explore rooms systematically. Move toward unexplored areas.
@@ -421,8 +501,9 @@ STRATEGY TIPS:
 5. INTERACT with Hull Breaches to seal them (reduces pressure loss).
 6. Avoid high-heat and low-pressure areas when possible, or pass through quickly.
 7. Watch out for Patrol Drones — they damage you on contact.
-8. INTERACT with the Data Core to transmit data and win the game.
-9. INTERACT with Log Terminals and Crew Items to gather evidence.
+8. INTERACT with the Data Core to transmit data and win — but ALL deductions must be answered first!
+9. INTERACT with Log Terminals and Crew Items to gather evidence and unlock deductions.
+10. Use SUBMIT_DEDUCTION when deductions are [UNLOCKED] in the DEDUCTIONS section. Choose the answer key that seems most supported by evidence.
 10. If HP is critical, prioritize finding Med Kits or Repair Cradles.
 11. Clean dirty rooms when the objective phase is "clean". Your CLEANING DIRECTIVE may lock you in a room until it reaches 80% cleanliness — use CLEAN repeatedly on dirty tiles until the directive clears!
 12. INTERACT with Closed Doors to open them for further exploration.
@@ -438,7 +519,8 @@ RESPONSE FORMAT — copy one of these exactly, filling in the values:
 {"action":"INTERACT","params":{"target":"relay_01"}}
 {"action":"SCAN"}
 {"action":"CLEAN"}
-{"action":"WAIT"}`;
+{"action":"WAIT"}
+{"action":"SUBMIT_DEDUCTION","params":{"deductionId":"deduction_what","answerKey":"correct"}}`;
 
 // ── Claude API caller ────────────────────────────────────────
 

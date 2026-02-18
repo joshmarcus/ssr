@@ -103,6 +103,26 @@ All design docs live in `space_station_roguelike_docs_v10/`:
 - `agents/agent_playtest_balance.md` — Playtesting and balance
 - `agents/agent_packaging_steam_deck.md` — Packaging and Steam Deck deployment
 
+## Important Project Files
+
+- `CLAUDE.md` — This file. Project instructions and architecture reference
+- `TEAM.md` — Sprint team roles, file ownership, workflow rules
+- `STATUS.md` — Living project status (update after each sprint)
+- `FUTURE_FEATURES.md` — Deferred features and design ideas
+- `space_station_roguelike_docs_v10/tasks/backlog.md` — Milestone roadmap and backlog
+
+## Sprint Workflow
+
+1. Review `STATUS.md` for current state (what works, what's broken)
+2. Check `backlog.md` and `FUTURE_FEATURES.md` for priorities
+3. Plan sprint: 3-5 deliverables, prioritized by game design lead
+4. Execute in parallel by role (see `TEAM.md`)
+5. QA: run `npx tsc --noEmit` + `npx vitest run` to verify
+6. **Always commit and push** after changes are verified
+7. Update `STATUS.md` after each sprint with changes and new findings
+8. **After major sprints**: Update critical docs, run a full playtest (harness or manual), share a playtest report before the next planning cycle. The whole team can propose priorities.
+9. **Design priority**: The game should be fun, interesting, and innovative — technical elegance is secondary
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)

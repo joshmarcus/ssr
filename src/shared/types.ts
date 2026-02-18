@@ -108,6 +108,7 @@ export enum ActionType {
   Wait = "wait",
   Look = "look",
   Journal = "journal",
+  SubmitDeduction = "submitDeduction",
 }
 
 export enum Direction {
@@ -125,6 +126,8 @@ export interface Action {
   type: ActionType;
   direction?: Direction;
   targetId?: EntityId;
+  deductionId?: string;
+  answerKey?: string;
 }
 
 // ── Room metadata ────────────────────────────────────────────

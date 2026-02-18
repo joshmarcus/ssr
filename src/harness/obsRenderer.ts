@@ -9,6 +9,7 @@ import {
 } from "../shared/constants.js";
 import { isValidAction } from "../sim/actions.js";
 import { getObjective, getRoomExits, getDiscoveries } from "../shared/ui.js";
+import { getUnlockedDeductions } from "../sim/deduction.js";
 
 import type {
   HarnessObservation,
@@ -456,6 +457,50 @@ export function buildObservation(
     alerts.push(`Stunned for ${state.player.stunTurns} more turn(s)`);
   }
 
+  // ── Journal entries ──
+  const journalEntries = (state.mystery?.journal ?? []).map(j => ({
+    id: j.id,
+    category: j.category,
+    summary: j.summary,
+    tags: j.tags,
+  }));
+
+  // ── Deductions ──
+  const allDeductions = state.mystery?.deductions ?? [];
+  const journal = state.mystery?.journal ?? [];
+  const unlockedDeductions = state.mystery
+    ? getUnlockedDeductions(allDeductions, journal)
+    : [];
+  const unlockedIds = new Set(unlockedDeductions.map(d => d.id));
+  const allJournalTags = new Set(journal.flatMap(j => j.tags));
+
+  const deductions = allDeductions.map(d => ({
+    id: d.id,
+    category: d.category,
+    question: d.question,
+    options: d.options.map(o => ({ key: o.key, label: o.label })),
+    solved: d.solved,
+    answeredCorrectly: d.answeredCorrectly,
+    requiredTags: d.requiredTags,
+    missingTags: d.requiredTags.filter(t => !allJournalTags.has(t)),
+  }));
+
+  const answered = allDeductions.filter(d => d.solved).length;
+  const correct = allDeductions.filter(d => d.answeredCorrectly).length;
+  const deductionProgress = { total: allDeductions.length, answered, correct };
+  const transmissionReady = allDeductions.length > 0 && allDeductions.every(d => d.solved);
+
+  // ── Add SUBMIT_DEDUCTION to valid actions ──
+  for (const d of unlockedDeductions) {
+    for (const opt of d.options) {
+      validActions.push({
+        type: "SUBMIT_DEDUCTION",
+        params: { deductionId: d.id, answerKey: opt.key },
+        description: `Answer "${d.question}" with "${opt.label}"`,
+      });
+    }
+  }
+
   return {
     turn: state.turn,
     seed: state.seed,
@@ -478,6 +523,10 @@ export function buildObservation(
     validActions,
     recentLogs,
     alerts,
+    journalEntries,
+    deductions,
+    deductionProgress,
+    transmissionReady,
   };
 }
 
@@ -558,6 +607,38 @@ export function renderObservationAsText(obs: HarnessObservation): string {
     lines.push("RECENT LOGS:");
     for (const log of obs.recentLogs) {
       lines.push(`  ${log}`);
+    }
+  }
+
+  // Journal
+  if (obs.journalEntries.length > 0) {
+    lines.push("");
+    lines.push(`JOURNAL: ${obs.journalEntries.length} entries`);
+    for (const j of obs.journalEntries.slice(-5)) {
+      lines.push(`  [${j.category}] ${j.summary} (tags: ${j.tags.join(", ")})`);
+    }
+  }
+
+  // Deductions
+  if (obs.deductions.length > 0) {
+    lines.push("");
+    lines.push(`DEDUCTIONS: ${obs.deductionProgress.answered}/${obs.deductionProgress.total} answered, ${obs.deductionProgress.correct} correct`);
+    if (obs.transmissionReady) {
+      lines.push("  >>> TRANSMISSION READY — interact with DataCore to win <<<");
+    }
+    for (const d of obs.deductions) {
+      const status = d.solved
+        ? (d.answeredCorrectly ? "[CORRECT]" : "[WRONG]")
+        : d.missingTags.length === 0 ? "[UNLOCKED]" : "[LOCKED]";
+      lines.push(`  ${d.id} ${status} ${d.question}`);
+      if (!d.solved && d.missingTags.length === 0) {
+        for (const o of d.options) {
+          lines.push(`    - ${o.key}: ${o.label}`);
+        }
+      }
+      if (d.missingTags.length > 0) {
+        lines.push(`    missing tags: ${d.missingTags.join(", ")}`);
+      }
     }
   }
 

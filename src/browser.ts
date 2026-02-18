@@ -86,11 +86,34 @@ function showOpeningCrawl(): void {
     e.preventDefault();
     dismissed = true;
     clearInterval(typewriterInterval);
-    crawlOverlay.style.display = "none";
-    gameStarted = true;
     window.removeEventListener("keydown", startGame);
     crawlOverlay.removeEventListener("click", startGame);
-    initGame();
+
+    // Boot sequence: typed-out messages before player control
+    crawlOverlay.innerHTML = "";
+    const bootPre = document.createElement("pre");
+    bootPre.className = "crawl-text";
+    bootPre.textContent = "";
+    crawlOverlay.appendChild(bootPre);
+
+    const bootMessages = [
+      { text: "SIGNAL ACQUIRED...", delay: 0 },
+      { text: "TERMINAL SYNC...", delay: 600 },
+      { text: "LINK ESTABLISHED", delay: 1200 },
+    ];
+
+    for (const msg of bootMessages) {
+      setTimeout(() => {
+        bootPre.textContent += (bootPre.textContent ? "\n" : "") + "> " + msg.text;
+      }, msg.delay);
+    }
+
+    // After boot sequence completes, start the game
+    setTimeout(() => {
+      crawlOverlay.style.display = "none";
+      gameStarted = true;
+      initGame();
+    }, 1800);
   };
 
   window.addEventListener("keydown", startGame);
@@ -503,9 +526,29 @@ function handleAction(action: Action): void {
       const logType = classifySimLog(simLog.text, simLog.source);
       display.addLog(simLog.text, logType);
     }
-    // Interaction produced logs -- play interact sound
+    // Interaction produced logs -- play interact sound + tile flash
     if (action.type === ActionType.Interact) {
       audio.playInteract();
+      // Flash the interacted entity's tile for visual feedback
+      if (action.targetId) {
+        const target = state.entities.get(action.targetId);
+        if (target) {
+          display.flashTile(target.pos.x, target.pos.y);
+        }
+      } else {
+        // No specific target — flash adjacent interactable entities
+        const px = state.player.entity.pos.x;
+        const py = state.player.entity.pos.y;
+        const deltas = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 0 }];
+        for (const d of deltas) {
+          for (const [id, ent] of state.entities) {
+            if (id === "player") continue;
+            if (ent.pos.x === px + d.x && ent.pos.y === py + d.y) {
+              display.flashTile(ent.pos.x, ent.pos.y);
+            }
+          }
+        }
+      }
     } else if (action.type === ActionType.Move) {
       audio.playMove();
     }

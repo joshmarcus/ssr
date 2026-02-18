@@ -196,6 +196,12 @@ function printSummary(state: GameState): void {
   // Count evidence found
   const evidenceFound = state.mystery?.discoveredEvidence.size ?? 0;
 
+  // Deduction stats
+  const deductions = state.mystery?.deductions ?? [];
+  const deductionsSolved = deductions.filter(d => d.solved).length;
+  const deductionsCorrect = deductions.filter(d => d.answeredCorrectly).length;
+  const journalCount = state.mystery?.journal.length ?? 0;
+
   console.log("");
   console.log("=== GAME OVER ===");
   console.log(`Result: ${state.victory ? "VICTORY" : "DEFEAT"}`);
@@ -203,6 +209,8 @@ function printSummary(state: GameState): void {
   console.log(`HP: ${p.hp}/${p.maxHp}`);
   console.log(`Rooms visited: ${roomsVisited}/${state.rooms.length}`);
   console.log(`Evidence found: ${evidenceFound}`);
+  console.log(`Journal entries: ${journalCount}`);
+  console.log(`Deductions: ${deductionsSolved}/${deductions.length} answered, ${deductionsCorrect} correct`);
 }
 
 // ── Script mode ──────────────────────────────────────────────

@@ -26,6 +26,21 @@ export interface HarnessObservation {
   validActions: ValidAction[];
   recentLogs: string[];       // last 10 log messages
   alerts: string[];           // urgent warnings
+
+  // Deduction support
+  journalEntries: { id: string; category: string; summary: string; tags: string[] }[];
+  deductions: {
+    id: string;
+    category: string;
+    question: string;
+    options: { key: string; label: string }[];
+    solved: boolean;
+    answeredCorrectly?: boolean;
+    requiredTags: string[];
+    missingTags: string[];
+  }[];
+  deductionProgress: { total: number; answered: number; correct: number };
+  transmissionReady: boolean;
 }
 
 /**

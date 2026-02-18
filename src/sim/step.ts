@@ -9,7 +9,7 @@ import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex } from 
 import { tickHazards, tickDeterioration, applyHazardDamage } from "./hazards.js";
 import { checkWinCondition, checkLossCondition } from "./objectives.js";
 import { updateVision } from "./vision.js";
-import { generateEvidenceTags } from "./deduction.js";
+import { generateEvidenceTags, getUnlockedDeductions, solveDeduction, linkEvidence } from "./deduction.js";
 import { assignThread } from "./threads.js";
 
 /**
@@ -196,6 +196,186 @@ function addJournalEntry(
       directiveOverrideTurn,
     },
   };
+}
+
+/**
+ * Apply the reward for a solved deduction (sim-side, no display calls).
+ * Returns updated GameState.
+ */
+function applyDeductionReward(state: GameState, deduction: { rewardType: string; rewardDescription: string; answeredCorrectly?: boolean }): GameState {
+  let next = { ...state };
+  const rewardLogs: LogEntry[] = [];
+
+  switch (deduction.rewardType) {
+    case "clearance": {
+      next.player = {
+        ...next.player,
+        clearanceLevel: (next.player.clearanceLevel || 0) + 1,
+      };
+      const newLevel = next.player.clearanceLevel;
+      const newEntities = new Map(next.entities);
+      let openedAny = false;
+      for (const [id, entity] of newEntities) {
+        if (entity.type === EntityType.ClosedDoor &&
+            entity.props["keyType"] === "clearance" &&
+            entity.props["closed"] === true &&
+            ((entity.props["clearanceLevel"] as number) || 1) <= newLevel) {
+          newEntities.set(id, {
+            ...entity,
+            props: { ...entity.props, closed: false, locked: false },
+          });
+          const dx = entity.pos.x;
+          const dy = entity.pos.y;
+          if (dy >= 0 && dy < next.height && dx >= 0 && dx < next.width) {
+            if (next.tiles === state.tiles) {
+              next.tiles = state.tiles.map(row => row.map(t => ({ ...t })));
+            }
+            next.tiles[dy][dx].walkable = true;
+          }
+          openedAny = true;
+        }
+      }
+      if (!openedAny) {
+        for (let y = 0; y < next.height; y++) {
+          for (let x = 0; x < next.width; x++) {
+            if (next.tiles[y][x].type === TileType.LockedDoor) {
+              if (next.tiles === state.tiles) {
+                next.tiles = state.tiles.map(row => row.map(t => ({ ...t })));
+              }
+              next.tiles[y][x] = {
+                ...next.tiles[y][x],
+                type: TileType.Door,
+                glyph: "▯",
+                walkable: true,
+              };
+              openedAny = true;
+              break;
+            }
+          }
+          if (openedAny) break;
+        }
+      }
+      next.entities = newEntities;
+      rewardLogs.push({
+        id: `log_reward_clearance_${next.turn}`,
+        timestamp: next.turn,
+        source: "system",
+        text: openedAny
+          ? "Security clearance upgraded. Restricted areas now accessible."
+          : "Security clearance upgraded — but no locked doors remain.",
+        read: false,
+      });
+      break;
+    }
+
+    case "room_reveal": {
+      if (next.tiles === state.tiles) {
+        next.tiles = state.tiles.map(row => row.map(t => ({ ...t })));
+      }
+      let revealed = false;
+      for (const room of next.rooms) {
+        let anyUnexplored = false;
+        for (let ry = room.y; ry < room.y + room.height; ry++) {
+          for (let rx = room.x; rx < room.x + room.width; rx++) {
+            if (ry >= 0 && ry < next.height && rx >= 0 && rx < next.width) {
+              if (!next.tiles[ry][rx].explored) {
+                anyUnexplored = true;
+              }
+            }
+          }
+        }
+        if (anyUnexplored) {
+          for (let ry = room.y; ry < room.y + room.height; ry++) {
+            for (let rx = room.x; rx < room.x + room.width; rx++) {
+              if (ry >= 0 && ry < next.height && rx >= 0 && rx < next.width) {
+                next.tiles[ry][rx].explored = true;
+              }
+            }
+          }
+          rewardLogs.push({
+            id: `log_reward_room_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: `Room revealed on map: ${room.name}`,
+            read: false,
+          });
+          revealed = true;
+          break;
+        }
+      }
+      if (!revealed) {
+        rewardLogs.push({
+          id: `log_reward_room_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "All rooms already discovered.",
+          read: false,
+        });
+      }
+      break;
+    }
+
+    case "drone_disable": {
+      const newEntities = new Map(next.entities);
+      let disabled = false;
+      for (const [id, entity] of newEntities) {
+        if (entity.type === EntityType.PatrolDrone) {
+          newEntities.delete(id);
+          disabled = true;
+          break;
+        }
+      }
+      next.entities = newEntities;
+      rewardLogs.push({
+        id: `log_reward_drone_${next.turn}`,
+        timestamp: next.turn,
+        source: "system",
+        text: disabled
+          ? "Patrol drone deactivated. Route cleared."
+          : "No patrol drones remain to disable.",
+        read: false,
+      });
+      break;
+    }
+
+    case "sensor_hint": {
+      let hinted = false;
+      for (const [, entity] of next.entities) {
+        if (entity.type === EntityType.SensorPickup) {
+          const room = next.rooms.find(r =>
+            entity.pos.x >= r.x && entity.pos.x < r.x + r.width &&
+            entity.pos.y >= r.y && entity.pos.y < r.y + r.height
+          );
+          rewardLogs.push({
+            id: `log_reward_sensor_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: room
+              ? `Sensor upgrade located in: ${room.name}`
+              : `Sensor upgrade located at coordinates (${entity.pos.x}, ${entity.pos.y})`,
+            read: false,
+          });
+          hinted = true;
+          break;
+        }
+      }
+      if (!hinted) {
+        rewardLogs.push({
+          id: `log_reward_sensor_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "All sensors already found.",
+          read: false,
+        });
+      }
+      break;
+    }
+  }
+
+  if (rewardLogs.length > 0) {
+    next.logs = [...next.logs, ...rewardLogs];
+  }
+  return next;
 }
 
 /**
@@ -3048,6 +3228,95 @@ export function step(state: GameState, action: Action): GameState {
       // Journal is a free action — no turn advance, no hazard tick
       // The browser layer handles the UI; sim just needs to not reject it
       return next;
+    case ActionType.SubmitDeduction: {
+      // Submit an answer to a deduction — used by harness for AI playtesting
+      if (!next.mystery || !action.deductionId || !action.answerKey) {
+        next.logs = [...next.logs, {
+          id: `log_deduction_invalid_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Invalid deduction submission.",
+          read: false,
+        }];
+        break;
+      }
+
+      const deduction = next.mystery.deductions.find(d => d.id === action.deductionId);
+      if (!deduction || deduction.solved) {
+        next.logs = [...next.logs, {
+          id: `log_deduction_notfound_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: deduction?.solved
+            ? "That deduction has already been answered."
+            : `Unknown deduction: ${action.deductionId}`,
+          read: false,
+        }];
+        break;
+      }
+
+      // Check if deduction is unlocked
+      const unlocked = getUnlockedDeductions(next.mystery.deductions, next.mystery.journal);
+      if (!unlocked.some(d => d.id === deduction.id)) {
+        next.logs = [...next.logs, {
+          id: `log_deduction_locked_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "That deduction is still locked. Solve the previous one first, or gather more evidence.",
+          read: false,
+        }];
+        break;
+      }
+
+      // Auto-link evidence: find journal entries whose tags cover the required tags
+      const journal = next.mystery.journal;
+      const autoLinked: string[] = [];
+      const neededTags = new Set(deduction.requiredTags);
+      for (const entry of journal) {
+        if (neededTags.size === 0) break;
+        let covers = false;
+        for (const tag of entry.tags) {
+          if (neededTags.has(tag)) {
+            covers = true;
+            neededTags.delete(tag);
+          }
+        }
+        if (covers) autoLinked.push(entry.id);
+      }
+
+      // Link evidence and solve
+      const linked = linkEvidence(deduction, autoLinked);
+      const { deduction: solved, correct } = solveDeduction(linked, action.answerKey, journal);
+
+      // Update the deduction in mystery state
+      next = {
+        ...next,
+        mystery: {
+          ...next.mystery,
+          deductions: next.mystery.deductions.map(d =>
+            d.id === solved.id ? solved : d
+          ),
+        },
+      };
+
+      // Log result
+      const resultText = correct
+        ? `Deduction correct: "${deduction.question}" — ${deduction.rewardDescription}`
+        : `Deduction answered (incorrect): "${deduction.question}"`;
+      next.logs = [...next.logs, {
+        id: `log_deduction_result_${deduction.id}_${next.turn}`,
+        timestamp: next.turn,
+        source: "data_core",
+        text: resultText,
+        read: false,
+      }];
+
+      // Apply reward
+      next = applyDeductionReward(next, solved);
+
+      // Free action — no turn advance
+      return next;
+    }
     default:
       break;
   }

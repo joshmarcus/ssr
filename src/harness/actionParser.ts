@@ -1,6 +1,7 @@
 import type { Action, GameState, Entity } from "../shared/types.js";
 import { ActionType, Direction, EntityType } from "../shared/types.js";
 import { isValidAction } from "../sim/actions.js";
+import { getUnlockedDeductions } from "../sim/deduction.js";
 import type { HarnessAction } from "./types.js";
 
 // ── Direction mapping ────────────────────────────────────────
@@ -101,8 +102,17 @@ export function parseAction(input: string): Action | { error: string } {
     case "LOOK":
       return { type: ActionType.Look };
 
+    case "SUBMIT_DEDUCTION": {
+      const dedId = parsed.params?.deductionId;
+      const ansKey = parsed.params?.answerKey;
+      if (typeof dedId !== "string" || typeof ansKey !== "string") {
+        return { error: `SUBMIT_DEDUCTION requires params.deductionId and params.answerKey` };
+      }
+      return { type: ActionType.SubmitDeduction, deductionId: dedId, answerKey: ansKey };
+    }
+
     default:
-      return { error: `Unknown action "${parsed.action}". Valid: MOVE, INTERACT, SCAN, CLEAN, WAIT, LOOK.` };
+      return { error: `Unknown action "${parsed.action}". Valid: MOVE, INTERACT, SCAN, CLEAN, WAIT, LOOK, SUBMIT_DEDUCTION.` };
   }
 }
 
@@ -219,6 +229,19 @@ export function getValidActionsForState(state: GameState): HarnessAction[] {
   actions.push({ action: "WAIT" });
   actions.push({ action: "LOOK" });
 
+  // 4. Deduction submissions — enumerate unlocked deductions with their options
+  if (state.mystery) {
+    const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
+    for (const d of unlocked) {
+      for (const opt of d.options) {
+        actions.push({
+          action: "SUBMIT_DEDUCTION",
+          params: { deductionId: d.id, answerKey: opt.key },
+        });
+      }
+    }
+  }
+
   return actions;
 }
 
@@ -239,6 +262,8 @@ export function describeAction(ha: HarnessAction): string {
       return "Wait one turn";
     case "LOOK":
       return "Look around (refresh vision)";
+    case "SUBMIT_DEDUCTION":
+      return `Submit deduction ${ha.params?.deductionId} with answer ${ha.params?.answerKey}`;
     default:
       return ha.action;
   }

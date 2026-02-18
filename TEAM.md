@@ -72,6 +72,16 @@ Standard team composition for sprint-based development. Each role runs as a para
 2. **Parallel execution:** Launch engineers simultaneously with clear scope
 3. **Integration:** QA runs full test suite after all engineers complete
 4. **Commit + push:** Single commit per sprint with all changes
+5. **Review:** At sprint end, collectively review state of play and identify new priority items
+6. **Backlog:** Maintain `backlog.md` with prioritized future work — update after each sprint
+
+## Design Priority
+
+**The Game Design Lead has priority.** All technical decisions defer to game feel:
+- The game should be fun, interesting, and innovative
+- Technical elegance is secondary to player experience
+- When in doubt about a feature, ask: "Does this make the game more engaging?"
+- Backlog prioritization follows the design lead's vision
 
 ## File Ownership Rules
 

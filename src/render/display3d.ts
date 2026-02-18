@@ -377,6 +377,10 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.lastRoomId = roomId;
   }
 
+  flashTile(_x: number, _y: number): void {
+    // No-op in 3D mode — tile flash is a 2D-only effect
+  }
+
   triggerScreenFlash(type: "damage" | "milestone" | "stun"): void {
     const flash = document.getElementById("damage-flash");
     if (!flash) return;
