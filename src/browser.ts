@@ -6,7 +6,7 @@ import type { LogType } from "./render/display.js";
 import { InputHandler } from "./render/input.js";
 import { AudioManager } from "./render/audio.js";
 import { GOLDEN_SEED } from "./shared/constants.js";
-import { OPENING_CRAWL, STATION_NAME, STATION_SUBTITLE, TAGLINE } from "./data/lore.js";
+import { getOpeningCrawl, STATION_NAME, STATION_SUBTITLE, TAGLINE } from "./data/lore.js";
 import {
   VICTORY_TITLE, DEFEAT_TITLE, DEFEAT_TEXT,
   DEFEAT_RELAY_TITLE, DEFEAT_RELAY_TEXT,
@@ -46,11 +46,15 @@ let gameStarted = false;
 function showOpeningCrawl(): void {
   crawlOverlay.style.display = "flex";
 
+  // Use the archetype from generated state for per-storyline opening text
+  const archetype = state.mystery?.timeline?.archetype;
+  const crawlLines = archetype ? getOpeningCrawl(archetype) : getOpeningCrawl("coolant_cascade" as any);
+
   const lines = [
     `> ${STATION_NAME} — ${STATION_SUBTITLE}`,
     `> ${TAGLINE}`,
     "",
-    ...OPENING_CRAWL,
+    ...crawlLines,
     "",
     "Press any key to begin...",
   ];

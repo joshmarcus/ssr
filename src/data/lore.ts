@@ -2,51 +2,105 @@
  * Station identity and opening text crawl for SSR.
  */
 
+import { IncidentArchetype } from "../shared/types.js";
+
 export const STATION_NAME = "CORVUS-7";
 export const STATION_SUBTITLE = "Deep Orbital Research Platform";
 export const STATION_DESIGNATION = "UN-ORC Station CORVUS-7 / Registry DP-0184201";
 
 /**
- * Opening text crawl displayed during the Boot / Link Establishment phase.
- * Rendered line-by-line with a terminal typewriter effect.
+ * Opening text crawl — trimmed core intro (archetype-agnostic).
+ * The per-archetype "last transmission" is appended by getOpeningCrawl().
  */
-export const OPENING_CRAWL: string[] = [
-  `CORVUS-7 was a deep orbital research platform operated by the United`,
-  `Nations Outer Rim Commission, stationed in a stable Lagrange orbit beyond`,
-  `the Mars-Jupiter corridor. Its crew of twelve maintained a rotating`,
-  `complement of long-duration experiments — materials science, vacuum`,
-  `biology, and classified signal analysis work that required absolute`,
-  `isolation from terrestrial interference. For nine months, CORVUS-7`,
-  `reported nominal status on every scheduled uplink.`,
+const OPENING_INTRO: string[] = [
+  `CORVUS-7. Deep orbital research platform, Lagrange orbit beyond`,
+  `the Mars-Jupiter corridor. Crew of twelve. Nine months of nominal`,
+  `uplinks to UN-ORC command.`,
   ``,
-  `Fourteen hours ago, the station missed its first check-in. Repeated`,
-  `hails returned nothing but carrier static. Telemetry shows the reactor`,
-  `is still online and life support registers partial function, but all`,
-  `crew communication channels are dead. The only response to emergency`,
-  `ping was a single automated handshake from a maintenance subsystem:`,
-  `one janitor-class rover, designation A3, standing by in the arrival`,
-  `bay with a full battery and a cleanliness sensor.`,
-  ``,
-  `You are the remote operator. Your link is low-bandwidth, terminal-only`,
-  `— no video, no audio, no telemetry beyond what the bot can sense. The`,
-  `station's data core holds the research bundle that CORVUS-7 existed to`,
-  `produce. If the core can be powered and the bundle transmitted, the`,
-  `mission is not a total loss. But first, you need to understand what`,
-  `went silent — and whether anything on board is still a threat.`,
+  `Fourteen hours ago, the station went silent. Reactor still online,`,
+  `life support partial, all crew channels dead. The only response to`,
+  `emergency ping: a single automated handshake from a janitor-class`,
+  `rover standing by in the arrival bay.`,
 ];
 
 /**
- * Condensed opening (3-4 sentences) for compact display contexts
- * such as the boot screen or game-start summary panel.
+ * Per-archetype "last transmission" — the final fragmented message
+ * intercepted from CORVUS-7 before the station went dark.
+ * Each hints at the storyline without spoiling it.
+ */
+const LAST_TRANSMISSIONS: Record<IncidentArchetype, string[]> = {
+  [IncidentArchetype.CoolantCascade]: [
+    `LAST TRANSMISSION [14:07:33 UTC]:`,
+    `"...thermal cascade in relay section four... I filed three`,
+    `requests... three... they reassigned me for it... the junction`,
+    `is going to—" [SIGNAL LOST]`,
+  ],
+  [IncidentArchetype.HullBreach]: [
+    `LAST TRANSMISSION [02:41:17 UTC]:`,
+    `"...pressure drop in crew quarters... breach point is in the`,
+    `residential ring... the alarms were off... someone turned them`,
+    `off..." [SIGNAL LOST]`,
+  ],
+  [IncidentArchetype.ReactorScram]: [
+    `LAST TRANSMISSION [09:22:08 UTC]:`,
+    `"...SCRAM came from the data core... no one was at the terminal`,
+    `...it issued the command itself... I don't think this is a`,
+    `malfunction..." [CARRIER LOST]`,
+  ],
+  [IncidentArchetype.Sabotage]: [
+    `LAST TRANSMISSION [03:52:44 UTC]:`,
+    `"...junctions failing in sequence... it's moving faster than`,
+    `anyone can walk... there's something in the walls... this is`,
+    `not a systems fault..." [SIGNAL LOST]`,
+  ],
+  [IncidentArchetype.SignalAnomaly]: [
+    `LAST TRANSMISSION [16:33:21 UTC]:`,
+    `"...the array wasn't receiving — it was transmitting... someone`,
+    `sent a response... the overload is spreading through every`,
+    `connected system—" [EM INTERFERENCE — SIGNAL LOST]`,
+  ],
+  [IncidentArchetype.ContainmentBreach]: [
+    `LAST TRANSMISSION [11:15:56 UTC]:`,
+    `"...containment breach in a section that's not on our plans...`,
+    `the symptoms don't match anything in the station inventory...`,
+    `what were they doing in there..." [SIGNAL LOST]`,
+  ],
+};
+
+/**
+ * Closing lines after the last transmission.
+ */
+const OPENING_OUTRO: string[] = [
+  `You are the remote operator. Terminal-only link — no video, no`,
+  `audio. The data core holds the research bundle. Power it, transmit`,
+  `it, and find out what happened aboard CORVUS-7.`,
+];
+
+/**
+ * Build the full opening crawl for a given archetype.
+ * Combines intro + last transmission + outro.
+ */
+export function getOpeningCrawl(archetype: IncidentArchetype): string[] {
+  return [
+    ...OPENING_INTRO,
+    "",
+    ...LAST_TRANSMISSIONS[archetype],
+    "",
+    ...OPENING_OUTRO,
+  ];
+}
+
+/** Legacy constant for backward compatibility (uses CoolantCascade default). */
+export const OPENING_CRAWL: string[] = getOpeningCrawl(IncidentArchetype.CoolantCascade);
+
+/**
+ * Condensed opening for compact display contexts.
  */
 export const OPENING_SUMMARY =
-  `Research station CORVUS-7 missed its scheduled uplink fourteen hours ago. ` +
-  `Telemetry shows the reactor is still online, but all crew channels are dead ` +
-  `and the data core sits unpowered behind a sealed door. ` +
-  `The only response to emergency ping was a single handshake from a janitor-class ` +
-  `rover standing by in the arrival bay with a full battery and a cleanliness sensor. ` +
-  `You are the remote operator — recover the research bundle before the station's ` +
-  `failing systems make it impossible.`;
+  `Research station CORVUS-7 went silent fourteen hours ago. ` +
+  `Reactor online, life support partial, all crew channels dead. ` +
+  `The only response: a handshake from a janitor-class rover in the arrival bay. ` +
+  `You are the remote operator — recover the research bundle and find out what happened.`;
 
 /**
  * Short tagline for title screen / loading.
