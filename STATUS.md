@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 8 (Save/Load + Phase PA + Mini-Map)
+- **Phase**: Sprint 9 (Deduction UX + Broadcast Fix + Phase Indicator)
 - **Test status**: 189 tests passing across 17 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
@@ -58,6 +58,14 @@
 2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
 2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 9 Changes
+
+- Deduction confirmation prompt: Y/N before locking in answers (both journal and broadcast paths)
+- Broadcast modal now shows all 5-6 deductions (was only showing first per category, missing 3 of 6)
+- [DEDUCTION READY] status bar indicator when unlocked deductions are available
+- Phase indicator in sidebar objective panel: MAINTENANCE / INVESTIGATION / RECOVERY / EVACUATION
+- Station map [m] renders as HTML overlay instead of destroying the log panel
 
 ## Sprint 8 Changes
 
