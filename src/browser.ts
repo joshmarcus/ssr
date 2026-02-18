@@ -1,5 +1,5 @@
 import { generate } from "./sim/procgen.js";
-import { step } from "./sim/step.js";
+import { step, applyDeductionReward as applyDeductionRewardSim } from "./sim/step.js";
 import { BrowserDisplay } from "./render/display.js";
 import type { IGameDisplay } from "./render/displayInterface.js";
 import type { LogType } from "./render/display.js";
@@ -21,7 +21,7 @@ import {
   DRONE_ENCOUNTER_LOGS, DRONE_CLEANING_MESSAGE,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
-import { ActionType, AttachmentSlot, SensorType, EntityType, ObjectivePhase, DeductionCategory, TileType } from "./shared/types.js";
+import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory } from "./shared/types.js";
 import { computeChoiceEndings } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
@@ -151,13 +151,14 @@ let confirmingDeduction = false; // Y/N confirmation before locking in deduction
 let mapOpen = false;
 let helpOpen = false;
 let broadcastOpen = false;
-let broadcastSection: "evidence" | number = "evidence"; // "evidence" or deduction index
+let broadcastSection: "evidence" | number | `choice_${number}` = "evidence"; // "evidence", deduction index, or "choice_N"
 let broadcastOptionIdx = 0;
 let broadcastEvidenceScroll = 0;
 let broadcastLinkedEvidence: string[] = [];
 let broadcastDetailDeduction: string | null = null; // deduction ID when in detail/evidence-linking view
 let broadcastEvidenceIdx = 0; // highlighted journal entry index in detail view
 let broadcastConfirming = false; // Y/N confirmation before locking in broadcast deduction
+let broadcastChoiceConfirming = false; // Y/N confirmation before locking in mystery choice
 
 // ── Evidence Browser state ──────────────────────────────────────
 let evidenceBrowserOpen = false;
@@ -1312,119 +1313,13 @@ function commitDeductionAnswer(): void {
 }
 
 function applyDeductionReward(deduction: Deduction): void {
-  switch (deduction.rewardType) {
-    case "clearance":
-      // Increment player clearance level
-      state.player = {
-        ...state.player,
-        clearanceLevel: (state.player.clearanceLevel || 0) + 1,
-      };
-      {
-        const newLevel = state.player.clearanceLevel;
-        // Open all clearance doors with clearanceLevel <= player's level
-        let openedAny = false;
-        for (const [id, entity] of state.entities) {
-          if (entity.type === EntityType.ClosedDoor &&
-              entity.props["keyType"] === "clearance" &&
-              entity.props["closed"] === true &&
-              (entity.props["clearanceLevel"] as number || 1) <= newLevel) {
-            state.entities.set(id, {
-              ...entity,
-              props: { ...entity.props, closed: false, locked: false },
-            });
-            // Make the tile walkable
-            const dx = entity.pos.x;
-            const dy = entity.pos.y;
-            if (dy >= 0 && dy < state.height && dx >= 0 && dx < state.width) {
-              state.tiles[dy][dx].walkable = true;
-            }
-            openedAny = true;
-          }
-        }
-        // Also check for any LockedDoor tiles (power-gated doors — legacy behavior)
-        if (!openedAny) {
-          for (let y = 0; y < state.height; y++) {
-            for (let x = 0; x < state.width; x++) {
-              if (state.tiles[y][x].type === TileType.LockedDoor) {
-                state.tiles[y][x] = {
-                  ...state.tiles[y][x],
-                  type: TileType.Door,
-                  glyph: "▯",
-                  walkable: true,
-                };
-                openedAny = true;
-                break;
-              }
-            }
-            if (openedAny) break;
-          }
-        }
-        if (openedAny) {
-          display.addLog("Security clearance upgraded. Restricted areas now accessible.", "milestone");
-        } else {
-          display.addLog("Security clearance upgraded — but no locked doors remain.", "system");
-        }
-      }
-      break;
-
-    case "room_reveal":
-      // Reveal a random unexplored room
-      for (const room of state.rooms) {
-        let anyUnexplored = false;
-        for (let ry = room.y; ry < room.y + room.height; ry++) {
-          for (let rx = room.x; rx < room.x + room.width; rx++) {
-            if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
-              if (!state.tiles[ry][rx].explored) {
-                anyUnexplored = true;
-              }
-            }
-          }
-        }
-        if (anyUnexplored) {
-          for (let ry = room.y; ry < room.y + room.height; ry++) {
-            for (let rx = room.x; rx < room.x + room.width; rx++) {
-              if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
-                state.tiles[ry][rx].explored = true;
-              }
-            }
-          }
-          display.addLog(`Room revealed on map: ${room.name}`, "milestone");
-          return;
-        }
-      }
-      display.addLog("All rooms already discovered.", "system");
-      break;
-
-    case "drone_disable":
-      // Disable the nearest patrol drone
-      for (const [id, entity] of state.entities) {
-        if (entity.type === EntityType.PatrolDrone) {
-          state.entities.delete(id);
-          display.addLog("Patrol drone deactivated. Route cleared.", "milestone");
-          return;
-        }
-      }
-      display.addLog("No patrol drones remain to disable.", "system");
-      break;
-
-    case "sensor_hint":
-      // Reveal location of nearest sensor pickup
-      for (const [, entity] of state.entities) {
-        if (entity.type === EntityType.SensorPickup) {
-          const room = state.rooms.find(r =>
-            entity.pos.x >= r.x && entity.pos.x < r.x + r.width &&
-            entity.pos.y >= r.y && entity.pos.y < r.y + r.height
-          );
-          if (room) {
-            display.addLog(`Sensor upgrade located in: ${room.name}`, "milestone");
-          } else {
-            display.addLog(`Sensor upgrade located at coordinates (${entity.pos.x}, ${entity.pos.y})`, "milestone");
-          }
-          return;
-        }
-      }
-      display.addLog("All sensors already found.", "system");
-      break;
+  // Delegate to the pure sim-side implementation and adopt the returned state
+  const prevLogCount = state.logs.length;
+  state = applyDeductionRewardSim(state, deduction);
+  // Show any new logs the sim generated
+  for (let i = prevLogCount; i < state.logs.length; i++) {
+    const logType = classifySimLog(state.logs[i].text, state.logs[i].source);
+    display.addLog(state.logs[i].text, logType);
   }
 }
 
@@ -1863,15 +1758,58 @@ function renderBroadcastModal(): void {
     deductionHtml += `</div>`;
   }
 
+  // ── Mystery Choices section ──────────────────────────────────
+  const choices = state.mystery.choices;
+  const thresholds = [3, 6, 10];
+  let choicesHtml = "";
+  let anyChoiceAvailable = false;
+
+  for (let ci = 0; ci < choices.length && ci < thresholds.length; ci++) {
+    const choice = choices[ci];
+    const available = journalCount >= thresholds[ci];
+    const isActive = broadcastSection === `choice_${ci}`;
+
+    let choiceClass = "broadcast-deduction";
+    if (!available) choiceClass += " locked";
+    if (choice.chosen) choiceClass += " solved";
+    if (isActive) choiceClass += " active-section";
+
+    choicesHtml += `<div class="${choiceClass}">`;
+
+    if (choice.chosen) {
+      const chosenOption = choice.options.find(o => o.key === choice.chosen);
+      choicesHtml += `<div class="broadcast-section-title"><span style="color:#0f0">[&#10003;]</span> ${escapeHtmlBroadcast(choice.prompt.slice(0, 60))}...</div>`;
+      choicesHtml += `<div style="color:#0f0;padding:2px 8px">&#10003; ${escapeHtmlBroadcast(chosenOption?.label ?? choice.chosen)}</div>`;
+    } else if (!available) {
+      choicesHtml += `<div class="broadcast-section-title"><span style="color:#555">[?]</span> DECISION ${ci + 1} &mdash; <span style="color:#555;font-weight:normal;font-size:12px">need ${thresholds[ci]} evidence (have ${journalCount})</span></div>`;
+    } else {
+      anyChoiceAvailable = true;
+      choicesHtml += `<div class="broadcast-section-title"><span style="color:#fa0">[!]</span> DECISION: ${escapeHtmlBroadcast(choice.prompt)}</div>`;
+      for (let i = 0; i < choice.options.length; i++) {
+        const prefix = (isActive && i === broadcastOptionIdx) ? "&#9656; " : "  ";
+        const cls = (isActive && i === broadcastOptionIdx) ? "broadcast-option selected" : "broadcast-option";
+        choicesHtml += `<div class="${cls}">${prefix}${i + 1}. ${escapeHtmlBroadcast(choice.options[i].label)}</div>`;
+      }
+    }
+
+    choicesHtml += `</div>`;
+  }
+
+  if (choices.length > 0) {
+    choicesHtml = `<div style="border-top:1px solid #444;margin:8px 0"></div>
+      <div class="broadcast-section-title" style="color:#ca8">REPORT DECISIONS</div>` + choicesHtml;
+  }
+
   // Transmit button
   const allSolved = deductions.every(d => d.solved);
+  const allChoicesMade = choices.every((c, i) => i >= thresholds.length || !!(c.chosen) || journalCount < thresholds[i]);
   const transmitHtml = allSolved
-    ? `<div class="broadcast-transmit">All deductions answered. Report ready for transmission.</div>`
+    ? `<div class="broadcast-transmit">All deductions answered.${allChoicesMade ? " All decisions made." : ""} Report ready for transmission.</div>`
     : "";
 
   const controlsText = broadcastDetailDeduction
     ? "[&#8593;/&#8595;] Navigate  [Space] Toggle link  [Enter] Answer  [Esc] Back"
-    : "[&#8593;/&#8595;] Navigate  [Enter] Answer  [Tab] Next section  [Esc] Close";
+    : "[&#8593;/&#8595;] Navigate  [Enter] Select  [Tab] Next section  [Esc] Close";
 
   overlay.innerHTML = `
     <div class="broadcast-box">
@@ -1880,6 +1818,7 @@ function renderBroadcastModal(): void {
       <div class="broadcast-evidence-list">${evidenceHtml}</div>
       <div style="border-top:1px solid #444;margin:8px 0"></div>
       ${deductionHtml}
+      ${choicesHtml}
       ${transmitHtml}
       <div class="broadcast-controls">${controlsText}</div>
     </div>`;
@@ -1934,6 +1873,24 @@ function commitBroadcastDeductionAnswer(): void {
   renderBroadcastModal();
 }
 
+/** Commit mystery choice answer after Y/N confirmation. */
+function commitBroadcastChoiceAnswer(): void {
+  if (!state.mystery || typeof broadcastSection !== "string" || !broadcastSection.startsWith("choice_")) return;
+  const ci = parseInt(broadcastSection.split("_")[1], 10);
+  const choice = state.mystery.choices[ci];
+  if (!choice || choice.chosen) return;
+
+  const chosenOption = choice.options[broadcastOptionIdx];
+  state.mystery.choices[ci] = {
+    ...choice,
+    chosen: chosenOption.key,
+    turnPresented: state.turn,
+  };
+  display.addLog(`Decision recorded: ${chosenOption.label}`, "milestone");
+  display.triggerScreenFlash("milestone");
+  renderBroadcastModal();
+}
+
 function handleBroadcastInput(e: KeyboardEvent): void {
   e.preventDefault();
   if (!state.mystery) return;
@@ -1942,15 +1899,21 @@ function handleBroadcastInput(e: KeyboardEvent): void {
   const journal = state.mystery.journal;
   const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
 
-  // Broadcast confirmation step: Y/N before locking in
-  if (broadcastConfirming) {
+  // Broadcast confirmation step: Y/N before locking in (deduction or choice)
+  if (broadcastConfirming || broadcastChoiceConfirming) {
     if (e.key === "y" || e.key === "Y") {
-      broadcastConfirming = false;
-      commitBroadcastDeductionAnswer();
+      if (broadcastConfirming) {
+        broadcastConfirming = false;
+        commitBroadcastDeductionAnswer();
+      } else {
+        broadcastChoiceConfirming = false;
+        commitBroadcastChoiceAnswer();
+      }
       return;
     }
     if (e.key === "n" || e.key === "N" || e.key === "Escape") {
       broadcastConfirming = false;
+      broadcastChoiceConfirming = false;
       renderBroadcastModal();
       return;
     }
@@ -2034,12 +1997,37 @@ function handleBroadcastInput(e: KeyboardEvent): void {
   }
 
   if (e.key === "Tab") {
-    // Cycle: evidence → deduction[0] → deduction[1] → ... → evidence
+    // Cycle: evidence → deduction[0] → ... → choice_0 → choice_1 → choice_2 → evidence
+    const choices = state.mystery.choices;
+    const choiceThresholds = [3, 6, 10];
+    const journalCount = journal.length;
+
     if (broadcastSection === "evidence") {
       broadcastSection = deductions.length > 0 ? 0 : "evidence";
+    } else if (typeof broadcastSection === "number") {
+      const nextIdx = broadcastSection + 1;
+      if (nextIdx < deductions.length) {
+        broadcastSection = nextIdx;
+      } else {
+        // Move to first choice section (if any available)
+        const firstAvailableChoice = choices.findIndex((c, i) =>
+          i < choiceThresholds.length && journalCount >= choiceThresholds[i] && !c.chosen
+        );
+        broadcastSection = firstAvailableChoice >= 0 ? `choice_${firstAvailableChoice}` : "evidence";
+      }
+    } else if (typeof broadcastSection === "string" && broadcastSection.startsWith("choice_")) {
+      const ci = parseInt(broadcastSection.split("_")[1], 10);
+      // Find next available choice
+      let nextChoice = -1;
+      for (let i = ci + 1; i < choices.length && i < choiceThresholds.length; i++) {
+        if (journalCount >= choiceThresholds[i] && !choices[i].chosen) {
+          nextChoice = i;
+          break;
+        }
+      }
+      broadcastSection = nextChoice >= 0 ? `choice_${nextChoice}` : "evidence";
     } else {
-      const nextIdx = (broadcastSection as number) + 1;
-      broadcastSection = nextIdx < deductions.length ? nextIdx : "evidence";
+      broadcastSection = "evidence";
     }
     broadcastOptionIdx = 0;
     renderBroadcastModal();
@@ -2048,6 +2036,51 @@ function handleBroadcastInput(e: KeyboardEvent): void {
 
   if (broadcastSection === "evidence") {
     // Scroll evidence list (no selection needed)
+    return;
+  }
+
+  // Handle choice sections
+  if (typeof broadcastSection === "string" && broadcastSection.startsWith("choice_")) {
+    const ci = parseInt(broadcastSection.split("_")[1], 10);
+    const choices = state.mystery.choices;
+    const choice = choices[ci];
+    if (!choice || choice.chosen) return;
+
+    if (e.key === "ArrowUp" || e.key === "w") {
+      broadcastOptionIdx = Math.max(0, broadcastOptionIdx - 1);
+      renderBroadcastModal();
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "s") {
+      broadcastOptionIdx = Math.min(choice.options.length - 1, broadcastOptionIdx + 1);
+      renderBroadcastModal();
+      return;
+    }
+    if (e.key === "Enter") {
+      // Show confirmation before locking in choice
+      const chosenOption = choice.options[broadcastOptionIdx];
+      broadcastChoiceConfirming = true;
+      const overlay = document.getElementById("broadcast-overlay");
+      if (overlay) {
+        overlay.innerHTML = `
+          <div class="broadcast-box">
+            <div class="broadcast-title">\u2550\u2550\u2550 CONFIRM DECISION \u2550\u2550\u2550</div>
+            <div style="padding:20px;text-align:center">
+              <div style="color:#ca8;font-size:14px;margin-bottom:12px">${escapeHtmlBroadcast(choice.prompt.slice(0, 120))}${choice.prompt.length > 120 ? "..." : ""}</div>
+              <div style="color:#fff;font-size:14px;margin-bottom:16px">Your decision: <span style="color:#6cf">${escapeHtmlBroadcast(chosenOption.label)}</span></div>
+              <div style="color:#fa0;font-size:13px;margin-bottom:8px">This will be included in your broadcast report.</div>
+              <div style="color:#aaa;font-size:14px">Confirm? [Y] Yes  [N] Go back</div>
+            </div>
+          </div>`;
+      }
+      return;
+    }
+    const num = parseInt(e.key, 10);
+    if (num >= 1 && num <= choice.options.length) {
+      broadcastOptionIdx = num - 1;
+      renderBroadcastModal();
+      return;
+    }
     return;
   }
 

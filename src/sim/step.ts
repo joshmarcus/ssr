@@ -204,7 +204,7 @@ function addJournalEntry(
  * Apply the reward for a solved deduction (sim-side, no display calls).
  * Returns updated GameState.
  */
-function applyDeductionReward(state: GameState, deduction: { rewardType: string; rewardDescription: string; answeredCorrectly?: boolean }): GameState {
+export function applyDeductionReward(state: GameState, deduction: { rewardType: string; rewardDescription: string; answeredCorrectly?: boolean }): GameState {
   let next = { ...state };
   const rewardLogs: LogEntry[] = [];
 

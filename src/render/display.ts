@@ -244,7 +244,7 @@ export class BrowserDisplay implements IGameDisplay {
   private container: HTMLElement;
   private sensorMode: SensorType | null = null;
   private logHistory: DisplayLogEntry[] = [];
-  private static readonly MAX_LOG_ENTRIES = 16;
+  private static readonly MAX_LOG_ENTRIES = 24;
   private roomFlashMessage = "";
   private roomFlashTimer: ReturnType<typeof setTimeout> | null = null;
   private lastRoomId = "";
@@ -1122,6 +1122,21 @@ export class BrowserDisplay implements IGameDisplay {
       miniMapHtml = `<div style="font-size:10px;line-height:1.1;padding:2px 0;border-bottom:1px solid #222;white-space:pre;font-family:monospace">${mapStr}</div>`;
     }
 
+    // ── Pinned notification (persistent at top of log) ──────────
+    let pinnedHtml = "";
+    if (state.mystery) {
+      const phaseLabel = phaseInfo.label;
+      const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
+      if (unlocked.length > 0) {
+        pinnedHtml = `<div style="color:#ff0;background:#1a1500;padding:2px 6px;border-bottom:1px solid #443;font-size:12px;font-weight:bold">[${phaseLabel}] DEDUCTION READY — press [r] to open Broadcast Report</div>`;
+      } else if (state.mystery.objectivePhase === ObjectivePhase.Recover) {
+        const allDedsSolved = state.mystery.deductions.every(d => d.solved);
+        if (!allDedsSolved) {
+          pinnedHtml = `<div style="color:#f44;background:#1a0500;padding:2px 6px;border-bottom:1px solid #433;font-size:12px">[${phaseLabel}] Gather evidence and solve deductions to unlock the Data Core</div>`;
+        }
+      }
+    }
+
     // ── Log panel (color-coded by type) ─────────────────────────
     const logEntries = this.logHistory.length > 0
       ? this.logHistory
@@ -1132,7 +1147,7 @@ export class BrowserDisplay implements IGameDisplay {
           .join("")
       : '<span class="log log-system">-- awaiting telemetry --</span>';
 
-    const logHtml = `<div class="log-panel">${logEntries}</div>`;
+    const logHtml = `<div class="log-panel">${pinnedHtml}${logEntries}</div>`;
 
     const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${statusHtml}${proximityHtml}${miniMapHtml}${roomListHtml}${infoHtml}</div>`;
     panel.innerHTML = logHtml + bottomHtml;
