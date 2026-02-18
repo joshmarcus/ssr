@@ -1,5 +1,6 @@
+import * as ROT from "rot-js";
 import type { GameState } from "../shared/types.js";
-import { SensorType } from "../shared/types.js";
+import { SensorType, TileType, EntityType } from "../shared/types.js";
 import {
   VISION_RADIUS_BASE,
   VISION_RADIUS_THERMAL,
@@ -24,12 +25,52 @@ function getPlayerRoomIndex(state: GameState): number {
 }
 
 /**
+ * Get positions of entities that block line of sight (closed doors, sealed airlocks).
+ */
+function getBlockingEntityPositions(state: GameState): Set<string> {
+  const blocking = new Set<string>();
+  for (const [, entity] of state.entities) {
+    if (entity.type === EntityType.ClosedDoor && entity.props["open"] !== true) {
+      blocking.add(`${entity.pos.x},${entity.pos.y}`);
+    }
+    if (entity.type === EntityType.Airlock && entity.props["open"] !== true) {
+      blocking.add(`${entity.pos.x},${entity.pos.y}`);
+    }
+  }
+  return blocking;
+}
+
+/**
+ * Create a callback for ROT.FOV that returns true if light passes through (x, y).
+ * Walls and locked doors always block. Closed door/airlock entities block.
+ * Floor, corridor, and open doors are transparent.
+ */
+function makeLightPassesCallback(
+  state: GameState,
+  blocking: Set<string>,
+): (x: number, y: number) => boolean {
+  const w = state.width;
+  const h = state.height;
+  return (x: number, y: number): boolean => {
+    if (x < 0 || x >= w || y < 0 || y >= h) return false;
+    const tile = state.tiles[y][x];
+    // Walls always block light
+    if (tile.type === TileType.Wall) return false;
+    // Locked doors block light
+    if (tile.type === TileType.LockedDoor) return false;
+    // Check entity-based blocking (closed doors, sealed airlocks)
+    if (blocking.has(`${x},${y}`)) return false;
+    return true;
+  };
+}
+
+/**
  * Recalculate vision for the current turn.
  *
  * Rules:
  * 1. All tiles set visible: false
  * 2. If player is in a room, reveal entire room + door tiles
- * 3. Corridor vision: Manhattan distance <= VISION_RADIUS_BASE from player
+ * 3. FOV vision: PreciseShadowcasting within VISION_RADIUS_BASE (walls/doors block)
  * 4. Thermal radar: tiles with heat >= threshold within VISION_RADIUS_THERMAL (through walls)
  * 5. Atmospheric radar: tiles with pressure < threshold within VISION_RADIUS_ATMOSPHERIC (through walls)
  * 6. Any tile set visible also becomes explored (permanent)
@@ -68,14 +109,13 @@ export function updateVision(state: GameState): GameState {
     }
   }
 
-  // 2. Corridor vision: always reveal tiles within base radius (Manhattan distance)
-  for (let dy = -VISION_RADIUS_BASE; dy <= VISION_RADIUS_BASE; dy++) {
-    for (let dx = -VISION_RADIUS_BASE; dx <= VISION_RADIUS_BASE; dx++) {
-      if (Math.abs(dx) + Math.abs(dy) <= VISION_RADIUS_BASE) {
-        reveal(px + dx, py + dy);
-      }
-    }
-  }
+  // 2. FOV-based corridor/general vision: PreciseShadowcasting with wall/door blocking
+  const blocking = getBlockingEntityPositions(state);
+  const lightPasses = makeLightPassesCallback(state, blocking);
+  const fov = new ROT.FOV.PreciseShadowcasting(lightPasses, { topology: 8 });
+  fov.compute(px, py, VISION_RADIUS_BASE, (x: number, y: number, _r: number, _vis: number) => {
+    reveal(x, y);
+  });
 
   // 3. Sensor-based extended vision (through walls) — all collected sensors apply
   const sensors = state.player.sensors ?? [];

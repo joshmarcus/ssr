@@ -506,6 +506,75 @@ function getWhyHintText(archetype: IncidentArchetype): string {
 }
 
 /**
+ * Get a prose explanation for what a tag means in the context of evidence.
+ * Used to give players feedback when linking evidence to deductions.
+ */
+export function getTagExplanation(tag: string, archetype?: IncidentArchetype): string {
+  // Archetype-specific flavor takes priority for relevant system tags
+  if (archetype) {
+    switch (archetype) {
+      case IncidentArchetype.CoolantCascade:
+        if (tag === "coolant" || tag === "thermal") return "Direct evidence of the thermal cascade event";
+        break;
+      case IncidentArchetype.HullBreach:
+        if (tag === "hull" || tag === "pressure") return "Direct evidence of the hull breach";
+        break;
+      case IncidentArchetype.ReactorScram:
+        if (tag === "reactor" || tag === "containment") return "Direct evidence of the reactor emergency";
+        break;
+      case IncidentArchetype.Sabotage:
+        if (tag === "electrical" || tag === "signal") return "Evidence suggesting deliberate interference";
+        break;
+      case IncidentArchetype.SignalAnomaly:
+        if (tag === "signal" || tag === "electrical") return "Evidence of the anomalous signal event";
+        break;
+      case IncidentArchetype.ContainmentBreach:
+        if (tag === "containment" || tag === "pressure") return "Evidence of the containment failure";
+        break;
+    }
+  }
+
+  // System tags
+  const systemExplanations: Record<string, string> = {
+    reactor: "Evidence of reactor system involvement",
+    coolant: "Evidence related to the coolant system",
+    thermal: "Evidence of thermal anomalies or overheating",
+    hull: "Evidence of hull damage or structural failure",
+    pressure: "Evidence of atmospheric pressure changes",
+    signal: "Evidence of signal interference or communications anomaly",
+    electrical: "Evidence of electrical system disruption",
+    containment: "Evidence related to containment field integrity",
+    radiation: "Evidence of radiation exposure",
+  };
+  if (systemExplanations[tag]) return systemExplanations[tag];
+
+  // Timeline tags
+  const timelineExplanations: Record<string, string> = {
+    timeline_early: "Information about conditions before the incident",
+    timeline_trigger: "Information about what triggered the incident",
+    timeline_response: "Evidence of the crew's response during the crisis",
+    timeline_aftermath: "Evidence about the aftermath and cover-up attempts",
+  };
+  if (timelineExplanations[tag]) return timelineExplanations[tag];
+
+  // Role tags
+  const roleExplanations: Record<string, string> = {
+    captain: "Points to the captain's involvement",
+    engineer: "Points to the engineer's involvement",
+    medic: "Points to the medic's involvement",
+    security: "Points to the security officer's involvement",
+    scientist: "Points to the scientist's involvement",
+    robotics: "Points to the robotics specialist's involvement",
+    life_support: "Points to the life support technician's involvement",
+    comms: "Points to the communications officer's involvement",
+  };
+  if (roleExplanations[tag]) return roleExplanations[tag];
+
+  // Crew last name tags or other unknown tags
+  return `Evidence involving ${tag}`;
+}
+
+/**
  * Generate tags for a journal entry based on context.
  * Called when adding new journal entries to derive appropriate tags.
  */

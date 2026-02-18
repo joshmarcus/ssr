@@ -26,7 +26,7 @@ import {
 import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory } from "./shared/types.js";
 import { computeChoiceEndings } from "./sim/mysteryChoices.js";
-import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence } from "./sim/deduction.js";
+import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence, getTagExplanation } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave } from "./sim/saveLoad.js";
 import { generateWhatWeKnow, formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
@@ -164,6 +164,7 @@ let hubLinkedEvidence: string[] = [];  // evidence IDs linked to a deduction
 let hubDetailDeduction: string | null = null; // deduction ID in evidence-linking mode
 let hubEvidenceIdx = 0;               // evidence entry index in linking mode
 let hubConfirming = false;            // Y/N confirmation for deduction answer
+let hubLinkFeedback = "";             // feedback message after toggling evidence
 let hubChoiceConfirming = false;      // Y/N confirmation for mystery choice
 let hubDecisionDetailIdx: number | null = null; // which decision is expanded (null = list view)
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
@@ -464,6 +465,7 @@ function handleRestartKey(e: KeyboardEvent): void {
     hubDetailDeduction = null;
     hubEvidenceIdx = 0;
     hubConfirming = false;
+    hubLinkFeedback = "";
     hubChoiceConfirming = false;
     hubDecisionDetailIdx = null;
     hubIdx = 0;
@@ -1754,10 +1756,34 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
 /** Detail view for evidence-linking within CONNECTIONS section. */
 function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduction, journal: import("./shared/types.js").JournalEntry[], _allTags: Set<string>): string {
   const crew = state.mystery?.crew ?? [];
+  const archetype = state.mystery?.timeline?.archetype;
+
+  // Compute real-time tag coverage from linked evidence
+  const { coveredTags, missingTags } = validateEvidenceLink(deduction, hubLinkedEvidence, journal);
+  const allCovered = missingTags.length === 0;
+
   let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:8px">`;
   html += `<div style="color:#fa0;font-weight:bold;font-size:14px;margin-bottom:6px">${esc(deduction.question)}</div>`;
   if (deduction.hintText) {
-    html += `<div style="color:#6cf;font-size:12px;font-style:italic;margin-bottom:8px">\u2139 ${esc(deduction.hintText)}</div>`;
+    html += `<div style="color:#6cf;font-size:12px;font-style:italic;margin-bottom:4px">\u2139 ${esc(deduction.hintText)}</div>`;
+  }
+
+  // Tag coverage bar — real-time pills
+  html += `<div style="margin:4px 0 6px 0;padding:4px 6px;background:#0a0a0a;border:1px solid ${allCovered ? '#443' : '#222'};border-radius:3px">`;
+  html += `<div style="color:#888;font-size:11px;margin-bottom:3px">Evidence covers ${coveredTags.length}/${deduction.requiredTags.length} required tags</div>`;
+  for (const tag of deduction.requiredTags) {
+    const isCovered = coveredTags.includes(tag);
+    const pillColor = isCovered ? "#0a2a0a" : "#2a0a0a";
+    const pillBorder = isCovered ? "#0f0" : "#f44";
+    const pillFg = isCovered ? "#0f0" : "#f44";
+    const icon = isCovered ? "\u2713" : "\u2717";
+    html += `<span style="display:inline-block;margin:1px 3px;padding:1px 6px;background:${pillColor};border:1px solid ${pillBorder};border-radius:8px;color:${pillFg};font-size:11px">${icon} ${esc(tag)}</span>`;
+  }
+  html += `</div>`;
+
+  // Feedback message from last toggle
+  if (hubLinkFeedback) {
+    html += `<div style="color:${allCovered ? '#fa0' : '#888'};font-size:11px;margin-bottom:4px;padding:2px 6px;font-style:italic">${esc(hubLinkFeedback)}</div>`;
   }
 
   // Evidence linking checkboxes
@@ -1768,23 +1794,46 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
     const checkbox = isLinked ? "[x]" : "[ ]";
     const highlight = (ji === hubEvidenceIdx) ? "color:#fff;font-weight:bold;" : "";
     const pointer = (ji === hubEvidenceIdx) ? "\u25b6 " : "  ";
-    const entryTagsHtml = entry.tags.map(t => esc(t)).join(", ");
-    // Show crew + relationships inline when highlighted (Deliverable 3)
+
+    // Show tags with matching required tags highlighted green
+    const matchingTags = entry.tags.filter(t => deduction.requiredTags.includes(t));
+    const nonMatchingTags = entry.tags.filter(t => !deduction.requiredTags.includes(t));
+    let entryTagsHtml = "";
+    if (matchingTags.length > 0) {
+      entryTagsHtml += matchingTags.map(t => `<span style="color:#0f0">${esc(t)}</span>`).join(", ");
+      if (nonMatchingTags.length > 0) entryTagsHtml += ", ";
+    }
+    entryTagsHtml += nonMatchingTags.map(t => `<span style="color:#444">${esc(t)}</span>`).join(", ");
+
+    // Show crew + relationships inline when highlighted
     let crewInline = "";
     if (ji === hubEvidenceIdx && entry.crewMentioned.length > 0) {
       const crewNames = entry.crewMentioned.map(id => {
         const member = crew.find(c => c.id === id);
         if (!member) return id;
         const rels = member.relationships.map(r => formatRelationship(member, r, crew)).filter(Boolean);
-        return `${member.firstName} ${member.lastName} (${member.role})${rels.length > 0 ? " — " + rels.join("; ") : ""}`;
+        return `${member.firstName} ${member.lastName} (${member.role})${rels.length > 0 ? " \u2014 " + rels.join("; ") : ""}`;
       });
       crewInline = `<div style="color:#6cf;font-size:10px;padding-left:24px">${crewNames.map(n => esc(n)).join(", ")}</div>`;
     }
-    html += `<div style="${highlight}padding:1px 0 1px 8px">${pointer}${checkbox} ${esc(entry.summary)}<div style="color:#555;font-size:11px;padding-left:24px">${entryTagsHtml}</div>${crewInline}</div>`;
+
+    // Linked entry: show which tags match (contribution summary)
+    let matchHint = "";
+    if (isLinked && matchingTags.length > 0) {
+      matchHint = `<span style="color:#0a0;font-size:10px;margin-left:6px">[MATCH: ${matchingTags.join(", ")}]</span>`;
+    }
+
+    html += `<div style="${highlight}padding:1px 0 1px 8px">${pointer}${checkbox} ${esc(entry.summary)}${matchHint}<div style="font-size:11px;padding-left:24px">${entryTagsHtml}</div>${crewInline}</div>`;
   }
 
   // Answer options below evidence
-  html += `<div style="border-top:1px solid #333;margin:8px 0;padding-top:6px"><div style="color:#aaa;font-size:12px;margin-bottom:4px">Select your answer:</div>`;
+  const answerBorder = allCovered ? "#443" : "#333";
+  html += `<div style="border-top:1px solid ${answerBorder};margin:8px 0;padding-top:6px">`;
+  if (allCovered) {
+    html += `<div style="color:#fa0;font-size:12px;margin-bottom:4px;font-weight:bold">\u2605 All evidence requirements met! Select your answer:</div>`;
+  } else {
+    html += `<div style="color:#aaa;font-size:12px;margin-bottom:4px">Select your answer:</div>`;
+  }
   for (let i = 0; i < deduction.options.length; i++) {
     const prefix = (i === hubOptionIdx) ? "\u25b6 " : "  ";
     const cls = (i === hubOptionIdx) ? "broadcast-option selected" : "broadcast-option";
@@ -2103,10 +2152,30 @@ function handleHubConnectionsInput(e: KeyboardEvent): void {
     if (e.key === " ") {
       if (journal.length > 0 && hubEvidenceIdx < journal.length) {
         const entryId = journal[hubEvidenceIdx].id;
+        const entry = journal[hubEvidenceIdx];
+        const archetype = state.mystery?.timeline?.archetype;
+
+        // Compute coverage before toggle
+        const coverageBefore = validateEvidenceLink(deduction, hubLinkedEvidence, journal);
+
         if (hubLinkedEvidence.includes(entryId)) {
           hubLinkedEvidence = hubLinkedEvidence.filter(id => id !== entryId);
+          hubLinkFeedback = "";
         } else {
           hubLinkedEvidence = [...hubLinkedEvidence, entryId];
+
+          // Compute coverage after adding this evidence
+          const coverageAfter = validateEvidenceLink(deduction, hubLinkedEvidence, journal);
+          const newTags = coverageAfter.coveredTags.filter(t => !coverageBefore.coveredTags.includes(t));
+
+          if (coverageAfter.missingTags.length === 0) {
+            hubLinkFeedback = "All evidence requirements met! Select your answer.";
+          } else if (newTags.length > 0) {
+            const explanations = newTags.map(t => getTagExplanation(t, archetype));
+            hubLinkFeedback = `\u2713 This evidence reveals: ${newTags.join(", ")} \u2014 ${explanations[0]}`;
+          } else {
+            hubLinkFeedback = "This evidence doesn't provide new information for this deduction.";
+          }
         }
       }
       renderInvestigationHub();
@@ -2157,6 +2226,7 @@ function handleHubConnectionsInput(e: KeyboardEvent): void {
       hubLinkedEvidence = [];
       hubEvidenceIdx = 0;
       hubOptionIdx = 0;
+      hubLinkFeedback = "";
       renderInvestigationHub();
     }
     return;

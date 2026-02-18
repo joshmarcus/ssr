@@ -4,10 +4,10 @@
 
 ## Current State
 
-- **Phase**: Sprint 16 (Mystery & Evidence Overhaul)
-- **Test status**: 253 tests passing across 23 test files (0 failing)
+- **Phase**: Sprint 17 (Visual Polish + Evidence Gameplay)
+- **Test status**: 269 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
-- **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
+- **Playtest**: Bot achieves VICTORY on seed 42 (178 turns, 5/5 deductions correct, 997 HP)
 
 ## What Works
 
@@ -59,6 +59,20 @@
 2026-02-17 14:56  feat: narrative cleaning directive messages + blocked-move explanation
 2026-02-17 14:50  feat: dedicated overlay indicator line in sidebar
 ```
+
+## Sprint 17 Changes
+
+- **Line-of-sight vision**: Replaced Manhattan diamond corridor vision (Rule 2) with ROT.js `PreciseShadowcasting` FOV in `src/sim/vision.ts`. Walls, locked doors, closed door entities, and sealed airlocks now block line of sight. Room reveal (entire room visible when player enters) still works. Sensor radar (thermal/atmospheric) still sees through walls. 5 new FOV tests (wall blocks, closed/open door, internal walls, FOV+room combo).
+- **Interaction indicators (blue halo)**: Non-exhausted interactable entities now render with a deep blue background glow (`#0a1a2a`) instead of the default entity-type glow. Exhausted entities retain their original glow. This helps players visually distinguish fresh interactions from used ones.
+- **Memory entities on explored tiles**: Static entities (relays, terminals, pickups, etc.) now appear as dim grey glyphs on explored-but-not-visible tiles, giving players a "I remember something was here" memory map. Mobile entities (drones, patrol drones, crew NPCs) are excluded.
+- **Evidence-to-deduction trial & error**: CONNECTIONS detail view now shows real-time tag coverage feedback when linking evidence:
+  - Tag coverage bar with green/red pills for each required tag
+  - Per-entry tag highlighting: matching tags shown green, non-matching shown dim
+  - `[MATCH: tag1, tag2]` labels on linked entries showing their contribution
+  - Contextual feedback messages on toggle: "This evidence reveals [TAG]" / "doesn't provide new info" / "All requirements met!"
+  - Gold-highlighted answer section when all tags are covered
+- **Tag explanations**: New `getTagExplanation(tag, archetype?)` function in `src/sim/deduction.ts` — returns prose explaining what each evidence tag means (system, timeline, role, crew name categories) with archetype-specific flavor.
+- **New tests**: 5 vision FOV tests + 11 evidence-linking tests (tag explanation, coverage validation) in new `tests/evidence-linking.test.ts`
 
 ## Sprint 16 Changes
 
@@ -156,7 +170,7 @@
 | Directory    | Last Modified |
 |-------------|---------------|
 | src/sim/     | 2026-02-18    |
-| src/render/  | 2026-02-17    |
+| src/render/  | 2026-02-18    |
 | src/harness/ | 2026-02-17    |
 | src/shared/  | 2026-02-18    |
 | src/data/    | 2026-02-18    |
@@ -184,6 +198,7 @@
 ### Tests (tests/)
 | File                          | Last Modified       |
 |------------------------------|---------------------|
+| evidence-linking.test.ts      | 2026-02-18          |
 | what-we-know.test.ts          | 2026-02-18          |
 | sprint4.test.ts               | 2026-02-17 22:24   |
 | deduction.test.ts             | 2026-02-17 21:53   |

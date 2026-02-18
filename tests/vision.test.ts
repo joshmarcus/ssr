@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { updateVision } from "../src/sim/vision.js";
 import { createEmptyState } from "../src/sim/state.js";
-import { TileType, AttachmentSlot, SensorType } from "../src/shared/types.js";
-import type { Attachment, Room } from "../src/shared/types.js";
+import { TileType, EntityType, AttachmentSlot, SensorType } from "../src/shared/types.js";
+import type { Attachment, Room, Entity } from "../src/shared/types.js";
 import { VISION_RADIUS_BASE, HEAT_VISIBLE_THRESHOLD, PRESSURE_VISIBLE_THRESHOLD } from "../src/shared/constants.js";
 
 function makeFloorState(width = 20, height = 20) {
@@ -26,17 +26,17 @@ function makeFloorState(width = 20, height = 20) {
 }
 
 describe("Vision system", () => {
-  it("reveals tiles within base vision radius", () => {
+  it("reveals tiles within base vision radius (open floor)", () => {
     const state = makeFloorState();
     state.player.entity.pos = { x: 10, y: 10 };
 
     const next = updateVision(state);
 
-    // Tiles within Manhattan distance <= VISION_RADIUS_BASE should be visible
+    // Player's tile should be visible
     expect(next.tiles[10][10].visible).toBe(true);
     expect(next.tiles[10][10].explored).toBe(true);
 
-    // At radius edge
+    // Tile directly at radius distance along a cardinal direction (no obstacles)
     expect(next.tiles[10][10 + VISION_RADIUS_BASE].visible).toBe(true);
 
     // Beyond radius
@@ -178,5 +178,125 @@ describe("Vision system", () => {
     // Far corner should be unexplored
     expect(next.tiles[19][19].visible).toBe(false);
     expect(next.tiles[19][19].explored).toBe(false);
+  });
+});
+
+describe("Vision FOV — wall and door blocking", () => {
+  it("wall blocks corridor vision (tile behind wall not visible)", () => {
+    const state = makeFloorState();
+    state.player.entity.pos = { x: 10, y: 10 };
+
+    // Place a wall at (10, 8) — 2 tiles north of player
+    state.tiles[8][10] = {
+      type: TileType.Wall,
+      glyph: "#",
+      walkable: false,
+      heat: 0, smoke: 0, dirt: 0, pressure: 100,
+      explored: false, visible: false,
+    };
+
+    const next = updateVision(state);
+
+    // Tile immediately before wall: visible
+    expect(next.tiles[9][10].visible).toBe(true);
+    // The wall itself: visible (FOV sees it)
+    expect(next.tiles[8][10].visible).toBe(true);
+    // Tile behind wall: NOT visible (blocked by wall)
+    expect(next.tiles[7][10].visible).toBe(false);
+  });
+
+  it("closed door entity blocks vision", () => {
+    const state = makeFloorState();
+    state.player.entity.pos = { x: 10, y: 10 };
+
+    // Place a closed door entity at (10, 8)
+    const doorEntity: Entity = {
+      id: "door_test",
+      type: EntityType.ClosedDoor,
+      pos: { x: 10, y: 8 },
+      props: {},
+    };
+    state.entities.set("door_test", doorEntity);
+
+    const next = updateVision(state);
+
+    // The door tile should be visible
+    expect(next.tiles[8][10].visible).toBe(true);
+    // Tile behind closed door: NOT visible
+    expect(next.tiles[7][10].visible).toBe(false);
+  });
+
+  it("open door entity is transparent to vision", () => {
+    const state = makeFloorState();
+    state.player.entity.pos = { x: 10, y: 10 };
+
+    // Place an open door entity at (10, 8)
+    const doorEntity: Entity = {
+      id: "door_test",
+      type: EntityType.ClosedDoor,
+      pos: { x: 10, y: 8 },
+      props: { open: true },
+    };
+    state.entities.set("door_test", doorEntity);
+
+    const next = updateVision(state);
+
+    // The door tile: visible
+    expect(next.tiles[8][10].visible).toBe(true);
+    // Tile behind open door: visible (not blocked)
+    expect(next.tiles[7][10].visible).toBe(true);
+  });
+
+  it("room reveal still works when room contains internal walls", () => {
+    const state = makeFloorState();
+    // Room from (3,3) to (3+6,3+6) = (3..8, 3..8)
+    const room: Room = { id: "room_0", name: "Test Room", x: 3, y: 3, width: 6, height: 6 };
+    state.rooms.push(room);
+    state.player.entity.pos = { x: 5, y: 5 }; // inside room
+
+    // Place a wall inside the room at (6, 5)
+    state.tiles[5][6] = {
+      type: TileType.Wall,
+      glyph: "#",
+      walkable: false,
+      heat: 0, smoke: 0, dirt: 0, pressure: 100,
+      explored: false, visible: false,
+    };
+
+    const next = updateVision(state);
+
+    // Room reveal should still show the entire room, even tiles behind the internal wall
+    expect(next.tiles[5][7].visible).toBe(true); // behind internal wall
+    expect(next.tiles[5][6].visible).toBe(true); // the wall itself
+    expect(next.tiles[3][3].visible).toBe(true); // corner of room
+  });
+
+  it("FOV and room reveal combine correctly", () => {
+    const state = makeFloorState();
+    const room: Room = { id: "room_0", name: "Test Room", x: 2, y: 2, width: 4, height: 4 };
+    state.rooms.push(room);
+    state.player.entity.pos = { x: 3, y: 3 }; // inside room
+
+    // Place walls surrounding room
+    for (let x = 1; x <= 6; x++) {
+      state.tiles[1][x] = { type: TileType.Wall, glyph: "#", walkable: false, heat: 0, smoke: 0, dirt: 0, pressure: 100, explored: false, visible: false };
+      state.tiles[6][x] = { type: TileType.Wall, glyph: "#", walkable: false, heat: 0, smoke: 0, dirt: 0, pressure: 100, explored: false, visible: false };
+    }
+    for (let y = 1; y <= 6; y++) {
+      state.tiles[y][1] = { type: TileType.Wall, glyph: "#", walkable: false, heat: 0, smoke: 0, dirt: 0, pressure: 100, explored: false, visible: false };
+      state.tiles[y][6] = { type: TileType.Wall, glyph: "#", walkable: false, heat: 0, smoke: 0, dirt: 0, pressure: 100, explored: false, visible: false };
+    }
+
+    const next = updateVision(state);
+
+    // Room tiles: visible via room reveal
+    expect(next.tiles[3][3].visible).toBe(true);
+    expect(next.tiles[2][2].visible).toBe(true);
+
+    // Surrounding walls: visible via room reveal (1-tile border)
+    expect(next.tiles[1][2].visible).toBe(true);
+
+    // Tiles outside walls: NOT visible (FOV blocked by walls)
+    expect(next.tiles[0][3].visible).toBe(false);
   });
 });

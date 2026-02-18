@@ -2,7 +2,7 @@ import * as ROT from "rot-js";
 import type { GameState, Entity, Room } from "../shared/types.js";
 import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
-import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName } from "../shared/ui.js";
+import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
 import type { IGameDisplay } from "./displayInterface.js";
 
@@ -144,6 +144,19 @@ const ENTITY_COLORS: Record<string, string> = {
   [EntityType.Console]: "#66aacc",
   [EntityType.Airlock]: "#0ff",
 };
+
+// Blue background glow for interactable (non-exhausted) entities
+const INTERACTABLE_BG = "#0a1a2a";
+
+// Static entity types that should appear as dim memory on explored-but-not-visible tiles
+const STATIC_ENTITY_TYPES = new Set<string>([
+  EntityType.Relay, EntityType.SensorPickup, EntityType.DataCore,
+  EntityType.LogTerminal, EntityType.CrewItem, EntityType.MedKit,
+  EntityType.Breach, EntityType.ClosedDoor, EntityType.SecurityTerminal,
+  EntityType.PressureValve, EntityType.FuseBox, EntityType.PowerCell,
+  EntityType.EscapePod, EntityType.RepairCradle, EntityType.Airlock,
+  EntityType.EvidenceTrace, EntityType.Console,
+]);
 
 // Entity background glow colors (subtle tint behind entities)
 const ENTITY_BG_GLOW: Record<string, string> = {
@@ -592,7 +605,7 @@ export class BrowserDisplay implements IGameDisplay {
     this.showTrail = false;
 
     // Build entity position lookup
-    const entityAt = new Map<string, { glyph: string; color: string; bgGlow?: string }>();
+    const entityAt = new Map<string, { glyph: string; color: string; bgGlow?: string; entity: Entity; exhausted: boolean }>();
     for (const [id, entity] of state.entities) {
       if (id === "player") continue;
       // Hidden crew items: only show if cleanliness sensor is active or item was revealed
@@ -610,10 +623,15 @@ export class BrowserDisplay implements IGameDisplay {
       if (entity.type === EntityType.Airlock) {
         entityColor = entity.props["open"] === true ? "#f00" : "#0ff";
       }
+      // Blue halo for interactable (non-exhausted) entities, default glow otherwise
+      const exhausted = isEntityExhausted(entity);
+      const bgGlow = exhausted ? ENTITY_BG_GLOW[entity.type] : INTERACTABLE_BG;
       entityAt.set(key, {
         glyph: ENTITY_GLYPHS[entity.type] || "?",
         color: entityColor,
-        bgGlow: ENTITY_BG_GLOW[entity.type],
+        bgGlow,
+        entity,
+        exhausted,
       });
     }
 
@@ -634,13 +652,22 @@ export class BrowserDisplay implements IGameDisplay {
         if (!tile.visible) {
           let memFg = "#1a1a1a";
           let memGlyph = tile.glyph;
+          let memBg = "#050505";
           if (tile.type === TileType.Wall) {
             memGlyph = this.getWallGlyph(state, x, y);
             memFg = "#282828";
           } else if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
             memFg = "#332210";
           }
-          this.display.draw(sx, sy, memGlyph, memFg, "#050505");
+          // Show static entities as dim memory on explored tiles
+          const posKey = `${x},${y}`;
+          const memEnt = entityAt.get(posKey);
+          if (memEnt && STATIC_ENTITY_TYPES.has(memEnt.entity.type)) {
+            memGlyph = memEnt.glyph;
+            memFg = "#333333";
+            memBg = "#080808";
+          }
+          this.display.draw(sx, sy, memGlyph, memFg, memBg);
           continue;
         }
 
