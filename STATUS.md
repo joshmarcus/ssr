@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 14 (Bot Evacuation + Late-Game Narrative + Recovery Tests)
-- **Test status**: 209 tests passing across 19 test files (0 failing)
+- **Phase**: Sprint 15 (Test Coverage + Harness Evacuation Obs)
+- **Test status**: 235 tests passing across 22 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
 
@@ -65,6 +65,13 @@
 2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
 2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 15 Changes
+
+- Deduction edge case tests: 9 tests (invalid/locked/solved rejections, correct/wrong answers, chain unlocking, Data Core phase gating)
+- Mystery choices tests: 10 tests (generation for all archetypes, blame/data/incident choices, computeChoiceEndings, crew name references)
+- Patrol drone tests: 7 tests (movement timing, hostile pursuit/damage/cooldown, wall avoidance, multi-drone)
+- Harness evacuation observations: evacuation state (crew found/following/evacuated/dead, pods powered) in HarnessObservation + text renderer
 
 ## Sprint 14 Changes
 
@@ -176,6 +183,9 @@
 | edge-cases.test.ts            | 2026-02-17 22:18   |
 | evidence.test.ts              | 2026-02-17 22:17   |
 | recovery.test.ts              | 2026-02-18          |
+| deduction-edge-cases.test.ts  | 2026-02-18          |
+| mystery-choices.test.ts       | 2026-02-18          |
+| patrol-drones.test.ts         | 2026-02-18          |
 
 ## Architecture
 

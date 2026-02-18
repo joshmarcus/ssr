@@ -535,6 +535,26 @@ export function buildObservation(
     deductions,
     deductionProgress,
     transmissionReady,
+    evacuation: state.mystery?.evacuation?.active ? (() => {
+      const evac = state.mystery!.evacuation!;
+      let followingCount = 0;
+      for (const [, e] of state.entities) {
+        if (e.type === EntityType.CrewNPC &&
+            e.props["following"] === true &&
+            e.props["evacuated"] !== true &&
+            e.props["dead"] !== true) {
+          followingCount++;
+        }
+      }
+      return {
+        active: true,
+        crewFound: evac.crewFound.length,
+        crewEvacuated: evac.crewEvacuated.length,
+        crewDead: evac.crewDead.length,
+        crewFollowing: followingCount,
+        podsPowered: evac.podsPowered.length,
+      };
+    })() : undefined,
   };
 }
 
@@ -661,6 +681,15 @@ export function renderObservationAsText(obs: HarnessObservation): string {
         lines.push(`    missing tags: ${d.missingTags.join(", ")}`);
       }
     }
+  }
+
+  // Evacuation
+  if (obs.evacuation?.active) {
+    const e = obs.evacuation;
+    lines.push("");
+    lines.push("EVACUATION:");
+    lines.push(`  Crew found: ${e.crewFound} | Following: ${e.crewFollowing} | Evacuated: ${e.crewEvacuated} | Dead: ${e.crewDead}`);
+    lines.push(`  Escape pods powered: ${e.podsPowered}`);
   }
 
   return lines.join("\n");

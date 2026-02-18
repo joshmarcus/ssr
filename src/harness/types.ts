@@ -41,6 +41,16 @@ export interface HarnessObservation {
   }[];
   deductionProgress: { total: number; answered: number; correct: number };
   transmissionReady: boolean;
+
+  // Evacuation support
+  evacuation?: {
+    active: boolean;
+    crewFound: number;
+    crewEvacuated: number;
+    crewDead: number;
+    crewFollowing: number;
+    podsPowered: number;
+  };
 }
 
 /**
