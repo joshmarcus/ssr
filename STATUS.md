@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 12 (Evacuation Polish + Help Overlay + Evacuation Tests)
+- **Phase**: Sprint 13 (Restart Fix + Relay Defeat + Crawl Polish + 3D Sync)
 - **Test status**: 202 tests passing across 18 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
@@ -65,6 +65,15 @@
 2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
 2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 13 Changes
+
+- Restart state reset: all per-run variables (tutorial hints, drone encounters, bot introspections, broadcast/overlay state) properly cleared on restart
+- Contextual defeat: heat-death shows RELAY TRIPPED prose, other defeats show LINK LOST
+- Opening crawl: 2x faster typewriter (120 chars/sec), station subtitle, atmospheric first logs ("The station is quiet. What happened here?")
+- 3D renderer: call rebuildEntityMeshes() on model load, entities get GLTF models immediately
+- 3D game-over overlay: synced with 2D version (performance rating, rooms, evidence, deductions, crew evacuation, mystery choices)
+- Removed dead VICTORY_TEXT import
 
 ## Sprint 12 Changes
 
