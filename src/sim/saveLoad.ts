@@ -5,7 +5,7 @@
 
 import type { GameState, Entity, EntityId } from "../shared/types.js";
 
-const SAVE_KEY = "ssr_save_v1";
+const SAVE_KEY = "ssr_save_v2";
 
 interface SerializedGameState {
   _version: 1;
