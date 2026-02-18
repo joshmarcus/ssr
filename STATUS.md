@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 13 (Restart Fix + Relay Defeat + Crawl Polish + 3D Sync)
-- **Test status**: 202 tests passing across 18 test files (0 failing)
+- **Phase**: Sprint 14 (Bot Evacuation + Late-Game Narrative + Recovery Tests)
+- **Test status**: 209 tests passing across 19 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
 
@@ -65,6 +65,12 @@
 2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
 2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 14 Changes
+
+- Playtest bot evacuation phase: CrewNPC/EscapePod priorities boost during evacuation, hasFollowingCrew helper, evacuation event logging + summary output
+- Late-game bot introspections: 3 new narrative milestones at turns 180, 240, 350
+- Recovery integration tests: 7 new tests (relay chain unlock, Data Core victory gating by phase, service bot activation, investigation→recovery phase transition, full relay→unlock→transmit pipeline)
 
 ## Sprint 13 Changes
 
@@ -169,6 +175,7 @@
 | procgen.test.ts               | 2026-02-17 15:40   |
 | edge-cases.test.ts            | 2026-02-17 22:18   |
 | evidence.test.ts              | 2026-02-17 22:17   |
+| recovery.test.ts              | 2026-02-18          |
 
 ## Architecture
 

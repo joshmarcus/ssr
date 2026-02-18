@@ -9,7 +9,7 @@ import { getUnlockedDeductions } from "./src/sim/deduction.js";
 import { getRoomCleanliness, getRoomAt } from "./src/sim/rooms.js";
 import { isEntityExhausted } from "./src/shared/ui.js";
 import type { GameState, Action, Position, Entity, Direction } from "./src/shared/types.js";
-import { ActionType, EntityType } from "./src/shared/types.js";
+import { ActionType, EntityType, ObjectivePhase } from "./src/shared/types.js";
 
 const SEED = parseInt(process.argv[2] || "42", 10);
 const MAX_TURNS = 500;
@@ -99,6 +99,8 @@ function getAdjacentInteractables(state: GameState): Entity[] {
 
 /** Priority score for interacting with an entity (higher = more important) */
 function interactPriority(entity: Entity, state: GameState): number {
+  const evacuating = state.mystery?.objectivePhase === ObjectivePhase.Evacuate;
+
   switch (entity.type) {
     case EntityType.DataCore: {
       // Only interact if all deductions answered
@@ -118,8 +120,21 @@ function interactPriority(entity: Entity, state: GameState): number {
     case EntityType.FuseBox: return 40;
     case EntityType.PressureValve: return 35;
     case EntityType.Breach: return 30;
-    case EntityType.CrewNPC: return 25;
-    case EntityType.EscapePod: return 20;
+    case EntityType.CrewNPC: {
+      if (!evacuating) return 25;
+      // During evacuation: high priority for undiscovered/unfollowing crew
+      if (entity.props["evacuated"] === true || entity.props["dead"] === true) return -1;
+      if (entity.props["following"] === true) return 5; // already following, low priority
+      return 200; // recruit crew to follow
+    }
+    case EntityType.EscapePod: {
+      if (!evacuating) return 20;
+      // During evacuation: board crew into pods
+      // Only high priority if we have following crew
+      const hasFollowers = hasFollowingCrew(state);
+      if (entity.props["powered"] !== true) return 30; // unpowered pod, still worth checking
+      return hasFollowers ? 180 : 15; // rush to pod if crew following
+    }
     case EntityType.ServiceBot: return 15;
     case EntityType.ClosedDoor: {
       // Open closed doors, don't close open ones
@@ -128,6 +143,19 @@ function interactPriority(entity: Entity, state: GameState): number {
     case EntityType.Airlock: return -1; // don't open airlocks randomly
     default: return 0;
   }
+}
+
+/** Check if any crew NPCs are currently following the player */
+function hasFollowingCrew(state: GameState): boolean {
+  for (const [, entity] of state.entities) {
+    if (entity.type === EntityType.CrewNPC &&
+        entity.props["following"] === true &&
+        entity.props["evacuated"] !== true &&
+        entity.props["dead"] !== true) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Track entities we've tried interacting with and they didn't change
@@ -340,7 +368,12 @@ for (let turn = 0; turn < MAX_TURNS; turn++) {
       log.text.includes("transmit") ||
       log.text.includes("deduction") ||
       log.text.includes("evidence") ||
-      log.text.includes("Deduction")
+      log.text.includes("Deduction") ||
+      log.text.includes("Crew found") ||
+      log.text.includes("following") ||
+      log.text.includes("boarded") ||
+      log.text.includes("EVACUATION") ||
+      log.text.includes("evacuation")
     )) {
       console.log(`  >> ${log.text}`);
     }
@@ -390,6 +423,16 @@ if (deds.length > 0) {
     const tags = d.requiredTags.join(", ");
     console.log(`  ${d.id}: ${status} — needs: [${tags}]`);
   }
+}
+
+// Show evacuation status
+const evac = state.mystery?.evacuation;
+if (evac && evac.active) {
+  console.log(`\nEvacuation status:`);
+  console.log(`  Crew found: ${evac.crewFound.length}`);
+  console.log(`  Crew evacuated: ${evac.crewEvacuated.length}`);
+  console.log(`  Crew dead: ${evac.crewDead.length}`);
+  console.log(`  Pods powered: ${evac.podsPowered.length}`);
 }
 
 if (issueLog.length > 0) {

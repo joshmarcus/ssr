@@ -31,6 +31,18 @@ export const BOT_INTROSPECTIONS: BotIntrospection[] = [
     turn: 120,
     text: "Unit A3 status: still operational. Still cleaning. The corridors look better, at least.",
   },
+  {
+    turn: 180,
+    text: "Unit A3 log: the evidence is forming a picture. This unit was not designed for detective work, but the data is… compelling.",
+  },
+  {
+    turn: 240,
+    text: "Unit A3 note: power reserves holding. The station feels different now — quieter, maybe. Or this unit is learning to listen.",
+  },
+  {
+    turn: 350,
+    text: "Unit A3 reflection: 350 turns. Most janitor bots are decommissioned before their first century. This unit has outlasted its creators.",
+  },
 ];
 
 // ── Drone encounter dialogue (Item 10) ─────────────────────
