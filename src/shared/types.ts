@@ -275,6 +275,9 @@ export interface Deduction {
   rewardType: "clearance" | "room_reveal" | "drone_disable" | "sensor_hint";
   rewardDescription: string;
   hintText?: string;           // archetype-specific hint shown in CONNECTIONS section
+  tagRevelations?: { tag: string; text: string }[];  // narrative sentence per required tag
+  synthesisText?: string;    // "what must be true" paragraph (shown when all tags covered)
+  conclusionText?: string;   // shown after correct answer
 }
 
 export interface MysteryChoice {

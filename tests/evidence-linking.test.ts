@@ -1,7 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { getTagExplanation, validateEvidenceLink } from "../src/sim/deduction.js";
-import { IncidentArchetype, DeductionCategory } from "../src/shared/types.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import * as ROT from "rot-js";
+import { getTagExplanation, validateEvidenceLink, generateDeductions } from "../src/sim/deduction.js";
+import { generateCrew } from "../src/sim/crewGen.js";
+import { generateTimeline } from "../src/sim/timeline.js";
+import { IncidentArchetype, DeductionCategory, CrewRole } from "../src/shared/types.js";
 import type { Deduction, JournalEntry } from "../src/shared/types.js";
+import { resolveRevelationTemplate, resolveRevelations } from "../src/data/revelations.js";
 
 describe("getTagExplanation", () => {
   it("returns meaningful text for system tags", () => {
@@ -118,5 +122,186 @@ describe("validateEvidenceLink — tag coverage feedback", () => {
     const result = validateEvidenceLink(ded, ["e1"], journal);
     expect(result.valid).toBe(true);
     expect(result.coveredTags).toEqual(["reactor", "timeline_trigger"]);
+  });
+});
+
+// ── Revelation system tests ──────────────────────────────────────
+
+const ROOM_NAMES = [
+  "Arrival Bay", "Engineering Storage", "Power Relay Junction",
+  "Central Atrium", "Robotics Bay", "Life Support",
+  "Communications Hub", "Crew Quarters", "Research Lab", "Med Bay",
+];
+
+describe("revelation generation", () => {
+  beforeEach(() => {
+    ROT.RNG.setSeed(184201);
+  });
+
+  it("generates tagRevelations for CoolantCascade deductions", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+    const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
+
+    // deduction_what should have revelations
+    const whatDed = deductions.find(d => d.id === "deduction_what");
+    expect(whatDed).toBeDefined();
+    expect(whatDed!.tagRevelations).toBeDefined();
+    expect(whatDed!.tagRevelations!.length).toBeGreaterThan(0);
+    expect(whatDed!.synthesisText).toBeDefined();
+    expect(whatDed!.synthesisText!.length).toBeGreaterThan(0);
+    expect(whatDed!.conclusionText).toBeDefined();
+    expect(whatDed!.conclusionText!.length).toBeGreaterThan(0);
+  });
+
+  it("generates revelations for all 6 archetypes", () => {
+    const archetypes = [
+      IncidentArchetype.CoolantCascade,
+      IncidentArchetype.HullBreach,
+      IncidentArchetype.ReactorScram,
+      IncidentArchetype.Sabotage,
+      IncidentArchetype.SignalAnomaly,
+      IncidentArchetype.ContainmentBreach,
+    ];
+
+    for (const archetype of archetypes) {
+      ROT.RNG.setSeed(184201);
+      const crew = generateCrew(10, 184201, ROOM_NAMES);
+      const timeline = generateTimeline(crew, archetype, ROOM_NAMES);
+      const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
+
+      // At least deduction_what should have revelations for every archetype
+      const whatDed = deductions.find(d => d.id === "deduction_what");
+      expect(whatDed?.tagRevelations, `${archetype} deduction_what should have tagRevelations`).toBeDefined();
+      expect(whatDed?.synthesisText, `${archetype} deduction_what should have synthesisText`).toBeDefined();
+    }
+  });
+
+  it("tagRevelations length matches requiredTags length", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+    const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
+
+    for (const d of deductions) {
+      if (d.tagRevelations) {
+        expect(d.tagRevelations.length, `${d.id} tagRevelations count should match requiredTags count`).toBe(d.requiredTags.length);
+      }
+    }
+  });
+
+  it("resolves template placeholders (no raw {engineer} in final text)", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+    const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
+
+    for (const d of deductions) {
+      if (d.tagRevelations) {
+        for (const rev of d.tagRevelations) {
+          expect(rev.text).not.toMatch(/\{engineer\}/);
+          expect(rev.text).not.toMatch(/\{captain\}/);
+          expect(rev.text).not.toMatch(/\{engineer_last\}/);
+          expect(rev.text).not.toMatch(/\{captain_last\}/);
+        }
+      }
+      if (d.synthesisText) {
+        expect(d.synthesisText).not.toMatch(/\{engineer\}/);
+        expect(d.synthesisText).not.toMatch(/\{captain\}/);
+      }
+      if (d.conclusionText) {
+        expect(d.conclusionText).not.toMatch(/\{engineer\}/);
+        expect(d.conclusionText).not.toMatch(/\{captain\}/);
+      }
+    }
+  });
+
+  it("tag revelations have tag-specific sentences", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+    const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
+
+    const whyDed = deductions.find(d => d.id === "deduction_why");
+    expect(whyDed?.tagRevelations).toBeDefined();
+    if (whyDed?.tagRevelations) {
+      // Each revelation should have a unique tag
+      const tags = whyDed.tagRevelations.map(r => r.tag);
+      expect(new Set(tags).size).toBe(tags.length);
+      // Each should have a non-empty text
+      for (const rev of whyDed.tagRevelations) {
+        expect(rev.text.length).toBeGreaterThan(20);
+      }
+    }
+  });
+});
+
+describe("resolveRevelationTemplate", () => {
+  it("replaces crew name placeholders", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+    const engineer = crew.find(c => c.role === CrewRole.Engineer);
+
+    const result = resolveRevelationTemplate(
+      "{engineer} filed a report. {engineer_last} warned command.",
+      crew,
+      timeline,
+    );
+
+    expect(result).not.toContain("{engineer}");
+    expect(result).not.toContain("{engineer_last}");
+    if (engineer) {
+      expect(result).toContain(engineer.firstName);
+      expect(result).toContain(engineer.lastName);
+    }
+  });
+
+  it("provides fallback when crew role missing", () => {
+    // Use a minimal fake timeline — generateTimeline requires crew, so we mock it
+    const fakeTimeline = {
+      archetype: IncidentArchetype.CoolantCascade,
+      events: [],
+      primaryHazard: "thermal",
+      sensorBias: "thermal" as const,
+    };
+    const result = resolveRevelationTemplate("{engineer} filed a report.", [], fakeTimeline as any);
+    expect(result).toContain("the engineer");
+    expect(result).not.toContain("{engineer}");
+  });
+});
+
+describe("resolveRevelations", () => {
+  beforeEach(() => {
+    ROT.RNG.setSeed(184201);
+  });
+
+  it("returns resolved revelations for valid archetype/deduction", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+
+    const result = resolveRevelations(IncidentArchetype.CoolantCascade, "deduction_what", crew, timeline);
+    expect(result).toBeDefined();
+    expect(result!.tagRevelations.length).toBeGreaterThan(0);
+    expect(result!.synthesisText.length).toBeGreaterThan(0);
+    expect(result!.conclusionText.length).toBeGreaterThan(0);
+  });
+
+  it("returns undefined for non-existent deduction", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+
+    const result = resolveRevelations(IncidentArchetype.CoolantCascade, "deduction_nonexistent", crew, timeline);
+    expect(result).toBeUndefined();
+  });
+
+  it("resolves crew-name tags in tagRevelations", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+    const engineer = crew.find(c => c.role === CrewRole.Engineer);
+
+    const result = resolveRevelations(IncidentArchetype.CoolantCascade, "deduction_why", crew, timeline);
+    expect(result).toBeDefined();
+    // The "why" deduction has a tag that was "{engineer_last}" — should be resolved to actual name
+    if (engineer && result) {
+      const engineerTag = result.tagRevelations.find(tr => tr.tag === engineer.lastName.toLowerCase());
+      expect(engineerTag, "should resolve {engineer_last} tag to actual last name").toBeDefined();
+    }
   });
 });

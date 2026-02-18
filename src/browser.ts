@@ -167,6 +167,8 @@ let hubConfirming = false;            // Y/N confirmation for deduction answer
 let hubLinkFeedback = "";             // feedback message after toggling evidence
 let hubChoiceConfirming = false;      // Y/N confirmation for mystery choice
 let hubDecisionDetailIdx: number | null = null; // which decision is expanded (null = list view)
+let hubFocusRegion: "evidence" | "answers" = "evidence"; // focus region in connection detail view
+let hubRevelationOverlay = false; // showing post-answer revelation overlay
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
 
 // ── Wait message variety ────────────────────────────────────────
@@ -1753,93 +1755,125 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
   return `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:4px 8px">${listHtml}</div>`;
 }
 
-/** Detail view for evidence-linking within CONNECTIONS section. */
+/** Detail view for evidence-linking within CONNECTIONS section — split-pane + revelation board. */
 function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduction, journal: import("./shared/types.js").JournalEntry[], _allTags: Set<string>): string {
   const crew = state.mystery?.crew ?? [];
-  const archetype = state.mystery?.timeline?.archetype;
 
   // Compute real-time tag coverage from linked evidence
   const { coveredTags, missingTags } = validateEvidenceLink(deduction, hubLinkedEvidence, journal);
   const allCovered = missingTags.length === 0;
 
-  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:8px">`;
-  html += `<div style="color:#fa0;font-weight:bold;font-size:14px;margin-bottom:6px">${esc(deduction.question)}</div>`;
+  // ── Header: question + hint + tag coverage ──
+  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:4px 8px">`;
+  html += `<div style="color:#fa0;font-weight:bold;font-size:14px;margin-bottom:4px">${esc(deduction.question)}</div>`;
   if (deduction.hintText) {
-    html += `<div style="color:#6cf;font-size:12px;font-style:italic;margin-bottom:4px">\u2139 ${esc(deduction.hintText)}</div>`;
+    html += `<div style="color:#6cf;font-size:11px;font-style:italic;margin-bottom:4px">\u2139 ${esc(deduction.hintText)}</div>`;
   }
 
-  // Tag coverage bar — real-time pills
-  html += `<div style="margin:4px 0 6px 0;padding:4px 6px;background:#0a0a0a;border:1px solid ${allCovered ? '#443' : '#222'};border-radius:3px">`;
-  html += `<div style="color:#888;font-size:11px;margin-bottom:3px">Evidence covers ${coveredTags.length}/${deduction.requiredTags.length} required tags</div>`;
+  // Tag coverage bar
+  html += `<div style="margin:2px 0 4px 0;padding:3px 6px;background:#0a0a0a;border:1px solid ${allCovered ? '#443' : '#222'};border-radius:3px">`;
+  html += `<span style="color:#888;font-size:10px">Tags: </span>`;
   for (const tag of deduction.requiredTags) {
     const isCovered = coveredTags.includes(tag);
     const pillColor = isCovered ? "#0a2a0a" : "#2a0a0a";
     const pillBorder = isCovered ? "#0f0" : "#f44";
     const pillFg = isCovered ? "#0f0" : "#f44";
     const icon = isCovered ? "\u2713" : "\u2717";
-    html += `<span style="display:inline-block;margin:1px 3px;padding:1px 6px;background:${pillColor};border:1px solid ${pillBorder};border-radius:8px;color:${pillFg};font-size:11px">${icon} ${esc(tag)}</span>`;
+    html += `<span style="display:inline-block;margin:1px 3px;padding:1px 6px;background:${pillColor};border:1px solid ${pillBorder};border-radius:8px;color:${pillFg};font-size:10px">${icon} ${esc(tag)}</span>`;
   }
   html += `</div>`;
 
-  // Feedback message from last toggle
-  if (hubLinkFeedback) {
-    html += `<div style="color:${allCovered ? '#fa0' : '#888'};font-size:11px;margin-bottom:4px;padding:2px 6px;font-style:italic">${esc(hubLinkFeedback)}</div>`;
-  }
+  // ── Split pane: evidence list (left 40%) | evidence detail (right 60%) ──
+  html += `<div class="journal-body" style="height:auto;max-height:220px;min-height:120px">`;
 
-  // Evidence linking checkboxes
-  html += `<div style="color:#aaa;font-size:12px;margin-bottom:4px">Link evidence [Space] then select answer [Enter]:</div>`;
+  // Left pane: evidence list with checkboxes
+  const inEvidenceFocus = hubFocusRegion === "evidence";
+  html += `<div class="journal-list" style="width:40%;font-size:11px;${inEvidenceFocus ? 'border-right:1px solid #fa0' : 'border-right:1px solid #222'}">`;
+  html += `<div style="color:${inEvidenceFocus ? '#fa0' : '#666'};font-size:10px;font-weight:bold;padding:2px 0;border-bottom:1px solid #222">EVIDENCE${inEvidenceFocus ? ' [Space]' : ''}</div>`;
   for (let ji = 0; ji < journal.length; ji++) {
     const entry = journal[ji];
     const isLinked = hubLinkedEvidence.includes(entry.id);
     const checkbox = isLinked ? "[x]" : "[ ]";
-    const highlight = (ji === hubEvidenceIdx) ? "color:#fff;font-weight:bold;" : "";
-    const pointer = (ji === hubEvidenceIdx) ? "\u25b6 " : "  ";
+    const isSelected = ji === hubEvidenceIdx;
+    const highlight = isSelected && inEvidenceFocus ? "color:#fff;font-weight:bold;background:#1a1a2a;" : isSelected ? "color:#ccc;background:#111;" : "";
+    const pointer = isSelected ? "\u25b6 " : "  ";
 
-    // Show tags with matching required tags highlighted green
+    // Show matching tags inline
     const matchingTags = entry.tags.filter(t => deduction.requiredTags.includes(t));
-    const nonMatchingTags = entry.tags.filter(t => !deduction.requiredTags.includes(t));
-    let entryTagsHtml = "";
+    let matchBadge = "";
     if (matchingTags.length > 0) {
-      entryTagsHtml += matchingTags.map(t => `<span style="color:#0f0">${esc(t)}</span>`).join(", ");
-      if (nonMatchingTags.length > 0) entryTagsHtml += ", ";
+      matchBadge = matchingTags.map(t => `<span style="color:#0f0;font-size:9px">${esc(t)}</span>`).join(" ");
     }
-    entryTagsHtml += nonMatchingTags.map(t => `<span style="color:#444">${esc(t)}</span>`).join(", ");
 
-    // Show crew + relationships inline when highlighted
-    let crewInline = "";
-    if (ji === hubEvidenceIdx && entry.crewMentioned.length > 0) {
+    html += `<div style="${highlight}padding:1px 2px;border-bottom:1px solid #111;cursor:default">${pointer}${checkbox} ${esc(entry.summary.slice(0, 35))}${entry.summary.length > 35 ? '...' : ''}<div style="padding-left:18px">${matchBadge}</div></div>`;
+  }
+  html += `</div>`;
+
+  // Right pane: evidence detail for currently highlighted entry
+  html += `<div class="journal-detail" style="width:60%;font-size:12px">`;
+  if (journal.length > 0 && hubEvidenceIdx < journal.length) {
+    const entry = journal[hubEvidenceIdx];
+    html += `<div class="journal-detail-title" style="font-size:12px">${esc(entry.summary)}</div>`;
+    html += `<div class="journal-detail-meta">${esc(entry.category.toUpperCase())} | Turn ${entry.turnDiscovered} | ${esc(entry.roomFound)}</div>`;
+    html += `<div class="journal-detail-content" style="font-size:12px;max-height:100px;overflow-y:auto">${esc(entry.detail)}</div>`;
+
+    // Tags
+    let tagsLine = "";
+    for (const tag of entry.tags) {
+      const isRequired = deduction.requiredTags.includes(tag);
+      tagsLine += isRequired
+        ? `<span class="tag-pill tag-covered">${esc(tag)}</span>`
+        : `<span class="tag-pill tag-missing">${esc(tag)}</span>`;
+    }
+    html += `<div style="margin-top:4px">${tagsLine}</div>`;
+
+    // Crew mentioned
+    if (entry.crewMentioned.length > 0) {
       const crewNames = entry.crewMentioned.map(id => {
         const member = crew.find(c => c.id === id);
-        if (!member) return id;
-        const rels = member.relationships.map(r => formatRelationship(member, r, crew)).filter(Boolean);
-        return `${member.firstName} ${member.lastName} (${member.role})${rels.length > 0 ? " \u2014 " + rels.join("; ") : ""}`;
+        return member ? `${member.firstName} ${member.lastName} (${member.role})` : id;
       });
-      crewInline = `<div style="color:#6cf;font-size:10px;padding-left:24px">${crewNames.map(n => esc(n)).join(", ")}</div>`;
+      html += `<div style="color:#6cf;font-size:10px;margin-top:4px">Crew: ${crewNames.map(n => esc(n)).join(", ")}</div>`;
     }
-
-    // Linked entry: show which tags match (contribution summary)
-    let matchHint = "";
-    if (isLinked && matchingTags.length > 0) {
-      matchHint = `<span style="color:#0a0;font-size:10px;margin-left:6px">[MATCH: ${matchingTags.join(", ")}]</span>`;
-    }
-
-    html += `<div style="${highlight}padding:1px 0 1px 8px">${pointer}${checkbox} ${esc(entry.summary)}${matchHint}<div style="font-size:11px;padding-left:24px">${entryTagsHtml}</div>${crewInline}</div>`;
-  }
-
-  // Answer options below evidence
-  const answerBorder = allCovered ? "#443" : "#333";
-  html += `<div style="border-top:1px solid ${answerBorder};margin:8px 0;padding-top:6px">`;
-  if (allCovered) {
-    html += `<div style="color:#fa0;font-size:12px;margin-bottom:4px;font-weight:bold">\u2605 All evidence requirements met! Select your answer:</div>`;
   } else {
-    html += `<div style="color:#aaa;font-size:12px;margin-bottom:4px">Select your answer:</div>`;
+    html += `<div class="journal-empty" style="font-size:11px">No evidence collected yet.</div>`;
   }
+  html += `</div></div>`; // close split pane
+
+  // ── Revelation Board ──
+  if (deduction.tagRevelations && deduction.tagRevelations.length > 0) {
+    const activeRevelations = deduction.tagRevelations.filter(tr => coveredTags.includes(tr.tag));
+    if (activeRevelations.length > 0) {
+      html += `<div class="revelation-board">`;
+      html += `<div style="color:#886;font-size:10px;font-weight:bold;margin-bottom:4px">REVELATIONS</div>`;
+      for (const rev of activeRevelations) {
+        html += `<div class="revelation-line"><span class="revelation-tag">${esc(rev.tag.toUpperCase())}:</span> ${esc(rev.text)}</div>`;
+      }
+      html += `</div>`;
+    }
+  }
+
+  // ── Synthesis block (shown when all tags covered) ──
+  if (allCovered && deduction.synthesisText) {
+    html += `<div class="synthesis-block">\u2605 SYNTHESIS: ${esc(deduction.synthesisText)}</div>`;
+  }
+
+  // ── Answer section ──
+  const inAnswerFocus = hubFocusRegion === "answers";
+  const answersClass = inAnswerFocus ? "answers-active" : (allCovered ? "answers-active" : "answers-dimmed");
+  html += `<div class="${answersClass}" style="border-top:1px solid ${allCovered ? '#443' : '#222'};margin:4px 0;padding-top:4px">`;
+  html += `<div style="color:${inAnswerFocus ? '#fa0' : '#888'};font-size:11px;font-weight:bold;margin-bottom:3px">${allCovered ? '\u2605 SELECT ANSWER' : 'ANSWERS'} ${inAnswerFocus ? '[Enter]' : '[Tab]'}</div>`;
   for (let i = 0; i < deduction.options.length; i++) {
-    const prefix = (i === hubOptionIdx) ? "\u25b6 " : "  ";
-    const cls = (i === hubOptionIdx) ? "broadcast-option selected" : "broadcast-option";
-    html += `<div class="${cls}">${prefix}${i + 1}. ${esc(deduction.options[i].label)}</div>`;
+    const isSelected = i === hubOptionIdx && inAnswerFocus;
+    const prefix = isSelected ? "\u25b6 " : "  ";
+    const cls = isSelected ? "broadcast-option selected" : "broadcast-option";
+    html += `<div class="${cls}" style="font-size:12px">${prefix}${i + 1}. ${esc(deduction.options[i].label)}</div>`;
   }
-  html += `</div></div>`;
+  html += `</div>`;
+
+  // Controls hint
+  html += `<div style="color:#555;font-size:10px;text-align:center;margin-top:4px">[Tab] Switch focus | [Space] Link evidence | [Enter] Confirm answer | [Esc] Back</div>`;
+  html += `</div>`;
 
   return html;
 }
@@ -2043,6 +2077,22 @@ function handleHubInput(e: KeyboardEvent): void {
     return;
   }
 
+  // Revelation overlay: any key dismisses
+  if (hubRevelationOverlay) {
+    hubRevelationOverlay = false;
+    hubDetailDeduction = null;
+    hubLinkedEvidence = [];
+    hubEvidenceIdx = 0;
+    hubFocusRegion = "evidence";
+    const overlay = document.getElementById("broadcast-overlay");
+    if (overlay) {
+      overlay.classList.remove("active");
+      overlay.innerHTML = "";
+    }
+    renderInvestigationHub();
+    return;
+  }
+
   // Confirmation step: Y/N for deduction or choice
   if (hubConfirming || hubChoiceConfirming) {
     if (e.key === "y" || e.key === "Y") {
@@ -2066,9 +2116,16 @@ function handleHubInput(e: KeyboardEvent): void {
 
   // Escape from detail views first
   if (hubDetailDeduction && e.key === "Escape") {
+    // Persist linked evidence back to deduction state before leaving
+    if (state.mystery) {
+      state.mystery.deductions = state.mystery.deductions.map(d =>
+        d.id === hubDetailDeduction ? { ...d, linkedEvidence: [...hubLinkedEvidence] } : d
+      );
+    }
     hubDetailDeduction = null;
     hubLinkedEvidence = [];
     hubEvidenceIdx = 0;
+    hubFocusRegion = "evidence";
     renderInvestigationHub();
     return;
   }
@@ -2139,70 +2196,116 @@ function handleHubConnectionsInput(e: KeyboardEvent): void {
       return;
     }
 
-    if (e.key === "ArrowUp" || e.key === "w") {
-      hubEvidenceIdx = Math.max(0, hubEvidenceIdx - 1);
+    // Tab toggles focus between evidence list and answer options
+    if (e.key === "Tab") {
+      e.preventDefault();
+      hubFocusRegion = hubFocusRegion === "evidence" ? "answers" : "evidence";
       renderInvestigationHub();
       return;
     }
-    if (e.key === "ArrowDown" || e.key === "s") {
-      hubEvidenceIdx = Math.min(journal.length - 1, hubEvidenceIdx + 1);
-      renderInvestigationHub();
-      return;
-    }
-    if (e.key === " ") {
-      if (journal.length > 0 && hubEvidenceIdx < journal.length) {
-        const entryId = journal[hubEvidenceIdx].id;
-        const entry = journal[hubEvidenceIdx];
-        const archetype = state.mystery?.timeline?.archetype;
 
-        // Compute coverage before toggle
-        const coverageBefore = validateEvidenceLink(deduction, hubLinkedEvidence, journal);
+    // ── Evidence focus region ──
+    if (hubFocusRegion === "evidence") {
+      if (e.key === "ArrowUp" || e.key === "w") {
+        hubEvidenceIdx = Math.max(0, hubEvidenceIdx - 1);
+        renderInvestigationHub();
+        return;
+      }
+      if (e.key === "ArrowDown" || e.key === "s") {
+        hubEvidenceIdx = Math.min(journal.length - 1, hubEvidenceIdx + 1);
+        renderInvestigationHub();
+        return;
+      }
+      if (e.key === " ") {
+        if (journal.length > 0 && hubEvidenceIdx < journal.length) {
+          const entryId = journal[hubEvidenceIdx].id;
 
-        if (hubLinkedEvidence.includes(entryId)) {
-          hubLinkedEvidence = hubLinkedEvidence.filter(id => id !== entryId);
-          hubLinkFeedback = "";
-        } else {
-          hubLinkedEvidence = [...hubLinkedEvidence, entryId];
+          // Compute coverage before toggle
+          const coverageBefore = validateEvidenceLink(deduction, hubLinkedEvidence, journal);
 
-          // Compute coverage after adding this evidence
-          const coverageAfter = validateEvidenceLink(deduction, hubLinkedEvidence, journal);
-          const newTags = coverageAfter.coveredTags.filter(t => !coverageBefore.coveredTags.includes(t));
-
-          if (coverageAfter.missingTags.length === 0) {
-            hubLinkFeedback = "All evidence requirements met! Select your answer.";
-          } else if (newTags.length > 0) {
-            const explanations = newTags.map(t => getTagExplanation(t, archetype));
-            hubLinkFeedback = `\u2713 This evidence reveals: ${newTags.join(", ")} \u2014 ${explanations[0]}`;
+          if (hubLinkedEvidence.includes(entryId)) {
+            hubLinkedEvidence = hubLinkedEvidence.filter(id => id !== entryId);
+            hubLinkFeedback = "";
           } else {
-            hubLinkFeedback = "This evidence doesn't provide new information for this deduction.";
+            hubLinkedEvidence = [...hubLinkedEvidence, entryId];
+
+            // Compute coverage after adding this evidence
+            const coverageAfter = validateEvidenceLink(deduction, hubLinkedEvidence, journal);
+            const newTags = coverageAfter.coveredTags.filter(t => !coverageBefore.coveredTags.includes(t));
+
+            if (coverageAfter.missingTags.length === 0) {
+              hubLinkFeedback = "All evidence requirements met! Press Tab to select your answer.";
+              audio.playDeductionReady();
+            } else if (newTags.length > 0) {
+              // Show revelation text for the new tag if available
+              const revelation = deduction.tagRevelations?.find(tr => newTags.includes(tr.tag));
+              if (revelation) {
+                hubLinkFeedback = ""; // revelation shown in revelation board
+              } else {
+                hubLinkFeedback = "";
+              }
+              audio.playDeductionReady();
+            } else {
+              hubLinkFeedback = "This evidence doesn't add new insight to this question.";
+            }
+          }
+
+          // Update linked evidence on deduction state immediately
+          if (state.mystery) {
+            state.mystery.deductions = state.mystery.deductions.map(d =>
+              d.id === hubDetailDeduction ? { ...d, linkedEvidence: [...hubLinkedEvidence] } : d
+            );
           }
         }
-      }
-      renderInvestigationHub();
-      return;
-    }
-    if (e.key === "Enter") {
-      const chosenOption = deduction.options[hubOptionIdx];
-      hubConfirming = true;
-      const overlay = document.getElementById("broadcast-overlay");
-      if (overlay) {
-        overlay.innerHTML = `
-          <div class="broadcast-box">
-            <div class="broadcast-title">\u2550\u2550\u2550 CONFIRM DEDUCTION \u2550\u2550\u2550</div>
-            <div style="padding:20px;text-align:center">
-              <div style="color:#fa0;font-size:16px;margin-bottom:12px">${esc(deduction.question)}</div>
-              <div style="color:#fff;font-size:14px;margin-bottom:16px">Your answer: <span style="color:#6cf">${esc(chosenOption.label)}</span></div>
-              <div style="color:#f44;font-size:13px;margin-bottom:8px">This answer is permanent.</div>
-              <div style="color:#aaa;font-size:14px">Are you sure? [Y] Confirm  [N] Go back</div>
-            </div>
-          </div>`;
+        renderInvestigationHub();
+        return;
       }
       return;
     }
-    const num = parseInt(e.key, 10);
-    if (num >= 1 && num <= deduction.options.length) {
-      hubOptionIdx = num - 1;
-      renderInvestigationHub();
+
+    // ── Answers focus region ──
+    if (hubFocusRegion === "answers") {
+      if (e.key === "ArrowUp" || e.key === "w") {
+        hubOptionIdx = Math.max(0, hubOptionIdx - 1);
+        renderInvestigationHub();
+        return;
+      }
+      if (e.key === "ArrowDown" || e.key === "s") {
+        hubOptionIdx = Math.min(deduction.options.length - 1, hubOptionIdx + 1);
+        renderInvestigationHub();
+        return;
+      }
+      if (e.key === "Enter") {
+        // Only allow answer submission if synthesis is revealed (all tags covered)
+        const { missingTags: currentMissing } = validateEvidenceLink(deduction, hubLinkedEvidence, journal);
+        if (currentMissing.length > 0) {
+          hubLinkFeedback = "Link more evidence before answering — not all required tags covered.";
+          renderInvestigationHub();
+          return;
+        }
+        const chosenOption = deduction.options[hubOptionIdx];
+        hubConfirming = true;
+        const overlay = document.getElementById("broadcast-overlay");
+        if (overlay) {
+          overlay.innerHTML = `
+            <div class="broadcast-box">
+              <div class="broadcast-title">\u2550\u2550\u2550 CONFIRM DEDUCTION \u2550\u2550\u2550</div>
+              <div style="padding:20px;text-align:center">
+                <div style="color:#fa0;font-size:16px;margin-bottom:12px">${esc(deduction.question)}</div>
+                <div style="color:#fff;font-size:14px;margin-bottom:16px">Your answer: <span style="color:#6cf">${esc(chosenOption.label)}</span></div>
+                <div style="color:#f44;font-size:13px;margin-bottom:8px">This answer is permanent.</div>
+                <div style="color:#aaa;font-size:14px">Are you sure? [Y] Confirm  [N] Go back</div>
+              </div>
+            </div>`;
+        }
+        return;
+      }
+      const num = parseInt(e.key, 10);
+      if (num >= 1 && num <= deduction.options.length) {
+        hubOptionIdx = num - 1;
+        renderInvestigationHub();
+        return;
+      }
       return;
     }
     return;
@@ -2223,9 +2326,10 @@ function handleHubConnectionsInput(e: KeyboardEvent): void {
     const d = deductions[hubIdx];
     if (d && !d.solved && unlockedSet.has(d.id)) {
       hubDetailDeduction = d.id;
-      hubLinkedEvidence = [];
+      hubLinkedEvidence = [...d.linkedEvidence];  // restore from state, not reset
       hubEvidenceIdx = 0;
       hubOptionIdx = 0;
+      hubFocusRegion = "evidence";
       hubLinkFeedback = "";
       renderInvestigationHub();
     }
@@ -2308,7 +2412,7 @@ function handleHubDecisionsInput(e: KeyboardEvent): void {
   }
 }
 
-/** Commit deduction answer after Y/N confirmation. */
+/** Commit deduction answer after Y/N confirmation. Shows revelation overlay. */
 function commitHubDeductionAnswer(): void {
   if (!state.mystery || !hubDetailDeduction) return;
   const deductions = state.mystery.deductions;
@@ -2331,23 +2435,59 @@ function commitHubDeductionAnswer(): void {
     d.id === solved.id ? solved : d
   );
 
+  // Show narrative revelation overlay
+  const overlay = document.getElementById("broadcast-overlay");
   if (correct) {
     display.addLog(`\u2713 CORRECT — ${solved.rewardDescription}`, "milestone");
     display.triggerScreenFlash("milestone");
     audio.playDeductionCorrect();
     applyDeductionReward(solved);
+
+    // Find next unlocked deduction for "UNLOCKED" line
+    const nextDeduction = deductions.find(d => d.unlockAfter === solved.id && !d.solved);
+    const nextLine = nextDeduction ? `<div style="color:#6cf;margin-top:8px">UNLOCKED: ${esc(nextDeduction.question)}</div>` : "";
+
+    if (overlay) {
+      overlay.classList.add("active");
+      overlay.innerHTML = `
+        <div class="revelation-overlay-box correct">
+          <div style="color:#fa0;font-size:18px;font-weight:bold;letter-spacing:3px;margin-bottom:12px">\u2605 REVELATION \u2605</div>
+          <div style="color:#fa0;font-size:14px;margin-bottom:12px">${esc(solved.question)}</div>
+          <div style="color:#0f0;font-size:13px;margin-bottom:12px">\u2713 ${esc(chosen.label)}</div>
+          ${solved.conclusionText ? `<div style="color:#ca8;font-size:13px;line-height:1.6;margin:12px 0;padding:8px 12px;border-left:2px solid #553;text-align:left">${esc(solved.conclusionText)}</div>` : ""}
+          <div style="color:#4a8;font-size:12px;margin-top:8px">REWARD: ${esc(solved.rewardDescription)}</div>
+          ${nextLine}
+          <div style="color:#555;font-size:12px;margin-top:16px;animation:crawl-skip-pulse 1.5s ease-in-out infinite">[Press any key to continue]</div>
+        </div>`;
+      hubRevelationOverlay = true;
+    }
+
     if (devModeEnabled) {
       display.addLog(`[DEV] Deduction ${solved.id} solved correctly`, "system");
     }
   } else {
     display.addLog(`\u2717 Incorrect. The evidence doesn't support that conclusion.`, "warning");
     audio.playDeductionWrong();
+
+    if (overlay) {
+      overlay.classList.add("active");
+      overlay.innerHTML = `
+        <div class="revelation-overlay-box incorrect">
+          <div style="color:#f44;font-size:18px;font-weight:bold;letter-spacing:3px;margin-bottom:12px">\u2717 INCONCLUSIVE</div>
+          <div style="color:#888;font-size:13px;line-height:1.6;margin:12px 0">The evidence doesn't support that conclusion.<br>Review the revelations and reconsider.</div>
+          <div style="color:#555;font-size:12px;margin-top:16px;animation:crawl-skip-pulse 1.5s ease-in-out infinite">[Press any key to continue]</div>
+        </div>`;
+      hubRevelationOverlay = true;
+    }
   }
 
-  hubDetailDeduction = null;
-  hubLinkedEvidence = [];
-  hubEvidenceIdx = 0;
-  renderInvestigationHub();
+  if (!hubRevelationOverlay) {
+    // Fallback if no overlay shown
+    hubDetailDeduction = null;
+    hubLinkedEvidence = [];
+    hubEvidenceIdx = 0;
+    renderInvestigationHub();
+  }
 }
 
 /** Commit mystery choice after Y/N confirmation. */

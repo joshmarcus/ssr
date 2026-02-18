@@ -17,6 +17,7 @@ import * as ROT from "rot-js";
 import type { CrewMember, IncidentTimeline, Deduction, JournalEntry } from "../shared/types.js";
 import { DeductionCategory, IncidentArchetype, CrewRole, CrewSecret } from "../shared/types.js";
 import { findByRole, findSecretHolder } from "./crewGen.js";
+import { resolveRevelations } from "../data/revelations.js";
 
 /**
  * Get the system tags associated with an incident archetype.
@@ -76,6 +77,16 @@ export function generateDeductions(
   if (timeline.archetype === IncidentArchetype.SignalAnomaly ||
       timeline.archetype === IncidentArchetype.Sabotage) {
     deductions.push(generateHiddenAgendaDeduction(crew, timeline, scientist));
+  }
+
+  // ── Attach revelation content to each deduction ──
+  for (const d of deductions) {
+    const revelations = resolveRevelations(timeline.archetype, d.id, crew, timeline);
+    if (revelations) {
+      d.tagRevelations = revelations.tagRevelations;
+      d.synthesisText = revelations.synthesisText;
+      d.conclusionText = revelations.conclusionText;
+    }
   }
 
   return deductions;

@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 17 (Visual Polish + Evidence Gameplay)
-- **Test status**: 269 tests passing across 24 test files (0 failing)
+- **Phase**: Sprint 18 (Mystery Revelation System)
+- **Test status**: 279 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (178 turns, 5/5 deductions correct, 997 HP)
 
@@ -22,11 +22,20 @@
 - 175+ narrative elements (63 log templates, 16 authored logs, 16 crew items)
 - Ship computer PA announcements (periodic atmospheric messages)
 - 6 incident archetypes with 5-phase timelines
-- 5-6 chained deductions with evidence linking and per-deduction hint text
+- 5-6 chained deductions with evidence linking, per-deduction hint text, and revelation cascade
+- **Revelation system**: linking evidence yields narrative sentences explaining HOW clues illuminate questions
+  - Tag-specific revelations appear in a Revelation Board as evidence is linked
+  - Gold synthesis paragraph crystallizes "what must be true" when all evidence is assembled
+  - Post-answer narrative overlay (correct: revelation + reward + next unlock, incorrect: inconclusive)
+  - ~120 authored revelation/synthesis/conclusion strings across 6 archetypes x 5 deduction tiers
 - Narrative threads grouping evidence
 - **Investigation Hub [r/v]**: unified 4-section overlay replacing old Evidence Browser + Broadcast Report
   - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, tags, thread)
-  - CONNECTIONS: deduction list with evidence-linking, hint text, tag coverage pills
+  - CONNECTIONS: **split-pane deduction detail** with evidence list (left 40%) + full evidence text (right 60%)
+    - Dual-focus navigation: Tab switches between evidence linking and answer selection
+    - Revelation Board: accumulated narrative sentences as evidence is linked
+    - Synthesis block (gold): appears when all required tags covered
+    - Linked evidence persists when navigating away
   - WHAT WE KNOW: auto-generated narrative prose summarizing investigation progress
   - DECISIONS: spoiler-protected mystery choices (title-only list, prompt revealed on select)
 - Crew relationships displayed in evidence detail and connection linking views
@@ -50,6 +59,7 @@
 ## Recent Changes (Git History)
 
 ```
+2026-02-18        feat: sprint 18 — mystery revelation system (revelation cascade, split-pane UI, post-answer overlay)
 2026-02-17 22:36  fix: add missing crewPaths.ts and threads.ts to repo
 2026-02-17 22:31  refactor: remove radiation, structural, EM/signal systems and station integrity
 2026-02-17 19:36  feat: playtest balance tuning + door auto-open + deduction gate
