@@ -1,8 +1,9 @@
 import * as ROT from "rot-js";
 import type { GameState, Entity, Room } from "../shared/types.js";
-import { TileType, EntityType, AttachmentSlot, SensorType } from "../shared/types.js";
+import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
 import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName } from "../shared/ui.js";
+import { getUnlockedDeductions } from "../sim/deduction.js";
 import type { IGameDisplay } from "./displayInterface.js";
 
 // ── Log entry types for color-coding ────────────────────────────
@@ -856,10 +857,19 @@ export class BrowserDisplay implements IGameDisplay {
   renderUI(state: GameState, panel: HTMLElement, visitedRoomIds?: Set<string>): void {
     // Sensor overlay indicator is now a dedicated line (see overlayLine below)
 
-    // ── Objective ────────────────────────────────────────────────
+    // ── Objective with phase indicator ─────────────────────────
     const objective = this.getObjective(state);
+    const phaseLabels: Record<string, { label: string; color: string }> = {
+      [ObjectivePhase.Clean]: { label: "MAINTENANCE", color: "#4a4" },
+      [ObjectivePhase.Investigate]: { label: "INVESTIGATION", color: "#fa0" },
+      [ObjectivePhase.Recover]: { label: "RECOVERY", color: "#f44" },
+      [ObjectivePhase.Evacuate]: { label: "EVACUATION", color: "#f0f" },
+    };
+    const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
+    const phaseInfo = phaseLabels[phase] ?? { label: "UNKNOWN", color: "#888" };
+    const phaseTag = `<span style="color:${phaseInfo.color};font-weight:bold;font-size:11px;letter-spacing:1px">[${phaseInfo.label}]</span> `;
     const objectiveHtml = `<div class="objective-panel">` +
-      `<span class="objective-label">OBJECTIVE:</span> ` +
+      `${phaseTag}<span class="objective-label">OBJECTIVE:</span> ` +
       `<span class="objective-text">${this.escapeHtml(objective.text)}</span>` +
       `<br><span class="objective-detail">${this.escapeHtml(objective.detail)}</span>` +
       `</div>`;
@@ -938,12 +948,9 @@ export class BrowserDisplay implements IGameDisplay {
         deductionTag = ` | <span class="label">Deductions:</span> <span style="color:${dedColor}">${correct}/${deds.length}</span>`;
       }
 
-      const thresholds = [3, 6, 10];
-      const hasAvailable = state.mystery.choices.some((c, i) =>
-        i < thresholds.length && jCount >= thresholds[i] && !c.chosen
-      );
-      if (hasAvailable) {
-        reportTag = ` | <span style="color:#ff0">[REPORT READY]</span>`;
+      const unlocked = getUnlockedDeductions(deds, state.mystery.journal);
+      if (unlocked.length > 0) {
+        reportTag = ` | <span style="color:#ff0;font-weight:bold">[DEDUCTION READY]</span>`;
       }
     }
 

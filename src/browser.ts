@@ -147,15 +147,17 @@ let lastObjectivePhase: ObjectivePhase | null = null;
 let activeDeduction: Deduction | null = null;
 let deductionSelectedIdx = 0;
 let pendingCrewDoor: { entityId: string; crewName: string } | null = null;
+let confirmingDeduction = false; // Y/N confirmation before locking in deduction answer
 let mapOpen = false;
 let helpOpen = false;
 let broadcastOpen = false;
-let broadcastSection: "evidence" | "what" | "why" | "who" = "evidence";
+let broadcastSection: "evidence" | number = "evidence"; // "evidence" or deduction index
 let broadcastOptionIdx = 0;
 let broadcastEvidenceScroll = 0;
 let broadcastLinkedEvidence: string[] = [];
 let broadcastDetailDeduction: string | null = null; // deduction ID when in detail/evidence-linking view
 let broadcastEvidenceIdx = 0; // highlighted journal entry index in detail view
+let broadcastConfirming = false; // Y/N confirmation before locking in broadcast deduction
 
 // ── Evidence Browser state ──────────────────────────────────────
 let evidenceBrowserOpen = false;
@@ -332,6 +334,14 @@ function initGame(): void {
   window.addEventListener("keydown", handleToggleKey);
   // Listen for choice/deduction/crew-door input
   window.addEventListener("keydown", (e) => {
+    if (mapOpen) {
+      if (e.key === "Escape" || e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        mapOpen = false;
+        closeMapOverlay();
+      }
+      return; // swallow all input while map is open
+    }
     if (evidenceBrowserOpen) {
       handleEvidenceBrowserInput(e);
       return;
@@ -386,15 +396,14 @@ function initGame(): void {
       }
       return;
     }
-    // M key toggles station map
-    if ((e.key === "m" || e.key === "M") && !journalOpen) {
+    // M key toggles station map (uses overlay, doesn't destroy log)
+    if ((e.key === "m" || e.key === "M") && !journalOpen && !evidenceBrowserOpen) {
       e.preventDefault();
       mapOpen = !mapOpen;
       if (mapOpen) {
         showStationMap();
       } else {
-        display.addLog("[Map closed]", "system");
-        renderAll();
+        closeMapOverlay();
       }
       return;
     }
@@ -1017,15 +1026,16 @@ function showHelp(): void {
   renderAll();
 }
 
-// ── Station map display (room checklist) ─────────────────────────
+// ── Station map display (HTML overlay — no longer destroys log panel) ──
 function showStationMap(): void {
-  display.addLog("═══ STATION MAP ═══", "milestone");
+  const overlay = document.getElementById("journal-overlay");
+  if (!overlay) return;
 
   const visited = visitedRoomIds;
+  let roomsHtml = "";
   for (const room of state.rooms) {
     const isVisited = visited.has(room.id);
 
-    // Check if camera-revealed (explored but not visited)
     let cameraRevealed = false;
     if (!isVisited) {
       for (let ry = room.y; ry < room.y + room.height; ry++) {
@@ -1039,16 +1049,34 @@ function showStationMap(): void {
     }
 
     if (isVisited) {
-      display.addLog(`  ✓ ${room.name}`, "milestone");
+      roomsHtml += `<div style="padding:3px 8px;color:#0f0">\u2713 ${escapeHtmlBroadcast(room.name)}</div>`;
     } else if (cameraRevealed) {
-      display.addLog(`  ○ ${room.name}`, "sensor");
+      roomsHtml += `<div style="padding:3px 8px;color:#6cf">\u25cb ${escapeHtmlBroadcast(room.name)}</div>`;
     } else {
-      display.addLog(`  · ???`, "system");
+      roomsHtml += `<div style="padding:3px 8px;color:#555">\u00b7 ???</div>`;
     }
   }
 
   const visitedCount = state.rooms.filter(r => visited.has(r.id)).length;
-  display.addLog(`${visitedCount}/${state.rooms.length} rooms explored. [M] close map.`, "system");
+  overlay.innerHTML = `
+    <div class="journal-container">
+      <div class="journal-header">\u2550\u2550\u2550 STATION MAP \u2550\u2550\u2550</div>
+      <div class="journal-body" style="flex-direction:column;padding:8px">
+        ${roomsHtml}
+        <div style="padding:8px;color:#888;border-top:1px solid #333;margin-top:8px">${visitedCount}/${state.rooms.length} rooms explored</div>
+      </div>
+      <div class="journal-controls">[Esc/m] Close</div>
+    </div>`;
+  overlay.classList.add("active");
+}
+
+function closeMapOverlay(): void {
+  const overlay = document.getElementById("journal-overlay");
+  if (overlay) {
+    overlay.classList.remove("active");
+    overlay.innerHTML = "";
+  }
+  mapOpen = false;
   renderAll();
 }
 
@@ -1185,6 +1213,22 @@ function showDeductionPrompt(): void {
 function handleDeductionInput(e: KeyboardEvent): boolean {
   if (!activeDeduction) return false;
 
+  // Confirmation step: Y/N before locking in
+  if (confirmingDeduction) {
+    e.preventDefault();
+    if (e.key === "y" || e.key === "Y") {
+      confirmingDeduction = false;
+      commitDeductionAnswer();
+      return true;
+    }
+    if (e.key === "n" || e.key === "N" || e.key === "Escape") {
+      confirmingDeduction = false;
+      showDeductionPrompt();
+      return true;
+    }
+    return true; // swallow other keys during confirm
+  }
+
   if (e.key === "ArrowUp" || e.key === "w") {
     e.preventDefault();
     deductionSelectedIdx = Math.max(0, deductionSelectedIdx - 1);
@@ -1199,41 +1243,12 @@ function handleDeductionInput(e: KeyboardEvent): boolean {
   }
   if (e.key === "Enter") {
     e.preventDefault();
-    const journal = state.mystery?.journal ?? [];
-    // Auto-link evidence: find journal entries that cover required tags
-    const linkedIds = journal
-      .filter(j => j.tags.some(t => activeDeduction!.requiredTags.includes(t)))
-      .map(j => j.id);
-    const linked = linkEvidence(activeDeduction, linkedIds);
-
-    const chosen = linked.options[deductionSelectedIdx];
-    const { deduction: solved, correct, validLink } = solveDeduction(linked, chosen.key, journal);
-
-    if (!validLink) {
-      const { missingTags } = validateEvidenceLink(linked, linked.linkedEvidence, journal);
-      display.addLog(`Cannot answer — evidence incomplete. Need: ${missingTags.join(", ")}`, "warning");
-      activeDeduction = null;
-      renderAll();
-      return true;
-    }
-
-    // Update the deduction in mystery state
-    if (state.mystery) {
-      state.mystery.deductions = state.mystery.deductions.map(d =>
-        d.id === solved.id ? solved : d
-      );
-    }
-
-    if (correct) {
-      display.addLog(`✓ CORRECT — ${solved.rewardDescription}`, "milestone");
-      display.triggerScreenFlash("milestone");
-      // Apply reward
-      applyDeductionReward(solved);
-    } else {
-      display.addLog(`✗ Incorrect. The evidence doesn't support that conclusion.`, "warning");
-    }
-
-    activeDeduction = null;
+    // Show confirmation prompt instead of immediately solving
+    confirmingDeduction = true;
+    display.addLog("", "system");
+    display.addLog(`═══ CONFIRM DEDUCTION ═══`, "milestone");
+    display.addLog(`Your answer: ${activeDeduction.options[deductionSelectedIdx].label}`, "narrative");
+    display.addLog("This answer is permanent. Are you sure? [Y/N]", "warning");
     renderAll();
     return true;
   }
@@ -1253,6 +1268,47 @@ function handleDeductionInput(e: KeyboardEvent): boolean {
     return true;
   }
   return true;
+}
+
+/** Actually commit the deduction answer after confirmation. */
+function commitDeductionAnswer(): void {
+  if (!activeDeduction) return;
+  const journal = state.mystery?.journal ?? [];
+  // Auto-link evidence: find journal entries that cover required tags
+  const linkedIds = journal
+    .filter(j => j.tags.some(t => activeDeduction!.requiredTags.includes(t)))
+    .map(j => j.id);
+  const linked = linkEvidence(activeDeduction, linkedIds);
+
+  const chosen = linked.options[deductionSelectedIdx];
+  const { deduction: solved, correct, validLink } = solveDeduction(linked, chosen.key, journal);
+
+  if (!validLink) {
+    const { missingTags } = validateEvidenceLink(linked, linked.linkedEvidence, journal);
+    display.addLog(`Cannot answer — evidence incomplete. Need: ${missingTags.join(", ")}`, "warning");
+    activeDeduction = null;
+    renderAll();
+    return;
+  }
+
+  // Update the deduction in mystery state
+  if (state.mystery) {
+    state.mystery.deductions = state.mystery.deductions.map(d =>
+      d.id === solved.id ? solved : d
+    );
+  }
+
+  if (correct) {
+    display.addLog(`✓ CORRECT — ${solved.rewardDescription}`, "milestone");
+    display.triggerScreenFlash("milestone");
+    // Apply reward
+    applyDeductionReward(solved);
+  } else {
+    display.addLog(`✗ Incorrect. The evidence doesn't support that conclusion.`, "warning");
+  }
+
+  activeDeduction = null;
+  renderAll();
 }
 
 function applyDeductionReward(deduction: Deduction): void {
@@ -1703,22 +1759,20 @@ function renderBroadcastModal(): void {
     }
   }
 
-  // Deduction sections
+  // Deduction sections — iterate ALL deductions (not just one per category)
   const categoryLabels: Record<string, string> = { what: "WHAT HAPPENED?", why: "WHY DID IT HAPPEN?", who: "WHO WAS RESPONSIBLE?" };
-  const categoryKeys: ("what" | "why" | "who")[] = ["what", "why", "who"];
 
   const allTags = new Set(journal.flatMap(j => j.tags));
   const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
   const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
 
   let deductionHtml = "";
-  for (const catKey of categoryKeys) {
-    const deduction = deductions.find(d => d.category === catKey);
-    if (!deduction) continue;
+  for (let di = 0; di < deductions.length; di++) {
+    const deduction = deductions[di];
 
     const isUnlocked = unlockedSet.has(deduction.id);
     const locked = !deduction.solved && !isUnlocked;
-    const isActive = broadcastSection === catKey;
+    const isActive = broadcastSection === di;
     const isDetailView = broadcastDetailDeduction === deduction.id;
 
     let sectionClass = "broadcast-deduction";
@@ -1737,6 +1791,7 @@ function renderBroadcastModal(): void {
     }
 
     // Section header with status indicators
+    const catLabel = categoryLabels[deduction.category] || deduction.category.toUpperCase();
     let headerPrefix: string;
     let headerSuffix = "";
     if (deduction.solved) {
@@ -1760,7 +1815,7 @@ function renderBroadcastModal(): void {
     }
 
     deductionHtml += `<div class="${sectionClass}">`;
-    deductionHtml += `<div class="broadcast-section-title">${headerPrefix} ${categoryLabels[catKey]}${headerSuffix}</div>`;
+    deductionHtml += `<div class="broadcast-section-title">${headerPrefix} ${catLabel}${headerSuffix}</div>`;
     if (!locked) {
       deductionHtml += `<div style="margin:2px 0 4px">${tagPillsHtml}</div>`;
     }
@@ -1842,6 +1897,43 @@ function closeBroadcastModal(): void {
   renderAll();
 }
 
+/** Commit broadcast deduction answer after Y/N confirmation. */
+function commitBroadcastDeductionAnswer(): void {
+  if (!state.mystery || !broadcastDetailDeduction) return;
+  const deductions = state.mystery.deductions;
+  const journal = state.mystery.journal;
+  const deduction = deductions.find(d => d.id === broadcastDetailDeduction);
+  if (!deduction) return;
+
+  const linked = linkEvidence(deduction, broadcastLinkedEvidence);
+  const chosen = linked.options[broadcastOptionIdx];
+  const { deduction: solved, correct, validLink } = solveDeduction(linked, chosen.key, journal);
+
+  if (!validLink) {
+    const { missingTags } = validateEvidenceLink(linked, linked.linkedEvidence, journal);
+    display.addLog(`Cannot answer — evidence incomplete. Need: ${missingTags.join(", ")}`, "warning");
+    renderBroadcastModal();
+    return;
+  }
+
+  state.mystery.deductions = state.mystery.deductions.map(d =>
+    d.id === solved.id ? solved : d
+  );
+
+  if (correct) {
+    display.addLog(`\u2713 CORRECT — ${solved.rewardDescription}`, "milestone");
+    display.triggerScreenFlash("milestone");
+    applyDeductionReward(solved);
+  } else {
+    display.addLog(`\u2717 Incorrect. The evidence doesn't support that conclusion.`, "warning");
+  }
+
+  broadcastDetailDeduction = null;
+  broadcastLinkedEvidence = [];
+  broadcastEvidenceIdx = 0;
+  renderBroadcastModal();
+}
+
 function handleBroadcastInput(e: KeyboardEvent): void {
   e.preventDefault();
   if (!state.mystery) return;
@@ -1849,7 +1941,21 @@ function handleBroadcastInput(e: KeyboardEvent): void {
   const deductions = state.mystery.deductions;
   const journal = state.mystery.journal;
   const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
-  const sections: ("evidence" | "what" | "why" | "who")[] = ["evidence", "what", "why", "who"];
+
+  // Broadcast confirmation step: Y/N before locking in
+  if (broadcastConfirming) {
+    if (e.key === "y" || e.key === "Y") {
+      broadcastConfirming = false;
+      commitBroadcastDeductionAnswer();
+      return;
+    }
+    if (e.key === "n" || e.key === "N" || e.key === "Escape") {
+      broadcastConfirming = false;
+      renderBroadcastModal();
+      return;
+    }
+    return; // swallow other keys during confirm
+  }
 
   // If in detail view, handle Escape to go back to list view
   if (broadcastDetailDeduction && e.key === "Escape") {
@@ -1898,34 +2004,23 @@ function handleBroadcastInput(e: KeyboardEvent): void {
       return;
     }
     if (e.key === "Enter") {
-      // Link evidence and solve
-      const linked = linkEvidence(deduction, broadcastLinkedEvidence);
-      const chosen = linked.options[broadcastOptionIdx];
-      const { deduction: solved, correct, validLink } = solveDeduction(linked, chosen.key, journal);
-
-      if (!validLink) {
-        const { missingTags } = validateEvidenceLink(linked, linked.linkedEvidence, journal);
-        display.addLog(`Cannot answer — evidence incomplete. Need: ${missingTags.join(", ")}`, "warning");
-        renderBroadcastModal();
-        return;
+      // Show confirmation instead of immediately solving
+      const chosenOption = deduction.options[broadcastOptionIdx];
+      broadcastConfirming = true;
+      // Update the broadcast modal to show the confirmation message
+      const overlay = document.getElementById("broadcast-overlay");
+      if (overlay) {
+        overlay.innerHTML = `
+          <div class="broadcast-box">
+            <div class="broadcast-title">\u2550\u2550\u2550 CONFIRM DEDUCTION \u2550\u2550\u2550</div>
+            <div style="padding:20px;text-align:center">
+              <div style="color:#fa0;font-size:16px;margin-bottom:12px">${escapeHtmlBroadcast(deduction.question)}</div>
+              <div style="color:#fff;font-size:14px;margin-bottom:16px">Your answer: <span style="color:#6cf">${escapeHtmlBroadcast(chosenOption.label)}</span></div>
+              <div style="color:#f44;font-size:13px;margin-bottom:8px">This answer is permanent.</div>
+              <div style="color:#aaa;font-size:14px">Are you sure? [Y] Confirm  [N] Go back</div>
+            </div>
+          </div>`;
       }
-
-      state.mystery.deductions = state.mystery.deductions.map(d =>
-        d.id === solved.id ? solved : d
-      );
-
-      if (correct) {
-        display.addLog(`\u2713 CORRECT — ${solved.rewardDescription}`, "milestone");
-        display.triggerScreenFlash("milestone");
-        applyDeductionReward(solved);
-      } else {
-        display.addLog(`\u2717 Incorrect. The evidence doesn't support that conclusion.`, "warning");
-      }
-
-      broadcastDetailDeduction = null;
-      broadcastLinkedEvidence = [];
-      broadcastEvidenceIdx = 0;
-      renderBroadcastModal();
       return;
     }
     // Number keys to select answer option in detail view
@@ -1939,8 +2034,13 @@ function handleBroadcastInput(e: KeyboardEvent): void {
   }
 
   if (e.key === "Tab") {
-    const curIdx = sections.indexOf(broadcastSection);
-    broadcastSection = sections[(curIdx + 1) % sections.length];
+    // Cycle: evidence → deduction[0] → deduction[1] → ... → evidence
+    if (broadcastSection === "evidence") {
+      broadcastSection = deductions.length > 0 ? 0 : "evidence";
+    } else {
+      const nextIdx = (broadcastSection as number) + 1;
+      broadcastSection = nextIdx < deductions.length ? nextIdx : "evidence";
+    }
     broadcastOptionIdx = 0;
     renderBroadcastModal();
     return;
@@ -1951,13 +2051,10 @@ function handleBroadcastInput(e: KeyboardEvent): void {
     return;
   }
 
-  // Deduction sections
-  const deduction = deductions.find(d => d.category === broadcastSection);
+  // Deduction sections — broadcastSection is a deduction index
+  const deduction = deductions[broadcastSection as number];
   if (!deduction || deduction.solved || !unlockedSet.has(deduction.id)) {
     // Locked or solved — Tab to next section
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      // Do nothing on locked sections
-    }
     return;
   }
 
