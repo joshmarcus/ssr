@@ -338,6 +338,14 @@ function initGame(): void {
   window.addEventListener("keydown", handleToggleKey);
   // Listen for choice/deduction/crew-door input
   window.addEventListener("keydown", (e) => {
+    if (helpOpen) {
+      if (e.key === "Escape" || e.key === "?") {
+        e.preventDefault();
+        helpOpen = false;
+        closeHelpOverlay();
+      }
+      return; // swallow all input while help is open
+    }
     if (mapOpen) {
       if (e.key === "Escape" || e.key === "m" || e.key === "M") {
         e.preventDefault();
@@ -377,13 +385,8 @@ function initGame(): void {
     // ? key toggles help
     if (e.key === "?" && !journalOpen) {
       e.preventDefault();
-      helpOpen = !helpOpen;
-      if (helpOpen) {
-        showHelp();
-      } else {
-        display.addLog("[Help closed]", "system");
-        renderAll();
-      }
+      helpOpen = true;
+      showHelp();
       return;
     }
     // R opens broadcast report modal — b is SW movement key
@@ -786,6 +789,28 @@ function handleAction(action: Action): void {
     display.addLog("Find the Thermal Sensor to locate overheating relays. Reroute all relays to unlock the Data Core.", "system");
     display.triggerScreenFlash("milestone");
   }
+  if (state.mystery && lastObjectivePhase !== ObjectivePhase.Evacuate &&
+      state.mystery.objectivePhase === ObjectivePhase.Evacuate) {
+    lastObjectivePhase = ObjectivePhase.Evacuate;
+    display.addLog("", "system");
+    display.addLog("═══ ⚡ RED ALERT ═══", "milestone");
+    display.addLog("CREW SURVIVORS DETECTED. Evacuation protocol activated.", "milestone");
+    display.addLog("Lead crew to Escape Pods. Interact [i] with crew to have them follow you.", "milestone");
+    display.addLog("Find powered Escape Pods and interact [i] to board crew.", "system");
+    display.addLog("TIP: Check the station map [m] to locate the Escape Pod Bay.", "system");
+    display.triggerScreenFlash("milestone");
+    audio.playEvacuation();
+  }
+
+  // Detect crew boarding events for audio
+  if (state.logs.length > prevLogs) {
+    for (let i = prevLogs; i < state.logs.length; i++) {
+      if (state.logs[i].text.includes("boards escape")) {
+        audio.playCrewBoard();
+        break;
+      }
+    }
+  }
 
   // Check for crew door prompt (Y/N) from sim logs
   if (state.logs.length > prevLogs && !pendingCrewDoor) {
@@ -1036,28 +1061,72 @@ function handleScan(): void {
 
 // ── Help display ────────────────────────────────────────────────
 function showHelp(): void {
-  display.addLog("═══ CONTROLS ═══", "milestone");
-  display.addLog("── Movement ──", "system");
-  display.addLog("  Arrow keys / WASD    Cardinal movement", "system");
-  display.addLog("  h j k l              West South North East (vi keys)", "system");
-  display.addLog("  y u b n              NW   NE    SW    SE   (diagonal)", "system");
-  display.addLog("  Numpad 1-9           8-way movement (5 = wait)", "system");
-  display.addLog("── Actions ──", "system");
-  display.addLog("  i                    Interact / open/close doors & airlocks", "system");
-  display.addLog("  c                    Clean current tile", "system");
-  display.addLog("  t / q                Cycle sensor overlay", "system");
-  display.addLog("  x                    Look (examine surroundings)", "system");
-  display.addLog("  .  Space  5          Wait one turn", "system");
-  display.addLog("── Menus ──", "system");
-  display.addLog("  r                    Broadcast report to base", "system");
-  display.addLog("  v                    Evidence browser (view journal)", "system");
-  display.addLog("  ;                    Quick journal / notes", "system");
-  display.addLog("  m                    Toggle station map", "system");
-  display.addLog("  ?                    Toggle this help", "system");
-  display.addLog("  Tab                  Switch journal tabs (in journal)", "system");
-  display.addLog("  Enter                Attempt deduction (in journal)", "system");
-  display.addLog("  F3                   Toggle 2D / 3D renderer", "system");
-  renderAll();
+  const overlay = document.getElementById("journal-overlay");
+  if (!overlay) return;
+
+  overlay.innerHTML = `
+    <div class="journal-container" style="padding:20px;overflow-y:auto;color:#ccc">
+      <div style="text-align:center;margin-bottom:12px">
+        <span style="color:#ff0;font-size:18px;font-weight:bold">═══ CONTROLS ═══</span>
+        <div style="color:#888;font-size:12px">Press [?] or [Esc] to close</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px 24px;max-width:700px;margin:0 auto">
+        <div>
+          <div style="color:#4af;font-weight:bold;margin-bottom:6px">── Movement ──</div>
+          <div><span style="color:#fff">Arrow keys / WASD</span>  Cardinal movement</div>
+          <div><span style="color:#fff">h j k l</span>  West South North East (vi)</div>
+          <div><span style="color:#fff">y u b n</span>  NW NE SW SE (diagonal)</div>
+          <div><span style="color:#fff">Numpad 1-9</span>  8-way movement (5 = wait)</div>
+        </div>
+
+        <div>
+          <div style="color:#4af;font-weight:bold;margin-bottom:6px">── Actions ──</div>
+          <div><span style="color:#fff">[i]</span>  Interact with adjacent objects</div>
+          <div style="color:#888;margin-left:20px">Terminals, doors, airlocks, relays,</div>
+          <div style="color:#888;margin-left:20px">repair cradles, crew NPCs, escape pods</div>
+          <div><span style="color:#fff">[c]</span>  Clean current tile</div>
+          <div><span style="color:#fff">[t] / [q]</span>  Cycle sensor overlay</div>
+          <div><span style="color:#fff">[x]</span>  Look (examine surroundings)</div>
+          <div><span style="color:#fff">[.] [Space] [5]</span>  Wait one turn</div>
+        </div>
+
+        <div>
+          <div style="color:#4af;font-weight:bold;margin-bottom:6px">── Menus & Info ──</div>
+          <div><span style="color:#fff">[r]</span>  Broadcast Report (deductions + choices)</div>
+          <div><span style="color:#fff">[v]</span>  Evidence Browser (full journal)</div>
+          <div><span style="color:#fff">[j] / [;]</span>  Quick journal toggle</div>
+          <div><span style="color:#fff">[m]</span>  Station map overlay</div>
+          <div><span style="color:#fff">[?]</span>  This help screen</div>
+        </div>
+
+        <div>
+          <div style="color:#4af;font-weight:bold;margin-bottom:6px">── In Menus ──</div>
+          <div><span style="color:#fff">[Tab]</span>  Switch sections / tabs</div>
+          <div><span style="color:#fff">[Enter]</span>  Submit deduction answer</div>
+          <div><span style="color:#fff">[Y] / [N]</span>  Confirm or cancel prompts</div>
+          <div><span style="color:#fff">[Esc]</span>  Close any overlay</div>
+          <div><span style="color:#fff">[R]</span>  Restart (game over screen)</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;border-top:1px solid #333;padding-top:12px;max-width:700px;margin-left:auto;margin-right:auto">
+        <div style="color:#4af;font-weight:bold;margin-bottom:6px">── Game Phases ──</div>
+        <div><span style="color:#4a4">MAINTENANCE</span>  Clean rooms to 80% to progress</div>
+        <div><span style="color:#fa0">INVESTIGATION</span>  Read terminals, collect evidence, solve deductions</div>
+        <div><span style="color:#f44">RECOVERY</span>  Reroute relays, transmit data from Data Core</div>
+        <div><span style="color:#f0f">EVACUATION</span>  Lead crew survivors to powered Escape Pods</div>
+      </div>
+    </div>`;
+  overlay.classList.add("active");
+}
+
+function closeHelpOverlay(): void {
+  const overlay = document.getElementById("journal-overlay");
+  if (overlay) {
+    overlay.innerHTML = "";
+    overlay.classList.remove("active");
+  }
 }
 
 // ── Station map display (HTML overlay — no longer destroys log panel) ──
@@ -1835,6 +1904,28 @@ function renderBroadcastModal(): void {
       <div class="broadcast-section-title" style="color:#ca8">REPORT DECISIONS</div>` + choicesHtml;
   }
 
+  // Evacuation status section
+  let evacHtml = "";
+  if (state.mystery.evacuation?.active) {
+    const evac = state.mystery.evacuation;
+    const found = evac.crewFound.length;
+    const evacuated = evac.crewEvacuated.length;
+    const dead = evac.crewDead.length;
+    const remaining = found - evacuated - dead;
+    const pods = evac.podsPowered.length;
+    const evacColor = dead > 0 ? "#f44" : evacuated > 0 ? "#4a4" : "#fa0";
+    evacHtml = `
+      <div style="border-top:1px solid #444;margin:8px 0"></div>
+      <div class="broadcast-section-title" style="color:#f0f">EVACUATION STATUS</div>
+      <div style="padding:4px 8px;color:#ccc">
+        <div>Crew found: <span style="color:#fff">${found}</span></div>
+        <div>Evacuated: <span style="color:#4a4">${evacuated}</span></div>
+        ${dead > 0 ? `<div>Lost: <span style="color:#f44">${dead}</span></div>` : ""}
+        ${remaining > 0 ? `<div>Still need rescue: <span style="color:#fa0">${remaining}</span></div>` : ""}
+        <div>Escape pods powered: <span style="color:#4af">${pods}</span></div>
+      </div>`;
+  }
+
   // Transmit button
   const allSolved = deductions.every(d => d.solved);
   const allChoicesMade = choices.every((c, i) => i >= thresholds.length || !!(c.chosen) || journalCount < thresholds[i]);
@@ -1854,6 +1945,7 @@ function renderBroadcastModal(): void {
       <div style="border-top:1px solid #444;margin:8px 0"></div>
       ${deductionHtml}
       ${choicesHtml}
+      ${evacHtml}
       ${transmitHtml}
       <div class="broadcast-controls">${controlsText}</div>
     </div>`;

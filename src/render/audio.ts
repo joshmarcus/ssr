@@ -148,4 +148,17 @@ export class AudioManager {
   playChoice(): void {
     this.tone(880, 0.1, 0.25, "sine", 440);
   }
+
+  /** Urgent alarm for evacuation phase (three descending tones). */
+  playEvacuation(): void {
+    this.tone(880, 0.15, 0.4, "square", 660);
+    setTimeout(() => this.tone(660, 0.15, 0.35, "square", 440), 200);
+    setTimeout(() => this.tone(440, 0.2, 0.3, "square", 330), 450);
+  }
+
+  /** Boarding confirmation sound (ascending sweep + click). */
+  playCrewBoard(): void {
+    this.tone(330, 0.12, 0.3, "sine", 660);
+    setTimeout(() => this.tone(880, 0.06, 0.25, "sine"), 150);
+  }
 }

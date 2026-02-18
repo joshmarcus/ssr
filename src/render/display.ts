@@ -1150,6 +1150,28 @@ export class BrowserDisplay implements IGameDisplay {
         }
       }
 
+      // Highlight key rooms during evacuation
+      if (state.mystery?.evacuation?.active) {
+        for (const [, ent] of state.entities) {
+          if (ent.type === EntityType.EscapePod) {
+            const ex = Math.floor(ent.pos.x * scaleX);
+            const ey = Math.floor(ent.pos.y * scaleY);
+            if (ey >= 0 && ey < mapH && ex >= 0 && ex < mapW && grid[ey][ex] !== " ") {
+              colorGrid[ey][ex] = "#0af"; // cyan for escape pods
+            }
+          }
+          if (ent.type === EntityType.CrewNPC && ent.props["following"] === true &&
+              ent.props["evacuated"] !== true && ent.props["dead"] !== true) {
+            const ex = Math.floor(ent.pos.x * scaleX);
+            const ey = Math.floor(ent.pos.y * scaleY);
+            if (ey >= 0 && ey < mapH && ex >= 0 && ex < mapW) {
+              grid[ey][ex] = "!";
+              colorGrid[ey][ex] = "#ff0"; // yellow for following crew
+            }
+          }
+        }
+      }
+
       // Draw player position
       const ppx = Math.floor(state.player.entity.pos.x * scaleX);
       const ppy = Math.floor(state.player.entity.pos.y * scaleY);
