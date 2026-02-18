@@ -2,32 +2,21 @@
 
 Ideas and planned features for post-MVP development.
 
-## Periodic Ship Computer Announcements
-The ship computer should periodically broadcast announcements about the overall station state:
-- Station-wide system status summaries every N turns
-- Dynamic warnings when conditions change (pressure dropping, heat rising)
-- Ambient flavor text from the station AI ("Maintenance schedule overdue by 847 days")
-- Could tie into the cleaning directive system and mystery phases
-- Should feel like a low-bitrate telemetry feed — fragmented, delayed, atmospheric
+## ~~Periodic Ship Computer Announcements~~ (DONE — Sprint 7)
+## ~~Sidebar/Nav Bar Polish~~ (DONE — Sprint 7)
+## ~~Evidence Browser / Journal Viewer~~ (DONE — Sprint 7, key: [v])
 
-## Sidebar/Nav Bar Polish
-Clean up the sidebar navigation to be crisp and minimal:
-- Highlight the legend of entity sigils that have been seen (not all — only discovered ones)
-- Style inspired by ondras/rot.js demo aesthetic: clean, tight, no clutter
-- Clean crisp narrative text styling — no verbose labels
-- Entity legend should only show glyphs the player has encountered this run
-- Minimal chrome — let the terminal aesthetic breathe
+## Save/Load System
+- Save game state to localStorage
+- Resume on page reload
+- Show save slot UI (1-3 slots)
+- Priority: MEDIUM — quality of life for longer sessions
 
-## Evidence Browser / Journal Viewer
-A rich, scrollable evidence browser so the player can review all discovered evidence:
-- Browse all collected journal entries, log transcripts, crew items, and trace evidence
-- See the **full content** of each piece of evidence (not just the summary tag)
-- Show **where** each piece of evidence was found (room name + coordinates)
-- Filter/sort by category (crew logs, items, traces, terminal entries)
-- Highlight which deductions each piece of evidence contributes to (tag connections)
-- Accessible via a dedicated key (e.g., `j` for journal) or overlay panel
-- Should work as a proper investigation board — the player needs to review clues to make deductions
-- Priority: HIGH — core to the mystery/deduction gameplay loop
+## Mini-Map Widget
+- Small ASCII mini-map in sidebar showing explored rooms
+- Highlight current room, show connected corridors
+- Replace the [m] full-screen map with an always-visible widget
+- Priority: MEDIUM — navigational aid
 
 ## Other Deferred Features
 - Radiation/Structural/EM sensor systems (removed in Sprint 5, may revisit)

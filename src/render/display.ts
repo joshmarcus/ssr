@@ -1057,6 +1057,64 @@ export class BrowserDisplay implements IGameDisplay {
 
     const infoHtml = `<div class="info-bar">${controlsHtml}</div>`;
 
+    // ── Mini-map (compact room layout) ───────────────────────────
+    let miniMapHtml = "";
+    if (state.rooms.length > 0 && visitedRoomIds && visitedRoomIds.size > 0) {
+      // Scale the map to fit in ~30x8 character grid
+      const mapW = 30;
+      const mapH = 8;
+      const scaleX = mapW / state.width;
+      const scaleY = mapH / state.height;
+
+      // Build a character grid
+      const grid: string[][] = [];
+      const colorGrid: string[][] = [];
+      for (let y = 0; y < mapH; y++) {
+        grid[y] = [];
+        colorGrid[y] = [];
+        for (let x = 0; x < mapW; x++) {
+          grid[y][x] = " ";
+          colorGrid[y][x] = "#222";
+        }
+      }
+
+      // Draw rooms
+      for (const room of state.rooms) {
+        const rx1 = Math.floor(room.x * scaleX);
+        const ry1 = Math.floor(room.y * scaleY);
+        const rx2 = Math.min(mapW - 1, Math.floor((room.x + room.width) * scaleX));
+        const ry2 = Math.min(mapH - 1, Math.floor((room.y + room.height) * scaleY));
+        const visited = visitedRoomIds.has(room.id);
+
+        for (let y = ry1; y <= ry2; y++) {
+          for (let x = rx1; x <= rx2; x++) {
+            if (y >= 0 && y < mapH && x >= 0 && x < mapW) {
+              grid[y][x] = visited ? "\u2588" : "\u2591";
+              colorGrid[y][x] = visited ? "#2a4a2a" : "#1a1a1a";
+            }
+          }
+        }
+      }
+
+      // Draw player position
+      const ppx = Math.floor(state.player.entity.pos.x * scaleX);
+      const ppy = Math.floor(state.player.entity.pos.y * scaleY);
+      if (ppy >= 0 && ppy < mapH && ppx >= 0 && ppx < mapW) {
+        grid[ppy][ppx] = "@";
+        colorGrid[ppy][ppx] = "#0f0";
+      }
+
+      // Render to HTML
+      let mapStr = "";
+      for (let y = 0; y < mapH; y++) {
+        for (let x = 0; x < mapW; x++) {
+          mapStr += `<span style="color:${colorGrid[y][x]}">${grid[y][x]}</span>`;
+        }
+        mapStr += "\n";
+      }
+      miniMapHtml = `<div style="font-size:10px;line-height:1.1;padding:2px 0;border-bottom:1px solid #222;white-space:pre;font-family:monospace">${mapStr}</div>`;
+    }
+
     // ── Log panel (color-coded by type) ─────────────────────────
     const logEntries = this.logHistory.length > 0
       ? this.logHistory
@@ -1069,7 +1127,7 @@ export class BrowserDisplay implements IGameDisplay {
 
     const logHtml = `<div class="log-panel">${logEntries}</div>`;
 
-    const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${statusHtml}${proximityHtml}${roomListHtml}${infoHtml}</div>`;
+    const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${statusHtml}${proximityHtml}${miniMapHtml}${roomListHtml}${infoHtml}</div>`;
     panel.innerHTML = logHtml + bottomHtml;
 
     // Auto-scroll log panel to bottom

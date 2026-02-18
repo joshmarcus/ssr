@@ -116,6 +116,22 @@ export const PA_ANNOUNCEMENTS_ATMOSPHERIC: string[] = [
   "CORVUS-7 CENTRAL: Cleaning protocols resuming. Thank you for your patience, crew.",
 ];
 
+export const PA_ANNOUNCEMENTS_INVESTIGATE: string[] = [
+  "CORVUS-7 CENTRAL: NOTICE — Crew status unknown. Recommend full station sweep.",
+  "CORVUS-7 CENTRAL: Evidence logging system active. All findings archived automatically.",
+  "CORVUS-7 CENTRAL: Crew manifest discrepancies detected. Cross-reference logs for clarity.",
+  "CORVUS-7 CENTRAL: NOTICE — Security cameras offline. Terminal logs are primary evidence source.",
+  "CORVUS-7 CENTRAL: Investigation protocol active. All terminals unlocked for review.",
+];
+
+export const PA_ANNOUNCEMENTS_RECOVER: string[] = [
+  "CORVUS-7 CENTRAL: PRIORITY — Relay cascade imminent. Manual rerouting required.",
+  "CORVUS-7 CENTRAL: Data Core access pending. Restore all relays to unlock transmission.",
+  "CORVUS-7 CENTRAL: Station systems critical. Relay restoration is highest priority.",
+  "CORVUS-7 CENTRAL: Research data integrity degrading. Transmission window narrowing.",
+  "CORVUS-7 CENTRAL: All relays must be rerouted before Data Core access is granted.",
+];
+
 // ── Cleanliness sensor trail hints (Item 1) ──────────────────
 // When cleanliness sensor is active, high-dirt areas reveal evacuation hints.
 export const DIRT_TRAIL_HINTS: string[] = [

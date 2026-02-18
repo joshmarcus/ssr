@@ -9,6 +9,7 @@ import {
 } from "../shared/constants.js";
 import {
   PA_ANNOUNCEMENTS_GENERAL, PA_ANNOUNCEMENTS_WARNING, PA_ANNOUNCEMENTS_ATMOSPHERIC,
+  PA_ANNOUNCEMENTS_INVESTIGATE, PA_ANNOUNCEMENTS_RECOVER,
 } from "../data/narrative.js";
 
 /**
@@ -306,7 +307,8 @@ export function tickPA(state: GameState): GameState {
 
   const newLogs = [...state.logs];
 
-  // Pick pool based on station conditions
+  // Pick pool based on game phase and station conditions
+  const phase = state.mystery?.objectivePhase;
   const hasHotZone = state.tiles.some(row => row.some(t => t.heat > 40));
   const hasLowPressure = state.tiles.some(row => row.some(t => t.pressure < 50));
 
@@ -315,6 +317,10 @@ export function tickPA(state: GameState): GameState {
 
   if ((hasHotZone || hasLowPressure) && turnHash < 40) {
     pool = PA_ANNOUNCEMENTS_WARNING;
+  } else if (phase === "investigate" && turnHash < 60) {
+    pool = PA_ANNOUNCEMENTS_INVESTIGATE;
+  } else if (phase === "recover" && turnHash < 60) {
+    pool = PA_ANNOUNCEMENTS_RECOVER;
   } else if (turnHash < 25) {
     pool = PA_ANNOUNCEMENTS_ATMOSPHERIC;
   } else {

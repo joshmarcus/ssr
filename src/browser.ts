@@ -25,6 +25,7 @@ import { ActionType, AttachmentSlot, SensorType, EntityType, ObjectivePhase, Ded
 import { computeChoiceEndings } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
+import { saveGame, loadGame, hasSave, deleteSave } from "./sim/saveLoad.js";
 
 // ── Parse seed from URL params or use golden seed ───────────────
 const params = new URLSearchParams(window.location.search);
@@ -122,7 +123,7 @@ function showOpeningCrawl(): void {
 
 // ── Game initialization ─────────────────────────────────────────
 let state = generate(seed);
-let display: IGameDisplay;
+let display: IGameDisplay = undefined!; // assigned in initGame()
 let is3D = false;
 
 // Lazy-loaded 3D renderer constructor — only populated when user first presses F3
@@ -426,6 +427,7 @@ function handleRestartKey(e: KeyboardEvent): void {
   if (e.key === "r" || e.key === "R") {
     e.preventDefault();
     // Reset game state
+    deleteSave();
     state = generate(seed);
     lastPlayerRoomId = "";
     visitedRoomIds.clear();
@@ -789,7 +791,13 @@ function handleAction(action: Action): void {
     }
   }
 
+  // Auto-save after each action (unless game is over)
+  if (!state.gameOver && state.turn % 5 === 0) {
+    saveGame(state);
+  }
+
   if (state.gameOver) {
+    deleteSave(); // Clear save on game end
     if (state.victory) {
       audio.playVictory();
       display.addLog("", "system");
@@ -1985,5 +1993,15 @@ function escapeHtmlBroadcast(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// ── Start with opening crawl ────────────────────────────────────
-showOpeningCrawl();
+// ── Start: check for save or show opening crawl ─────────────────
+const savedState = hasSave() ? loadGame() : null;
+if (savedState) {
+  state = savedState;
+  gameStarted = true;
+  initGame();
+  // display is now assigned by initGame
+  display.addLog("[Save loaded — resuming session]", "milestone");
+  renderAll();
+} else {
+  showOpeningCrawl();
+}
