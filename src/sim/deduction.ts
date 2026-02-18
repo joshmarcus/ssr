@@ -5,18 +5,42 @@
  * WHY did it happen? (cause/motive)
  * WHO is responsible? (crew involvement)
  *
- * Deductions unlock as the player gathers evidence.
+ * Deductions form a chain: solving one unlocks the next.
+ * Each deduction requires the player to LINK specific evidence
+ * (journal entries whose tags cover the deduction's requiredTags)
+ * before answering.
+ *
  * Correct answers give tangible gameplay rewards.
  * Wrong answers cost time but don't permanently block progress.
  */
 import * as ROT from "rot-js";
-import type { CrewMember, IncidentTimeline, Deduction } from "../shared/types.js";
+import type { CrewMember, IncidentTimeline, Deduction, JournalEntry } from "../shared/types.js";
 import { DeductionCategory, IncidentArchetype, CrewRole, CrewSecret } from "../shared/types.js";
 import { findByRole, findSecretHolder } from "./crewGen.js";
 
 /**
+ * Get the system tags associated with an incident archetype.
+ */
+export function getArchetypeTags(archetype: IncidentArchetype): string[] {
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade:
+      return ["coolant", "thermal", "reactor"];
+    case IncidentArchetype.HullBreach:
+      return ["hull", "pressure"];
+    case IncidentArchetype.ReactorScram:
+      return ["reactor", "containment"];
+    case IncidentArchetype.Sabotage:
+      return ["electrical", "signal"];
+    case IncidentArchetype.SignalAnomaly:
+      return ["signal", "electrical"];
+    case IncidentArchetype.ContainmentBreach:
+      return ["containment", "pressure"];
+  }
+}
+
+/**
  * Generate deductions from the crew and timeline.
- * Produces 4-6 deductions structured around WHAT/WHY/WHO.
+ * Produces 5-6 deductions structured as a chain: each unlocks after the previous.
  * ROT.RNG must be seeded.
  */
 export function generateDeductions(
@@ -31,23 +55,24 @@ export function generateDeductions(
   const security = findByRole(crew, CrewRole.Security);
   const scientist = findByRole(crew, CrewRole.Scientist);
   const secretHolder = findSecretHolder(crew);
+  const archTags = getArchetypeTags(timeline.archetype);
 
-  // ── WHAT happened? ──────────────────────────────────────────
-  deductions.push(generateWhatDeduction(timeline, engineer, roomNames));
+  // ── Tier 1: WHAT happened? (available immediately, needs 1 system tag) ──
+  deductions.push(generateWhatDeduction(timeline, engineer, roomNames, archTags));
 
-  // ── WHAT (secondary): What was the sequence of events? ──────
-  deductions.push(generateSequenceDeduction(timeline, crew, roomNames));
+  // ── Tier 2: WHERE did it start? (unlocked after Tier 1) ──
+  deductions.push(generateSequenceDeduction(timeline, crew, roomNames, archTags));
 
-  // ── WHY did it happen? ──────────────────────────────────────
-  deductions.push(generateWhyDeduction(timeline, captain, engineer, secretHolder));
+  // ── Tier 3: WHY did it happen? (unlocked after Tier 2) ──
+  deductions.push(generateWhyDeduction(timeline, captain, engineer, secretHolder, archTags));
 
-  // ── WHO: Who tried to prevent it? ───────────────────────────
+  // ── Tier 4: WHO tried to prevent it? (unlocked after Tier 3) ──
   deductions.push(generateHeroDeduction(crew, timeline));
 
-  // ── WHO: Who bears responsibility? ──────────────────────────
+  // ── Tier 5: WHO bears responsibility? (unlocked after Tier 4) ──
   deductions.push(generateResponsibilityDeduction(crew, timeline, captain, secretHolder));
 
-  // ── WHY (secondary): What were they really doing here? ──────
+  // ── Tier 6 (optional): What were they really doing here? ──
   if (timeline.archetype === IncidentArchetype.SignalAnomaly ||
       timeline.archetype === IncidentArchetype.Sabotage) {
     deductions.push(generateHiddenAgendaDeduction(crew, timeline, scientist));
@@ -60,6 +85,7 @@ function generateWhatDeduction(
   timeline: IncidentTimeline,
   engineer: CrewMember | undefined,
   roomNames: string[],
+  archTags: string[],
 ): Deduction {
   const correctAnswer = getIncidentDescription(timeline.archetype);
   const wrongAnswers = getWrongIncidentDescriptions(timeline.archetype);
@@ -68,7 +94,6 @@ function generateWhatDeduction(
     { label: correctAnswer, key: "correct", correct: true },
     ...wrongAnswers.map((label, i) => ({ label, key: `wrong_${i}`, correct: false })),
   ];
-  // Shuffle options deterministically
   shuffleArray(options);
 
   return {
@@ -76,7 +101,8 @@ function generateWhatDeduction(
     category: DeductionCategory.What,
     question: "Based on the evidence, what happened aboard CORVUS-7?",
     options,
-    evidenceRequired: 2,
+    requiredTags: [archTags[0]],  // just one system tag — easy entry point
+    linkedEvidence: [],
     solved: false,
     rewardType: "room_reveal",
     rewardDescription: "Reveals the location of an unexplored room on the map",
@@ -87,6 +113,7 @@ function generateSequenceDeduction(
   timeline: IncidentTimeline,
   crew: CrewMember[],
   roomNames: string[],
+  archTags: string[],
 ): Deduction {
   const triggerEvent = timeline.events.find(e => e.phase === "trigger");
   const room = triggerEvent?.location || roomNames[0] || "the station";
@@ -109,7 +136,9 @@ function generateSequenceDeduction(
     category: DeductionCategory.What,
     question: "Where and how did the incident begin?",
     options,
-    evidenceRequired: 4,
+    requiredTags: [archTags[0], "timeline_trigger"],
+    unlockAfter: "deduction_what",
+    linkedEvidence: [],
     solved: false,
     rewardType: "sensor_hint",
     rewardDescription: "Reveals the location of the next sensor upgrade",
@@ -121,6 +150,7 @@ function generateWhyDeduction(
   captain: CrewMember | undefined,
   engineer: CrewMember | undefined,
   secretHolder: CrewMember | undefined,
+  archTags: string[],
 ): Deduction {
   const archetype = timeline.archetype;
   let correctKey: string;
@@ -168,12 +198,16 @@ function generateWhyDeduction(
   ];
   shuffleArray(options);
 
+  // Need archetype tag + engineer or captain crew tag
+  const crewTag = engineer?.lastName.toLowerCase() || "engineer";
   return {
     id: "deduction_why",
     category: DeductionCategory.Why,
     question: "Why did the incident happen?",
     options,
-    evidenceRequired: 5,
+    requiredTags: [archTags[0], crewTag],
+    unlockAfter: "deduction_sequence",
+    linkedEvidence: [],
     solved: false,
     rewardType: "drone_disable",
     rewardDescription: "Disables a patrol drone, clearing a safe route",
@@ -184,7 +218,6 @@ function generateHeroDeduction(
   crew: CrewMember[],
   timeline: IncidentTimeline,
 ): Deduction {
-  // The engineer is almost always the one who tried to prevent/fix it
   const engineer = findByRole(crew, CrewRole.Engineer);
   const correctLabel = engineer
     ? `${engineer.firstName} ${engineer.lastName} (${engineer.role})`
@@ -204,7 +237,9 @@ function generateHeroDeduction(
     category: DeductionCategory.Who,
     question: "Who tried hardest to prevent the disaster?",
     options,
-    evidenceRequired: 3,
+    requiredTags: ["engineer", "timeline_response"],
+    unlockAfter: "deduction_why",
+    linkedEvidence: [],
     solved: false,
     rewardType: "clearance",
     rewardDescription: "Grants clearance to open a locked door elsewhere in the station",
@@ -242,12 +277,15 @@ function generateResponsibilityDeduction(
   ];
   shuffleArray(options);
 
+  const captainTag = captain?.lastName.toLowerCase() || "captain";
   return {
     id: "deduction_responsibility",
     category: DeductionCategory.Who,
     question: "Who bears the most responsibility for what happened?",
     options,
-    evidenceRequired: 7,
+    requiredTags: [captainTag, "timeline_aftermath"],
+    unlockAfter: "deduction_hero",
+    linkedEvidence: [],
     solved: false,
     rewardType: "room_reveal",
     rewardDescription: "Reveals a hidden section of the station",
@@ -279,7 +317,9 @@ function generateHiddenAgendaDeduction(
     category: DeductionCategory.Why,
     question: "What was really going on aboard CORVUS-7?",
     options,
-    evidenceRequired: 8,
+    requiredTags: ["signal", "scientist"],
+    unlockAfter: "deduction_responsibility",
+    linkedEvidence: [],
     solved: false,
     rewardType: "sensor_hint",
     rewardDescription: "Reveals the location of hidden evidence",
@@ -316,7 +356,6 @@ function getWrongIncidentDescriptions(archetype: IncidentArchetype): string[] {
   ];
   const correct = getIncidentDescription(archetype);
   const wrong = all.filter(d => d !== correct);
-  // Pick 3 random wrong answers
   return wrong.slice(0, 3);
 }
 
@@ -328,23 +367,91 @@ function shuffleArray<T>(arr: T[]): void {
 }
 
 /**
- * Check if a deduction should be unlocked based on journal count.
+ * Check if a deduction is available for the player to attempt.
+ * A deduction is unlocked when:
+ * 1. It's not already solved
+ * 2. Its prerequisite deduction (unlockAfter) is solved
+ * 3. The player's journal contains entries that collectively cover the requiredTags
  */
 export function getUnlockedDeductions(
   deductions: Deduction[],
-  journalCount: number,
+  journal: JournalEntry[],
 ): Deduction[] {
-  return deductions.filter(d => !d.solved && journalCount >= d.evidenceRequired);
+  const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
+  const allTags = new Set(journal.flatMap(j => j.tags));
+
+  return deductions.filter(d => {
+    if (d.solved) return false;
+    // Check chain prerequisite
+    if (d.unlockAfter && !solvedIds.has(d.unlockAfter)) return false;
+    // Check that journal has entries covering all required tags
+    for (const tag of d.requiredTags) {
+      if (!allTags.has(tag)) return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Validate that selected evidence entries cover a deduction's required tags.
+ * Returns which tags are covered, which are missing, and whether the link is valid.
+ */
+export function validateEvidenceLink(
+  deduction: Deduction,
+  selectedEntryIds: string[],
+  journal: JournalEntry[],
+): { valid: boolean; coveredTags: string[]; missingTags: string[] } {
+  const selectedEntries = journal.filter(j => selectedEntryIds.includes(j.id));
+  const selectedTags = new Set(selectedEntries.flatMap(j => j.tags));
+
+  const coveredTags: string[] = [];
+  const missingTags: string[] = [];
+
+  for (const tag of deduction.requiredTags) {
+    if (selectedTags.has(tag)) {
+      coveredTags.push(tag);
+    } else {
+      missingTags.push(tag);
+    }
+  }
+
+  return {
+    valid: missingTags.length === 0,
+    coveredTags,
+    missingTags,
+  };
+}
+
+/**
+ * Link evidence to a deduction (updates the deduction's linkedEvidence).
+ * Returns updated deduction.
+ */
+export function linkEvidence(
+  deduction: Deduction,
+  journalEntryIds: string[],
+): Deduction {
+  return {
+    ...deduction,
+    linkedEvidence: [...journalEntryIds],
+  };
 }
 
 /**
  * Attempt to solve a deduction.
+ * Requires linkedEvidence to be valid (cover all requiredTags).
  * Returns the updated deduction and whether the answer was correct.
  */
 export function solveDeduction(
   deduction: Deduction,
   answerKey: string,
-): { deduction: Deduction; correct: boolean } {
+  journal: JournalEntry[],
+): { deduction: Deduction; correct: boolean; validLink: boolean } {
+  // Validate evidence link first
+  const { valid } = validateEvidenceLink(deduction, deduction.linkedEvidence, journal);
+  if (!valid) {
+    return { deduction, correct: false, validLink: false };
+  }
+
   const chosen = deduction.options.find(o => o.key === answerKey);
   const correct = chosen?.correct || false;
   return {
@@ -354,5 +461,100 @@ export function solveDeduction(
       answeredCorrectly: correct,
     },
     correct,
+    validLink: true,
   };
+}
+
+/**
+ * Generate tags for a journal entry based on context.
+ * Called when adding new journal entries to derive appropriate tags.
+ */
+export function generateEvidenceTags(
+  category: JournalEntry["category"],
+  detail: string,
+  roomName: string,
+  crewMentioned: string[],
+  crewMembers: CrewMember[],
+  archetype?: IncidentArchetype,
+): string[] {
+  const tags: string[] = [];
+
+  // Location tag (room name → lowercase + underscore)
+  if (roomName) {
+    tags.push(roomName.toLowerCase().replace(/\s+/g, "_"));
+  }
+
+  // Crew tags — add role tags for mentioned crew
+  for (const crewId of crewMentioned) {
+    const member = crewMembers.find(c => c.id === crewId);
+    if (member) {
+      tags.push(member.role.toLowerCase());
+      tags.push(member.lastName.toLowerCase());
+    }
+  }
+
+  // System tags from content keywords
+  const lowerDetail = detail.toLowerCase();
+  const systemKeywords: Record<string, string> = {
+    "coolant": "coolant",
+    "thermal": "thermal",
+    "temperature": "thermal",
+    "heat": "thermal",
+    "reactor": "reactor",
+    "containment": "containment",
+    "hull": "hull",
+    "breach": "hull",
+    "pressure": "pressure",
+    "depressur": "pressure",
+    "signal": "signal",
+    "anomal": "signal",
+    "electrical": "electrical",
+    "power": "electrical",
+    "radiation": "radiation",
+  };
+  for (const [keyword, tag] of Object.entries(systemKeywords)) {
+    if (lowerDetail.includes(keyword)) {
+      tags.push(tag);
+    }
+  }
+
+  // Timeline tags from content keywords
+  const timelineKeywords: Record<string, string> = {
+    "before the incident": "timeline_early",
+    "warning": "timeline_early",
+    "maintenance": "timeline_early",
+    "deferred": "timeline_early",
+    "triggered": "timeline_trigger",
+    "cascade": "timeline_trigger",
+    "started": "timeline_trigger",
+    "alarm": "timeline_trigger",
+    "response": "timeline_response",
+    "evacuate": "timeline_response",
+    "rescue": "timeline_response",
+    "tried to": "timeline_response",
+    "aftermath": "timeline_aftermath",
+    "cover": "timeline_aftermath",
+    "hidden": "timeline_aftermath",
+    "secret": "timeline_aftermath",
+  };
+  for (const [keyword, tag] of Object.entries(timelineKeywords)) {
+    if (lowerDetail.includes(keyword)) {
+      tags.push(tag);
+    }
+  }
+
+  // Archetype-specific tags
+  if (archetype) {
+    const archTags = getArchetypeTags(archetype);
+    // Add the primary archetype tag if it's not already present
+    if (archTags.length > 0 && !tags.includes(archTags[0])) {
+      // Only add if the content is related to the main system
+      if (category === "log" || category === "trace") {
+        tags.push(archTags[0]);
+      }
+    }
+  }
+
+  // Deduplicate
+  return [...new Set(tags)];
 }

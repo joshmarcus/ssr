@@ -5,9 +5,6 @@ import {
   HEAT_DAMAGE_PER_TURN, HEAT_PAIN_THRESHOLD, COOL_RECOVERY_RATE, HEAT_SPREAD_MIN,
   PRESSURE_BREACH_DRAIN, PRESSURE_SPREAD_RATE, PRESSURE_DAMAGE_THRESHOLD, PRESSURE_DAMAGE_PER_TURN,
   PRESSURE_BULKHEAD_THRESHOLD, DETERIORATION_INTERVAL, DETERIORATION_HEAT_BOOST, DETERIORATION_SMOKE_SPAWN,
-  RADIATION_SPREAD_RATE, RADIATION_SPREAD_RANGE, RADIATION_DAMAGE_THRESHOLD, RADIATION_DAMAGE_PER_TURN,
-  RADIATION_DAMAGE_NO_SENSOR, RADIATION_SOURCE_RATE, RADIATION_SOURCE_CAP, RADIATION_DECAY_RATE,
-  SHIELD_GENERATOR_RADIUS, STRESS_COLLAPSE_THRESHOLD, STRESS_COLLAPSE_TURNS, STRESS_SPREAD_RATE,
   GLYPHS,
 } from "../shared/constants.js";
 
@@ -26,166 +23,6 @@ const ADJACENT_DELTAS = [
  */
 function cloneTiles(tiles: Tile[][]): Tile[][] {
   return tiles.map((row) => row.map((t) => ({ ...t })));
-}
-
-/**
- * Tick radiation: sources emit, radiation spreads (through walls), decays slowly.
- * Shield generators with activated=true zero radiation within their radius.
- */
-export function tickRadiation(state: GameState): GameState {
-  const oldTiles = state.tiles;
-  const newTiles = cloneTiles(oldTiles);
-
-  // Collect radiation source positions
-  const radiationSources: { x: number; y: number }[] = [];
-  for (const [, entity] of state.entities) {
-    if (entity.type === EntityType.RadiationSource) {
-      radiationSources.push({ x: entity.pos.x, y: entity.pos.y });
-    }
-  }
-
-  // Inject radiation at source tiles
-  for (const src of radiationSources) {
-    if (src.y >= 0 && src.y < state.height && src.x >= 0 && src.x < state.width) {
-      newTiles[src.y][src.x].radiation = Math.min(
-        RADIATION_SOURCE_CAP,
-        newTiles[src.y][src.x].radiation + RADIATION_SOURCE_RATE,
-      );
-    }
-  }
-
-  // Spread radiation: CRITICAL — radiation penetrates walls (unlike heat)
-  for (let y = 0; y < state.height; y++) {
-    for (let x = 0; x < state.width; x++) {
-      const tile = oldTiles[y][x];
-      if (tile.radiation <= 0) continue;
-
-      for (let dy = -RADIATION_SPREAD_RANGE; dy <= RADIATION_SPREAD_RANGE; dy++) {
-        for (let dx = -RADIATION_SPREAD_RANGE; dx <= RADIATION_SPREAD_RANGE; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const dist = Math.abs(dx) + Math.abs(dy);
-          if (dist > RADIATION_SPREAD_RANGE) continue;
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
-          // Radiation penetrates walls — no walkable check
-          const spreadAmount = Math.max(1, Math.floor(RADIATION_SPREAD_RATE * (tile.radiation / 100) / dist));
-          newTiles[ny][nx].radiation = Math.min(100, newTiles[ny][nx].radiation + spreadAmount);
-        }
-      }
-    }
-  }
-
-  // Natural radiation decay (very slow)
-  const sourceSet = new Set(radiationSources.map(s => `${s.x},${s.y}`));
-  for (let y = 0; y < state.height; y++) {
-    for (let x = 0; x < state.width; x++) {
-      if (sourceSet.has(`${x},${y}`)) continue; // sources don't decay
-      if (newTiles[y][x].radiation > 0) {
-        newTiles[y][x].radiation = Math.max(0, newTiles[y][x].radiation - RADIATION_DECAY_RATE);
-      }
-    }
-  }
-
-  // Shield generators: zero radiation within radius when activated
-  for (const [, entity] of state.entities) {
-    if (entity.type === EntityType.ShieldGenerator && entity.props["activated"] === true) {
-      const sx = entity.pos.x;
-      const sy = entity.pos.y;
-      for (let dy = -SHIELD_GENERATOR_RADIUS; dy <= SHIELD_GENERATOR_RADIUS; dy++) {
-        for (let dx = -SHIELD_GENERATOR_RADIUS; dx <= SHIELD_GENERATOR_RADIUS; dx++) {
-          if (Math.abs(dx) + Math.abs(dy) > SHIELD_GENERATOR_RADIUS) continue;
-          const nx = sx + dx;
-          const ny = sy + dy;
-          if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height) {
-            newTiles[ny][nx].radiation = 0;
-          }
-        }
-      }
-    }
-  }
-
-  return { ...state, tiles: newTiles };
-}
-
-/**
- * Tick structural stress: spreads to adjacent walkable tiles, collapses tiles
- * that exceed threshold for too many turns. ReinforcementPanel prevents collapse.
- */
-export function tickStructuralStress(state: GameState): GameState {
-  const oldTiles = state.tiles;
-  const newTiles = cloneTiles(oldTiles);
-  const newEntities = new Map(state.entities);
-
-  // Collect reinforced positions (tile + adjacent tiles)
-  const reinforcedPositions = new Set<string>();
-  for (const [, entity] of state.entities) {
-    if (entity.type === EntityType.ReinforcementPanel && entity.props["installed"] === true) {
-      const ex = entity.pos.x;
-      const ey = entity.pos.y;
-      reinforcedPositions.add(`${ex},${ey}`);
-      for (const d of ADJACENT_DELTAS) {
-        reinforcedPositions.add(`${ex + d.x},${ey + d.y}`);
-      }
-    }
-  }
-
-  // Spread stress to adjacent walkable tiles
-  for (let y = 0; y < state.height; y++) {
-    for (let x = 0; x < state.width; x++) {
-      const tile = oldTiles[y][x];
-      if (tile.stress <= 0) continue;
-
-      for (const d of ADJACENT_DELTAS) {
-        const nx = x + d.x;
-        const ny = y + d.y;
-        if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
-        if (!oldTiles[ny][nx].walkable) continue;
-        newTiles[ny][nx].stress = Math.min(100, newTiles[ny][nx].stress + STRESS_SPREAD_RATE);
-      }
-    }
-  }
-
-  // Check collapse conditions
-  for (let y = 0; y < state.height; y++) {
-    for (let x = 0; x < state.width; x++) {
-      if (reinforcedPositions.has(`${x},${y}`)) {
-        // Reinforced tiles cannot collapse — reset stressTurns
-        newTiles[y][x].stressTurns = 0;
-        continue;
-      }
-
-      if (newTiles[y][x].stress >= STRESS_COLLAPSE_THRESHOLD) {
-        newTiles[y][x].stressTurns++;
-
-        if (newTiles[y][x].stressTurns >= STRESS_COLLAPSE_TURNS) {
-          // Tile collapses — drop rubble (blocks movement, cleanable)
-          newTiles[y][x].walkable = false;
-          newTiles[y][x].stress = 0;
-          newTiles[y][x].stressTurns = 0;
-          // Place rubble entity (if not already present and not player's tile)
-          const px = state.player.entity.pos.x;
-          const py = state.player.entity.pos.y;
-          if (!(x === px && y === py)) {
-            const rubbleId = `rubble_${x}_${y}`;
-            if (!newEntities.has(rubbleId)) {
-              newEntities.set(rubbleId, {
-                id: rubbleId,
-                type: EntityType.Rubble,
-                pos: { x, y },
-                props: {},
-              });
-            }
-          }
-        }
-      } else {
-        // Below threshold — reset counter
-        newTiles[y][x].stressTurns = 0;
-      }
-    }
-  }
-
-  return { ...state, tiles: newTiles, entities: newEntities };
 }
 
 /**
@@ -369,15 +206,7 @@ export function tickHazards(state: GameState): GameState {
     }
   }
 
-  let result: GameState = { ...state, tiles: newTiles };
-
-  // Tick radiation system
-  result = tickRadiation(result);
-
-  // Structural stress: drops rubble (cleanable) instead of walls
-  result = tickStructuralStress(result);
-
-  return result;
+  return { ...state, tiles: newTiles };
 }
 
 /**
@@ -427,7 +256,7 @@ export function tickDeterioration(state: GameState): GameState {
   const deteriorationMsgs = [
     "Station systems degrading. Thermal containment failing.",
     "Emergency: Heat signatures expanding. Environmental controls offline.",
-    "WARNING: Station integrity declining. Hull stress increasing.",
+    "WARNING: Station conditions declining. Environmental systems degrading.",
     "Automated alert: Ambient temperature rising across multiple sectors.",
     "Cascade failure detected. Heat management systems non-responsive.",
   ];
@@ -458,7 +287,6 @@ export function applyHazardDamage(inputState: GameState): GameState {
   const sensors = state.player.sensors ?? [];
   const hasThermal = sensors.includes(SensorType.Thermal);
   const hasAtmospheric = sensors.includes(SensorType.Atmospheric);
-  const hasRadiation = sensors.includes(SensorType.Radiation);
 
   // Pressure damage: low-pressure tiles damage the bot
   // Atmospheric sensor halves pressure damage (better seals awareness)
@@ -549,40 +377,8 @@ export function applyHazardDamage(inputState: GameState): GameState {
     };
   }
 
-  // Radiation damage: doubled without radiation sensor
-  if (tile.radiation >= RADIATION_DAMAGE_THRESHOLD) {
-    const radDamage = hasRadiation ? RADIATION_DAMAGE_PER_TURN : RADIATION_DAMAGE_NO_SENSOR;
-    const radHp = Math.max(0, state.player.hp - radDamage);
-    const radLogs = [...state.logs];
-    if (state.turn % 2 === 0 || radHp <= 0) {
-      const radMsgs = [
-        "Radiation exposure detected. Shielding inadequate.",
-        "WARNING: Ionizing radiation exceeds safety limits.",
-        "Geiger counter spiking. Circuit boards degrading.",
-        "Radiation damage accumulating. Seek shielded area.",
-      ];
-      radLogs.push({
-        id: `log_radiation_warn_${state.turn}`,
-        timestamp: state.turn,
-        source: "system",
-        text: `${radMsgs[state.turn % radMsgs.length]} (-${radDamage} HP, ${radHp}/${state.player.maxHp})`,
-        read: false,
-      });
-    }
-    state = {
-      ...state,
-      player: {
-        ...state.player,
-        hp: radHp,
-        alive: radHp > 0,
-      },
-      logs: radLogs,
-    };
-    if (radHp <= 0) return state;
-  }
-
   // Recovery: slow heal on cool tiles only
-  if (tile.heat < HEAT_PAIN_THRESHOLD && tile.pressure >= PRESSURE_DAMAGE_THRESHOLD && tile.radiation < RADIATION_DAMAGE_THRESHOLD && state.player.hp < state.player.maxHp) {
+  if (tile.heat < HEAT_PAIN_THRESHOLD && tile.pressure >= PRESSURE_DAMAGE_THRESHOLD && state.player.hp < state.player.maxHp) {
     const healedHp = Math.min(state.player.maxHp, state.player.hp + COOL_RECOVERY_RATE);
     return {
       ...state,

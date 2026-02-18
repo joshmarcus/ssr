@@ -3,14 +3,14 @@ import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, Objective
 import {
   GLYPHS, PATROL_DRONE_DAMAGE, PATROL_DRONE_STUN_TURNS, PATROL_DRONE_SPEED,
   PATROL_DRONE_ATTACK_COOLDOWN,
-  STATION_INTEGRITY_DECAY_RATE, STATION_INTEGRITY_BREACH_PENALTY,
-  STATION_INTEGRITY_RELAY_BONUS, STATION_INTEGRITY_CRITICAL,
 } from "../shared/constants.js";
 import { isValidAction, getDirectionDelta, hasUnlockedDoorAt, isAutoSealedBulkhead } from "./actions.js";
 import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex } from "./rooms.js";
 import { tickHazards, tickDeterioration, applyHazardDamage } from "./hazards.js";
 import { checkWinCondition, checkLossCondition } from "./objectives.js";
 import { updateVision } from "./vision.js";
+import { generateEvidenceTags } from "./deduction.js";
+import { assignThread } from "./threads.js";
 
 /**
  * Find entities adjacent to or at the player's position.
@@ -89,16 +89,6 @@ function isEntityExhausted(entity: Entity, state: GameState): boolean {
       return entity.props["collected"] === true;
     case EntityType.EvidenceTrace:
       return entity.props["discovered"] === true;
-    case EntityType.RadiationSource:
-      return true; // not directly interactable — just informational
-    case EntityType.ShieldGenerator:
-      return entity.props["activated"] === true;
-    case EntityType.ReinforcementPanel:
-      return entity.props["installed"] === true;
-    case EntityType.SignalBooster:
-      return entity.props["activated"] === true;
-    case EntityType.HiddenDevice:
-      return entity.props["discovered"] === true;
     case EntityType.CrewNPC:
       return entity.props["evacuated"] === true || entity.props["dead"] === true;
     case EntityType.EscapePod:
@@ -135,6 +125,19 @@ function addJournalEntry(
     }
   }
 
+  // Generate evidence tags for clue-linking
+  const tags = generateEvidenceTags(
+    category,
+    detail,
+    roomFound,
+    crewMentioned,
+    state.mystery.crew,
+    state.mystery.timeline.archetype,
+  );
+
+  // Assign this entry to a narrative thread based on its tags
+  const threadName = assignThread(tags, state.mystery.threads);
+
   const entry: JournalEntry = {
     id,
     turnDiscovered: state.turn,
@@ -143,7 +146,16 @@ function addJournalEntry(
     detail,
     crewMentioned,
     roomFound,
+    tags,
+    thread: threadName,
   };
+
+  // Update the threads array: add this entry's ID to the matching thread
+  const newThreads = state.mystery.threads.map(t =>
+    t.name === threadName
+      ? { ...t, entries: [...t.entries, id] }
+      : t,
+  );
 
   const newJournal = [...state.mystery.journal, entry];
   const newEvidence = new Set([...state.mystery.discoveredEvidence, id]);
@@ -178,6 +190,7 @@ function addJournalEntry(
       ...state.mystery,
       journal: newJournal,
       discoveredEvidence: newEvidence,
+      threads: newThreads,
       objectivePhase: newPhase,
       cleaningDirective: newCleaningDirective,
       directiveOverrideTurn,
@@ -200,10 +213,10 @@ function getPlayerRoom(state: GameState): { room: Room; index: number } | null {
 }
 
 /**
- * Check and apply cleaning directive pressure.
+ * Check and apply cleaning directive advisory.
  * When the cleaning directive is active and the player is in a dirty room,
- * increment violation turns. Every 5 violation turns, add a warning.
- * At 10 violation turns, stun the player for 1 turn.
+ * log a warning message. The directive is advisory only — it does not
+ * block movement or stun the player.
  */
 function checkCleaningDirective(state: GameState): GameState {
   if (!state.mystery || !state.mystery.cleaningDirective) return state;
@@ -215,7 +228,6 @@ function checkCleaningDirective(state: GameState): GameState {
       mystery: {
         ...state.mystery,
         cleaningDirective: false,
-        directiveViolationTurns: 0,
       },
       logs: [
         ...state.logs,
@@ -236,63 +248,29 @@ function checkCleaningDirective(state: GameState): GameState {
   const cleanliness = getRoomCleanliness(state, playerRoom.room.name);
   const goal = state.mystery.roomCleanlinessGoal;
 
-  // Room is clean enough — no pressure, reset violation counter
+  // Room is clean enough — no warning needed
   if (cleanliness >= goal) {
-    if (state.mystery.directiveViolationTurns > 0) {
-      return {
-        ...state,
-        mystery: {
-          ...state.mystery,
-          directiveViolationTurns: 0,
-        },
-      };
-    }
     return state;
   }
 
-  // Room is dirty — increment violation turns
-  const newViolationTurns = state.mystery.directiveViolationTurns + 1;
-  let next: GameState = {
-    ...state,
-    mystery: {
-      ...state.mystery,
-      directiveViolationTurns: newViolationTurns,
-    },
-  };
-
-  // First violation turn in this room: warn the player they can't leave
-  if (newViolationTurns === 1) {
-    next = {
-      ...next,
+  // Room is dirty — issue advisory warning (every 10 turns to avoid spam)
+  if (state.turn % 10 === 1) {
+    return {
+      ...state,
       logs: [
-        ...next.logs,
+        ...state.logs,
         {
-          id: `log_directive_warn_${next.turn}`,
-          timestamp: next.turn,
+          id: `log_directive_warn_${state.turn}`,
+          timestamp: state.turn,
           source: "system",
-          text: `Primary directive engaged — maintenance subroutine will not permit departure from ${playerRoom.room.name} until cleanliness reaches 80%.`,
-          read: false,
-        },
-      ],
-    };
-  } else if (newViolationTurns % 10 === 0) {
-    // Periodic reminder
-    next = {
-      ...next,
-      logs: [
-        ...next.logs,
-        {
-          id: `log_directive_remind_${next.turn}`,
-          timestamp: next.turn,
-          source: "system",
-          text: `Maintenance subroutine active — ${playerRoom.room.name} still below 80% cleanliness. Motor inhibitors engaged until room is serviced.`,
+          text: `Maintenance advisory — ${playerRoom.room.name} below ${goal}% cleanliness. Press [c] to clean.`,
           read: false,
         },
       ],
     };
   }
 
-  return next;
+  return state;
 }
 
 /**
@@ -308,73 +286,6 @@ function getPlayerRoomName(state: GameState): string {
     }
   }
   return "Corridor";
-}
-
-/**
- * Tick station integrity — slow decay that creates visible tension.
- * Decay rate increases with unsealed breaches.
- * Rerouting relays restores integrity.
- * Below critical threshold, hazards spread faster (handled in hazards.ts via the value).
- */
-function tickStationIntegrity(state: GameState): GameState {
-  let decay = STATION_INTEGRITY_DECAY_RATE;
-
-  // Count unsealed breaches — each adds extra decay
-  for (const [, entity] of state.entities) {
-    if (entity.type === EntityType.Breach && entity.props["sealed"] !== true) {
-      decay += STATION_INTEGRITY_BREACH_PENALTY;
-    }
-  }
-
-  // Below critical threshold, decay accelerates slightly
-  if (state.stationIntegrity < STATION_INTEGRITY_CRITICAL) {
-    decay *= 1.5;
-  }
-
-  const newIntegrity = Math.max(0, state.stationIntegrity - decay);
-
-  // Station integrity hitting 0 doesn't immediately kill — it causes
-  // accelerated hazards and a warning. Loss still comes from HP/conditions.
-  let next = { ...state, stationIntegrity: newIntegrity };
-
-  // Warning logs at key thresholds
-  const prevIntegrity = state.stationIntegrity;
-  if (prevIntegrity >= 75 && newIntegrity < 75) {
-    next.logs = [
-      ...next.logs,
-      {
-        id: `log_integrity_75_${next.turn}`,
-        timestamp: next.turn,
-        source: "system",
-        text: "WARNING: Station integrity at 75%. Systems degrading. Investigate faster.",
-        read: false,
-      },
-    ];
-  } else if (prevIntegrity >= 50 && newIntegrity < 50) {
-    next.logs = [
-      ...next.logs,
-      {
-        id: `log_integrity_50_${next.turn}`,
-        timestamp: next.turn,
-        source: "system",
-        text: "CAUTION: Station integrity at 50%. Hazard spread accelerating. Secondary systems failing.",
-        read: false,
-      },
-    ];
-  } else if (prevIntegrity >= STATION_INTEGRITY_CRITICAL && newIntegrity < STATION_INTEGRITY_CRITICAL) {
-    next.logs = [
-      ...next.logs,
-      {
-        id: `log_integrity_critical_${next.turn}`,
-        timestamp: next.turn,
-        source: "system",
-        text: "CRITICAL: Station integrity below 25%. Hull stress critical. Complete objectives immediately.",
-        read: false,
-      },
-    ];
-  }
-
-  return next;
 }
 
 /**
@@ -452,9 +363,6 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       const sensorLogMessages: Record<string, string> = {
         [SensorType.Thermal]: "Thermal sensor module installed. Vasquez left this here — factory sealed, never used. Scan mode now available.",
         [SensorType.Atmospheric]: "Atmospheric sensor module installed. Pressure differentials now visible. Breaches glow red on the overlay.",
-        [SensorType.Radiation]: "Radiation sensor module installed. Ionizing radiation levels now visible. Sources glow on the overlay.",
-        [SensorType.Structural]: "Structural sensor module installed. Stress fractures and collapse risk now visible on the overlay.",
-        [SensorType.EMSignal]: "EM/Signal sensor module installed. Hidden electromagnetic sources now detectable. Concealed devices revealed.",
       };
       const logMsg = sensorLogMessages[sensorType] || `${sensorType} sensor installed. Scan mode updated.`;
 
@@ -551,8 +459,6 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       }
 
       next.entities = newEntities;
-      // Boost station integrity when relay is rerouted
-      next.stationIntegrity = Math.min(100, next.stationIntegrity + STATION_INTEGRITY_RELAY_BONUS);
       next.logs = [
         ...state.logs,
         {
@@ -1049,14 +955,12 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             if (e.props["activated"] === true) activatedRelayCount++;
           }
         }
-        const integrityOk = state.stationIntegrity > 50;
         const relaysOk = activatedRelayCount >= 2;
 
-        if (!allBreachesSealed || !integrityOk || !relaysOk) {
+        if (!allBreachesSealed || !relaysOk) {
           const conditions: string[] = [];
           if (!allBreachesSealed) conditions.push(`breach containment [${unsealedBreachCount} unsealed]`);
           if (!relaysOk) conditions.push(`power restoration [${activatedRelayCount}/2 relays]`);
-          if (!integrityOk) conditions.push(`hull integrity [${Math.round(state.stationIntegrity)}%/50%]`);
           next.logs = [
             ...state.logs,
             {
@@ -1552,167 +1456,6 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       break;
     }
 
-    case EntityType.RadiationSource: {
-      // Informational only — player needs a shield generator to deal with this
-      next.logs = [
-        ...state.logs,
-        {
-          id: `log_radsource_${targetId}_${next.turn}`,
-          timestamp: next.turn,
-          source: "system",
-          text: "A radiation source — containment failed. You need a shield generator.",
-          read: false,
-        },
-      ];
-      break;
-    }
-
-    case EntityType.ShieldGenerator: {
-      if (target.props["activated"] === true) {
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_shield_already_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "system",
-            text: "Shield generator already online. Radiation suppression active.",
-            read: false,
-          },
-        ];
-      } else {
-        // Toggle activated state
-        const newEntities = new Map(state.entities);
-        newEntities.set(targetId, {
-          ...target,
-          props: { ...target.props, activated: true },
-        });
-        next.entities = newEntities;
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_shield_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "system",
-            text: "Shield generator online. Radiation clearing in vicinity.",
-            read: false,
-          },
-        ];
-      }
-      break;
-    }
-
-    case EntityType.ReinforcementPanel: {
-      if (target.props["installed"] === true) {
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_reinforce_already_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "system",
-            text: "Reinforcement panel already installed. Structure stabilized.",
-            read: false,
-          },
-        ];
-      } else {
-        const newEntities = new Map(state.entities);
-        newEntities.set(targetId, {
-          ...target,
-          props: { ...target.props, installed: true },
-        });
-        next.entities = newEntities;
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_reinforce_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "system",
-            text: "Reinforcement panel installed. Structural integrity stabilized.",
-            read: false,
-          },
-        ];
-      }
-      break;
-    }
-
-    case EntityType.SignalBooster: {
-      if (target.props["activated"] === true) {
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_sigboost_already_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "system",
-            text: "Signal booster already active. Relay chain reinforced.",
-            read: false,
-          },
-        ];
-      } else {
-        const newEntities = new Map(state.entities);
-        newEntities.set(targetId, {
-          ...target,
-          props: { ...target.props, activated: true },
-        });
-        next.entities = newEntities;
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_sigboost_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "system",
-            text: "Signal booster activated. Signal relay chain strengthened.",
-            read: false,
-          },
-        ];
-      }
-      break;
-    }
-
-    case EntityType.HiddenDevice: {
-      // No sensor required to interact — EM sensor only affects visibility
-      if (target.props["discovered"] === true) {
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_hidden_already_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "system",
-            text: "Hidden device already analyzed. Data recovered.",
-            read: false,
-          },
-        ];
-      } else {
-        const newEntities = new Map(state.entities);
-        newEntities.set(targetId, {
-          ...target,
-          props: { ...target.props, discovered: true },
-        });
-        next.entities = newEntities;
-
-        const evidenceText = (target.props["evidenceText"] as string) || "Hidden device discovered. Encrypted data fragment recovered.";
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_hidden_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "sensor",
-            text: `EM scan reveals a concealed device. ${evidenceText}`,
-            read: false,
-          },
-        ];
-
-        // Add journal entry for the discovery
-        next = addJournalEntry(
-          next,
-          `journal_hidden_${targetId}`,
-          "item",
-          `Hidden device: EM anomaly`,
-          evidenceText,
-          getPlayerRoomName(state),
-        );
-      }
-      break;
-    }
-
     case EntityType.CrewNPC: {
       const crewFirstName = target.props["firstName"] as string || "Unknown";
       const crewLastName = target.props["lastName"] as string || "Crew";
@@ -1757,7 +1500,6 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         const cx = target.pos.x;
         const cy = target.pos.y;
         let nearbyHeat = 0;
-        let nearbyRadiation = 0;
         let nearbyLowPressure = false;
         for (let dy = -2; dy <= 2; dy++) {
           for (let dx = -2; dx <= 2; dx++) {
@@ -1766,7 +1508,6 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             if (ty >= 0 && ty < state.height && tx >= 0 && tx < state.width) {
               const t = state.tiles[ty][tx];
               nearbyHeat = Math.max(nearbyHeat, t.heat);
-              nearbyRadiation = Math.max(nearbyRadiation, t.radiation);
               if (t.pressure <= 40) nearbyLowPressure = true;
             }
           }
@@ -1774,7 +1515,6 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
 
         const hazards: string[] = [];
         if (nearbyHeat >= 30) hazards.push("heat");
-        if (nearbyRadiation >= 30) hazards.push("radiation");
         if (nearbyLowPressure) hazards.push("low pressure");
 
         if (isSealed) {
@@ -1886,7 +1626,6 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         const hazardTypes: string[] = [];
         if (tile) {
           if (tile.heat >= 30) { immediateDamage += 8; hazardTypes.push("heat"); }
-          if (tile.radiation >= 30) { immediateDamage += 10; hazardTypes.push("radiation"); }
           if (tile.pressure <= 40) { immediateDamage += 6; hazardTypes.push("decompression"); }
         }
 
@@ -2343,15 +2082,6 @@ function handleScan(state: GameState): GameState {
   if (sensors.includes(SensorType.Atmospheric)) {
     scanParts.push("Pressure differentials mapped.");
   }
-  if (sensors.includes(SensorType.Radiation)) {
-    scanParts.push("Radiation sources highlighted.");
-  }
-  if (sensors.includes(SensorType.Structural)) {
-    scanParts.push("Structural stress points visible.");
-  }
-  if (sensors.includes(SensorType.EMSignal)) {
-    scanParts.push("EM anomalies detected.");
-  }
   if (sensors.length <= 1) {
     scanParts.push("Basic scan only — find sensor upgrades for more detail.");
   }
@@ -2770,7 +2500,7 @@ function movePatrolDrones(state: GameState): GameState {
  * Move crew NPCs that are following the player.
  * Following crew move 1 step toward the player using simple greedy pathfinding.
  * They stay 1-2 tiles behind (don't stack on the player tile).
- * Crew take hazard damage from heat, radiation, and low pressure.
+ * Crew take hazard damage from heat and low pressure.
  */
 function moveCrewNPCs(state: GameState): GameState {
   const newEntities = new Map(state.entities);
@@ -2799,10 +2529,6 @@ function moveCrewNPCs(state: GameState): GameState {
       if (tile.heat >= 40) {
         hazardDamage += 3;
         hazardType = "heat";
-      }
-      if (tile.radiation >= 50) {
-        hazardDamage += 4;
-        hazardType = hazardType ? "environmental hazards" : "radiation";
       }
       if (tile.pressure <= 40) {
         hazardDamage += 3;
@@ -3092,9 +2818,6 @@ export function step(state: GameState, action: Action): GameState {
         const hasHiddenItems = [...state.entities.values()].some(
           e => e.type === EntityType.CrewItem && e.pos.x === px && e.pos.y === py && e.props["hidden"] === true
         );
-        const hasNearbyRubble = [...state.entities.values()].some(
-          e => e.type === EntityType.Rubble && Math.abs(e.pos.x - px) <= 1 && Math.abs(e.pos.y - py) <= 1
-        );
         // Check if any tile in the 3x3 area has dirt or smoke
         let areaHasDirt = false;
         for (let dy = -1; dy <= 1; dy++) {
@@ -3107,7 +2830,7 @@ export function step(state: GameState, action: Action): GameState {
             }
           }
         }
-        if (!areaHasDirt && !nearRelay && !hasHiddenItems && !hasNearbyRubble) {
+        if (!areaHasDirt && !nearRelay && !hasHiddenItems) {
           next.logs = [...next.logs, {
             id: `log_clean_none_${next.turn}`,
             timestamp: next.turn,
@@ -3173,33 +2896,10 @@ export function step(state: GameState, action: Action): GameState {
             });
           }
         }
-        // Clear rubble on player tile and all surrounding tiles (3x3)
-        let rubbleCleared = 0;
-        for (const [id, entity] of newEntities) {
-          if (entity.type === EntityType.Rubble) {
-            if (Math.abs(entity.pos.x - px) <= 1 && Math.abs(entity.pos.y - py) <= 1) {
-              newEntities.delete(id);
-              // Restore tile walkability
-              newTiles[entity.pos.y][entity.pos.x].walkable = true;
-              rubbleCleared++;
-            }
-          }
-        }
         next.entities = newEntities;
 
-        // Item 5: Contextual cleaning log messages
+        // Contextual cleaning log messages
         const cleanLogs: LogEntry[] = [];
-        if (rubbleCleared > 0) {
-          cleanLogs.push({
-            id: `log_clean_rubble_${next.turn}`,
-            timestamp: next.turn,
-            source: "system" as const,
-            text: rubbleCleared === 1
-              ? "Clearing debris. Passage restored."
-              : `Clearing debris. ${rubbleCleared} passages restored.`,
-            read: false,
-          });
-        }
         const oldSmoke = state.tiles[py][px].smoke;
         const oldDirt = state.tiles[py][px].dirt;
         if (oldSmoke > 0) {
@@ -3287,17 +2987,6 @@ export function step(state: GameState, action: Action): GameState {
           read: false,
         });
 
-        // Reset directive violation turns when player cleans
-        if (next.mystery && next.mystery.cleaningDirective) {
-          next = {
-            ...next,
-            mystery: {
-              ...next.mystery,
-              directiveViolationTurns: 0,
-            },
-          };
-        }
-
         // Track rooms cleaned to goal — triggers investigation subgoal
         if (next.mystery && roomCleanliness >= next.mystery.roomCleanlinessGoal) {
           // Check if this room was already counted as clean
@@ -3383,9 +3072,6 @@ export function step(state: GameState, action: Action): GameState {
 
   // Apply hazard damage to player
   next = applyHazardDamage(next);
-
-  // Station integrity decay
-  next = tickStationIntegrity(next);
 
   // Cleaning directive pressure check
   next = checkCleaningDirective(next);

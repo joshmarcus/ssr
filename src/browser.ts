@@ -23,7 +23,7 @@ import {
 import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
 import { ActionType, AttachmentSlot, SensorType, EntityType, ObjectivePhase, DeductionCategory, TileType } from "./shared/types.js";
 import { computeChoiceEndings } from "./sim/mysteryChoices.js";
-import { getUnlockedDeductions, solveDeduction } from "./sim/deduction.js";
+import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 
 // ── Parse seed from URL params or use golden seed ───────────────
@@ -129,6 +129,9 @@ let broadcastOpen = false;
 let broadcastSection: "evidence" | "what" | "why" | "who" = "evidence";
 let broadcastOptionIdx = 0;
 let broadcastEvidenceScroll = 0;
+let broadcastLinkedEvidence: string[] = [];
+let broadcastDetailDeduction: string | null = null; // deduction ID when in detail/evidence-linking view
+let broadcastEvidenceIdx = 0; // highlighted journal entry index in detail view
 
 // ── Wait message variety ────────────────────────────────────────
 const WAIT_MESSAGES_COOL = [
@@ -899,9 +902,6 @@ function handleScan(): void {
     [SensorType.Cleanliness]: "[CLEANLINESS OVERLAY ON] — Dirt trails reveal crew movement patterns.",
     [SensorType.Thermal]: "[THERMAL OVERLAY ON]",
     [SensorType.Atmospheric]: "[ATMOSPHERIC OVERLAY ON] — Pressure differentials visible. Breaches glow red.",
-    [SensorType.Radiation]: "[RADIATION OVERLAY ON] — Ionizing radiation sources visible.",
-    [SensorType.Structural]: "[STRUCTURAL OVERLAY ON] — Stress fractures visible.",
-    [SensorType.EMSignal]: "[EM/SIGNAL OVERLAY ON] — Hidden electromagnetic sources visible.",
   };
 
   if (nextMode === null) {
@@ -981,12 +981,6 @@ function showJournal(): void {
     return;
   }
 
-  // Station integrity display
-  const integrity = Math.round(state.stationIntegrity);
-  const intBar = "█".repeat(Math.floor(integrity / 5)) + "░".repeat(20 - Math.floor(integrity / 5));
-  const intColor = integrity > 50 ? "milestone" : integrity > 25 ? "warning" : "critical";
-  display.addLog(`STATION INTEGRITY [${intBar}] ${integrity}%`, intColor);
-
   if (journalTab === "evidence") {
     showEvidenceTab();
   } else {
@@ -1036,7 +1030,9 @@ function showEvidenceTab(): void {
 function showDeductionsTab(): void {
   if (!state.mystery) return;
   const deductions = state.mystery.deductions;
-  const journalCount = state.mystery.journal.length;
+  const journal = state.mystery.journal;
+  const unlocked = getUnlockedDeductions(deductions, journal);
+  const unlockedIds = new Set(unlocked.map(d => d.id));
 
   display.addLog("═══ DEDUCTIONS ═══", "milestone");
   display.addLog("Piece together: WHAT happened, WHY, and WHO is responsible.", "system");
@@ -1048,16 +1044,26 @@ function showDeductionsTab(): void {
     [DeductionCategory.Who]: "WHO",
   };
 
+  const allTags = new Set(journal.flatMap(j => j.tags));
+
   for (const d of deductions) {
     const catLabel = categoryLabels[d.category] || d.category;
-    const locked = journalCount < d.evidenceRequired;
+    const isUnlocked = unlockedIds.has(d.id);
 
     if (d.solved) {
       const mark = d.answeredCorrectly ? "✓" : "✗";
       display.addLog(`[${mark}] ${catLabel}: ${d.question}`, d.answeredCorrectly ? "milestone" : "warning");
-    } else if (locked) {
-      const needed = d.evidenceRequired - journalCount;
-      display.addLog(`[???] ${catLabel}: (need ${needed} more evidence to unlock)`, "system");
+    } else if (!isUnlocked) {
+      const missingTags = d.requiredTags.filter(t => !allTags.has(t));
+      const solvedIds = new Set(deductions.filter(dd => dd.solved).map(dd => dd.id));
+      const chainLocked = d.unlockAfter && !solvedIds.has(d.unlockAfter);
+      if (chainLocked) {
+        display.addLog(`[???] ${catLabel}: (solve previous deduction first)`, "system");
+      } else if (missingTags.length > 0) {
+        display.addLog(`[???] ${catLabel}: (need: ${missingTags.join(", ")})`, "system");
+      } else {
+        display.addLog(`[???] ${catLabel}: (locked)`, "system");
+      }
     } else {
       display.addLog(`[!] ${catLabel}: ${d.question}  ← [Enter] to answer`, "narrative");
     }
@@ -1071,8 +1077,7 @@ function showDeductionsTab(): void {
 
 function handleDeductionAttempt(): void {
   if (!state.mystery) return;
-  const journalCount = state.mystery.journal.length;
-  const unlocked = getUnlockedDeductions(state.mystery.deductions, journalCount);
+  const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
   if (unlocked.length === 0) {
     display.addLog("No deductions available. Gather more evidence.", "system");
     renderAll();
@@ -1116,8 +1121,23 @@ function handleDeductionInput(e: KeyboardEvent): boolean {
   }
   if (e.key === "Enter") {
     e.preventDefault();
-    const chosen = activeDeduction.options[deductionSelectedIdx];
-    const { deduction: solved, correct } = solveDeduction(activeDeduction, chosen.key);
+    const journal = state.mystery?.journal ?? [];
+    // Auto-link evidence: find journal entries that cover required tags
+    const linkedIds = journal
+      .filter(j => j.tags.some(t => activeDeduction!.requiredTags.includes(t)))
+      .map(j => j.id);
+    const linked = linkEvidence(activeDeduction, linkedIds);
+
+    const chosen = linked.options[deductionSelectedIdx];
+    const { deduction: solved, correct, validLink } = solveDeduction(linked, chosen.key, journal);
+
+    if (!validLink) {
+      const { missingTags } = validateEvidenceLink(linked, linked.linkedEvidence, journal);
+      display.addLog(`Cannot answer — evidence incomplete. Need: ${missingTags.join(", ")}`, "warning");
+      activeDeduction = null;
+      renderAll();
+      return true;
+    }
 
     // Update the deduction in mystery state
     if (state.mystery) {
@@ -1300,83 +1320,13 @@ function handleCrewDoorInput(e: KeyboardEvent): void {
   }
 }
 
-// ── Mystery choice presentation ─────────────────────────────────
-function presentChoice(choice: MysteryChoice): void {
-  activeChoice = choice;
-  choiceSelectedIdx = 0;
-  display.addLog("", "system");
-  display.addLog("═══ BROADCAST REPORT ═══", "milestone");
-  display.addLog(choice.prompt, "narrative");
-  display.addLog("", "system");
-  for (let i = 0; i < choice.options.length; i++) {
-    const prefix = i === choiceSelectedIdx ? "▸ " : "  ";
-    display.addLog(`${prefix}${i + 1}. ${choice.options[i].label}`, i === choiceSelectedIdx ? "milestone" : "system");
-  }
-  display.addLog("", "system");
-  display.addLog("[Arrow keys to select, Enter to confirm, Esc to defer]", "system");
-  renderAll();
+// ── Mystery choice presentation (deprecated — replaced by broadcast modal) ──
+function presentChoice(_choice: MysteryChoice): void {
+  return;
 }
 
-function handleChoiceInput(e: KeyboardEvent): boolean {
-  if (!activeChoice) return false;
-
-  if (e.key === "ArrowUp" || e.key === "w") {
-    e.preventDefault();
-    choiceSelectedIdx = Math.max(0, choiceSelectedIdx - 1);
-    presentChoice(activeChoice);
-    return true;
-  }
-  if (e.key === "ArrowDown" || e.key === "s") {
-    e.preventDefault();
-    choiceSelectedIdx = Math.min(activeChoice.options.length - 1, choiceSelectedIdx + 1);
-    presentChoice(activeChoice);
-    return true;
-  }
-  if (e.key === "Enter") {
-    e.preventDefault();
-    const chosen = activeChoice.options[choiceSelectedIdx];
-    if (state.mystery) {
-      const choiceObj = state.mystery.choices.find(c => c.id === activeChoice!.id);
-      if (choiceObj) {
-        choiceObj.chosen = chosen.key;
-        choiceObj.turnPresented = state.turn;
-      }
-    }
-    display.addLog(`Decision made: "${chosen.label}"`, "milestone");
-    choicesPresented.add(activeChoice.id);
-    activeChoice = null;
-    renderAll();
-    return true;
-  }
-  if (e.key === "Escape") {
-    e.preventDefault();
-    display.addLog("Report deferred. Press [b] when ready.", "system");
-    activeChoice = null;
-    renderAll();
-    return true;
-  }
-  // Number keys for quick select
-  const num = parseInt(e.key, 10);
-  if (num >= 1 && num <= activeChoice.options.length) {
-    e.preventDefault();
-    choiceSelectedIdx = num - 1;
-    // Trigger confirm
-    const chosen = activeChoice.options[choiceSelectedIdx];
-    if (state.mystery) {
-      const choiceObj = state.mystery.choices.find(c => c.id === activeChoice!.id);
-      if (choiceObj) {
-        choiceObj.chosen = chosen.key;
-        choiceObj.turnPresented = state.turn;
-      }
-    }
-    display.addLog(`Decision made: "${chosen.label}"`, "milestone");
-    choicesPresented.add(activeChoice.id);
-    activeChoice = null;
-    renderAll();
-    return true;
-  }
-
-  return true; // consume all input while choice is active
+function handleChoiceInput(_e: KeyboardEvent): boolean {
+  return false;
 }
 
 // Get mystery choices that are available (threshold met, not yet answered)
@@ -1418,35 +1368,99 @@ function renderBroadcastModal(): void {
   const categoryLabels: Record<string, string> = { what: "WHAT HAPPENED?", why: "WHY DID IT HAPPEN?", who: "WHO WAS RESPONSIBLE?" };
   const categoryKeys: ("what" | "why" | "who")[] = ["what", "why", "who"];
 
+  const allTags = new Set(journal.flatMap(j => j.tags));
+  const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
+  const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
+
   let deductionHtml = "";
   for (const catKey of categoryKeys) {
     const deduction = deductions.find(d => d.category === catKey);
     if (!deduction) continue;
 
-    const locked = journalCount < deduction.evidenceRequired;
+    const isUnlocked = unlockedSet.has(deduction.id);
+    const locked = !deduction.solved && !isUnlocked;
     const isActive = broadcastSection === catKey;
-    const needed = deduction.evidenceRequired - journalCount;
+    const isDetailView = broadcastDetailDeduction === deduction.id;
 
     let sectionClass = "broadcast-deduction";
     if (locked) sectionClass += " locked";
     if (deduction.solved) sectionClass += " solved";
     if (isActive) sectionClass += " active-section";
 
-    let reqText = `[${deduction.evidenceRequired}+ clues]`;
-    if (locked) reqText = `[${needed} more clues needed]`;
+    // Tag coverage display: show required tags as colored pills
+    let tagPillsHtml = "";
+    for (const tag of deduction.requiredTags) {
+      if (allTags.has(tag)) {
+        tagPillsHtml += `<span class="tag-pill tag-covered">${escapeHtmlBroadcast(tag)}</span>`;
+      } else {
+        tagPillsHtml += `<span class="tag-pill tag-missing">${escapeHtmlBroadcast(tag)}</span>`;
+      }
+    }
+
+    // Section header with status indicators
+    let headerPrefix: string;
+    let headerSuffix = "";
+    if (deduction.solved) {
+      headerPrefix = `<span style="color:#0f0">[&#10003;]</span>`;
+      headerSuffix = ` &mdash; <span style="color:#0f0;font-weight:normal;font-size:12px">SOLVED</span>`;
+    } else if (isUnlocked) {
+      const { missingTags } = validateEvidenceLink(deduction, broadcastLinkedEvidence, journal);
+      const cluesNeeded = missingTags.length;
+      headerPrefix = `<span style="color:#fa0">[&gt;]</span>`;
+      headerSuffix = cluesNeeded > 0
+        ? ` &mdash; <span style="color:#888;font-weight:normal;font-size:12px">${cluesNeeded} clue${cluesNeeded !== 1 ? "s" : ""} needed</span>`
+        : ` &mdash; <span style="color:#4a4;font-weight:normal;font-size:12px">ready to answer</span>`;
+    } else {
+      headerPrefix = `<span style="color:#555">[?]</span>`;
+      const chainLocked = deduction.unlockAfter && !solvedIds.has(deduction.unlockAfter);
+      if (chainLocked) {
+        headerSuffix = ` &mdash; <span style="color:#555;font-weight:normal;font-size:12px">solve previous first</span>`;
+      } else {
+        headerSuffix = ` &mdash; <span style="color:#555;font-weight:normal;font-size:12px">need more evidence</span>`;
+      }
+    }
 
     deductionHtml += `<div class="${sectionClass}">`;
-    deductionHtml += `<div class="broadcast-section-title">${categoryLabels[catKey]} <span style="color:#666;font-weight:normal;font-size:12px">${reqText}</span></div>`;
+    deductionHtml += `<div class="broadcast-section-title">${headerPrefix} ${categoryLabels[catKey]}${headerSuffix}</div>`;
+    if (!locked) {
+      deductionHtml += `<div style="margin:2px 0 4px">${tagPillsHtml}</div>`;
+    }
 
     if (deduction.solved) {
-      const mark = deduction.answeredCorrectly ? "✓" : "✗";
+      const mark = deduction.answeredCorrectly ? "&#10003;" : "&#10007;";
       const chosen = deduction.options.find(o => o.correct === deduction.answeredCorrectly) || deduction.options[0];
       deductionHtml += `<div style="color:${deduction.answeredCorrectly ? '#0f0' : '#f44'}">${mark} ${escapeHtmlBroadcast(chosen.label)}</div>`;
     } else if (locked) {
-      deductionHtml += `<div style="color:#555">(Locked — gather ${needed} more evidence)</div>`;
-    } else {
+      const missingTags = deduction.requiredTags.filter(t => !allTags.has(t));
+      const chainLocked = deduction.unlockAfter && !solvedIds.has(deduction.unlockAfter);
+      const parts: string[] = [];
+      if (chainLocked) parts.push("solve previous deduction first");
+      if (missingTags.length > 0) parts.push(`need evidence with tags: ${missingTags.join(", ")}`);
+      deductionHtml += `<div style="color:#555">(Locked &mdash; ${parts.join("; ") || "locked"})</div>`;
+    } else if (isDetailView) {
+      // Detail view: show evidence linking list
+      deductionHtml += `<div style="margin:4px 0;color:#aaa;font-size:12px">Link evidence [Space] then answer [Enter]:</div>`;
+      for (let ji = 0; ji < journal.length; ji++) {
+        const entry = journal[ji];
+        const isLinked = broadcastLinkedEvidence.includes(entry.id);
+        const checkbox = isLinked ? "[x]" : "[ ]";
+        const cls = isLinked ? "evidence-linked" : "evidence-unlinked";
+        const highlight = (ji === broadcastEvidenceIdx) ? "color:#fff;font-weight:bold;" : "";
+        const pointer = (ji === broadcastEvidenceIdx) ? "&#9656; " : "  ";
+        const entryTagsHtml = entry.tags.map(t => escapeHtmlBroadcast(t)).join(", ");
+        deductionHtml += `<div class="${cls}" style="${highlight}padding:1px 0 1px 8px">${pointer}${checkbox} ${escapeHtmlBroadcast(entry.summary)}<div style="color:#555;font-size:11px;padding-left:24px">${entryTagsHtml}</div></div>`;
+      }
+      deductionHtml += `<div style="border-top:1px solid #333;margin:6px 0"></div>`;
+      // Show answer options below evidence
       for (let i = 0; i < deduction.options.length; i++) {
-        const prefix = (isActive && i === broadcastOptionIdx) ? "▸ " : "  ";
+        const prefix = (i === broadcastOptionIdx) ? "&#9656; " : "  ";
+        const cls = (i === broadcastOptionIdx) ? "broadcast-option selected" : "broadcast-option";
+        deductionHtml += `<div class="${cls}">${prefix}${i + 1}. ${escapeHtmlBroadcast(deduction.options[i].label)}</div>`;
+      }
+    } else {
+      // List view: show options only
+      for (let i = 0; i < deduction.options.length; i++) {
+        const prefix = (isActive && i === broadcastOptionIdx) ? "&#9656; " : "  ";
         const cls = (isActive && i === broadcastOptionIdx) ? "broadcast-option selected" : "broadcast-option";
         deductionHtml += `<div class="${cls}">${prefix}${i + 1}. ${escapeHtmlBroadcast(deduction.options[i].label)}</div>`;
       }
@@ -1461,15 +1475,19 @@ function renderBroadcastModal(): void {
     ? `<div class="broadcast-transmit">All deductions answered. Report ready for transmission.</div>`
     : "";
 
+  const controlsText = broadcastDetailDeduction
+    ? "[&#8593;/&#8595;] Navigate  [Space] Toggle link  [Enter] Answer  [Esc] Back"
+    : "[&#8593;/&#8595;] Navigate  [Enter] Answer  [Tab] Next section  [Esc] Close";
+
   overlay.innerHTML = `
     <div class="broadcast-box">
-      <div class="broadcast-title">═══ BROADCAST REPORT TO BASE ═══</div>
+      <div class="broadcast-title">&#9552;&#9552;&#9552; BROADCAST REPORT TO BASE &#9552;&#9552;&#9552;</div>
       <div class="broadcast-section-title">EVIDENCE COLLECTED (${journalCount})</div>
       <div class="broadcast-evidence-list">${evidenceHtml}</div>
       <div style="border-top:1px solid #444;margin:8px 0"></div>
       ${deductionHtml}
       ${transmitHtml}
-      <div class="broadcast-controls">[↑/↓] Navigate  [Enter] Answer  [Tab] Next section  [Esc] Close</div>
+      <div class="broadcast-controls">${controlsText}</div>
     </div>`;
   overlay.classList.add("active");
 }
@@ -1490,11 +1508,94 @@ function handleBroadcastInput(e: KeyboardEvent): void {
   if (!state.mystery) return;
 
   const deductions = state.mystery.deductions;
-  const journalCount = state.mystery.journal.length;
+  const journal = state.mystery.journal;
+  const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
   const sections: ("evidence" | "what" | "why" | "who")[] = ["evidence", "what", "why", "who"];
+
+  // If in detail view, handle Escape to go back to list view
+  if (broadcastDetailDeduction && e.key === "Escape") {
+    broadcastDetailDeduction = null;
+    broadcastLinkedEvidence = [];
+    broadcastEvidenceIdx = 0;
+    renderBroadcastModal();
+    return;
+  }
 
   if (e.key === "Escape" || e.key === "b") {
     closeBroadcastModal();
+    return;
+  }
+
+  // If in detail view, handle evidence linking
+  if (broadcastDetailDeduction) {
+    const deduction = deductions.find(d => d.id === broadcastDetailDeduction);
+    if (!deduction || deduction.solved || !unlockedSet.has(deduction.id)) {
+      broadcastDetailDeduction = null;
+      renderBroadcastModal();
+      return;
+    }
+
+    if (e.key === "ArrowUp" || e.key === "w") {
+      broadcastEvidenceIdx = Math.max(0, broadcastEvidenceIdx - 1);
+      renderBroadcastModal();
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "s") {
+      broadcastEvidenceIdx = Math.min(journal.length - 1, broadcastEvidenceIdx + 1);
+      renderBroadcastModal();
+      return;
+    }
+    if (e.key === " ") {
+      // Toggle evidence linking for the highlighted journal entry
+      if (journal.length > 0 && broadcastEvidenceIdx < journal.length) {
+        const entryId = journal[broadcastEvidenceIdx].id;
+        if (broadcastLinkedEvidence.includes(entryId)) {
+          broadcastLinkedEvidence = broadcastLinkedEvidence.filter(id => id !== entryId);
+        } else {
+          broadcastLinkedEvidence = [...broadcastLinkedEvidence, entryId];
+        }
+      }
+      renderBroadcastModal();
+      return;
+    }
+    if (e.key === "Enter") {
+      // Link evidence and solve
+      const linked = linkEvidence(deduction, broadcastLinkedEvidence);
+      const chosen = linked.options[broadcastOptionIdx];
+      const { deduction: solved, correct, validLink } = solveDeduction(linked, chosen.key, journal);
+
+      if (!validLink) {
+        const { missingTags } = validateEvidenceLink(linked, linked.linkedEvidence, journal);
+        display.addLog(`Cannot answer — evidence incomplete. Need: ${missingTags.join(", ")}`, "warning");
+        renderBroadcastModal();
+        return;
+      }
+
+      state.mystery.deductions = state.mystery.deductions.map(d =>
+        d.id === solved.id ? solved : d
+      );
+
+      if (correct) {
+        display.addLog(`\u2713 CORRECT — ${solved.rewardDescription}`, "milestone");
+        display.triggerScreenFlash("milestone");
+        applyDeductionReward(solved);
+      } else {
+        display.addLog(`\u2717 Incorrect. The evidence doesn't support that conclusion.`, "warning");
+      }
+
+      broadcastDetailDeduction = null;
+      broadcastLinkedEvidence = [];
+      broadcastEvidenceIdx = 0;
+      renderBroadcastModal();
+      return;
+    }
+    // Number keys to select answer option in detail view
+    const num = parseInt(e.key, 10);
+    if (num >= 1 && num <= deduction.options.length) {
+      broadcastOptionIdx = num - 1;
+      renderBroadcastModal();
+      return;
+    }
     return;
   }
 
@@ -1513,7 +1614,7 @@ function handleBroadcastInput(e: KeyboardEvent): void {
 
   // Deduction sections
   const deduction = deductions.find(d => d.category === broadcastSection);
-  if (!deduction || deduction.solved || journalCount < deduction.evidenceRequired) {
+  if (!deduction || deduction.solved || !unlockedSet.has(deduction.id)) {
     // Locked or solved — Tab to next section
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       // Do nothing on locked sections
@@ -1532,21 +1633,10 @@ function handleBroadcastInput(e: KeyboardEvent): void {
     return;
   }
   if (e.key === "Enter") {
-    const chosen = deduction.options[broadcastOptionIdx];
-    const { deduction: solved, correct } = solveDeduction(deduction, chosen.key);
-
-    state.mystery.deductions = state.mystery.deductions.map(d =>
-      d.id === solved.id ? solved : d
-    );
-
-    if (correct) {
-      display.addLog(`✓ CORRECT — ${solved.rewardDescription}`, "milestone");
-      display.triggerScreenFlash("milestone");
-      applyDeductionReward(solved);
-    } else {
-      display.addLog(`✗ Incorrect. The evidence doesn't support that conclusion.`, "warning");
-    }
-
+    // Enter detail view for evidence linking instead of immediately answering
+    broadcastDetailDeduction = deduction.id;
+    broadcastLinkedEvidence = [];
+    broadcastEvidenceIdx = 0;
     renderBroadcastModal();
     return;
   }

@@ -140,7 +140,6 @@ const ENTITY_COLORS: Record<string, string> = {
   [EntityType.EscapePod]: "#44ffaa",
   [EntityType.CrewNPC]: "#ffee66",
   [EntityType.RepairCradle]: "#44ddff",
-  [EntityType.Rubble]: "#998877",
   [EntityType.Console]: "#66aacc",
 };
 
@@ -161,7 +160,6 @@ const ENTITY_BG_GLOW: Record<string, string> = {
   [EntityType.EscapePod]: "#081a10",
   [EntityType.CrewNPC]: "#1a1800",
   [EntityType.RepairCradle]: "#081820",
-  [EntityType.Rubble]: "#1a1510",
   [EntityType.Console]: "#0a1520",
 };
 
@@ -179,15 +177,12 @@ const ENTITY_GLYPHS: Record<string, string> = {
   [EntityType.ClosedDoor]: "\ud83d\udeaa",   // 🚪
   [EntityType.SecurityTerminal]: "\ud83d\udcf7", // 📷
   [EntityType.PatrolDrone]: "\ud83d\udef8",     // 🛸
-  [EntityType.RadiationSource]: "\u2622\ufe0f", // ☢️
   [EntityType.PressureValve]: "\u2699\ufe0f", // ⚙️
   [EntityType.FuseBox]: "\ud83d\udd0c",       // 🔌
   [EntityType.PowerCell]: "\ud83d\udd0b",     // 🔋 (reuse battery glyph)
   [EntityType.EscapePod]: "\ud83d\ude80",     // 🚀
   [EntityType.CrewNPC]: "\ud83d\ude4b",       // 🙋
   [EntityType.RepairCradle]: "\u2695\ufe0f",  // ⚕️
-  [EntityType.Rubble]: "\ud83e\udea8",         // 🪨
-  [EntityType.ShieldGenerator]: "\ud83d\udee1\ufe0f", // 🛡️
   [EntityType.EvidenceTrace]: "\ud83d\udc63",  // 👣
   [EntityType.Console]: "\ud83d\udcbb",  // 💻 (terminal)
 };
@@ -936,9 +931,6 @@ export class BrowserDisplay implements IGameDisplay {
       [SensorType.Thermal]: "#f44",
       [SensorType.Cleanliness]: "#4f4",
       [SensorType.Atmospheric]: "#4af",
-      [SensorType.Radiation]: "#ff0",
-      [SensorType.Structural]: "#fa0",
-      [SensorType.EMSignal]: "#c4f",
     };
     let overlayLine = "";
     if (this.sensorMode) {
@@ -1011,10 +1003,7 @@ export class BrowserDisplay implements IGameDisplay {
       { key: EntityType.PowerCell, glyph: ENTITY_GLYPHS[EntityType.PowerCell] || "⬡", color: "#fd4", label: "Power Cell" },
       { key: EntityType.EscapePod, glyph: ENTITY_GLYPHS[EntityType.EscapePod] || "⬡", color: "#4fa", label: "Escape Pod" },
       { key: EntityType.CrewNPC, glyph: ENTITY_GLYPHS[EntityType.CrewNPC] || "☺", color: "#fe6", label: "Crew" },
-      { key: EntityType.RadiationSource, glyph: ENTITY_GLYPHS[EntityType.RadiationSource] || "☢", color: "#4f4", label: "Radiation" },
-      { key: EntityType.ShieldGenerator, glyph: ENTITY_GLYPHS[EntityType.ShieldGenerator] || "⊛", color: "#4f4", label: "Shield Gen" },
       { key: EntityType.EvidenceTrace, glyph: ENTITY_GLYPHS[EntityType.EvidenceTrace] || "※", color: "#ca8", label: "Evidence" },
-      { key: EntityType.Rubble, glyph: ENTITY_GLYPHS[EntityType.Rubble] || "▒", color: "#987", label: "Rubble" },
       { key: EntityType.Console, glyph: ENTITY_GLYPHS[EntityType.Console] || "💻", color: "#6ac", label: "Console" },
       { key: "_heat", glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
       { key: "_locked", glyph: GLYPHS.lockedDoor, color: "#f00", label: "Locked" },

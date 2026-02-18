@@ -21,9 +21,6 @@ export interface Tile {
   smoke: number; // 0-100 smoke density
   dirt: number; // 0-100 cleanliness value (crew activity traces)
   pressure: number; // 0-100 atmospheric pressure (100 = normal, 0 = vacuum)
-  radiation: number; // 0-100 radiation level
-  stress: number; // 0-100 structural stress (collapse at 80+ for 3 turns)
-  stressTurns: number; // turns spent above 80 stress
   explored: boolean; // true if tile has ever been visible
   visible: boolean; // true if tile is currently visible
 }
@@ -50,15 +47,9 @@ export enum EntityType {
   FuseBox = "fuse_box",
   PowerCell = "power_cell",
   EvidenceTrace = "evidence_trace",
-  RadiationSource = "radiation_source",
-  ShieldGenerator = "shield_generator",
-  ReinforcementPanel = "reinforcement_panel",
-  SignalBooster = "signal_booster",
-  HiddenDevice = "hidden_device",
   EscapePod = "escape_pod",
   CrewNPC = "crew_npc",
   RepairCradle = "repair_cradle",
-  Rubble = "rubble",
   Console = "console",
 }
 
@@ -88,9 +79,6 @@ export enum SensorType {
   Cleanliness = "cleanliness",
   Thermal = "thermal",
   Atmospheric = "atmospheric",
-  Radiation = "radiation",
-  Structural = "structural",
-  EMSignal = "em_signal",
 }
 
 export interface Attachment {
@@ -164,7 +152,6 @@ export interface GameState {
   gameOver: boolean;
   victory: boolean;
   mystery?: MysteryState;
-  stationIntegrity: number; // 0-100, big visible danger meter
 }
 
 // ── Logs / evidence ──────────────────────────────────────────
@@ -274,7 +261,9 @@ export interface Deduction {
   category: DeductionCategory;
   question: string;
   options: { label: string; key: string; correct: boolean }[];
-  evidenceRequired: number;  // journal entries needed to unlock
+  requiredTags: string[];      // tags that linked evidence must collectively cover
+  unlockAfter?: string;        // deduction ID that must be solved first (chain)
+  linkedEvidence: string[];    // journal entry IDs the player has linked
   solved: boolean;
   answeredCorrectly?: boolean;
   rewardType: "clearance" | "room_reveal" | "drone_disable" | "sensor_hint";
@@ -298,6 +287,8 @@ export interface JournalEntry {
   detail: string;         // full text when expanded
   crewMentioned: string[]; // crew IDs referenced — for cross-referencing
   roomFound: string;
+  tags: string[];         // evidence tags for clue-linking (system, crew, timeline, location)
+  thread?: string;        // narrative thread name (e.g. "The Warning Signs")
 }
 
 export enum ObjectivePhase {
@@ -316,6 +307,12 @@ export interface EvacuationState {
   evacuationStartTurn: number;
 }
 
+export interface NarrativeThread {
+  name: string;           // e.g. "The Warning Signs"
+  description: string;    // brief summary of this thread
+  entries: string[];      // journal entry IDs belonging to this thread
+}
+
 export interface MysteryState {
   crew: CrewMember[];
   timeline: IncidentTimeline;
@@ -325,6 +322,7 @@ export interface MysteryState {
   pendingChoice?: MysteryChoice;
   journal: JournalEntry[];
   deductions: Deduction[];
+  threads: NarrativeThread[];
   objectivePhase: ObjectivePhase;
   roomsCleanedCount: number; // rooms cleaned to goal threshold
   investigationTrigger: number; // rooms to clean before investigation subgoal appears
@@ -332,7 +330,6 @@ export interface MysteryState {
   cleaningDirective: boolean; // true until overridden by investigation
   roomCleanlinessGoal: number; // percentage (default 80)
   directiveOverrideTurn?: number; // turn when directive was overridden
-  directiveViolationTurns: number; // turns in dirty room without cleaning
   evacuation?: EvacuationState;
 }
 

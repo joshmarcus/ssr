@@ -1,16 +1,11 @@
 import type { GameState } from "../shared/types.js";
-import { SensorType, EntityType } from "../shared/types.js";
+import { SensorType } from "../shared/types.js";
 import {
   VISION_RADIUS_BASE,
   VISION_RADIUS_THERMAL,
   VISION_RADIUS_ATMOSPHERIC,
-  VISION_RADIUS_RADIATION,
-  VISION_RADIUS_STRUCTURAL,
-  VISION_RADIUS_EM,
   HEAT_VISIBLE_THRESHOLD,
   PRESSURE_VISIBLE_THRESHOLD,
-  RADIATION_DAMAGE_THRESHOLD,
-  STRESS_COLLAPSE_THRESHOLD,
 } from "../shared/constants.js";
 
 /**
@@ -112,69 +107,6 @@ export function updateVision(state: GameState): GameState {
           if (state.tiles[ty][tx].pressure < PRESSURE_VISIBLE_THRESHOLD) {
             reveal(tx, ty);
           }
-        }
-      }
-    }
-  }
-
-  // Radiation sensor: reveal tiles with radiation and RadiationSource/ShieldGenerator entities
-  if (sensors.includes(SensorType.Radiation)) {
-    for (let dy = -VISION_RADIUS_RADIATION; dy <= VISION_RADIUS_RADIATION; dy++) {
-      for (let dx = -VISION_RADIUS_RADIATION; dx <= VISION_RADIUS_RADIATION; dx++) {
-        if (Math.abs(dx) + Math.abs(dy) > VISION_RADIUS_RADIATION) continue;
-        const tx = px + dx;
-        const ty = py + dy;
-        if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
-          // Reveal tiles with significant radiation (penetrates walls)
-          if (state.tiles[ty][tx].radiation > 0) {
-            reveal(tx, ty);
-          }
-        }
-      }
-    }
-    // Reveal RadiationSource and ShieldGenerator entities within radius
-    for (const [, entity] of state.entities) {
-      if (entity.type === EntityType.RadiationSource || entity.type === EntityType.ShieldGenerator) {
-        const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
-        if (dist <= VISION_RADIUS_RADIATION) {
-          reveal(entity.pos.x, entity.pos.y);
-        }
-      }
-    }
-  }
-
-  // Structural sensor: reveal tiles with stress and ReinforcementPanel entities
-  if (sensors.includes(SensorType.Structural)) {
-    for (let dy = -VISION_RADIUS_STRUCTURAL; dy <= VISION_RADIUS_STRUCTURAL; dy++) {
-      for (let dx = -VISION_RADIUS_STRUCTURAL; dx <= VISION_RADIUS_STRUCTURAL; dx++) {
-        if (Math.abs(dx) + Math.abs(dy) > VISION_RADIUS_STRUCTURAL) continue;
-        const tx = px + dx;
-        const ty = py + dy;
-        if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
-          if (state.tiles[ty][tx].stress > 0) {
-            reveal(tx, ty);
-          }
-        }
-      }
-    }
-    // Reveal ReinforcementPanel entities within radius
-    for (const [, entity] of state.entities) {
-      if (entity.type === EntityType.ReinforcementPanel) {
-        const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
-        if (dist <= VISION_RADIUS_STRUCTURAL) {
-          reveal(entity.pos.x, entity.pos.y);
-        }
-      }
-    }
-  }
-
-  // EM/Signal sensor: reveal HiddenDevice and SignalBooster entities
-  if (sensors.includes(SensorType.EMSignal)) {
-    for (const [, entity] of state.entities) {
-      if (entity.type === EntityType.HiddenDevice || entity.type === EntityType.SignalBooster) {
-        const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
-        if (dist <= VISION_RADIUS_EM) {
-          reveal(entity.pos.x, entity.pos.y);
         }
       }
     }

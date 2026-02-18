@@ -12,7 +12,9 @@ import { generateTimeline, generateLogs } from "./timeline.js";
 import { CrewRole } from "../shared/types.js";
 import { generateMysteryChoices } from "./mysteryChoices.js";
 import { generateDeductions } from "./deduction.js";
+import { generateThreads } from "./threads.js";
 import { LANDMARK_CONSOLES } from "../data/consoleText.js";
+import { generateCrewPaths } from "./crewPaths.js";
 
 /**
  * Room name assignments — enough for a large station.
@@ -101,9 +103,6 @@ export function generate(seed: number): GameState {
         smoke: 0,
         dirt: 0,
         pressure: 100,
-        radiation: 0,
-        stress: 0,
-        stressTurns: 0,
         explored: false,
         visible: false,
       };
@@ -133,9 +132,6 @@ export function generate(seed: number): GameState {
         smoke: 0,
         dirt: 0,
         pressure: 100,
-        radiation: 0,
-        stress: 0,
-        stressTurns: 0,
         explored: false,
         visible: false,
       };
@@ -160,6 +156,7 @@ export function generate(seed: number): GameState {
   const generatedLogData = generateLogs(crew, timeline, roomNames, generatedLogCount);
   const choices = generateMysteryChoices(crew, timeline, roomNames);
   const deductions = generateDeductions(crew, timeline, roomNames);
+  const threads = generateThreads(crew, timeline);
 
   // Evidence threshold: need to find ~40% of available logs to unlock recovery phase
   const evidenceThreshold = Math.max(3, Math.floor(generatedLogCount * 0.4));
@@ -172,30 +169,28 @@ export function generate(seed: number): GameState {
     choices,
     journal: [],
     deductions,
+    threads,
     objectivePhase: ObjectivePhase.Clean,
     roomsCleanedCount: 0,
     investigationTrigger: 1, // clean 1 room before yellow alert triggers investigation
     evidenceThreshold,
     cleaningDirective: true,
     roomCleanlinessGoal: 60,
-    directiveViolationTurns: 0,
   };
 
   placeEntities(state, rooms);
   placeEvidenceTraces(state, rooms);
+  placeCorridorClues(state);
   generateDirtTrails(state, rooms);
 
   // Place 1-2 security terminals in mid-station rooms
   placeSecurityTerminals(state, rooms);
 
-  // Place Sprint 3 entities: radiation sources, shield generators, etc.
-  placeSprintThreeEntities(state, rooms);
-
-  // Place Sprint 3 sensor pickups
-  placeSprintThreeSensors(state, rooms);
-
   // Place crew NPCs and escape pods for evacuation mechanic
   placeCrewAndPods(state, rooms);
+
+  // Generate crew escape paths and place breadcrumb evidence along them
+  generateCrewPaths(state);
 
   // Place keyed doors (clearance + environmental)
   placeClearanceDoors(state, rooms);
@@ -434,9 +429,6 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
           smoke: 0,
           dirt: 0,
           pressure: PRESSURE_NORMAL,
-          radiation: 0,
-          stress: 0,
-          stressTurns: 0,
           explored: false,
           visible: false,
         };
@@ -460,9 +452,6 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
       smoke: 0,
       dirt: 0,
       pressure: PRESSURE_NORMAL,
-      radiation: 0,
-      stress: 0,
-      stressTurns: 0,
       explored: false,
       visible: false,
     };
@@ -706,9 +695,6 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
         smoke: 0,
         dirt: 0,
         pressure: 100,
-        radiation: 0,
-        stress: 0,
-        stressTurns: 0,
         explored: false,
         visible: false,
       };
@@ -884,10 +870,6 @@ function placeEvidenceTraces(state: GameState, rooms: DiggerRoom[]): void {
         traceDesc = "Micro-fractures in the wall plating. Pressure differential left a visible stress pattern. Someone was here when it happened.";
         sensorRequired = SensorType.Atmospheric;
         break;
-      case "radiation":
-        traceDesc = "Faint discoloration on the surface. Radiation exposure, brief but intense. Someone walked through here recently.";
-        sensorRequired = null; // visible to cleanliness sensor
-        break;
       case "atmospheric":
         traceDesc = "Chemical residue on the floor panels. Something contaminated this area. Footprints lead away toward the corridor.";
         sensorRequired = SensorType.Atmospheric;
@@ -915,6 +897,175 @@ function placeEvidenceTraces(state: GameState, rooms: DiggerRoom[]): void {
         crewMemberId: actor?.id || null,
       },
     });
+  }
+}
+
+/**
+ * Corridor trace texts — environmental storytelling for corridor evidence.
+ */
+const CORRIDOR_TRACE_TEXTS = [
+  "Scuff marks on the floor — someone was dragged or ran through here in a hurry.",
+  "A cracked data tablet. The screen shows a half-written emergency message.",
+  "Coolant residue streaks along the corridor wall. The leak came from somewhere nearby.",
+  "Emergency lighting panel, smashed. Intentional or collateral damage?",
+  "Boot prints in the dust — two sets heading in opposite directions.",
+  "Someone scratched tally marks into the wall plating. Counting days? Hours?",
+  "A medkit, opened and emptied. Bandage wrappers trail further down the corridor.",
+  "Magnetic clamp marks on the wall — something heavy was moved through here.",
+  "A fire extinguisher, discharged. Chemical foam residue coats the floor.",
+  "A comm badge abandoned on the floor, its last transmission light still blinking.",
+];
+
+/**
+ * Crew item text templates for corridor-placed personal effects.
+ */
+const CORRIDOR_CREW_ITEM_TEMPLATES = [
+  (first: string, last: string) => `${first} ${last}'s ID badge — found on the corridor floor.`,
+  (_first: string, last: string) => `A personal audio recorder labeled '${last}'. The last entry sounds panicked.`,
+  (_first: string, last: string) => `A notebook with ${last}'s handwriting — hasty diagrams of system bypasses.`,
+  (_first: string, last: string) => `${last}'s toolkit, left open. Several tools are missing.`,
+];
+
+/**
+ * Check if a position falls inside any room.
+ */
+function isInRoom(state: GameState, x: number, y: number): boolean {
+  return state.rooms.some(r => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height);
+}
+
+/**
+ * Place evidence entities in corridor tiles (walkable tiles not inside any room).
+ * Places 6-8 EvidenceTrace entities and 3-4 CrewItem entities.
+ * Prefers tiles near room entrances (within 4 tiles of a door tile).
+ */
+function placeCorridorClues(state: GameState): void {
+  // ── Collect all corridor tiles ─────────────────────────────────
+  const corridorTiles: { x: number; y: number }[] = [];
+  for (let y = 0; y < state.height; y++) {
+    for (let x = 0; x < state.width; x++) {
+      if (state.tiles[y][x].walkable && !isInRoom(state, x, y)) {
+        corridorTiles.push({ x, y });
+      }
+    }
+  }
+
+  if (corridorTiles.length === 0) return;
+
+  // ── Collect door tile positions for proximity filtering ─────────
+  const doorPositions: { x: number; y: number }[] = [];
+  for (let y = 0; y < state.height; y++) {
+    for (let x = 0; x < state.width; x++) {
+      if (state.tiles[y][x].type === TileType.Door || state.tiles[y][x].type === TileType.LockedDoor) {
+        doorPositions.push({ x, y });
+      }
+    }
+  }
+
+  // ── Filter to prefer tiles near room entrances ─────────────────
+  const nearDoorTiles = corridorTiles.filter(t =>
+    doorPositions.some(d => Math.abs(d.x - t.x) + Math.abs(d.y - t.y) <= 4)
+  );
+
+  // Use near-door tiles if we have enough, otherwise fall back to all corridor tiles
+  const candidateTiles = nearDoorTiles.length >= 12 ? nearDoorTiles : corridorTiles;
+
+  // ── Shuffle candidates using ROT.RNG ───────────────────────────
+  const shuffled = [...candidateTiles];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(ROT.RNG.getUniform() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // ── Place evidence traces (6-8) ────────────────────────────────
+  const traceCount = 6 + Math.floor(ROT.RNG.getUniform() * 3); // 6, 7, or 8
+  const placedPositions: { x: number; y: number }[] = [];
+
+  let traceIdx = 0;
+  for (const tile of shuffled) {
+    if (traceIdx >= traceCount) break;
+
+    // Ensure minimum spacing of 3 tiles between placed items
+    const tooClose = placedPositions.some(
+      p => Math.abs(p.x - tile.x) + Math.abs(p.y - tile.y) < 3
+    );
+    if (tooClose) continue;
+
+    // Don't place on tiles that already have entities
+    let occupied = false;
+    for (const [, entity] of state.entities) {
+      if (entity.pos.x === tile.x && entity.pos.y === tile.y) {
+        occupied = true;
+        break;
+      }
+    }
+    if (occupied) continue;
+
+    const textIndex = Math.floor(ROT.RNG.getUniform() * CORRIDOR_TRACE_TEXTS.length);
+    const traceText = CORRIDOR_TRACE_TEXTS[textIndex];
+
+    state.entities.set(`corridor_trace_${traceIdx}`, {
+      id: `corridor_trace_${traceIdx}`,
+      type: EntityType.EvidenceTrace,
+      pos: { x: tile.x, y: tile.y },
+      props: {
+        text: traceText,
+        interacted: false,
+        corridor: true,
+      },
+    });
+
+    placedPositions.push(tile);
+    traceIdx++;
+  }
+
+  // ── Place crew items (3-4) ─────────────────────────────────────
+  if (!state.mystery?.crew || state.mystery.crew.length === 0) return;
+
+  const crewItemCount = 3 + Math.floor(ROT.RNG.getUniform() * 2); // 3 or 4
+  const crew = state.mystery.crew;
+
+  let itemIdx = 0;
+  for (const tile of shuffled) {
+    if (itemIdx >= crewItemCount) break;
+
+    // Ensure minimum spacing of 3 tiles between ALL placed items (traces + crew items)
+    const tooClose = placedPositions.some(
+      p => Math.abs(p.x - tile.x) + Math.abs(p.y - tile.y) < 3
+    );
+    if (tooClose) continue;
+
+    // Don't place on tiles that already have entities
+    let occupied = false;
+    for (const [, entity] of state.entities) {
+      if (entity.pos.x === tile.x && entity.pos.y === tile.y) {
+        occupied = true;
+        break;
+      }
+    }
+    if (occupied) continue;
+
+    // Pick a random crew member
+    const crewMember = crew[Math.floor(ROT.RNG.getUniform() * crew.length)];
+
+    // Pick a random crew item template
+    const templateIndex = Math.floor(ROT.RNG.getUniform() * CORRIDOR_CREW_ITEM_TEMPLATES.length);
+    const itemText = CORRIDOR_CREW_ITEM_TEMPLATES[templateIndex](crewMember.firstName, crewMember.lastName);
+
+    state.entities.set(`corridor_item_${itemIdx}`, {
+      id: `corridor_item_${itemIdx}`,
+      type: EntityType.CrewItem,
+      pos: { x: tile.x, y: tile.y },
+      props: {
+        text: itemText,
+        crewId: crewMember.id,
+        pickedUp: false,
+        corridor: true,
+        visible: true,
+      },
+    });
+
+    placedPositions.push(tile);
+    itemIdx++;
   }
 }
 
@@ -1025,175 +1176,6 @@ function placePowerCellPuzzle(
       pos,
       props: { collected: false },
     });
-  });
-}
-
-/**
- * Place Sprint 3 entities: RadiationSource, ShieldGenerator, ReinforcementPanel,
- * SignalBooster, HiddenDevice.
- */
-function placeSprintThreeEntities(state: GameState, rooms: DiggerRoom[]): void {
-  const n = rooms.length;
-  if (n < 5) return;
-
-  const archetype = state.mystery?.timeline.archetype;
-  const isReactorScram = archetype === IncidentArchetype.ReactorScram;
-
-  // ── Radiation sources and shield generators ───────────────────
-  // ReactorScram: 1-2 RadiationSource in mid-station, 1-2 ShieldGenerator nearby
-  // Other archetypes: 1 RadiationSource, 1 ShieldGenerator (lighter presence)
-  const radSourceCount = isReactorScram ? Math.min(2, Math.max(1, Math.floor(n / 5))) : 1;
-  const shieldGenCount = radSourceCount; // match source count
-
-  const midStart = Math.floor(n * 0.3);
-  const midEnd = Math.floor(n * 0.7);
-
-  for (let i = 0; i < radSourceCount; i++) {
-    const ri = Math.min(n - 2, midStart + Math.floor((midEnd - midStart) * (i + 1) / (radSourceCount + 1)));
-    const room = rooms[ri];
-    const pos = getRoomCenter(room);
-    state.entities.set(`radiation_source_${i}`, {
-      id: `radiation_source_${i}`,
-      type: EntityType.RadiationSource,
-      pos,
-      props: {},
-    });
-    // Seed initial radiation on the tile
-    if (pos.y >= 0 && pos.y < state.height && pos.x >= 0 && pos.x < state.width) {
-      state.tiles[pos.y][pos.x].radiation = 30;
-    }
-  }
-
-  for (let i = 0; i < shieldGenCount; i++) {
-    // Place shield generator 1-2 rooms after the corresponding radiation source
-    const ri = Math.min(n - 2, midStart + Math.floor((midEnd - midStart) * (i + 1) / (shieldGenCount + 1)) + 1);
-    const room = rooms[ri];
-    const pos = getRoomPos(room, 1, -1);
-    state.entities.set(`shield_generator_${i}`, {
-      id: `shield_generator_${i}`,
-      type: EntityType.ShieldGenerator,
-      pos,
-      props: { activated: false },
-    });
-  }
-
-  // ── Reinforcement panel: 1 in a room with stress potential ──────
-  // Pick a room in mid-station; seed initial stress on tiles
-  const reinforceIdx = Math.min(n - 2, Math.floor(n * 0.5));
-  const reinforceRoom = rooms[reinforceIdx];
-  const reinforcePos = getRoomPos(reinforceRoom, -1, 0);
-  state.entities.set("reinforcement_panel_0", {
-    id: "reinforcement_panel_0",
-    type: EntityType.ReinforcementPanel,
-    pos: reinforcePos,
-    props: { installed: false },
-  });
-  // Seed some structural stress nearby
-  if (reinforcePos.y >= 0 && reinforcePos.y < state.height &&
-      reinforcePos.x >= 0 && reinforcePos.x < state.width) {
-    state.tiles[reinforcePos.y][reinforcePos.x].stress = 40;
-    const adjDeltas = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 }];
-    for (const d of adjDeltas) {
-      const ax = reinforcePos.x + d.x;
-      const ay = reinforcePos.y + d.y;
-      if (ax >= 0 && ax < state.width && ay >= 0 && ay < state.height && state.tiles[ay][ax].walkable) {
-        state.tiles[ay][ax].stress = Math.max(state.tiles[ay][ax].stress, 25);
-      }
-    }
-  }
-
-  // ── Signal boosters: 1-2 in mid-to-late rooms ──────────────────
-  const signalBoosterCount = Math.min(2, Math.max(1, Math.floor(n / 6)));
-  for (let i = 0; i < signalBoosterCount; i++) {
-    const ri = Math.min(n - 2, Math.floor(n * 0.6) + i * Math.floor(n * 0.15));
-    const room = rooms[ri];
-    const pos = getRoomPos(room, i === 0 ? 1 : -1, i === 0 ? 1 : -1);
-    state.entities.set(`signal_booster_${i}`, {
-      id: `signal_booster_${i}`,
-      type: EntityType.SignalBooster,
-      pos,
-      props: { activated: false },
-    });
-  }
-
-  // ── Hidden devices: 1-2 (only visible with EM sensor) ──────────
-  const hiddenDeviceCount = Math.min(2, Math.max(1, Math.floor(n / 7)));
-  for (let i = 0; i < hiddenDeviceCount; i++) {
-    // Place in later rooms for mystery relevance
-    const ri = Math.min(n - 2, Math.floor(n * 0.65) + i * Math.floor(n * 0.12));
-    const room = rooms[ri];
-    const pos = getRoomPos(room, i === 0 ? -1 : 1, i === 0 ? -1 : 1);
-    state.entities.set(`hidden_device_${i}`, {
-      id: `hidden_device_${i}`,
-      type: EntityType.HiddenDevice,
-      pos,
-      props: { discovered: false, evidenceText: `Hidden device ${i}: encrypted data fragment recovered. Signal analysis required.` },
-    });
-  }
-}
-
-/**
- * Place Sprint 3 sensor pickups: Radiation, Structural, EM/Signal.
- */
-function placeSprintThreeSensors(state: GameState, rooms: DiggerRoom[]): void {
-  const n = rooms.length;
-  if (n < 5) return;
-
-  const archetype = state.mystery?.timeline.archetype;
-  const isReactorScram = archetype === IncidentArchetype.ReactorScram;
-
-  // ── Radiation sensor ──────────────────────────────────────────
-  // ReactorScram: place before first radiation zone
-  // Otherwise: mid-station room
-  let radSensorIdx: number;
-  if (isReactorScram) {
-    // Place before the first radiation source (which is at ~30-40% through)
-    radSensorIdx = Math.max(1, Math.floor(n * 0.25));
-  } else {
-    radSensorIdx = Math.max(1, Math.floor(n * 0.35));
-  }
-  radSensorIdx = Math.min(radSensorIdx, n - 2);
-  const radSensorRoom = rooms[radSensorIdx];
-  const radSensorPos = getRoomPos(radSensorRoom, 1, 0);
-  state.entities.set("sensor_radiation", {
-    id: "sensor_radiation",
-    type: EntityType.SensorPickup,
-    pos: radSensorPos,
-    props: { sensorType: SensorType.Radiation },
-  });
-
-  // ── Structural sensor ─────────────────────────────────────────
-  // Near Engineering Storage
-  let structSensorIdx = state.rooms.findIndex(r => r.name === "Engineering Storage");
-  if (structSensorIdx < 0 || structSensorIdx >= n) {
-    structSensorIdx = Math.max(1, Math.floor(n * 0.2));
-  }
-  // Place in adjacent room if possible, otherwise same room different position
-  const structActualIdx = Math.min(n - 2, structSensorIdx + 1);
-  const structSensorRoom = rooms[structActualIdx];
-  const structSensorPos = getRoomPos(structSensorRoom, -1, 1);
-  state.entities.set("sensor_structural", {
-    id: "sensor_structural",
-    type: EntityType.SensorPickup,
-    pos: structSensorPos,
-    props: { sensorType: SensorType.Structural },
-  });
-
-  // ── EM/Signal sensor ──────────────────────────────────────────
-  // In Data Core vicinity or late-game room
-  let emSensorIdx = state.rooms.findIndex(r => r.name === "Data Core");
-  if (emSensorIdx < 0 || emSensorIdx >= n) {
-    emSensorIdx = n - 2; // fallback to near-last room
-  }
-  // Place 1-2 rooms before Data Core
-  const emActualIdx = Math.max(1, emSensorIdx - 2);
-  const emSensorRoom = rooms[emActualIdx];
-  const emSensorPos = getRoomPos(emSensorRoom, 1, -1);
-  state.entities.set("sensor_em_signal", {
-    id: "sensor_em_signal",
-    type: EntityType.SensorPickup,
-    pos: emSensorPos,
-    props: { sensorType: SensorType.EMSignal },
   });
 }
 
@@ -1399,9 +1381,6 @@ function placeClearanceDoors(state: GameState, rooms: DiggerRoom[]): void {
           smoke: 0,
           dirt: 0,
           pressure: PRESSURE_NORMAL,
-          radiation: 0,
-          stress: 0,
-          stressTurns: 0,
           explored: false,
           visible: false,
         };

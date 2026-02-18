@@ -201,10 +201,7 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
   if (tile.heat > 30) alerts.push(`WARNING: High heat (${tile.heat}) at your position!`);
   if (tile.smoke > 30) alerts.push(`WARNING: Smoke detected (${tile.smoke}) at your position!`);
   if (tile.pressure < 60) alerts.push(`WARNING: Low pressure (${tile.pressure}) at your position!`);
-  if (tile.radiation > 40) alerts.push(`WARNING: Radiation detected (${tile.radiation}) at your position!`);
-  if (tile.stress > 60) alerts.push(`WARNING: Structural stress (${tile.stress}) at your position!`);
   if (state.player.hp < 30) alerts.push(`CRITICAL: Low HP (${state.player.hp}/${state.player.maxHp})!`);
-  if (state.stationIntegrity < 40) alerts.push(`ALERT: Station integrity at ${state.stationIntegrity}%!`);
 
   // Cleaning directive — tell the AI explicitly about the room lock
   if (state.mystery?.cleaningDirective && room) {
@@ -227,7 +224,6 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
     roomExits,
     sensors,
     activeSensor,
-    stationIntegrity: Math.round(state.stationIntegrity),
     objectivePhase: state.mystery?.objectivePhase ?? "clean",
     objectiveText,
     objectiveDetail,
@@ -260,15 +256,9 @@ function glyphForType(type: EntityType): string {
     [EntityType.FuseBox]: "F",
     [EntityType.PowerCell]: "H",
     [EntityType.EvidenceTrace]: "?",
-    [EntityType.RadiationSource]: "!",
-    [EntityType.ShieldGenerator]: "G",
-    [EntityType.ReinforcementPanel]: "#",
-    [EntityType.SignalBooster]: "~",
-    [EntityType.HiddenDevice]: "h",
     [EntityType.EscapePod]: "E",
     [EntityType.CrewNPC]: "N",
     [EntityType.RepairCradle]: "c",
-    [EntityType.Rubble]: "%",
     [EntityType.Console]: "K",
   };
   return map[type] ?? "?";
@@ -280,7 +270,7 @@ function renderObservationAsText(obs: HarnessObservation): string {
   lines.push(`=== TURN ${obs.turn} ===`);
   const exitsStr = obs.roomExits.length > 0 ? ` [exits: ${obs.roomExits.join(" ")}]` : "";
   lines.push(`Location: ${obs.currentRoom}${exitsStr} | Position: (${obs.pos.x}, ${obs.pos.y})`);
-  lines.push(`HP: ${obs.hp}/${obs.maxHp} | Station Integrity: ${obs.stationIntegrity}% | Discoveries: ${obs.discoveries}`);
+  lines.push(`HP: ${obs.hp}/${obs.maxHp} | Discoveries: ${obs.discoveries}`);
   if (obs.stunTurns > 0) {
     lines.push(`STATUS: STUNNED (${obs.stunTurns} turns remaining — cannot act)`);
   }
@@ -409,9 +399,8 @@ GOAL: Explore the station, solve puzzles, restore power systems, and transmit da
 
 GAME MECHANICS:
 - Turn-based: each action = one turn.
-- You have HP. Taking damage from hazards (heat, low pressure, radiation, patrol drones) reduces HP. At 0 HP you lose.
-- Station Integrity degrades over time. Restoring power relays slows degradation.
-- Rooms may contain hazards (heat, smoke, low pressure, radiation, structural stress). Use sensors to detect them.
+- You have HP. Taking damage from hazards (heat, low pressure, patrol drones) reduces HP. At 0 HP you lose.
+- Rooms may contain hazards (heat, smoke, low pressure). Use sensors to detect them.
 
 OBSERVATIONS:
 - Each turn you see: a map viewport (@ = you), nearby entities with IDs, valid actions, and alerts.

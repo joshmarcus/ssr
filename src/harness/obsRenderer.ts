@@ -6,9 +6,6 @@ import {
 import {
   HEAT_PAIN_THRESHOLD,
   PRESSURE_DAMAGE_THRESHOLD,
-  RADIATION_DAMAGE_THRESHOLD,
-  STRESS_COLLAPSE_THRESHOLD,
-  STATION_INTEGRITY_CRITICAL,
 } from "../shared/constants.js";
 import { isValidAction } from "../sim/actions.js";
 import { getObjective, getRoomExits, getDiscoveries } from "../shared/ui.js";
@@ -56,15 +53,9 @@ const ENTITY_CHAR: Record<string, string> = {
   [EntityType.FuseBox]: "F",
   [EntityType.PowerCell]: "p",
   [EntityType.EvidenceTrace]: "e",
-  [EntityType.RadiationSource]: "!",
-  [EntityType.ShieldGenerator]: "G",
-  [EntityType.ReinforcementPanel]: "N",
-  [EntityType.SignalBooster]: "A",
-  [EntityType.HiddenDevice]: "?",
   [EntityType.EscapePod]: "E",
   [EntityType.CrewNPC]: "H",
   [EntityType.RepairCradle]: "M",
-  [EntityType.Rubble]: "X",
 };
 
 /** Human-readable name for entity types. */
@@ -86,15 +77,9 @@ const ENTITY_NAME: Record<string, string> = {
   [EntityType.FuseBox]: "FuseBox",
   [EntityType.PowerCell]: "PowerCell",
   [EntityType.EvidenceTrace]: "EvidenceTrace",
-  [EntityType.RadiationSource]: "RadiationSource",
-  [EntityType.ShieldGenerator]: "ShieldGenerator",
-  [EntityType.ReinforcementPanel]: "ReinforcementPanel",
-  [EntityType.SignalBooster]: "SignalBooster",
-  [EntityType.HiddenDevice]: "HiddenDevice",
   [EntityType.EscapePod]: "EscapePod",
   [EntityType.CrewNPC]: "CrewNPC",
   [EntityType.RepairCradle]: "RepairCradle",
-  [EntityType.Rubble]: "Rubble",
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -155,16 +140,6 @@ function isEntityExhausted(entity: Entity, state: GameState): boolean {
       return entity.props["collected"] === true;
     case EntityType.EvidenceTrace:
       return entity.props["discovered"] === true;
-    case EntityType.RadiationSource:
-      return true;
-    case EntityType.ShieldGenerator:
-      return entity.props["activated"] === true;
-    case EntityType.ReinforcementPanel:
-      return entity.props["installed"] === true;
-    case EntityType.SignalBooster:
-      return entity.props["activated"] === true;
-    case EntityType.HiddenDevice:
-      return entity.props["discovered"] === true;
     case EntityType.CrewNPC:
       return entity.props["evacuated"] === true || entity.props["dead"] === true;
     case EntityType.EscapePod:
@@ -172,8 +147,6 @@ function isEntityExhausted(entity: Entity, state: GameState): boolean {
              ((entity.props["capacity"] as number) || 3);
     case EntityType.RepairCradle:
       return false;
-    case EntityType.Rubble:
-      return true;
     default:
       return false;
   }
@@ -222,19 +195,7 @@ function extractAttrs(entity: Entity): Record<string, unknown> {
     case EntityType.PowerCell:
       if (p["collected"] !== undefined) attrs["collected"] = p["collected"];
       break;
-    case EntityType.ShieldGenerator:
-      if (p["activated"] !== undefined) attrs["activated"] = p["activated"];
-      break;
-    case EntityType.ReinforcementPanel:
-      if (p["installed"] !== undefined) attrs["installed"] = p["installed"];
-      break;
-    case EntityType.SignalBooster:
-      if (p["activated"] !== undefined) attrs["activated"] = p["activated"];
-      break;
     case EntityType.EvidenceTrace:
-      if (p["discovered"] !== undefined) attrs["discovered"] = p["discovered"];
-      break;
-    case EntityType.HiddenDevice:
       if (p["discovered"] !== undefined) attrs["discovered"] = p["discovered"];
       break;
     case EntityType.SecurityTerminal:
@@ -273,7 +234,6 @@ function tileChar(state: GameState, x: number, y: number): string {
   // Hazard overlays first (heat and smoke are important)
   if (tile.heat >= HEAT_PAIN_THRESHOLD) return "~";
   if (tile.smoke >= 30) return "%";
-  if (tile.radiation >= 30) return "*";
 
   switch (tile.type) {
     case TileType.Wall:
@@ -488,20 +448,8 @@ export function buildObservation(
     alerts.push(`Low pressure on current tile (${playerTile.pressure})`);
   }
 
-  if (playerTile.radiation >= RADIATION_DAMAGE_THRESHOLD) {
-    alerts.push(`High radiation on current tile (${playerTile.radiation})`);
-  }
-
-  if (playerTile.stress >= STRESS_COLLAPSE_THRESHOLD) {
-    alerts.push(`Structural stress critical (${playerTile.stress}) — collapse imminent`);
-  }
-
   if (hp <= maxHp * 0.25) {
     alerts.push(`Low HP: ${hp}/${maxHp}`);
-  }
-
-  if (state.stationIntegrity <= STATION_INTEGRITY_CRITICAL) {
-    alerts.push(`Station integrity critical: ${state.stationIntegrity}%`);
   }
 
   if (state.player.stunTurns > 0) {
@@ -520,7 +468,6 @@ export function buildObservation(
     roomExits,
     sensors: sensorNames,
     activeSensor,
-    stationIntegrity: state.stationIntegrity,
     objectivePhase,
     objectiveText: objective.text,
     objectiveDetail: objective.detail,
@@ -545,7 +492,7 @@ export function renderObservationAsText(obs: HarnessObservation): string {
   // Header
   lines.push(`=== TURN ${obs.turn} | SEED ${obs.seed} | ${obs.currentRoom} ===`);
   lines.push(
-    `HP: ${obs.hp}/${obs.maxHp} | Integrity: ${obs.stationIntegrity}% | Phase: ${obs.objectivePhase}`,
+    `HP: ${obs.hp}/${obs.maxHp} | Phase: ${obs.objectivePhase}`,
   );
   const sensorStr = obs.activeSensor ?? "None";
   lines.push(`Sensor: ${sensorStr} | Pos: (${obs.pos.x}, ${obs.pos.y})`);

@@ -16,7 +16,6 @@ export interface HarnessObservation {
   roomExits: string[];        // compass directions of exits from current room
   sensors: string[];          // equipped sensor names
   activeSensor: string | null;
-  stationIntegrity: number;
   objectivePhase: string;     // Clean, Investigate, Recover, Evacuate
   objectiveText: string;      // human-readable objective description
   objectiveDetail: string;    // detailed instructions for current objective

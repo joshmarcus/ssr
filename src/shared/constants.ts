@@ -49,35 +49,6 @@ export const PATROL_DRONE_STUN_TURNS = 0; // turns player is stunned after drone
 export const PATROL_DRONE_SPEED = 3; // drone moves every N turns
 export const PATROL_DRONE_ATTACK_COOLDOWN = 4; // turns between attacks (drone retreats after hitting)
 
-// ── Radiation ───────────────────────────────────────────────
-export const RADIATION_SPREAD_RATE = 0.05; // glacial spread
-export const RADIATION_SPREAD_RANGE = 1; // only immediate neighbors
-export const RADIATION_DAMAGE_THRESHOLD = 80; // need high radiation to hurt
-export const RADIATION_DAMAGE_PER_TURN = 1; // -1 HP per turn
-export const RADIATION_DAMAGE_NO_SENSOR = 1; // -1 HP per turn (same, just no warning)
-export const RADIATION_SOURCE_RATE = 0.5; // slow buildup at source
-export const RADIATION_SOURCE_CAP = 85;
-export const RADIATION_DECAY_RATE = 0.8; // decay away from source — tuned with Math.max(1) spread minimum
-export const SHIELD_GENERATOR_RADIUS = 5;
-
-// ── Structural stress ──────────────────────────────────────
-export const STRESS_COLLAPSE_THRESHOLD = 98;
-export const STRESS_COLLAPSE_TURNS = 25; // turns above threshold before collapse
-export const STRESS_SPREAD_RATE = 0.02;
-
-// ── Vision radii for new sensors ───────────────────────────
-export const VISION_RADIUS_RADIATION = 8;
-export const VISION_RADIUS_STRUCTURAL = 8;
-export const VISION_RADIUS_EM = 10;
-
-// ── Station Integrity ───────────────────────────────────────
-export const STATION_INTEGRITY_MAX = 100;
-export const STATION_INTEGRITY_DECAY_RATE = 0.01; // per turn base decay (~1% per 100 turns)
-export const STATION_INTEGRITY_RELAY_BONUS = 10; // restored per relay rerouted
-export const STATION_INTEGRITY_BREACH_PENALTY = 0.05; // extra decay per unsealed breach
-export const STATION_INTEGRITY_CRITICAL = 25; // below this, hazards accelerate
-export const STATION_INTEGRITY_LOSS = 0; // game over if integrity reaches 0
-
 // ── PA system ───────────────────────────────────────────────
 export const PA_INTERVAL = 15; // turns between PA announcements
 
@@ -108,13 +79,7 @@ export const GLYPHS = {
   fuseBox: "▦",  // grid — fuse box / junction
   powerCell: "⬡", // hexagon — power cell
   evidenceTrace: "👣", // footprints — evidence trace
-  radiationSource: "☢", // radioactive — radiation source
-  shieldGenerator: "🛡", // shield — shield generator
-  reinforcementPanel: "▧", // hatched — reinforcement panel
-  signalBooster: "⊡", // squared dot — signal booster
-  hiddenDevice: "◇", // diamond outline — hidden device (EM sensor only)
   escapePod: "⬡",    // hexagon — escape pod
-  rubble: "▒",       // medium shade — debris/rubble
   crewNPC: "🙋",      // person raising hand — living crew member
   repairCradle: "⚕️",  // medical — bot repair station
   console: "▣",       // terminal — interactable console

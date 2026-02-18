@@ -90,7 +90,6 @@ function buildFallbackObservation(state: GameState, visibility: "full" | "player
   lines.push(`Turn: ${state.turn}`);
   lines.push(`HP: ${p.hp}/${p.maxHp}`);
   lines.push(`Position: (${p.entity.pos.x}, ${p.entity.pos.y})`);
-  lines.push(`Station Integrity: ${state.stationIntegrity}`);
   lines.push(`Game Over: ${state.gameOver}  Victory: ${state.victory}`);
   if (p.stunTurns > 0) {
     lines.push(`STUNNED: ${p.stunTurns} turns remaining`);
@@ -204,7 +203,6 @@ function printSummary(state: GameState): void {
   console.log(`HP: ${p.hp}/${p.maxHp}`);
   console.log(`Rooms visited: ${roomsVisited}/${state.rooms.length}`);
   console.log(`Evidence found: ${evidenceFound}`);
-  console.log(`Station Integrity: ${state.stationIntegrity}`);
 }
 
 // ── Script mode ──────────────────────────────────────────────

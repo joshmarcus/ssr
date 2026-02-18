@@ -28,14 +28,23 @@ function equipThermal(state: GameState): GameState {
 describe("evidence system", () => {
   it("evidence traces are placed in generated maps", () => {
     const state = generate(GOLDEN_SEED);
-    const traces: string[] = [];
+    const roomTraces: string[] = [];
+    const corridorTraces: string[] = [];
     for (const [id, entity] of state.entities) {
       if (entity.type === EntityType.EvidenceTrace) {
-        traces.push(id);
+        if (entity.props["corridor"]) {
+          corridorTraces.push(id);
+        } else {
+          roomTraces.push(id);
+        }
       }
     }
-    expect(traces.length).toBeGreaterThanOrEqual(3);
-    expect(traces.length).toBeLessThanOrEqual(5);
+    // Room-based evidence traces: 3-5
+    expect(roomTraces.length).toBeGreaterThanOrEqual(3);
+    expect(roomTraces.length).toBeLessThanOrEqual(5);
+    // Corridor evidence traces: 6-8 from placeCorridorClues + crew path breadcrumbs
+    expect(corridorTraces.length).toBeGreaterThanOrEqual(6);
+    expect(corridorTraces.length).toBeLessThanOrEqual(40);
   });
 
   it("evidence traces have proper properties", () => {
@@ -43,8 +52,14 @@ describe("evidence system", () => {
     for (const [, entity] of state.entities) {
       if (entity.type === EntityType.EvidenceTrace) {
         expect(entity.props["text"]).toBeTruthy();
-        expect(entity.props["phase"]).toBeTruthy();
-        expect(entity.props["discovered"]).toBe(false);
+        if (entity.props["corridor"]) {
+          // Corridor traces have interacted flag instead of phase
+          expect(entity.props["interacted"]).toBe(false);
+        } else {
+          // Room-based traces have phase and discovered
+          expect(entity.props["phase"]).toBeTruthy();
+          expect(entity.props["discovered"]).toBe(false);
+        }
       }
     }
   });
@@ -169,38 +184,4 @@ describe("evidence system", () => {
     expect(state.gameOver).toBe(false);
   });
 
-  it("station integrity decays over time", () => {
-    let state = generate(GOLDEN_SEED);
-    const initial = state.stationIntegrity;
-
-    // Wait 10 turns
-    for (let i = 0; i < 10; i++) {
-      state = step(state, { type: ActionType.Wait });
-    }
-
-    expect(state.stationIntegrity).toBeLessThan(initial);
-    expect(state.stationIntegrity).toBeGreaterThan(0);
-  });
-
-  it("relay rerouting boosts station integrity", () => {
-    let state = equipThermal(generate(GOLDEN_SEED));
-
-    // Wait a few turns to let integrity decay
-    for (let i = 0; i < 5; i++) {
-      state = step(state, { type: ActionType.Wait });
-    }
-    const beforeRelay = state.stationIntegrity;
-
-    // Reroute a relay
-    const relay = state.entities.get("relay_p01")!;
-    state.player = {
-      ...state.player,
-      entity: { ...state.player.entity, pos: { ...relay.pos } },
-    };
-    state = step(state, interact("relay_p01"));
-
-    // Integrity should have received a boost (minus the turn's decay)
-    // The net effect should still be positive since bonus > decay
-    expect(state.stationIntegrity).toBeGreaterThan(beforeRelay);
-  });
 });

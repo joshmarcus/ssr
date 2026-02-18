@@ -116,7 +116,6 @@ const NON_INTERACTABLE: Set<EntityType> = new Set([
   EntityType.Drone,
   EntityType.PatrolDrone,
   EntityType.RepairBot,
-  EntityType.RadiationSource,
 ]);
 
 /**
@@ -144,14 +143,6 @@ function isExhausted(entity: Entity, state: GameState): boolean {
       return entity.props["collected"] === true;
     case EntityType.EvidenceTrace:
       return entity.props["discovered"] === true;
-    case EntityType.ShieldGenerator:
-      return entity.props["activated"] === true;
-    case EntityType.ReinforcementPanel:
-      return entity.props["installed"] === true;
-    case EntityType.SignalBooster:
-      return entity.props["activated"] === true;
-    case EntityType.HiddenDevice:
-      return entity.props["revealed"] === true;
     default:
       return false;
   }

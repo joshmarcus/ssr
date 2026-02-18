@@ -194,15 +194,9 @@ const ENTITY_NAMES: Record<string, string> = {
   [EntityType.FuseBox]: "Fuse Box",
   [EntityType.PowerCell]: "Power Cell",
   [EntityType.EvidenceTrace]: "Evidence Trace",
-  [EntityType.RadiationSource]: "Radiation Source",
-  [EntityType.ShieldGenerator]: "Shield Generator",
-  [EntityType.ReinforcementPanel]: "Reinforcement Panel",
-  [EntityType.SignalBooster]: "Signal Booster",
-  [EntityType.HiddenDevice]: "Hidden Device",
   [EntityType.EscapePod]: "Escape Pod",
   [EntityType.CrewNPC]: "Crew NPC",
   [EntityType.RepairCradle]: "Repair Cradle",
-  [EntityType.Rubble]: "Rubble",
   [EntityType.Console]: "Console",
 };
 
