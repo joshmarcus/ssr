@@ -4,7 +4,7 @@ import {
   HEAT_SPREAD_RATE, SMOKE_SPREAD_RATE, HEAT_DECAY_RATE, HEAT_SOURCE_RATE, HEAT_SOURCE_CAP,
   HEAT_DAMAGE_PER_TURN, HEAT_PAIN_THRESHOLD, COOL_RECOVERY_RATE, HEAT_SPREAD_MIN,
   PRESSURE_BREACH_DRAIN, PRESSURE_SPREAD_RATE, PRESSURE_DAMAGE_THRESHOLD, PRESSURE_DAMAGE_PER_TURN,
-  PRESSURE_BULKHEAD_THRESHOLD, DETERIORATION_INTERVAL, DETERIORATION_HEAT_BOOST, DETERIORATION_SMOKE_SPAWN,
+  PRESSURE_BULKHEAD_THRESHOLD, AIRLOCK_PRESSURE_DRAIN, DETERIORATION_INTERVAL, DETERIORATION_HEAT_BOOST, DETERIORATION_SMOKE_SPAWN,
   GLYPHS,
 } from "../shared/constants.js";
 
@@ -117,6 +117,17 @@ export function tickHazards(state: GameState): GameState {
     const [bx, by] = key.split(",").map(Number);
     if (by >= 0 && by < state.height && bx >= 0 && bx < state.width) {
       newTiles[by][bx].pressure = Math.max(0, newTiles[by][bx].pressure - PRESSURE_BREACH_DRAIN);
+    }
+  }
+
+  // Airlock drain: open airlocks act as pressure sinks
+  for (const [, entity] of state.entities) {
+    if (entity.type === EntityType.Airlock && entity.props["open"] === true) {
+      const ax = entity.pos.x;
+      const ay = entity.pos.y;
+      if (ay >= 0 && ay < state.height && ax >= 0 && ax < state.width) {
+        newTiles[ay][ax].pressure = 0; // airlock tile is always at 0 pressure while open
+      }
     }
   }
 

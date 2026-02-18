@@ -51,6 +51,7 @@ export enum EntityType {
   CrewNPC = "crew_npc",
   RepairCradle = "repair_cradle",
   Console = "console",
+  Airlock = "airlock",
 }
 
 export interface Entity {

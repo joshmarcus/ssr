@@ -119,7 +119,11 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
     if (entity.id === "player") continue;
     const dist = manhattan(playerPos, entity.pos);
     if (dist > 12) continue; // only nearby entities
-    const interactable = dist <= 1 && !isEntityExhausted(entity);
+    // Airlocks and doors are always interactable (toggleable), override exhaustion check
+    const exhausted = entity.type === EntityType.Airlock || entity.type === EntityType.ClosedDoor
+      ? false
+      : isEntityExhausted(entity);
+    const interactable = dist <= 1 && !exhausted;
     const attrs: Record<string, unknown> = {};
     if (entity.props["activated"] !== undefined) attrs["activated"] = entity.props["activated"];
     if (entity.props["sealed"] !== undefined) attrs["sealed"] = entity.props["sealed"];
@@ -128,6 +132,7 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
     if (entity.props["locked"] !== undefined) attrs["locked"] = entity.props["locked"];
     if (entity.props["powered"] !== undefined) attrs["powered"] = entity.props["powered"];
     if (entity.props["sensorType"] !== undefined) attrs["sensorType"] = entity.props["sensorType"];
+    if (entity.props["open"] !== undefined) attrs["open"] = entity.props["open"];
     poi.push({
       id: entity.id,
       type: entity.type,
@@ -305,6 +310,7 @@ function glyphForType(type: EntityType): string {
     [EntityType.CrewNPC]: "N",
     [EntityType.RepairCradle]: "c",
     [EntityType.Console]: "K",
+    [EntityType.Airlock]: "A",
   };
   return map[type] ?? "?";
 }
@@ -344,7 +350,20 @@ function renderObservationAsText(obs: HarnessObservation): string {
       const attrStr = Object.keys(p.attrs).length > 0
         ? ` (${Object.entries(p.attrs).map(([k, v]) => `${k}=${v}`).join(", ")})`
         : "";
-      lines.push(`  ${p.name} (${p.id}) @ (${p.pos.x},${p.pos.y}) dist=${p.distance}${inter}${attrStr}`);
+
+      // Special descriptions for toggleable entities
+      let displayName = p.name;
+      if (p.type === EntityType.Airlock || p.type === "airlock") {
+        displayName = p.attrs["open"] === true
+          ? "Airlock (OPEN \u2014 venting)"
+          : "Airlock (SEALED)";
+      } else if (p.type === EntityType.ClosedDoor || p.type === "closed_door") {
+        displayName = p.attrs["closed"] === false
+          ? "Door (OPEN \u2014 can close)"
+          : "Door (CLOSED \u2014 can open)";
+      }
+
+      lines.push(`  ${displayName} (${p.id}) @ (${p.pos.x},${p.pos.y}) dist=${p.distance}${inter}${attrStr}`);
     }
   }
 
@@ -506,8 +525,9 @@ STRATEGY TIPS:
 10. Use SUBMIT_DEDUCTION when deductions are [UNLOCKED] in the DEDUCTIONS section. Choose the answer key that seems most supported by evidence.
 10. If HP is critical, prioritize finding Med Kits or Repair Cradles.
 11. Clean dirty rooms when the objective phase is "clean". Your CLEANING DIRECTIVE may lock you in a room until it reaches 80% cleanliness — use CLEAN repeatedly on dirty tiles until the directive clears!
-12. INTERACT with Closed Doors to open them for further exploration.
-13. When you see a "CLEANING DIRECTIVE ACTIVE" alert, you MUST use CLEAN action repeatedly until room cleanliness reaches the goal. You cannot leave the room until then.
+12. INTERACT with Closed Doors to open or close them. Open doors can be closed again for tactical reasons.
+13. INTERACT with Airlocks to toggle them open/sealed. Open airlocks vent atmosphere — seal them to restore pressure.
+14. When you see a "CLEANING DIRECTIVE ACTIVE" alert, you MUST use CLEAN action repeatedly until room cleanliness reaches the goal. You cannot leave the room until then.
 
 CRITICAL RULES:
 1. ONLY choose actions from the "VALID ACTIONS" list in your observation. Do NOT try directions not listed.

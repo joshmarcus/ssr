@@ -70,7 +70,9 @@ function isEntityExhausted(entity: Entity, state: GameState): boolean {
     case EntityType.Relay:
       return entity.props["activated"] === true || entity.props["locked"] === true;
     case EntityType.ClosedDoor:
-      return entity.props["closed"] === false;
+      return entity.props["locked"] === true;
+    case EntityType.Airlock:
+      return false; // always toggleable
     case EntityType.SecurityTerminal:
       return false; // always interactable (door lock toggle after first access)
     case EntityType.CrewItem:
@@ -1002,16 +1004,37 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
 
     case EntityType.ClosedDoor: {
       if (target.props["closed"] !== true) {
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_door_already_${targetId}_${next.turn}`,
+        // Door is open — CLOSE it (toggle)
+        // Don't allow closing if player is standing on the door
+        const px = state.player.entity.pos.x;
+        const py = state.player.entity.pos.y;
+        if (target.pos.x === px && target.pos.y === py) {
+          next.logs = [...state.logs, {
+            id: `log_door_cant_close_${targetId}_${next.turn}`,
             timestamp: next.turn,
             source: "system",
-            text: "Door already open.",
+            text: "Cannot seal bulkhead while standing in the doorway.",
             read: false,
-          },
-        ];
+          }];
+          break;
+        }
+        // Close the door
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, closed: true },
+        });
+        const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
+        newTiles[target.pos.y][target.pos.x].walkable = false;
+        next.entities = newEntities;
+        next.tiles = newTiles;
+        next.logs = [...state.logs, {
+          id: `log_door_close_${targetId}_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Bulkhead sealed.",
+          read: false,
+        }];
         break;
       }
 
@@ -1198,6 +1221,61 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             read: false,
           },
         ];
+      }
+      break;
+    }
+
+    case EntityType.Airlock: {
+      const isOpen = target.props["open"] === true;
+      if (!isOpen) {
+        // Open the airlock
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, open: true },
+        });
+        const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
+        newTiles[target.pos.y][target.pos.x].walkable = true;
+        newTiles[target.pos.y][target.pos.x].pressure = 0;
+        next.entities = newEntities;
+        next.tiles = newTiles;
+        next.logs = [...state.logs, {
+          id: `log_airlock_open_${targetId}_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "AIRLOCK OPEN — decompression warning. Atmosphere venting to space.",
+          read: false,
+        }];
+      } else {
+        // Close the airlock
+        const px = state.player.entity.pos.x;
+        const py = state.player.entity.pos.y;
+        if (target.pos.x === px && target.pos.y === py) {
+          next.logs = [...state.logs, {
+            id: `log_airlock_cant_close_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: "Cannot seal airlock while standing in the hatch.",
+            read: false,
+          }];
+          break;
+        }
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, open: false },
+        });
+        const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
+        newTiles[target.pos.y][target.pos.x].walkable = false;
+        next.entities = newEntities;
+        next.tiles = newTiles;
+        next.logs = [...state.logs, {
+          id: `log_airlock_close_${targetId}_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Airlock sealed. Pressure stabilizing.",
+          read: false,
+        }];
       }
       break;
     }

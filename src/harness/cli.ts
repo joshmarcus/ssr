@@ -125,7 +125,7 @@ function buildFallbackObservation(state: GameState, visibility: "full" | "player
   lines.push("");
   lines.push("--- Valid Actions ---");
   for (const va of validActions) {
-    const desc = describeAction(va);
+    const desc = describeAction(va, state);
     lines.push(`  ${JSON.stringify(va)}  // ${desc}`);
   }
 

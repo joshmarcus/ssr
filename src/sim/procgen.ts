@@ -708,6 +708,59 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
     }
   }
 
+  // ── Airlocks (player-controlled pressure vents) ──────
+  const airlockCandidates: { x: number; y: number }[] = [];
+  // Scan border walls adjacent to walkable interior
+  for (let x = 1; x < state.width - 1; x++) {
+    // Top edge
+    if (state.tiles[0][x].type === TileType.Wall && state.tiles[1][x].walkable) {
+      airlockCandidates.push({ x, y: 0 });
+    }
+    // Bottom edge
+    if (state.tiles[state.height - 1][x].type === TileType.Wall && state.tiles[state.height - 2][x].walkable) {
+      airlockCandidates.push({ x, y: state.height - 1 });
+    }
+  }
+  for (let y = 1; y < state.height - 1; y++) {
+    // Left edge
+    if (state.tiles[y][0].type === TileType.Wall && state.tiles[y][1].walkable) {
+      airlockCandidates.push({ x: 0, y });
+    }
+    // Right edge
+    if (state.tiles[y][state.width - 1].type === TileType.Wall && state.tiles[y][state.width - 2].walkable) {
+      airlockCandidates.push({ x: state.width - 1, y });
+    }
+  }
+
+  // Place up to 2 airlocks, spread apart
+  const placedAirlocks: { x: number; y: number }[] = [];
+  for (const cand of airlockCandidates) {
+    if (placedAirlocks.length >= 2) break;
+    const tooClose = placedAirlocks.some(a => Math.abs(a.x - cand.x) + Math.abs(a.y - cand.y) < 15);
+    if (tooClose) continue;
+    const hash = (cand.x * 17 + cand.y * 11 + state.seed) % 4;
+    if (hash === 0) {
+      state.tiles[cand.y][cand.x] = {
+        type: TileType.Door,
+        glyph: GLYPHS.airlock,
+        walkable: false,
+        heat: 0,
+        smoke: 0,
+        dirt: 0,
+        pressure: 100,
+        explored: false,
+        visible: false,
+      };
+      state.entities.set(`airlock_${placedAirlocks.length}`, {
+        id: `airlock_${placedAirlocks.length}`,
+        type: EntityType.Airlock,
+        pos: { x: cand.x, y: cand.y },
+        props: { open: false },
+      });
+      placedAirlocks.push(cand);
+    }
+  }
+
   // ── Puzzle variation: seed determines which optional puzzles appear ──
   // Use the seed to pick 1-2 optional puzzle types per run
   const puzzleRng = ((state.seed * 2654435761) >>> 0) % 100;

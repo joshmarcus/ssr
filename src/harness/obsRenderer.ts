@@ -57,6 +57,7 @@ const ENTITY_CHAR: Record<string, string> = {
   [EntityType.EscapePod]: "E",
   [EntityType.CrewNPC]: "H",
   [EntityType.RepairCradle]: "M",
+  [EntityType.Airlock]: "A",
 };
 
 /** Human-readable name for entity types. */
@@ -81,6 +82,7 @@ const ENTITY_NAME: Record<string, string> = {
   [EntityType.EscapePod]: "EscapePod",
   [EntityType.CrewNPC]: "CrewNPC",
   [EntityType.RepairCradle]: "RepairCradle",
+  [EntityType.Airlock]: "Airlock",
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -122,7 +124,9 @@ function isEntityExhausted(entity: Entity, state: GameState): boolean {
     case EntityType.Relay:
       return entity.props["activated"] === true || entity.props["locked"] === true;
     case EntityType.ClosedDoor:
-      return entity.props["closed"] === false;
+      return false; // doors can always be toggled (opened or closed)
+    case EntityType.Airlock:
+      return false; // airlocks can always be toggled
     case EntityType.SecurityTerminal:
       return false;
     case EntityType.CrewItem:
@@ -220,6 +224,10 @@ function extractAttrs(entity: Entity): Record<string, unknown> {
       break;
     case EntityType.RepairCradle:
       if (p["uses"] !== undefined) attrs["uses"] = p["uses"];
+      break;
+    case EntityType.Airlock:
+      if (p["open"] !== undefined) attrs["open"] = p["open"];
+      if (p["locked"] !== undefined) attrs["locked"] = p["locked"];
       break;
     default:
       break;
@@ -573,8 +581,21 @@ export function renderObservationAsText(obs: HarnessObservation): string {
       const attrsStr = Object.keys(p.attrs).length > 0
         ? ` {${Object.entries(p.attrs).map(([k, v]) => `${k}:${String(v)}`).join(", ")}}`
         : "";
+
+      // Special descriptions for toggleable entities
+      let typeDesc = p.type;
+      if (p.type === "Airlock") {
+        typeDesc = p.attrs["open"] === true
+          ? "Airlock (OPEN \u2014 venting)"
+          : "Airlock (SEALED)";
+      } else if (p.type === "ClosedDoor") {
+        typeDesc = p.attrs["closed"] === false
+          ? "Door (OPEN \u2014 can close)"
+          : "Door (CLOSED \u2014 can open)";
+      }
+
       lines.push(
-        `  ${p.id.padEnd(16)} ${p.type.padEnd(22)} (${p.pos.x},${p.pos.y}) dist=${p.distance}${interactTag}${attrsStr}`,
+        `  ${p.id.padEnd(16)} ${typeDesc.padEnd(22)} (${p.pos.x},${p.pos.y}) dist=${p.distance}${interactTag}${attrsStr}`,
       );
     }
   }

@@ -966,7 +966,7 @@ function showHelp(): void {
   display.addLog("  y u b n              NW   NE    SW    SE   (diagonal)", "system");
   display.addLog("  Numpad 1-9           8-way movement (5 = wait)", "system");
   display.addLog("── Actions ──", "system");
-  display.addLog("  i / e                Interact with adjacent entity", "system");
+  display.addLog("  i / e                Interact / open/close doors & airlocks", "system");
   display.addLog("  c                    Clean current tile", "system");
   display.addLog("  t / q                Cycle sensor overlay", "system");
   display.addLog("  x                    Look (examine surroundings)", "system");

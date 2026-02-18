@@ -42,6 +42,7 @@ export const PRESSURE_SPREAD_RATE = 1; // pressure leaks to adjacent tiles per t
 export const PRESSURE_DAMAGE_THRESHOLD = 40; // below this, bot takes damage
 export const PRESSURE_DAMAGE_PER_TURN = 3; // HP lost per turn in low-pressure zone
 export const PRESSURE_BULKHEAD_THRESHOLD = 10; // below this, adjacent doors auto-seal
+export const AIRLOCK_PRESSURE_DRAIN = 8; // pressure drained per turn at open airlock tile
 
 // ── Patrol drone ─────────────────────────────────────────────
 export const PATROL_DRONE_DAMAGE = 5; // HP lost on contact with hostile patrol drone
@@ -83,4 +84,5 @@ export const GLYPHS = {
   crewNPC: "🙋",      // person raising hand — living crew member
   repairCradle: "⚕️",  // medical — bot repair station
   console: "▣",       // terminal — interactable console
+  airlock: "⊟",       // airlock hatch
 } as const;

@@ -140,7 +140,9 @@ function isExhausted(entity: Entity, state: GameState): boolean {
     case EntityType.Relay:
       return entity.props["activated"] === true || entity.props["locked"] === true;
     case EntityType.ClosedDoor:
-      return entity.props["closed"] === false;
+      return false; // doors can always be toggled (opened or closed)
+    case EntityType.Airlock:
+      return false; // airlocks can always be toggled
     case EntityType.CrewItem:
       return entity.props["examined"] === true || entity.props["hidden"] === true;
     case EntityType.LogTerminal:
@@ -247,13 +249,27 @@ export function getValidActionsForState(state: GameState): HarnessAction[] {
 
 /**
  * Format a HarnessAction as a human-readable description string.
+ * If state is provided, gives richer descriptions for entity interactions.
  */
-export function describeAction(ha: HarnessAction): string {
+export function describeAction(ha: HarnessAction, state?: GameState): string {
   switch (ha.action) {
     case "MOVE":
       return `Move ${DIR_LABELS[ha.params?.dir as string] ?? ha.params?.dir}`;
-    case "INTERACT":
+    case "INTERACT": {
+      const targetId = ha.params?.target as string | undefined;
+      if (targetId && state) {
+        const entity = state.entities.get(targetId);
+        if (entity) {
+          if (entity.type === EntityType.Airlock) {
+            return "Toggle airlock";
+          }
+          if (entity.type === EntityType.ClosedDoor && entity.props["closed"] === false) {
+            return "Close door";
+          }
+        }
+      }
       return `Interact with ${ha.params?.target}`;
+    }
     case "SCAN":
       return "Scan surroundings";
     case "CLEAN":

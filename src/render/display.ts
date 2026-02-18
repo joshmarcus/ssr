@@ -141,6 +141,7 @@ const ENTITY_COLORS: Record<string, string> = {
   [EntityType.CrewNPC]: "#ffee66",
   [EntityType.RepairCradle]: "#44ddff",
   [EntityType.Console]: "#66aacc",
+  [EntityType.Airlock]: "#0ff",
 };
 
 // Entity background glow colors (subtle tint behind entities)
@@ -161,6 +162,7 @@ const ENTITY_BG_GLOW: Record<string, string> = {
   [EntityType.CrewNPC]: "#1a1800",
   [EntityType.RepairCradle]: "#081820",
   [EntityType.Console]: "#0a1520",
+  [EntityType.Airlock]: "#001a1a",
 };
 
 const ENTITY_GLYPHS: Record<string, string> = {
@@ -185,6 +187,7 @@ const ENTITY_GLYPHS: Record<string, string> = {
   [EntityType.RepairCradle]: "\u2695\ufe0f",  // ⚕️
   [EntityType.EvidenceTrace]: "\ud83d\udc63",  // 👣
   [EntityType.Console]: "\ud83d\udcbb",  // 💻 (terminal)
+  [EntityType.Airlock]: "\u229f",        // ⊟
 };
 
 // ── Thermal color interpolation ─────────────────────────────────
@@ -554,9 +557,14 @@ export class BrowserDisplay implements IGameDisplay {
         continue;
       }
       const key = `${entity.pos.x},${entity.pos.y}`;
+      // Airlock: red when open, cyan when closed
+      let entityColor = ENTITY_COLORS[entity.type] || "#fff";
+      if (entity.type === EntityType.Airlock) {
+        entityColor = entity.props["open"] === true ? "#f00" : "#0ff";
+      }
       entityAt.set(key, {
         glyph: ENTITY_GLYPHS[entity.type] || "?",
-        color: ENTITY_COLORS[entity.type] || "#fff",
+        color: entityColor,
         bgGlow: ENTITY_BG_GLOW[entity.type],
       });
     }
@@ -1005,6 +1013,7 @@ export class BrowserDisplay implements IGameDisplay {
       { key: EntityType.CrewNPC, glyph: ENTITY_GLYPHS[EntityType.CrewNPC] || "☺", color: "#fe6", label: "Crew" },
       { key: EntityType.EvidenceTrace, glyph: ENTITY_GLYPHS[EntityType.EvidenceTrace] || "※", color: "#ca8", label: "Evidence" },
       { key: EntityType.Console, glyph: ENTITY_GLYPHS[EntityType.Console] || "💻", color: "#6ac", label: "Console" },
+      { key: EntityType.Airlock, glyph: ENTITY_GLYPHS[EntityType.Airlock] || "⊟", color: "#0ff", label: "Airlock" },
       { key: "_heat", glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
       { key: "_locked", glyph: GLYPHS.lockedDoor, color: "#f00", label: "Locked" },
       { key: "_door", glyph: GLYPHS.door, color: "#a52", label: "Door" },
@@ -1025,7 +1034,7 @@ export class BrowserDisplay implements IGameDisplay {
 
     const controlsHtml = `<span class="label">Keys:</span> ` +
       `<span class="key">hjkl</span>/<span class="key">yubn</span> move ` +
-      `<span class="key">i</span> interact ` +
+      `<span class="key">i</span> open/close doors &amp; interact ` +
       `<span class="key">t</span> sensor ` +
       `<span class="key">c</span> clean ` +
       `<span class="key">;</span> journal ` +
