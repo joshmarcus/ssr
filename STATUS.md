@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 10 (Mystery Choices + Reward Consolidation + Log Polish)
+- **Phase**: Sprint 11 (Sound Effects + Game-Over Polish + Tutorial Hints)
 - **Test status**: 189 tests passing across 17 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
@@ -29,6 +29,9 @@
 - Harness CLI for AI playtesting (with deduction support)
 - Heuristic playtest bot (playtest_bot.ts)
 - Mystery choices: 3 narrative decisions in broadcast report (blame, data handling, incident-specific)
+- Procedural sound effects: 12 Web Audio SFX (movement, interaction, scan, errors, victory/defeat, phase transitions, deductions, PA, choices)
+- Game-over overlay: performance rating (S/A/B/C/D), stats summary, mystery choices recap
+- Tutorial hints: context-sensitive tips at early turns and on first-time events
 
 ## Known Issues
 
@@ -59,6 +62,12 @@
 2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
 2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 11 Changes
+
+- Web Audio synthesizer: 12 procedural SFX (move, interact, scan, error, victory, defeat, phase transition, deduction ready/correct/wrong, PA static burst, choice ping)
+- Game-over overlay polish: performance rating (S/A/B/C/D) with color-coded display, rooms explored, evidence collected, deduction accuracy, mystery choices summary
+- Tutorial hints: 3 early-turn tips (turns 3/8/15) + event-triggered hints (first evidence, first deduction, investigation phase)
 
 ## Sprint 10 Changes
 

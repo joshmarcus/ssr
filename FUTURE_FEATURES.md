@@ -9,6 +9,8 @@ Ideas and planned features for post-MVP development.
 ## ~~Mini-Map Widget~~ (DONE — Sprint 8)
 ## ~~Deduction Confirmation / Broadcast Fix~~ (DONE — Sprint 9)
 ## ~~Mystery Choices in Broadcast~~ (DONE — Sprint 10)
+## ~~Sound/Audio System~~ (DONE — Sprint 11)
+## ~~Game-Over Polish + Tutorial Hints~~ (DONE — Sprint 11)
 
 ## Other Deferred Features
 - Radiation/Structural/EM sensor systems (removed in Sprint 5, may revisit)
@@ -19,7 +21,7 @@ Ideas and planned features for post-MVP development.
 - Crew NPC dialogue and cooperation puzzles
 - Controller/gamepad input (Steam Deck target)
 - CI/GitHub Actions pipeline
-- Sound/audio system
 - Meta-progression between runs
 - Evacuation phase activation (crew rescue objective)
 - ~~Mystery choices system~~ (DONE — Sprint 10)
+- ~~Sound/audio system~~ (DONE — Sprint 11)
