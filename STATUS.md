@@ -1,31 +1,36 @@
 # SSR — Project Status
 
-*Last updated: 2026-02-17*
+*Last updated: 2026-02-18*
 
 ## Current State
 
-- **Phase**: Sprint 6 (Harness Deduction Support + Demo Polish)
-- **Test status**: 178 tests passing across 16 test files (0 failing)
+- **Phase**: Sprint 7 (Evidence Browser + PA Announcements + Sidebar Polish)
+- **Test status**: 189 tests passing across 17 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
+- **Playtest**: Bot achieves VICTORY on seed 42 (175 turns, 5/5 deductions correct)
 
 ## What Works
 
 - Core game loop: explore -> evidence -> puzzles -> transmit
 - 7 player actions (Move, Interact, Scan, Clean, Wait, Look, Journal, SubmitDeduction)
-- 24 entity types with distinct interactions
+- 25 entity types with distinct interactions (including Airlock)
 - 3-sensor ladder (Cleanliness, Thermal, Atmospheric)
 - Heat/smoke + pressure/breach hazard systems with spreading
+- Fire system with slow spread and low-pressure suppression
+- Airlock system: toggleable entities that vent atmosphere
 - Procedural crew generation (8-12 crew, relationships, secrets, fates)
 - 150+ narrative elements (38 log templates, 16 authored logs, 16 crew items)
+- Ship computer PA announcements (periodic atmospheric messages)
 - 6 incident archetypes with 5-phase timelines
 - 5-6 chained deductions with evidence linking
 - Narrative threads grouping evidence
+- Evidence Browser overlay [v]: full journal with content, tags, threads, deduction links
 - ROT.js browser rendering with viewport scrolling
-- Harness CLI for AI playtesting (with deduction support as of Sprint 6)
+- Harness CLI for AI playtesting (with deduction support)
+- Heuristic playtest bot (playtest_bot.ts)
 
 ## Known Issues
 
-- Seed 184201 procgen produces only 1 room (golden seed test broken)
 - Controller/gamepad input not yet implemented
 - No save/load system
 - No CI pipeline deployed
@@ -54,6 +59,17 @@
 2026-02-17 10:56  feat: AI playtesting harness — observation renderer, action parser, Claude driver
 2026-02-17 10:42  feat: rubble system, glyph cleanup, 3D facing fix
 ```
+
+## Sprint 7 Changes
+
+- Evidence Browser overlay: scrollable journal with full content, room locations, tags, thread grouping, crew references, and deduction linking (tabs: ALL / THREADS / DEDUCTIONS)
+- Ship computer PA announcements: CORVUS-7 CENTRAL broadcasts every ~15 turns (context-aware: general, warning, atmospheric pools)
+- Sidebar polish: evidence count, deduction progress (correct/total), updated key hints
+- Airlock entity system: toggleable airlocks that vent atmosphere to 0 pressure
+- Complete isEntityExhausted: added missing cases for EvidenceTrace, SensorPickup, DataCore, ServiceBot, CrewNPC, EscapePod, RepairCradle, SecurityTerminal
+- Claude driver fixes: assistant prefill for JSON output, greedy regex for nested braces, Haiku model default
+- Heuristic playtest bot: automated gameplay verification (playtest_bot.ts)
+- Fire system: slow spread with low-pressure suppression
 
 ## Sprint 6 Changes
 
