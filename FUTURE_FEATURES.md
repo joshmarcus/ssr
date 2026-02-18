@@ -18,6 +18,17 @@ Clean up the sidebar navigation to be crisp and minimal:
 - Entity legend should only show glyphs the player has encountered this run
 - Minimal chrome — let the terminal aesthetic breathe
 
+## Evidence Browser / Journal Viewer
+A rich, scrollable evidence browser so the player can review all discovered evidence:
+- Browse all collected journal entries, log transcripts, crew items, and trace evidence
+- See the **full content** of each piece of evidence (not just the summary tag)
+- Show **where** each piece of evidence was found (room name + coordinates)
+- Filter/sort by category (crew logs, items, traces, terminal entries)
+- Highlight which deductions each piece of evidence contributes to (tag connections)
+- Accessible via a dedicated key (e.g., `j` for journal) or overlay panel
+- Should work as a proper investigation board — the player needs to review clues to make deductions
+- Priority: HIGH — core to the mystery/deduction gameplay loop
+
 ## Other Deferred Features
 - Radiation/Structural/EM sensor systems (removed in Sprint 5, may revisit)
 - Station integrity cascading failure system

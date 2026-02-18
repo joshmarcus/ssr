@@ -218,7 +218,9 @@ export function isEntityExhausted(entity: Entity): boolean {
     case EntityType.ClosedDoor:
       return entity.props["locked"] === true;
     case EntityType.Airlock:
-      return false;
+      return false; // always toggleable
+    case EntityType.SecurityTerminal:
+      return false; // always interactable (door lock toggle after first access)
     case EntityType.Console:
       return entity.props["read"] === true;
     case EntityType.CrewItem:
@@ -229,10 +231,24 @@ export function isEntityExhausted(entity: Entity): boolean {
       return entity.props["powered"] === true;
     case EntityType.PowerCell:
       return entity.props["collected"] === true;
+    case EntityType.EvidenceTrace:
+      return entity.props["discovered"] === true;
+    case EntityType.SensorPickup:
+      return entity.props["collected"] === true;
+    case EntityType.DataCore:
+      return false; // always interactable (transmit when ready)
+    case EntityType.ServiceBot:
+      return entity.props["activated"] === true;
+    case EntityType.CrewNPC:
+      return entity.props["evacuated"] === true || entity.props["dead"] === true;
+    case EntityType.EscapePod:
+      return (entity.props["boarded"] as number || 0) >= (entity.props["capacity"] as number || 3);
+    case EntityType.RepairCradle:
+      return false; // always interactable
     case EntityType.PatrolDrone:
     case EntityType.Drone:
     case EntityType.RepairBot:
-      return true;
+      return true; // not interactable
     default:
       return false;
   }

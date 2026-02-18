@@ -25,7 +25,7 @@ import type { HarnessObservation, PoiEntry, ValidAction } from "./types.js";
 
 // ── Configuration ────────────────────────────────────────────
 
-const DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const DEFAULT_MAX_TURNS = 200;
 const API_ENDPOINT = "https://api.anthropic.com/v1/messages";
 const API_VERSION = "2023-06-01";
@@ -33,7 +33,7 @@ const MAX_TOKENS = 200;
 const CONVERSATION_WINDOW = 5; // keep last N turns of context
 const MAX_RETRIES = 5;
 const INITIAL_BACKOFF_MS = 1000;
-const TURN_DELAY_MS = 1500; // delay between turns to avoid rate limiting
+const TURN_DELAY_MS = 4000; // delay between turns to avoid rate limiting
 
 // ── Result types ─────────────────────────────────────────────
 
@@ -443,8 +443,8 @@ function parseAction(responseText: string): Action | null {
   if (codeBlockMatch) {
     jsonStr = codeBlockMatch[1].trim();
   } else {
-    // Try extracting the first JSON object from the text
-    const jsonMatch = jsonStr.match(/\{[\s\S]*?\}/);
+    // Try extracting a JSON object — use greedy match to handle nested braces
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       jsonStr = jsonMatch[0];
     }
@@ -556,6 +556,13 @@ async function callClaude(
 ): Promise<string> {
   let lastError: Error | null = null;
 
+  // Use assistant prefill to force JSON output
+  const prefill = '{"action":"';
+  const messagesWithPrefill = [
+    ...messages,
+    { role: "assistant" as const, content: prefill },
+  ];
+
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const response = await fetch(API_ENDPOINT, {
@@ -569,7 +576,7 @@ async function callClaude(
           model,
           max_tokens: MAX_TOKENS,
           system: SYSTEM_PROMPT,
-          messages,
+          messages: messagesWithPrefill,
         }),
       });
 
@@ -594,7 +601,8 @@ async function callClaude(
       };
 
       const textBlock = data.content.find(b => b.type === "text");
-      return textBlock?.text ?? "";
+      // Prepend the prefill since the model continues from it
+      return prefill + (textBlock?.text ?? "");
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < MAX_RETRIES - 1) {
