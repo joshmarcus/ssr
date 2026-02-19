@@ -1,15 +1,15 @@
 # SSR — Project Status
 
-*Last updated: 2026-02-18*
+*Last updated: 2026-02-19*
 
 ## Current State
 
-- **Phase**: Sprint 19 (Storyline Overhaul + Writers Room Review)
+- **Phase**: Sprint 20 (Deduction Quality Polish)
 - **Test status**: 279 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Default archetype**: SignalAnomaly (locked for playtesting — highest-rated storyline)
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
-- **Save key**: v3 (bumped due to archetype distribution change)
+- **Save key**: v3
 
 ## What Works
 
@@ -64,6 +64,18 @@
 - No CI pipeline deployed
 - `selectArchetype()` locked to SignalAnomaly — restore seed-based selection after polish pass
 
+## Sprint 20 Changes
+
+### Deduction Quality Polish (P0/P1/P2 fixes from Writers Room)
+- **P0: Fix premature villain identification**: HullBreach Tier 3 now requires `["hull", "forensic"]` instead of `{security_last}` — no longer names the killer 2 tiers early. Sabotage Tier 3 now requires `["electrical", "biological"]` instead of `{captain_last}`.
+- **P2: Fix duplicate tag requirements**: SignalAnomaly Tier 3 changed from `{scientist_last}` to `"transmission"` — scientist name saved for Tier 5 responsibility reveal only.
+- **P1: Diversify primary tags**: Tier 2 now uses secondary archetype tags (CoolantCascade: `thermal`, HullBreach: `pressure`) instead of reusing the Tier 1 tag. Forces new evidence discovery.
+- **P0: Cut revelation text ~30%**: Systematic trim across all ~50 revelation strings. Tag revelations now 1-2 sentences, syntheses 2-3 sentences. All Protected Lines preserved.
+- **4 flagged lines fixed**: Removed "This station died one junction at a time" (overwrought), "to isolate, to blind, to feed" (purple prose), "That certainty is what makes them responsible" (editorial), replaced "The data core killed the power" with evidence-based language.
+- **P2: Strengthen wrong answers**: Archetype-aware distractors at Tiers 2-3. Each archetype now has one plausible wrong answer that uses the same evidence differently.
+- **STORYLINES.md cleanup**: Removed all ContainmentBreach content, updated archetype counts, fixed captain-as-villain counts.
+- **Playtest bot**: VICTORY on seed 42 in 179 turns, 6/6 deductions correct. New tag requirements validated.
+
 ## Sprint 19 Changes
 
 ### ContainmentBreach Archetype Removed
@@ -95,6 +107,7 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ## Recent Changes (Git History)
 
 ```
+2026-02-19        feat: sprint 20 — deduction quality polish (P0/P1/P2 fixes)
 2026-02-18        feat: sprint 19 — storyline overhaul, ContainmentBreach removed, writers room review
 2026-02-18        feat: sprint 18 — mystery revelation system (revelation cascade, split-pane UI, post-answer overlay)
 2026-02-17 22:36  fix: add missing crewPaths.ts and threads.ts to repo
@@ -220,14 +233,14 @@ Three independent review agents evaluated all storylines. Results captured in `W
 | src/render/  | 2026-02-18    |
 | src/harness/ | 2026-02-17    |
 | src/shared/  | 2026-02-18    |
-| src/data/    | 2026-02-18    |
+| src/data/    | 2026-02-19    |
 
 ### Key Sim Files
 | File                   | Last Modified       |
 |-----------------------|---------------------|
 | src/sim/step.ts        | 2026-02-17 22:49   |
 | src/sim/procgen.ts     | 2026-02-17 22:22   |
-| src/sim/deduction.ts   | 2026-02-18          |
+| src/sim/deduction.ts   | 2026-02-19          |
 | src/sim/whatWeKnow.ts  | 2026-02-18          |
 | src/sim/hazards.ts     | 2026-02-17 22:18   |
 | src/sim/crewPaths.ts   | 2026-02-17 22:02   |
