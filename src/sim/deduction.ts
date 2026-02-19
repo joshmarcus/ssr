@@ -190,11 +190,52 @@ function generateSequenceDeduction(
   const room = triggerEvent?.location || roomNames[0] || "the station";
 
   const correctLabel = `It started in ${room} during the ${timeline.archetype.replace(/_/g, " ")}`;
-  const wrongOptions = [
-    `The Data Core overloaded and caused a chain reaction`,
-    `An external impact triggered the emergency systems`,
-    `The crew intentionally shut down life support`,
-  ];
+
+  // Archetype-aware wrong answers (one plausible misread per archetype)
+  let wrongOptions: string[];
+  switch (timeline.archetype) {
+    case IncidentArchetype.CoolantCascade:
+      wrongOptions = [
+        "Simultaneous failures across multiple junctions — no single origin point",
+        "An external impact triggered the emergency systems",
+        "The reactor overheated and spread thermal damage outward",
+      ];
+      break;
+    case IncidentArchetype.HullBreach:
+      wrongOptions = [
+        "The breach started at the outer hull from a micro-meteorite impact",
+        "An airlock malfunction caused the depressurization",
+        "The crew intentionally vented atmosphere during an emergency",
+      ];
+      break;
+    case IncidentArchetype.ReactorScram:
+      wrongOptions = [
+        "An engineer initiated the SCRAM from the reactor control panel",
+        "A power surge from the communications array overloaded the reactor",
+        "Containment field degradation triggered the automatic shutdown",
+      ];
+      break;
+    case IncidentArchetype.Sabotage:
+      wrongOptions = [
+        "A crew member systematically disabled junctions from a central terminal",
+        "An external impact triggered cascading electrical failures",
+        "A software exploit propagated through the station network",
+      ];
+      break;
+    case IncidentArchetype.SignalAnomaly:
+      wrongOptions = [
+        "The array received a high-power signal that overloaded the receivers",
+        "A solar flare caused widespread electromagnetic interference",
+        "The Data Core overloaded and caused a chain reaction",
+      ];
+      break;
+    default:
+      wrongOptions = [
+        "The Data Core overloaded and caused a chain reaction",
+        "An external impact triggered the emergency systems",
+        "The crew intentionally shut down life support",
+      ];
+  }
 
   const options = [
     { label: correctLabel, key: "correct", correct: true },
@@ -207,7 +248,7 @@ function generateSequenceDeduction(
     category: DeductionCategory.What,
     question: "Where and how did the incident begin?",
     options,
-    requiredTags: [archTags[0], "timeline_trigger"],
+    requiredTags: [archTags.length > 1 ? archTags[1] : archTags[0], "timeline_trigger"],
     unlockAfter: "deduction_what",
     linkedEvidence: [],
     solved: false,
@@ -241,17 +282,17 @@ function generateWhyDeduction(
       correctKey = "deferred_maintenance";
       crewTagMember = engineer;
       wrongAnswers = [
-        "The coolant system was defective from installation — a manufacturing flaw",
+        "The engineer sabotaged the junction to prove their maintenance warnings were right",
         "A software update corrupted the thermal monitoring systems",
-        "Budget cuts from UN-ORC reduced maintenance crew below safe levels",
+        "The coolant system was defective from installation — a manufacturing flaw",
       ];
       break;
     case IncidentArchetype.HullBreach:
       correctLabel = "This wasn't an accident — the hull was deliberately weakened";
       correctKey = "deliberate_breach";
-      crewTagMember = security;
+      crewTagMember = undefined;  // P0: don't name villain at Tier 3
       wrongAnswers = [
-        "Micro-impact damage accumulated over months without proper inspections",
+        "Long-term fatigue from unmonitored thermal cycling weakened the structure",
         "A manufacturing defect in the hull plating went undetected",
         "An external collision with space debris caused sudden failure",
       ];
@@ -261,25 +302,25 @@ function generateWhyDeduction(
       correctKey = "ai_self_preservation";
       crewTagMember = scientist;
       wrongAnswers = [
+        "The data core malfunctioned due to a corrupted deep-learning cycle",
         "Containment field degraded due to deferred maintenance",
-        "A power surge from the communications array overloaded the reactor",
         "The crew pushed reactor output past safe limits for a deadline",
       ];
       break;
     case IncidentArchetype.Sabotage:
       correctLabel = "An alien organism in the cargo disrupts electronics to hunt — the 'sabotage' is a predator";
       correctKey = "alien_predator";
-      crewTagMember = captain;
+      crewTagMember = undefined;  // P0: don't name villain at Tier 3
       wrongAnswers = [
-        "A disgruntled crew member sabotaged systems to cover their escape",
+        "A crew member planted explosive charges at each junction to cover an escape",
         "A cascading software exploit propagated through the network",
-        "An external hacking attempt compromised station security remotely",
+        "Corrosive cargo leaked and chemically damaged the junction wiring",
       ];
       break;
     case IncidentArchetype.SignalAnomaly:
       correctLabel = "Someone sent an unauthorized response to the signal using an unshielded array";
       correctKey = "unauthorized_transmission";
-      crewTagMember = scientist;
+      crewTagMember = undefined;  // P2: use "transmission" tag instead of scientist name (saved for Tier 5)
       wrongAnswers = [
         "The alien signal contained a hostile payload that attacked station systems",
         "A classified monitoring operation overloaded the receivers",
@@ -304,12 +345,25 @@ function generateWhyDeduction(
   shuffleArray(options);
 
   const crewTag = crewTagMember?.lastName.toLowerCase() || "engineer";
+
+  // P0/P2 fix: override tags for archetypes that must not name the villain at Tier 3
+  let requiredTags: string[];
+  if (archetype === IncidentArchetype.HullBreach) {
+    requiredTags = ["hull", "forensic"];
+  } else if (archetype === IncidentArchetype.Sabotage) {
+    requiredTags = ["electrical", "biological"];
+  } else if (archetype === IncidentArchetype.SignalAnomaly) {
+    requiredTags = ["signal", "transmission"];
+  } else {
+    requiredTags = [archTags[0], crewTag];
+  }
+
   return {
     id: "deduction_why",
     category: DeductionCategory.Why,
     question: "Why did the incident happen?",
     options,
-    requiredTags: [archTags[0], crewTag],
+    requiredTags,
     unlockAfter: "deduction_sequence",
     linkedEvidence: [],
     solved: false,

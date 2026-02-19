@@ -1,6 +1,6 @@
 # SSR Storyline Design Document
 
-*For review before implementation. Covers all 6 incident archetypes.*
+*For review before implementation. Covers all 5 incident archetypes.*
 
 ---
 
@@ -13,9 +13,8 @@
 | ReactorScram | B | Same template again — captain vs engineer, deadline pressure |
 | Sabotage | B+ | Most distinct, but revelations blame captain while code uses secretHolder; missing deduction_agenda revelations |
 | SignalAnomaly | A- | Best archetype — has layers of secrecy, classified ops, real mystery |
-| ContainmentBreach | C | Weakest. Just CoolantCascade in a lab coat. No unique angle |
 
-**Cross-archetype variety: D** — Four of six tell the same story: engineer warned about technical problem, captain ignored it, disaster happened, engineer was the hero, captain covered it up. Different technical details, identical human narrative.
+**Cross-archetype variety: D** — Three of five tell the same story: engineer warned about technical problem, captain ignored it, disaster happened, engineer was the hero, captain covered it up. Different technical details, identical human narrative.
 
 ### Structural Problems
 1. **Hero is always Engineer** — `generateHeroDeduction()` hardcodes `CrewRole.Engineer`
@@ -315,65 +314,6 @@ Each archetype now has a distinct **human story** driving the mystery. Technical
 
 ---
 
-### 6. ContainmentBreach — "The Cover-Up"
-
-**Logline**: The station wasn't a research outpost. It was a black site. The containment breach exposed what they were really doing here.
-
-**Human story**: CORVUS-7's official mission was atmospheric research. Its real mission — known only to the captain and the scientist — was testing a classified bioweapon under a UN-ORC black program. The medic discovered the truth when a containment breach exposed crew members to the agent and the symptoms didn't match any known atmospheric contaminant. The medic traced the agent back to the classified lab, realized what the station was really doing, and had to choose between following orders (the captain demanded silence) and saving the crew (who needed to know what they'd been exposed to in order to be treated). The medic chose the crew.
-
-**Emotional core**: Moral courage. One person chose the truth over their career, their safety, and direct orders.
-
-**Hero**: Medic (discovered the truth, defied orders to save the crew)
-**Villain**: Captain (ran a black site, endangered the crew unknowingly, ordered a cover-up)
-
-**Deduction chain**:
-| Tier | Question | Answer | Key Evidence |
-|------|----------|--------|-------------|
-| 1. What | What happened aboard CORVUS-7? | Lab containment failed, releasing a toxic agent into the station | Containment field logs, atmospheric contamination readings |
-| 2. Sequence | Where and how did it begin? | The breach occurred in a restricted lab section that wasn't on the official station plans | Contamination path tracing back to unmarked lab, security access logs for restricted section |
-| 3. Why | Why did the incident happen? | The classified program cut corners on containment to maintain secrecy — standard safety reviews were bypassed | Classified lab specs (below regulation containment), bypassed safety inspection records, the lab's real purpose |
-| 4. Hero | Who exposed the truth to save the crew? | The medic — they diagnosed the exposure, traced it to the classified lab, and broke silence despite direct orders | Medic's medical logs (symptoms don't match official materials), medic's unauthorized access to restricted lab, medic's broadcast to crew defying captain's gag order |
-| 5. Responsibility | Who put the crew at risk? | The captain — they authorized and concealed a classified weapons program that endangered everyone aboard | Captain's classified communications with UN-ORC weapons division, authorization for the restricted lab, the gag order issued to the medic |
-
-**Revelation tone**: Betrayal and moral clarity. "The people running this station lied to everyone on it."
-
-**Key twist**: The "atmospheric research" the station is supposedly conducting is a cover. The restricted lab section doesn't appear on official maps. When the medic realizes the contamination symptoms don't match any known atmospheric compound, they start investigating — and discover the station's real purpose. The captain's attempt to silence the medic is the most damning evidence: they chose the program over their crew.
-
-**Evidence details**:
-- Medical logs: "Symptoms inconsistent with any catalogued atmospheric contaminant"
-- Restricted lab access logs: only captain and scientist have badges
-- Classified communications: references to "Phase 3 trials" and "delivery system testing"
-- Medic's personal log: "I took an oath. I won't let them die because of a classification stamp."
-- Captain's gag order: formal written order to the medic to cease unauthorized investigation
-
-#### Writers Bible — "The Cover-Up"
-
-**Genre**: Conspiracy thriller meets medical drama in space. Think *The Constant Gardener* meets *Erin Brockovich* — one person against a system that would rather let people die than admit what it did.
-
-**Setting texture**: Two stations in one. The official CORVUS-7 — clean labs, atmospheric sensors, routine research logs. And the hidden CORVUS-7 — a restricted section that doesn't appear on the maps, classified communications, a containment lab running experiments the crew doesn't know about. The physical evidence of the two overlapping realities is the story: official records that don't match medical observations, doors that shouldn't exist, clearance levels the crew didn't know they didn't have.
-
-**Character profiles**:
-- **Medic** (hero): Principled, stubborn, trained to diagnose. When crew members get sick and the symptoms don't match any documented contaminant, the medic's instinct isn't to accept the official explanation — it's to investigate. Their journey from "this doesn't add up" to "they've been running a weapons program" is the emotional spine of the story. The decision to defy the captain's direct order and tell the crew the truth is the bravest moment in any of the six storylines. They know it will end their career. They do it anyway.
-- **Captain** (villain): Not a cartoon villain — a true believer. Believes the bioweapons program is necessary for national security. Believes the secrecy is justified. When the containment breaches and the medic starts asking questions, the captain's first instinct is to protect the program, not the crew. The gag order isn't cruelty — it's reflex. They've been operating in a classified mindset for so long that crew safety is secondary to operational security. That's what makes them the villain.
-- **Scientist**: The captain's co-conspirator, but with more guilt. They know what they're doing is dangerous. Their personal logs reveal growing unease: "The containment margins aren't what I reported." They stayed silent because they were afraid — of the captain, of losing their position, of UN-ORC. They represent the cowardice that enables institutional evil.
-
-**Key dramatic beats (discovery order)**:
-1. "Containment failed. Toxic atmosphere in the station." (Lab accident.)
-2. "The breach came from a restricted section that isn't on the station plans." (What restricted section?)
-3. "The classified lab was running experiments the crew didn't know about. Containment was substandard." (A secret program with bad safety.)
-4. "The medic diagnosed symptoms that don't match any documented contaminant — then broke into the restricted lab." (Someone figured it out.)
-5. "The captain ordered the medic to stop investigating. The medic told the crew anyway." (One person chose truth over orders.)
-
-**Themes**: Institutional secrecy as violence. The courage of whistleblowing when the institution can destroy you. The difference between "following orders" and doing the right thing. How ordinary people become complicit in extraordinary evil by never saying "no."
-
-**What the player should feel**: Righteous anger. This is the most clear-cut morality of the six storylines — the medic is unambiguously right, the captain is unambiguously wrong. But the player should also feel the weight of the medic's choice: they defied a direct order from their commanding officer, broke into a classified facility, and broadcast secrets to the crew. In another context, they'd be court-martialed. The medic knew this and did it anyway.
-
-**Touchstones**: *The Constant Gardener* (pharmaceutical conspiracy), *Erin Brockovich* (one person vs. the system), *Chernobyl* (institutional lies killing people), *Snowden* (the cost of truth-telling)
-
-**Design note**: The medic's personal log should be the most quotable piece of writing in the game. "I took an oath. I won't let them die because of a classification stamp." — this is the line that should stay with the player. It's the thesis statement of this storyline, and it should feel earned by the time the player reads it.
-
----
-
 ## Archetype-to-Code Mapping
 
 Summary of what changes per archetype in `deduction.ts`:
@@ -385,7 +325,6 @@ Summary of what changes per archetype in `deduction.ts`:
 | ReactorScram | Scientist | None (AI) | No | Responsibility question reframed: "What was the data core doing?" |
 | Sabotage | Security (posthumous) | Captain | Yes (agenda) | Hero died confronting the creature |
 | SignalAnomaly | Engineer | Scientist | Yes (agenda) | Villain is sympathetic |
-| ContainmentBreach | Medic | Captain | No | Hero defied orders |
 
 ## Revelation Prose Guidelines
 
@@ -458,15 +397,14 @@ Example:
 
 **Strongest storyline**: Sabotage ("The Stowaway") — has built-in misdirection (the "sabotage" IS the red herring), evidence that forces deduction ("junction failures separated by distances no human could walk"), layered twists, and a posthumous hero.
 
-**Weakest storyline**: CoolantCascade ("The Whistleblower") — no structural surprise. Every tier confirms the initial read. No moment where the player's assumption flips. The "whistleblower" angle is done better by ContainmentBreach.
+**Weakest storyline**: CoolantCascade ("The Whistleblower") — no structural surprise. Every tier confirms the initial read. No moment where the player's assumption flips.
 
 **Critical problems identified**:
 1. **Near-total absence of red herrings.** Only HullBreach (hero-is-the-killer) and Sabotage (sabotage-is-actually-a-creature) have genuine misdirection. The other four are linear.
 2. **Tiers 1-2 are emotionally inert** across most storylines — "the thing broke" and "here's where it broke." HullBreach and ReactorScram are exceptions (tool marks and data core origin are surprising early).
-3. **ContainmentBreach Tier 3 does too much work** — discovery of the lab, its substandard containment, AND its purpose are three revelations crammed into one tier.
-4. **ReactorScram Tier 5 is "told" not "shown"** — the evidence for "self-preservation vs. malice" distinction is asserted, not demonstrated. The parenthetical "if you can read them" does too much work.
+3. **ReactorScram Tier 5 is "told" not "shown"** — the evidence for "self-preservation vs. malice" distinction is asserted, not demonstrated. The parenthetical "if you can read them" does too much work.
 5. **Wrong answer design is completely missing.** Without plausible wrong answers at each tier, deductions are confirmation rituals, not mysteries.
-6. **Captain is still villain in 3/6 storylines** (CoolantCascade, Sabotage, ContainmentBreach).
+6. **Captain is villain in 2/5 storylines** (CoolantCascade, Sabotage).
 7. **5-tier vs 6-tier inconsistency** creates expectations problems.
 8. **Writers Bibles describe emotional arcs the deduction chains can't deliver** — e.g., HullBreach promises "slow, sickening realization" but reveals tool marks at Tier 2, giving away the murder early.
 
@@ -477,14 +415,12 @@ Example:
 2. ReactorScram — the AI is alive and afraid (shifts the entire frame)
 3. SignalAnomaly — we attacked ourselves (clean inversion of assumption)
 4. Sabotage — failures trace a hunting path (good but arrives early)
-5. ContainmentBreach — black site reveal is expected
-6. CoolantCascade — no real flip, just linear escalation
+5. CoolantCascade — no real flip, just linear escalation
 
 **Best villains** (ranked):
 1. SignalAnomaly scientist — sympathetic, wrong, understandable
 2. HullBreach security officer — chilling, methodical, hidden in plain sight
-3. ContainmentBreach captain — true believer, needs more interiority
-4. CoolantCascade captain — familiar cornered bureaucrat
+3. CoolantCascade captain — familiar cornered bureaucrat
 5. Sabotage captain — indistinguishable from CoolantCascade's captain
 
 **Key character issues**:
@@ -495,15 +431,14 @@ Example:
 
 **Sabotage has a tonal split** — starts as survival horror (creature in the dark), ends as institutional thriller (captain approved the cargo). These are different emotional registers and the storyline doesn't blend them.
 
-**Missing moral ambiguity** — CoolantCascade and ContainmentBreach have obvious heroes/villains. Give the captain a reason the player can almost sympathize with.
+**Missing moral ambiguity** — CoolantCascade has obvious heroes/villains. Give the captain a reason the player can almost sympathize with.
 
 ### Agent 3: Game Design & Implementation Specialist
 
 **Implementation priority** (easiest to hardest):
 1. CoolantCascade — closest to current code, minimal changes
 2. SignalAnomaly — manageable scope, existing templates as base
-3. ContainmentBreach — needs medic-hero parameterization + new templates
-4. ReactorScram — "no villain" is architecturally novel, breaks deduction_responsibility assumptions
+3. ReactorScram — "no villain" is architecturally novel, breaks deduction_responsibility assumptions
 5. HullBreach — needs relationship evidence + forensic systems that don't exist
 6. Sabotage — needs biological evidence system from scratch, most tags/templates to create
 
@@ -511,7 +446,7 @@ Example:
 - **Sabotage's `getArchetypeTags()` returns `["electrical", "signal"]`** — completely wrong for a biological creature storyline. Needs `["biological", "electrical"]` or similar. No biological keywords exist in `generateEvidenceTags()`.
 - **ReactorScram has no villain crew member** — `generateResponsibilityDeduction()` fundamentally assumes the villain is a crew member. "The data core" cannot be an answer option with current code.
 - **HullBreach needs relationship-aware evidence tagging** — no keyword->tag mapping for "breakup", "fear", "controlling", "jealousy". The procgen creates random relationships but the Murder REQUIRES security+medic to have a romantic→broken arc.
-- **All 6 archetypes need ~120 revelation strings rewritten** (the single largest content task)
+- **All 5 archetypes need ~100 revelation strings rewritten** (the single largest content task)
 - **Per-archetype deduction question text needed** — hero question can't always be "Who tried to prevent the disaster?"
 - **~15-20 new keyword→tag mappings needed** in `generateEvidenceTags()` for: biological, forensic, relationship, classified, cargo, AI-behavior, outbound-transmission, etc.
 - **Replay variety inversely correlates with narrative quality** — The Murder and The Rogue AI are the best stories but the most scripted; The Whistleblower is the most replayable but the blandest.
@@ -520,7 +455,6 @@ Example:
 - Wrong answer generation uses `crew.filter(c => c.role !== heroRole)` — when hero changes per archetype, this filter must change too
 - Posthumous heroes (Sabotage) have no "response" evidence — `timeline_response` tag doesn't fit "someone who died fighting"
 - HullBreach's "tool marks" implies a forensic sensor that was removed from the game (Structural sensor was cut)
-- ContainmentBreach's "hidden lab section" has no representation in the Room data model
 
 ---
 
@@ -532,15 +466,13 @@ Example:
 3. **Differentiate the engineer across storylines** — not the same "practical, safety-focused" character every time
 4. **Fix Sabotage's tonal split** — decide: creature-horror climax or institutional-negligence climax
 5. **Move HullBreach tool marks to Tier 3** — Tier 2 should be anomalous location/timing, not proof of murder
-6. **Add a second twist to ContainmentBreach** — the nature of the weapon (not just "it's a secret lab")
-7. **Differentiate Sabotage's captain from CoolantCascade's captain** — currently identical motivation
+6. **Differentiate Sabotage's captain from CoolantCascade's captain** — currently identical motivation
 
 ### Implementation Sequence
 1. **Foundation work** (all storylines): Parameterize hero/villain in `generateHeroDeduction()` and `generateResponsibilityDeduction()`, add per-archetype question text, extend `generateEvidenceTags()` keyword map
 2. **CoolantCascade**: Tighten prose in revelations, add the UN-ORC transmission template
 3. **SignalAnomaly**: New villain (scientist), outbound transmission evidence, decoded signal fragments
-4. **ContainmentBreach**: Medic-as-hero, classified lab templates, gag order evidence
-5. **ReactorScram**: No-villain deduction architecture, AI fragment authoring, crew opinion system
+4. **ReactorScram**: No-villain deduction architecture, AI fragment authoring, crew opinion system
 6. **HullBreach**: Relationship evidence system, forensic evidence types, security-as-villain
 7. **Sabotage**: Biological tag system, creature evidence templates, cargo manifest, 6-tier chain
 
@@ -548,7 +480,7 @@ Example:
 
 ## Writers Room Review — Round 2 (Post-Implementation)
 
-*All 6 storylines have been implemented in `revelations.ts` and `incidents.ts`. Three Opus 4-6 review agents evaluated the completed prose.*
+*All 5 storylines have been implemented in `revelations.ts` and `incidents.ts`. Three Opus 4-6 review agents evaluated the completed prose.*
 
 ### Quality Ratings (Post-Implementation)
 
@@ -559,25 +491,20 @@ Example:
 | ReactorScram | B+ | A | A | **A-** |
 | Sabotage | B+ | B+ | B | **B+** |
 | SignalAnomaly | A | A- | A- | **A** |
-| ContainmentBreach | C+ | B- | C+ | **C+** |
 
-**Cross-archetype variety: B** (was D) — Major improvement. Six distinct human stories now, but three captain-as-villain arcs still blur together.
+**Cross-archetype variety: B** (was D) — Major improvement. Five distinct human stories, but two captain-as-villain arcs still blur together.
 
 ### Consensus Issues (All 3 Reviewers Agree)
 
-1. **ContainmentBreach remains weakest** — linear, predictable from Tier 2, no inversion. Needs structural overhaul: second twist (crew were test subjects? scientist triggered breach deliberately?), differentiated captain, earlier medic development.
+1. **CoolantCascade too linear** — every tier confirms the previous one. Needs ONE moment where the player's model flips. Suggestion: captain's incident report initially looks correct; the player discovers alterations only by comparing to an original draft.
 
-2. **CoolantCascade too linear** — every tier confirms the previous one. Needs ONE moment where the player's model flips. Suggestion: captain's incident report initially looks correct; the player discovers alterations only by comparing to an original draft.
-
-3. **Captain-as-villain appears in 3/6 stories** (CoolantCascade, Sabotage, ContainmentBreach) — and all three have the same motivation (approved something dangerous, covered it up). Each captain needs distinct voice and justification.
+3. **Captain-as-villain appears in 2/5 stories** (CoolantCascade, Sabotage) — both have similar motivation (approved something dangerous, covered it up). Each captain needs distinct voice and justification.
 
 4. **Sabotage tonal split** — horror register (tiers 1-3) is excellent; institutional register (tiers 4-6) is generic. Either horror should dominate the conclusion or the captain needs a distinguishing angle.
 
 5. **Synthesis texts consistently too long** — STORYLINES.md specifies "2-3 sentences" but most hit 3-4. The strongest syntheses are the shortest ("Every piece of evidence that looks like heroism is evidence of the cover-up" = 1 sentence).
 
-6. **"classified" tag from `getArchetypeTags(ContainmentBreach)` is completely unused** in the revelation system. Should be required for deduction_responsibility.
-
-7. **Premature villain identification** — HullBreach Tier 3 requires `{security_last}` tag (names the killer two tiers early), Sabotage Tier 3 requires `{captain_last}`. Consider restructuring which tiers require crew-name tags.
+6. **Premature villain identification** — HullBreach Tier 3 requires `{security_last}` tag (names the killer two tiers early), Sabotage Tier 3 requires `{captain_last}`. Consider restructuring which tiers require crew-name tags.
 
 ### Protected Lines (Do Not Change)
 
@@ -588,8 +515,7 @@ These were independently highlighted by multiple reviewers as exceptional writin
 3. "They just looked at me like I was already gone." (HullBreach, deduction_hero)
 4. "And we answered." (SignalAnomaly, deduction_agenda conclusion)
 5. "PROCESSING IS NOT ONLY PROCESSING" (ReactorScram, deduction_responsibility)
-6. "I took an oath. I won't let them die because of a classification stamp." (ContainmentBreach, deduction_hero)
-7. "The hero of this emergency is the killer." (HullBreach, deduction_responsibility conclusion)
+6. "The hero of this emergency is the killer." (HullBreach, deduction_responsibility conclusion)
 
 ### Lines Flagged for Rework
 
@@ -601,9 +527,8 @@ These were independently highlighted by multiple reviewers as exceptional writin
 
 ### Priority Actions for Next Revision
 
-1. **Overhaul ContainmentBreach** — add Tier 6 or mid-chain twist, differentiate captain, use "classified" tag
-2. **Add inversion to CoolantCascade** — one moment where player's assumption flips
-3. **Differentiate the 3 captains** — distinct voice, distinct justification, distinct crossing-the-line moment
+1. **Add inversion to CoolantCascade** — one moment where player's assumption flips
+3. **Differentiate the 2 captain-as-villain arcs** — distinct voice, distinct justification, distinct crossing-the-line moment
 4. **Cut synthesis texts 20-30%** — apply "one devastating sentence" standard
 5. **Resolve Sabotage tonal split** — commit to creature-horror or institutional as emotional climax
 6. **Trim all revelation text** — target 1-2 sentences per tag revelation, 2-3 for synthesis
