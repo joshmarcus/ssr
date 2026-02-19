@@ -90,15 +90,15 @@ const REVELATIONS: RevelationMap = {
       tagRevelations: [
         {
           tag: "{captain_last}",
-          text: "Three deferral signatures, one reassignment order, one intercepted complaint to UN-ORC — all bearing {captain}'s authorization. Not negligence. Retaliation.",
+          text: "The filed incident report reads clean: 'material fatigue, no prior indicators.' But the recovered original draft has entire paragraphs deleted — three maintenance requests, a reassignment order, a transmission to UN-ORC. All cut before filing.",
         },
         {
           tag: "timeline_aftermath",
-          text: "{captain}'s incident report lists the cause as 'unforeseeable equipment failure.' No mention of the three maintenance requests, the reassignment, or the transmission to UN-ORC.",
+          text: "Compare the two versions side by side. The filed report says 'maintenance status: current.' The original draft said 'deferred maintenance at junction V-4.' {captain} didn't just ignore the warnings — {captain_last} erased them.",
         },
       ],
-      synthesisText: "{captain} denied the repairs, reassigned the whistleblower, and filed an incident report that pretends none of it happened. The cover-up started the moment {engineer} went over {captain_last}'s head.",
-      conclusionText: "CONFIRMED: {captain} deferred maintenance, punished the whistleblower, and falsified the report. The system didn't fail — it was failed.",
+      synthesisText: "The official report looked clean. The recovered draft tells the real story: three maintenance requests deleted, a whistleblower reassigned, and the word 'deferred' overwritten with 'material fatigue.' {captain} didn't just fail to act — {captain_last} rewrote history.",
+      conclusionText: "CONFIRMED: {captain} falsified the incident report. The official record is a lie. The system didn't fail — it was failed.",
     },
   },
 
@@ -324,15 +324,15 @@ const REVELATIONS: RevelationMap = {
       tagRevelations: [
         {
           tag: "biological",
-          text: "The real manifest lists 'XB-VII Biological Sample, Class 4 Containment Required.' Routing codes: UN-ORC xenobiology division. Not a commercial delivery — a classified specimen transfer.",
+          text: "The real manifest lists 'XB-VII Biological Sample, Class 4 Containment Required.' But the routing history shows seven prior transfers through CORVUS-7 — all under the same program code. This wasn't the first specimen. It was the eighth.",
         },
         {
           tag: "cargo",
-          text: "Hidden communications reference 'Phase 2 acquisition' and 'live sample transit via CORVUS-7.' The station was a designated transfer node for a covert xenobiology program. The crew was never informed.",
+          text: "Hidden communications: 'Phase 2 acquisition complete. Live sample in transit. Advise: crew rotation recommended before next transfer cycle.' They were already planning the ninth shipment. The crew was scheduled to be replaced, not warned.",
         },
       ],
-      synthesisText: "CORVUS-7 was a waypoint for classified biological specimens — live alien organisms routed under {captain}'s authority, without the crew's knowledge or proper containment. The creature was not an accident. It was cargo.",
-      conclusionText: "CONFIRMED: Classified xenobiology program — live specimens routed through CORVUS-7. The crew was expendable. The cargo was not.",
+      synthesisText: "Seven prior specimens, all routed through CORVUS-7 under {captain}'s authority. The crew was never told. The next transfer was already scheduled — with a fresh crew, because the current one had been 'exposed.' {security} died holding a corridor so the others could live. The program that killed {security_last} was never going to stop.",
+      conclusionText: "CONFIRMED: CORVUS-7 was a waypoint for a classified xenobiology pipeline — eight specimens and counting. {security} died for a program that considered the entire crew disposable.",
     },
   },
 

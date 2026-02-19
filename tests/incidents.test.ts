@@ -25,7 +25,18 @@ describe("incidents", () => {
     }
   });
 
-  it("all 6 archetypes have complete templates", () => {
+  it("all 5 archetypes are reachable across seeds", () => {
+    const seen = new Set<IncidentArchetype>();
+    for (let seed = 0; seed < 100; seed++) {
+      seen.add(selectArchetype(seed));
+    }
+    expect(seen.size).toBe(ALL_ARCHETYPES.length);
+    for (const arch of ALL_ARCHETYPES) {
+      expect(seen.has(arch), `archetype ${arch} should be reachable`).toBe(true);
+    }
+  });
+
+  it("all 5 archetypes have complete templates", () => {
     for (const arch of ALL_ARCHETYPES) {
       const template = getTemplate(arch);
       expect(template).toBeDefined();

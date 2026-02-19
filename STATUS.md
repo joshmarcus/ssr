@@ -4,10 +4,10 @@
 
 ## Current State
 
-- **Phase**: Sprint 20 (Deduction Quality Polish)
-- **Test status**: 279 tests passing across 24 test files (0 failing)
+- **Phase**: Sprint 21 (Unlock the Archetypes)
+- **Test status**: 280 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
-- **Default archetype**: SignalAnomaly (locked for playtesting — highest-rated storyline)
+- **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
 - **Save key**: v3
 
@@ -62,7 +62,16 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
-- `selectArchetype()` locked to SignalAnomaly — restore seed-based selection after polish pass
+- Bot pathfinding: playtest bot gets stuck escorting survivors on some seeds (184201, 4, 5)
+
+## Sprint 21 Changes
+
+### Unlock the Archetypes
+- **Restored seed-based archetype selection**: `selectArchetype(seed)` now uses `seed % 5` instead of returning SignalAnomaly. All 5 archetypes reachable across seeds.
+- **CoolantCascade structural inversion (captain's report twist)**: Rewrote deduction_responsibility tier — player now compares the filed incident report ("material fatigue, no prior indicators") against the recovered original draft (three deleted maintenance requests, a reassignment order, a transmission to UN-ORC). Two new log templates: `coverup_official_report` and `coverup_original_draft`.
+- **Captain voice differentiation**: CoolantCascade captain uses corporate euphemism (sanitized reports, redacted paragraphs); Sabotage captain uses military brevity ("Risk is acceptable", reclassification, manifest deletion). No longer interchangeable.
+- **Sabotage tonal resolution**: Rewrote deduction_agenda (Tier 6) — the final revelation now reveals CORVUS-7 as an ongoing pipeline (8 prior specimens, crew scheduled for replacement). Commits to creature-horror as emotional climax.
+- **Multi-archetype playtest validation**: All 5 archetypes tested. ReactorScram (seed 42): VICTORY 5/5. Sabotage (seed 3): VICTORY 6/6. HullBreach (seed 184201): 5/5 correct. SignalAnomaly (seed 4): 6/6 correct. CoolantCascade (seed 5): 3/3 correct.
 
 ## Sprint 20 Changes
 

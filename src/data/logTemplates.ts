@@ -240,6 +240,22 @@ export const LOG_TEMPLATES: LogTemplate[] = [
     source: "anonymous",
   },
 
+  // ── Cover-up evidence (CoolantCascade) ─────────────────────────
+  {
+    id: "coverup_official_report",
+    category: "aftermath",
+    title: "Incident Report — Filed",
+    text: "INCIDENT REPORT — {captain}: Unforeseeable thermal cascade in relay section. Equipment age consistent with failure mode. No prior indicators. Maintenance status: current. Cause: material fatigue. Recommendation: scheduled relay replacement at next resupply.",
+    source: "{captain_last}",
+  },
+  {
+    id: "coverup_original_draft",
+    category: "aftermath",
+    title: "Incident Report — Original Draft [RECOVERED]",
+    text: "INCIDENT REPORT DRAFT — {captain}: Thermal cascade in relay section. [DELETED: 'Three maintenance requests filed by {engineer_last} over three weeks. All deferred — resupply deadline took priority.'] [DELETED: '{engineer_last} transmitted concerns to UN-ORC directly. Reassignment order issued.'] Cause: [OVERWRITTEN: was 'deferred maintenance at junction V-4'] material fatigue.",
+    source: "system",
+  },
+
   // ── Technical / comms ─────────────────────────────────────────
   {
     id: "tech_signal",

@@ -115,11 +115,11 @@ export const INCIDENT_TEMPLATES: Record<IncidentArchetype, IncidentTemplate> = {
 
 /**
  * Select an incident archetype deterministically from a seed.
- * TEMPORARY: Locked to SignalAnomaly for playtesting (highest-rated storyline).
- * TODO: Restore seed-based selection when all storylines are polished.
+ * Uses modular arithmetic over the enum values for even distribution.
  */
-export function selectArchetype(_seed: number): IncidentArchetype {
-  return IncidentArchetype.SignalAnomaly;
+export function selectArchetype(seed: number): IncidentArchetype {
+  const archetypes = Object.values(IncidentArchetype);
+  return archetypes[Math.abs(seed) % archetypes.length];
 }
 
 /**
