@@ -8,6 +8,11 @@ export class AudioManager {
   private masterGain: GainNode | null = null;
   private ambientNodes: AudioNode[] = [];
   private ambientActive = false;
+  private bgMusic: HTMLAudioElement | null = null;
+  private bgMusicStarted = false;
+  private ttsEnabled = false;
+  private ttsQueue: string[] = [];
+  private ttsSpeaking = false;
 
   /** Lazily initialise AudioContext (must follow a user gesture). */
   private ensure(): { ctx: AudioContext; master: GainNode } {
@@ -432,5 +437,78 @@ export class AudioManager {
     signal.start();
     signalLfo.start();
     this.ambientNodes.push(signal, signalLfo);
+  }
+
+  // ── Background music ──────────────────────────────────────
+
+  /** Start looping background music (triggered on first interaction). */
+  startBgMusic(): void {
+    if (this.bgMusicStarted) return;
+    this.bgMusicStarted = true;
+    const base = (import.meta as unknown as { env: { BASE_URL: string } }).env.BASE_URL || "/";
+    const audio = new Audio(`${base}music/8bit_afterglow.mp3`);
+    audio.loop = true;
+    audio.volume = 0.12; // quiet background layer
+    this.bgMusic = audio;
+    audio.play().catch(() => {
+      // Autoplay blocked — will retry on next interaction
+      this.bgMusicStarted = false;
+    });
+  }
+
+  /** Stop background music (e.g., on game over). */
+  stopBgMusic(): void {
+    if (this.bgMusic) {
+      this.bgMusic.pause();
+      this.bgMusic.currentTime = 0;
+      this.bgMusic = null;
+    }
+    this.bgMusicStarted = false;
+  }
+
+  // ── Text-to-speech ────────────────────────────────────────
+
+  /** Enable or disable TTS for game text. */
+  setTTS(enabled: boolean): void {
+    this.ttsEnabled = enabled;
+    if (!enabled) {
+      window.speechSynthesis?.cancel();
+      this.ttsQueue = [];
+      this.ttsSpeaking = false;
+    }
+  }
+
+  /** Get current TTS state. */
+  isTTSEnabled(): boolean {
+    return this.ttsEnabled;
+  }
+
+  /** Speak text aloud via browser SpeechSynthesis API. Queues if already speaking. */
+  speak(text: string): void {
+    if (!this.ttsEnabled || !window.speechSynthesis) return;
+    // Strip markup/tags for clean speech
+    const clean = text.replace(/<[^>]*>/g, "").replace(/\[.*?\]/g, "").trim();
+    if (!clean) return;
+    this.ttsQueue.push(clean);
+    this.processQueue();
+  }
+
+  private processQueue(): void {
+    if (this.ttsSpeaking || this.ttsQueue.length === 0) return;
+    const text = this.ttsQueue.shift()!;
+    this.ttsSpeaking = true;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.1;
+    utterance.pitch = 0.8; // slightly lower for station computer feel
+    utterance.volume = 0.7;
+    utterance.onend = () => {
+      this.ttsSpeaking = false;
+      this.processQueue();
+    };
+    utterance.onerror = () => {
+      this.ttsSpeaking = false;
+      this.processQueue();
+    };
+    window.speechSynthesis.speak(utterance);
   }
 }

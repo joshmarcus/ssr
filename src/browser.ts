@@ -816,6 +816,22 @@ function initGame(): void {
       renderAll();
       return;
     }
+    // F5 toggles dev mode
+    if (e.key === "F5") {
+      e.preventDefault();
+      devModeEnabled = !devModeEnabled;
+      display.addLog(devModeEnabled ? "[DEV MODE ON]" : "[DEV MODE OFF]", "system");
+      renderAll();
+      return;
+    }
+    // F6 toggles text-to-speech
+    if (e.key === "F6") {
+      e.preventDefault();
+      audio.setTTS(!audio.isTTSEnabled());
+      display.addLog(audio.isTTSEnabled() ? "[TTS ON] Game text will be read aloud." : "[TTS OFF]", "system");
+      renderAll();
+      return;
+    }
     // Any non-Escape key cancels restart prompt
     if (restartPending) {
       restartPending = false;
@@ -1091,6 +1107,9 @@ function handleAction(action: Action): void {
   const prevDirt = state.tiles[ppy]?.[ppx]?.dirt ?? 0;
   state = step(state, action);
 
+  // Start background music on first player interaction
+  audio.startBgMusic();
+
   // Show sim-generated log messages (from interactions) with proper classification
   if (state.logs.length > prevLogs) {
     let hasPA = false;
@@ -1099,6 +1118,8 @@ function handleAction(action: Action): void {
       const logType = classifySimLog(simLog.text, simLog.source);
       display.addLog(simLog.text, logType);
       if (simLog.text.startsWith("CORVUS-7 CENTRAL:")) hasPA = true;
+      // Feed to TTS if enabled
+      audio.speak(simLog.text);
     }
     if (hasPA) audio.playPA();
     // Interaction produced logs -- play interact sound + tile flash
@@ -1459,6 +1480,7 @@ function handleAction(action: Action): void {
   if (state.gameOver) {
     deleteSave(); // Clear save on game end
     audio.stopAmbient(); // Silence the ambient drone
+    audio.stopBgMusic(); // Stop background music
 
     // Record run in history
     const deds = state.mystery?.deductions ?? [];
