@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 54 complete (Room Investigation Progress, Legend Dimming, Airlock Fix)
+- **Phase**: Sprint 55 complete (Sensor Clues, Background Music, TTS, Decisions Removal)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -82,6 +82,39 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 55 Changes
+
+### Sensor-Specific Environmental Clues
+- **Removed sensor-gating from log terminals**: All terminals now freely readable (thematically correct — a bot reading a screen doesn't need a thermal sensor)
+- **SENSOR_CLUES system**: ~35 archetype × room × sensor entries replacing old flavor-only SCAN_REVEALS
+- **Tagged journal entries**: Scanning with thermal/atmospheric in rooms produces proper journal entries with evidence tags that feed deduction linking
+- **Sensor-gated discovery**: Each clue requires the matching sensor (thermal or atmospheric) — sensors become perception tools, not keys
+- **Milestone-gated**: Each room+sensor clue fires once, tracked via `sensor_clue_${room}_${sensor}` milestones
+
+### Background Music
+- **8-Bit Afterglow**: Looping background music track at low volume (0.12)
+- **First-interaction trigger**: Music starts on first player action, not page load (respects autoplay policy)
+- **Stops on game over**: Silenced alongside ambient soundscape when game ends
+- **Served via Vite publicDir**: `public/music/8bit_afterglow.mp3`
+
+### Text-to-Speech
+- **F6 toggle**: Browser SpeechSynthesis API reads all game log entries aloud
+- **Station computer voice**: Low pitch (0.8), slightly fast rate (1.1x)
+- **Queued playback**: Entries queue if already speaking, with proper error recovery
+
+### Investigation Hub Streamlined
+- **DECISIONS tab removed**: Hub now has 3 tabs: EVIDENCE, CONNECTIONS, WHAT WE KNOW
+- **Notifications removed**: [DECISION] badge, "DECISION AVAILABLE" banner, choice unlock logs all removed
+- **Mystery choice data retained**: Structures and consequence logic kept in codebase for potential future use
+
+### Hazard Tuning
+- **Increased heat damage**: 8 → 12 HP/turn, pain threshold 40 → 35
+- **Increased smoke damage**: 2 → 5 HP/turn, slow threshold 40 → 35, damage threshold 60 → 55
+- **Faster deterioration**: Interval 25 → 22 turns, heat boost 2 → 3, smoke spawn 8 → 12
+
+### UI Polish
+- **Larger map legend**: Glyphs 15px → 20px, labels 12px → 15px, increased spacing for better readability
 
 ## Sprint 54 Changes
 
