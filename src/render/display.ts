@@ -158,7 +158,23 @@ const ENTITY_COLORS: Record<string, string> = {
 };
 
 // Blue background glow for interactable (non-exhausted) entities
-const INTERACTABLE_BG = "#0a1a2a";
+const INTERACTABLE_BG = "#102848";
+
+/** Dim a hex color to ~35% brightness for exhausted/read entities on the map. */
+function dimColor(hex: string): string {
+  let r: number, g: number, b: number;
+  if (hex.length === 4) { // #rgb
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else { // #rrggbb
+    r = parseInt(hex.slice(1, 3), 16);
+    g = parseInt(hex.slice(3, 5), 16);
+    b = parseInt(hex.slice(5, 7), 16);
+  }
+  const f = 0.35;
+  return `#${Math.round(r * f).toString(16).padStart(2, "0")}${Math.round(g * f).toString(16).padStart(2, "0")}${Math.round(b * f).toString(16).padStart(2, "0")}`;
+}
 
 // Static entity types that should appear as dim memory on explored-but-not-visible tiles
 const STATIC_ENTITY_TYPES = new Set<string>([
@@ -913,7 +929,8 @@ export class BrowserDisplay implements IGameDisplay {
           const manhattan = Math.abs(x - curPos.x) + Math.abs(y - curPos.y);
           if (tile.smoke <= 50 || manhattan <= 1) {
             glyph = ent.glyph;
-            fg = ent.color;
+            // Exhausted entities render dimmed to show they've been explored
+            fg = ent.exhausted ? dimColor(ent.color) : ent.color;
             // Subtle background glow behind entities
             const glowBg = ent.bgGlow;
             if (glowBg) bg = glowBg;
