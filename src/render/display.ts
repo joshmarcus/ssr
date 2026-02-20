@@ -159,7 +159,7 @@ const ENTITY_COLORS: Record<string, string> = {
 
 // Blue background glow for interactable (non-exhausted) entities
 // Must be clearly visible against dark backgrounds — serves as "here's something to interact with"
-const INTERACTABLE_BG = "#142850";
+const INTERACTABLE_BG = "#1e4488";
 
 /** Dim a hex color to ~35% brightness for exhausted/read entities on the map. */
 function dimColor(hex: string): string {
@@ -748,9 +748,9 @@ export class BrowserDisplay implements IGameDisplay {
       if (entity.type === EntityType.Airlock) {
         entityColor = entity.props["open"] === true ? "#f00" : "#0ff";
       }
-      // Blue halo for interactable (non-exhausted) entities; exhausted = no glow
+      // Blue halo for interactable entities; dim grey for exhausted/explored
       const exhausted = isEntityExhausted(entity);
-      const bgGlow = exhausted ? undefined : INTERACTABLE_BG;
+      const bgGlow = exhausted ? "#181818" : INTERACTABLE_BG;
       entityAt.set(key, {
         glyph: ENTITY_GLYPHS[entity.type] || "?",
         color: entityColor,
