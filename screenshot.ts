@@ -68,9 +68,9 @@ async function startVite(): Promise<{ proc: ChildProcess; url: string }> {
 
     let output = "";
     const timeout = setTimeout(() => {
-      reject(new Error("Vite did not start within 15s"));
+      reject(new Error("Vite did not start within 30s"));
       proc.kill();
-    }, 15000);
+    }, 30000);
 
     proc.stdout!.on("data", (data: Buffer) => {
       output += data.toString();
