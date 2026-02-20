@@ -26,8 +26,8 @@ import {
   TUTORIAL_HINT_INVESTIGATION, PRESSURE_ZONE_HINTS,
   CREW_DISTRESS_HINT, BREACH_PROXIMITY_HINT,
 } from "./data/narrative.js";
-import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
-import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype } from "./shared/types.js";
+import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
+import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
 import { computeChoiceEndings } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence, getTagExplanation } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
@@ -390,6 +390,51 @@ function flickerThenRender(): void {
   }, interval);
 }
 
+/** Generate an atmospheric fragment for a crew member's last known room. */
+function getCrewMemoryFragment(c: CrewMember): string | null {
+  const name = `${c.firstName} ${c.lastName}`;
+  const fateFragments: Record<string, string[]> = {
+    [CrewFate.Dead]: [
+      `A faded name tag reads: ${name}. The workstation is still warm.`,
+      `${name}'s terminal is still logged in. The last entry is unfinished.`,
+      `Scuff marks near ${name}'s station. Something happened here.`,
+    ],
+    [CrewFate.Missing]: [
+      `${name}'s coffee cup sits half-full on the console. Still lukewarm.`,
+      `A personal photo on the desk — ${name}'s family. Where did they go?`,
+      `${name}'s access badge is still in the card reader.`,
+    ],
+    [CrewFate.Survived]: [
+      `${name}'s station is orderly. They had time to shut down properly.`,
+      `A note pinned to ${name}'s monitor: "Check section 7."`,
+    ],
+    [CrewFate.Escaped]: [
+      `${name}'s locker is open — essentials taken in a hurry.`,
+      `${name}'s console shows a countdown timer. They knew.`,
+    ],
+    [CrewFate.InCryo]: [
+      `${name}'s workstation hums with standby power. Cryo prep checklist on screen.`,
+      `Medical forms on ${name}'s desk. Self-administered cryo protocol.`,
+    ],
+  };
+  const roleFragments: Record<string, string[]> = {
+    [CrewRole.Engineer]: [`Maintenance tools arranged with ${name}'s characteristic precision.`],
+    [CrewRole.Medic]: [`${name}'s med scanner sits on the counter, battery depleted.`],
+    [CrewRole.Scientist]: [`Research samples labeled in ${name}'s handwriting line the shelf.`],
+    [CrewRole.Security]: [`${name}'s duty roster is pinned to the wall. Last entry circled in red.`],
+    [CrewRole.Captain]: [`The captain's chair bears ${name}'s nameplate. Polished but empty.`],
+  };
+  // Prefer fate-based, fall back to role-based
+  const fateOpts = fateFragments[c.fate] ?? [];
+  const roleOpts = roleFragments[c.role] ?? [];
+  const allOpts = [...fateOpts, ...roleOpts];
+  if (allOpts.length === 0) return null;
+  // Deterministic pick based on crew id hash
+  let hash = 0;
+  for (let i = 0; i < c.id.length; i++) hash = ((hash << 5) - hash + c.id.charCodeAt(i)) | 0;
+  return allOpts[Math.abs(hash) % allOpts.length];
+}
+
 /** Check if the player entered a new room and log its description. */
 function checkRoomEntry(): void {
   const px = state.player.entity.pos.x;
@@ -422,6 +467,15 @@ function checkRoomEntry(): void {
       );
       if (incidentTrace) {
         display.addLog(incidentTrace, "narrative");
+      }
+
+      // Crew memory fragment: atmospheric text for rooms where crew were last known
+      const crew = state.mystery?.crew ?? [];
+      const crewInRoom = crew.filter(c => c.lastKnownRoom === currentRoom.name);
+      if (crewInRoom.length > 0) {
+        const c = crewInRoom[0]; // Show one fragment per room
+        const fragment = getCrewMemoryFragment(c);
+        if (fragment) display.addLog(fragment, "narrative");
       }
 
       // List notable entities in the room
@@ -1299,10 +1353,12 @@ function handleAction(action: Action): void {
     const crewDead = evac?.crewDead.length ?? 0;
     let crewTotal = crewEvac + crewDead;
     for (const [, e] of state.entities) { if (e.type === EntityType.CrewNPC) crewTotal++; }
+    // Scoring matches display.ts showGameOverOverlay — keep in sync
     let sc = 0;
     if (state.victory) sc += 30;
     sc += Math.min(20, dedsCorrect * (20 / Math.max(deds.length, 1)));
     if (crewTotal > 0) sc += Math.min(20, (crewEvac / crewTotal) * 20);
+    sc += Math.min(10, (visitedRoomIds.size / Math.max(state.rooms.length, 1)) * 10);
     sc += Math.min(10, (hpPct / 100) * 10);
     sc += Math.min(10, state.victory && state.turn < 200 ? 10 : state.victory && state.turn < 350 ? 5 : 0);
     const runRating = sc >= 90 ? "S" : sc >= 75 ? "A" : sc >= 55 ? "B" : sc >= 35 ? "C" : "D";

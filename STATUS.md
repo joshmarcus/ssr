@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 44 complete (Seed Persistence, Autosave, Restart Key, Save Resilience)
+- **Phase**: Sprint 45 complete (Scoring Sync, Crew Memory Fragments, Playtest Validation)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -13,7 +13,7 @@
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 650, Normal: 500, Hard: 350) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 184201 (272T), 42 (191T) — all VICTORY on normal
+- **Playtest results**: 7 (146T), 42 (191T), 100 (159T), 184201 (272T), 999 (153T) — all VICTORY on normal, all deductions correct
 
 ## What Works
 
@@ -82,6 +82,23 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 45 Changes
+
+### Performance Rating Scoring Sync
+- **Synced browser.ts and display.ts scoring**: Both now use identical formula including exploration bonus (up to 10 pts for rooms visited)
+- Rating breakdown: Victory (30) + Deductions (20) + Crew Evac (20) + Exploration (10) + HP (10) + Speed (10) = max 100
+
+### Crew Memory Fragments
+- **Atmospheric one-liners on room entry**: When entering a room where a crew member was last known, shows a short narrative fragment
+- **Fate-based and role-based variants**: Dead crew leave "unfinished terminal entries", missing crew leave "half-full coffee cups", engineers leave "maintenance tools"
+- **Deterministic selection**: Fragment picked via hash of crew ID for reproducibility
+- Rewards thorough exploration with character texture without being required for gameplay
+
+### Playtest Validation (5 seeds)
+- Seeds 7 (ReactorScram), 42 (ReactorScram), 100 (CoolantCascade), 184201 (HullBreach), 999 (SignalAnomaly) — all VICTORY
+- All deductions correct across all seeds, HP ranges 868-1000
+- Rooms visited 4-16 out of 15-28 total — exploration incentive working
 
 ## Sprint 44 Changes
 
