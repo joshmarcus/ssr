@@ -26,6 +26,8 @@ import {
   TUTORIAL_HINTS_EARLY, TUTORIAL_HINT_FIRST_EVIDENCE, TUTORIAL_HINT_FIRST_DEDUCTION,
   TUTORIAL_HINT_INVESTIGATION, PRESSURE_ZONE_HINTS,
   CREW_DISTRESS_HINT, BREACH_PROXIMITY_HINT,
+  ROOM_AMBIENT_EVENTS, ROOM_AMBIENT_DEFAULT,
+  CREW_ESCORT_REACTIONS,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
@@ -182,6 +184,8 @@ let crewDistressHintShown = false;
 let breachProximityHintShown = false;
 let cleanMsgIndex = 0;
 let lastAmbientRoomId = "";
+let currentRoomTurns = 0; // turns spent in current room (for ambient events)
+let lastRoomIdForAmbient = ""; // track room changes for ambient counter
 let journalOpen = false;
 let journalTab: "evidence" | "deductions" = "evidence";
 let activeChoice: MysteryChoice | null = null;
@@ -994,6 +998,14 @@ function handleRestartKey(e: KeyboardEvent): void {
     gameStarted = false;
     showOpeningCrawl();
   }
+  if (e.key === "c" || e.key === "C") {
+    e.preventDefault();
+    void display.copyRunSummary().then((ok: boolean) => {
+      if (ok) {
+        display.addLog("[Run summary copied to clipboard]", "system");
+      }
+    });
+  }
 }
 
 // ── Renderer toggle (F3) ─────────────────────────────────────
@@ -1160,6 +1172,22 @@ function handleAction(action: Action): void {
         } else if (tile && tile.heat > 20) {
           display.addLog("Ambient temperature elevated. Thermal warnings on hull sensors.", "warning");
         }
+        // Hazard proximity: warn about dangerous adjacent tiles
+        if (tile && tile.heat < 30 && tile.smoke < 10) {
+          const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+          let nearHeat = false, nearSmoke = false;
+          for (const [ddx, ddy] of dirs) {
+            const adj = state.tiles[py + ddy]?.[px + ddx];
+            if (!adj) continue;
+            if (adj.heat >= 35) nearHeat = true;
+            if (adj.smoke >= 40) nearSmoke = true;
+          }
+          if (nearHeat && state.turn % 4 === 0) {
+            display.addLog("Warning: thermal readings spiking in adjacent section.", "warning");
+          } else if (nearSmoke && state.turn % 4 === 0) {
+            display.addLog("Warning: dense particulate concentration detected ahead.", "warning");
+          }
+        }
         break;
       }
       case ActionType.Wait: {
@@ -1267,6 +1295,52 @@ function handleAction(action: Action): void {
           display.addLog(BREACH_PROXIMITY_HINT, "system");
           breachProximityHintShown = true;
           break;
+        }
+      }
+    }
+  }
+
+  // Room ambient micro-events: atmospheric flavor when lingering in a room
+  if (state.turn !== prevTurn) {
+    const playerPos = state.player.entity.pos;
+    const currentRoom = getRoomAt(state, playerPos);
+    const roomId = currentRoom ? currentRoom.name : "";
+    if (roomId && roomId === lastRoomIdForAmbient) {
+      currentRoomTurns++;
+      // Fire an ambient event every 7 turns while lingering
+      if (currentRoomTurns > 0 && currentRoomTurns % 7 === 0) {
+        const pool = ROOM_AMBIENT_EVENTS[roomId] ?? ROOM_AMBIENT_DEFAULT;
+        const ambIdx = (state.turn * 3 + roomId.length * 7) % pool.length;
+        display.addLog(pool[ambIdx], "narrative");
+      }
+    } else {
+      currentRoomTurns = 0;
+      lastRoomIdForAmbient = roomId;
+    }
+  }
+
+  // Crew escort personality reactions: contextual dialogue while following
+  if (state.turn !== prevTurn && state.turn % 10 === 0) {
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+    const tile = state.tiles[py]?.[px];
+    for (const [, entity] of state.entities) {
+      if (entity.type !== EntityType.CrewNPC) continue;
+      if (entity.props["following"] !== true) continue;
+      if (entity.props["dead"] === true || entity.props["evacuated"] === true) continue;
+      const personality = (entity.props["personality"] as string) || "cautious";
+      const crewName = `${entity.props["firstName"]} ${entity.props["lastName"]}`;
+      // Pick context based on current tile conditions
+      let context = "quiet";
+      if (tile && tile.heat >= 25) context = "heat";
+      else if (tile && tile.smoke >= 10) context = "smoke";
+      else if (tile && tile.pressure < 50) context = "dark";
+      const reactionPool = CREW_ESCORT_REACTIONS[context];
+      if (reactionPool) {
+        const fn = reactionPool[personality];
+        if (fn) {
+          display.addLog(fn(crewName), "narrative");
+          break; // one reaction per tick
         }
       }
     }

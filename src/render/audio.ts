@@ -448,7 +448,7 @@ export class AudioManager {
     const base = (import.meta as unknown as { env: { BASE_URL: string } }).env.BASE_URL || "/";
     const audio = new Audio(`${base}music/8bit_afterglow.mp3`);
     audio.loop = true;
-    audio.volume = 0.12; // quiet background layer
+    audio.volume = 0.06; // very quiet background layer
     this.bgMusic = audio;
     audio.play().catch(() => {
       // Autoplay blocked — will retry on next interaction

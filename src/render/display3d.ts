@@ -478,6 +478,10 @@ export class BrowserDisplay3D implements IGameDisplay {
     overlay.classList.add("active");
   }
 
+  async copyRunSummary(): Promise<boolean> {
+    return false; // 3D renderer delegates to 2D for game-over
+  }
+
   destroy(): void {
     cancelAnimationFrame(this.animFrameId);
     window.removeEventListener("resize", this.resizeHandler);

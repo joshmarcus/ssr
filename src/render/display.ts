@@ -302,6 +302,9 @@ export class BrowserDisplay implements IGameDisplay {
   // Flash tile mechanism for interaction feedback
   private flashTiles: Set<string> = new Set();
 
+  // Run summary for clipboard sharing
+  _runSummary = "";
+
   // Stored handler for cleanup
   private resizeHandler: () => void;
 
@@ -573,9 +576,21 @@ export class BrowserDisplay implements IGameDisplay {
           SEED ${state.seed} &middot; ${ARCHETYPE_DISPLAY_NAMES[state.mystery?.timeline.archetype as IncidentArchetype] ?? "UNKNOWN"}${state.difficulty && state.difficulty !== "normal" ? ` &middot; ${state.difficulty.toUpperCase()}` : ""}
         </div>
         ${this.renderRunHistory(state.seed)}
-        <div class="gameover-restart">[R] Replay Seed ${state.seed} &nbsp;&nbsp;|&nbsp;&nbsp; [N] New Story</div>
+        <div class="gameover-restart">[R] Replay Seed ${state.seed} &nbsp;&nbsp;|&nbsp;&nbsp; [N] New Story &nbsp;&nbsp;|&nbsp;&nbsp; [C] Copy Run</div>
       </div>`;
     overlay.classList.add("active");
+
+    // Store run summary for clipboard copy
+    const archetypeName = ARCHETYPE_DISPLAY_NAMES[archetype as IncidentArchetype] ?? "UNKNOWN";
+    const diffLabel = state.difficulty && state.difficulty !== "normal" ? ` // ${state.difficulty.toUpperCase()}` : "";
+    const base = (typeof window !== "undefined" ? window.location.origin + window.location.pathname : "");
+    const crewLine = totalCrewForScore > 0 ? `Crew: ${crewEvacuated}/${totalCrewForScore} evacuated // ` : "";
+    this._runSummary = [
+      `CORVUS-7 // Seed ${state.seed} // ${archetypeName}${diffLabel}`,
+      `Rating: ${rating} (${Math.round(score)}/100) // ${state.turn} turns`,
+      `${crewLine}Deductions: ${deductionsCorrect}/${deductions.length} correct`,
+      `Play this seed: ${base}?seed=${state.seed}`,
+    ].join("\n");
   }
 
   destroy(): void {
@@ -598,6 +613,17 @@ export class BrowserDisplay implements IGameDisplay {
     const opts = this.display.getOptions();
     if (opts.fontSize !== fontSize) {
       this.display.setOptions({ fontSize });
+    }
+  }
+
+  /** Copy run summary to clipboard. Returns true if successful. */
+  async copyRunSummary(): Promise<boolean> {
+    if (!this._runSummary) return false;
+    try {
+      await navigator.clipboard.writeText(this._runSummary);
+      return true;
+    } catch {
+      return false;
     }
   }
 

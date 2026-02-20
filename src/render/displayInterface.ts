@@ -24,5 +24,6 @@ export interface IGameDisplay {
   triggerScreenFlash(type: "damage" | "milestone" | "stun"): void;
   flashTile(x: number, y: number): void;
   showGameOverOverlay(state: GameState): void;
+  copyRunSummary(): Promise<boolean>;
   destroy(): void;
 }

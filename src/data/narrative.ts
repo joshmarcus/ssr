@@ -97,6 +97,39 @@ export const CREW_BOARDING_DIALOGUE: Record<string, (name: string) => string> = 
   [PersonalityTrait.Pragmatic]: (name) => `${name} buckles in with practiced efficiency. "Good work, little bot. Get yourself out too."`,
 };
 
+// ── Crew escort reactions (contextual dialogue while following) ──
+// Keyed by context trigger, then by personality. Each returns a one-liner.
+export const CREW_ESCORT_REACTIONS: Record<string, Record<string, (name: string) => string>> = {
+  heat: {
+    [PersonalityTrait.Cautious]: (name) => `${name} flinches. "It's getting hot. Are you sure about this route?"`,
+    [PersonalityTrait.Ambitious]: (name) => `${name} wipes sweat from their brow. "Keep moving. We can take it."`,
+    [PersonalityTrait.Loyal]: (name) => `${name} pulls their collar up. "The others — were they in this heat too?"`,
+    [PersonalityTrait.Secretive]: (name) => `${name} glances at a vent panel. "There's a reason the thermal regulators failed here."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name} checks the wall temperature with their hand. "We have maybe two minutes before this gets dangerous."`,
+  },
+  smoke: {
+    [PersonalityTrait.Cautious]: (name) => `${name} coughs. "I can't see. I can't—" They grab onto your chassis.`,
+    [PersonalityTrait.Ambitious]: (name) => `${name} pulls their shirt over their nose. "Smoke means fire means we need to move faster."`,
+    [PersonalityTrait.Loyal]: (name) => `${name} looks back through the haze. "Anyone else back there? Hello?"`,
+    [PersonalityTrait.Secretive]: (name) => `${name} breathes shallow. "This smoke... it's not from the fire. Check the ventilation logs."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name} drops low. "Stay below the smoke line. Crawl if you have to."`,
+  },
+  dark: {
+    [PersonalityTrait.Cautious]: (name) => `${name} stumbles in the dark. "Wait — slow down. I can't see where I'm stepping."`,
+    [PersonalityTrait.Ambitious]: (name) => `${name}: "Power's out here too. They really did a number on this place."`,
+    [PersonalityTrait.Loyal]: (name) => `${name} whispers: "Is someone there? I keep hearing—" They shake their head. "Never mind."`,
+    [PersonalityTrait.Secretive]: (name) => `${name} is quiet for a long time. Then: "The lights went out the night it happened, too."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name}: "Emergency lighting should still work. Someone pulled the breakers intentionally."`,
+  },
+  quiet: {
+    [PersonalityTrait.Cautious]: (name) => `${name} glances around nervously. "It's too quiet. That's never good."`,
+    [PersonalityTrait.Ambitious]: (name) => `${name}: "How much further to the pods? We're wasting time."`,
+    [PersonalityTrait.Loyal]: (name) => `${name}: "I keep thinking about the people who didn't make it to cryo."`,
+    [PersonalityTrait.Secretive]: (name) => `${name} stares at a wall panel. "There's something I should tell you. When we get to the pod."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name}: "Bot — you're doing good work. Just get us there in one piece."`,
+  },
+};
+
 // ── Crew questioning dialogue (archetype-specific testimony) ──
 // When player interacts with a following crew NPC, they provide a clue.
 // Each archetype has a pool of testimony lines that reference the incident.
@@ -247,6 +280,76 @@ export const CLEANING_MESSAGES: string[] = [
   "Scouring carbon buildup. Underneath, a smudged partial boot print. Size 7, standard-issue. At a run.",
   "Scraping residue away. The deck plating here is warped slightly — heat damage from below. The floor was hot.",
   "Clearing the surface. A tiny patch of dried adhesive — someone posted a note here and tore it down in a hurry.",
+];
+
+// ── Room ambient micro-events ────────────────────────────────
+// Fire periodically while lingering in a room (every 6-8 turns in same room).
+// Makes the station feel alive/dying. Deterministic via turn + room hash.
+export const ROOM_AMBIENT_EVENTS: Record<string, string[]> = {
+  "Engine Core": [
+    "A pipe groans overhead. Condensation drips onto a cooling manifold.",
+    "Something shifts deep in the reactor housing — metal settling under thermal stress.",
+    "The emergency lighting flickers, then steadies. Power draw spikes briefly on the status panel.",
+    "A faint vibration runs through the deck plates. The station's bones are tired.",
+  ],
+  "Data Core": [
+    "The processing array hums louder for a moment, then quiets.",
+    "A status LED blinks in a pattern that almost looks deliberate.",
+    "Cool air from the server ventilation shifts direction momentarily.",
+    "A terminal screen refreshes — displaying the same diagnostic it has for 847 days.",
+  ],
+  "Life Support": [
+    "The air recycler cycles with a wet, labored sound.",
+    "A pressure gauge needle twitches, settles, twitches again.",
+    "The CO2 scrubber wheezes. A red indicator light comes on, then goes off.",
+    "Water condensation drips from an overhead duct into a growing puddle.",
+  ],
+  "Med Bay": [
+    "A diagnostic terminal flickers, displaying a partial blood panel before going dark.",
+    "The autodoc's arm twitches in its housing — muscle memory from its last procedure.",
+    "A medicine cabinet door swings slightly on broken hinges.",
+    "The defibrillator unit beeps once. Low battery warning.",
+  ],
+  "Crew Quarters": [
+    "A personal terminal plays the last few seconds of a message on loop. The voice is familiar.",
+    "A coffee cup sits on a desk. The contents evaporated long ago, leaving a brown ring.",
+    "A photo frame on the wall shows a family. The faces are too small to read.",
+    "The air here smells different — faintly human. Laundry detergent and recycled oxygen.",
+  ],
+  "Cargo Hold": [
+    "A crate shifts as the station adjusts its attitude. Magnetic clamps strain.",
+    "The cargo manifest screen cycles through entries too fast to read.",
+    "Something drips from a high shelf. Probably condensation. Probably.",
+    "A loading arm creaks in its housing, frozen mid-operation.",
+  ],
+  "Power Relay Junction": [
+    "Electricity arcs briefly between exposed contacts. The relay housing hums.",
+    "The power distribution panel clicks — load balancing between failing circuits.",
+    "A burnt-out relay module smolders faintly. The smell of scorched insulation.",
+  ],
+  "Research Lab": [
+    "A centrifuge spins down slowly, its sample long evaporated.",
+    "Lab equipment status lights blink in sequence — an automated diagnostic cycle.",
+    "A whiteboard shows equations in two different handwritings. The second stopped mid-line.",
+  ],
+  "Communications Hub": [
+    "Static crackles from an open channel. Nothing on the other end.",
+    "The antenna array status shows READY. It has been ready for 847 days.",
+    "A transmission log scrolls past. Most entries are marked FAILED.",
+  ],
+  "Bridge": [
+    "The captain's chair swivels slightly — an air current from a damaged vent.",
+    "Navigation displays show the station's orbit. The numbers are not encouraging.",
+    "A priority alert flashes on the command console. No one has acknowledged it.",
+  ],
+};
+
+// Default ambient events for rooms without specific entries
+export const ROOM_AMBIENT_DEFAULT: string[] = [
+  "A distant clang reverberates through the station frame.",
+  "The lighting dims briefly, then recovers. Power fluctuation.",
+  "Something creaks in the walls — thermal expansion, or structural fatigue.",
+  "The ventilation hum changes pitch for a moment. Pressure differential.",
 ];
 
 // ── Drone cleaning message (Sprint 2 Item 14) ───────────────

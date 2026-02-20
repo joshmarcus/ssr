@@ -27,17 +27,17 @@ export const SMOKE_DAMAGE_THRESHOLD = 55; // smoke level at which bot takes dama
 export const SMOKE_DAMAGE_PER_TURN = 5; // HP lost per turn in dense smoke
 
 // ── Turn limit ──────────────────────────────────────────────
-export const MAX_TURNS = 500;
-export const TURN_WARNING_THRESHOLD = 350; // "Station power reserves declining"
-export const TURN_URGENT_THRESHOLD = 400;  // "Power reserves critical"
-export const TURN_CRITICAL_THRESHOLD = 450; // "Imminent power failure"
+export const MAX_TURNS = 1000;
+export const TURN_WARNING_THRESHOLD = 700; // "Station power reserves declining"
+export const TURN_URGENT_THRESHOLD = 800;  // "Power reserves critical"
+export const TURN_CRITICAL_THRESHOLD = 900; // "Imminent power failure"
 
 // ── Difficulty modifiers ────────────────────────────────────
 // Each difficulty adjusts turn limit, player HP, hazard damage, and deterioration pacing.
 export const DIFFICULTY_SETTINGS = {
-  easy:   { maxTurns: 650, maxHp: 1400, damageMultiplier: 0.6, deteriorationInterval: 35 },
-  normal: { maxTurns: 500, maxHp: 1000, damageMultiplier: 1.0, deteriorationInterval: 25 },
-  hard:   { maxTurns: 350, maxHp:  750, damageMultiplier: 1.5, deteriorationInterval: 18 },
+  easy:   { maxTurns: 1300, maxHp: 1400, damageMultiplier: 0.6, deteriorationInterval: 35 },
+  normal: { maxTurns: 1000, maxHp: 1000, damageMultiplier: 1.0, deteriorationInterval: 25 },
+  hard:   { maxTurns:  700, maxHp:  750, damageMultiplier: 1.5, deteriorationInterval: 18 },
 } as const;
 
 // ── Station deterioration ────────────────────────────────────
