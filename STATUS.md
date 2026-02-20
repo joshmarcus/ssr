@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 52 complete (Entity Visual Distinction, Exploration Feedback, Epilogues)
+- **Phase**: Sprint 53 complete (Mystery Choice Notifications, Deduction Progress UI)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -82,6 +82,20 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 53 Changes
+
+### Mystery Choice Notifications
+- **Choice unlock log**: "CORVUS-7 CENTRAL: New decision available. Open Investigation Hub [v] → DECISIONS to review." fires when journal length crosses 3/6/10 entry thresholds
+- **[DECISION] status bar tag**: Shown when unanswered choices are available (blue, next to [DEDUCTION READY])
+- **Pinned "DECISION AVAILABLE" notification**: Shown in log panel header, stacks with DEDUCTION READY notification
+
+### Deduction Progress Indicators (Investigation Hub CONNECTIONS)
+- **Progress summary header**: "DEDUCTIONS: N/M solved (K correct)" at top of CONNECTIONS tab
+- **Tier numbers**: Each deduction shows "Tier 1", "Tier 2", etc. for clear progression sense
+- **Updated status icons**: Diamond (◇) for unlocked deductions, circle (○) for locked (replacing ! and ?)
+- **"ALL EVIDENCE GATHERED" gold prompt**: When all required tags are covered for an unlocked deduction, shows gold text encouraging submission
+- **"Still needed" hint**: When tags are missing, shows which evidence categories are still needed
 
 ## Sprint 52 Changes
 
