@@ -493,7 +493,47 @@ function checkRoomEntry(): void {
         display.addLog(`You detect: ${unique.join(", ")}`, "sensor");
       }
     }
+
+    // Tension-based room entry flavor — fires on every room change (not just first visit)
+    // Only after turn 100, escalating frequency with turn count
+    if (state.turn >= 100) {
+      const tensionMsg = getTensionFlavor(state.turn, currentRoom.name);
+      if (tensionMsg) display.addLog(tensionMsg, "narrative");
+    }
   }
+}
+
+/** Tension-based atmospheric flavor on room transitions. */
+const TENSION_EARLY: string[] = [
+  "The lights flicker briefly as you enter. Power fluctuations are becoming routine.",
+  "A distant hum resonates through the walls. The station's heartbeat is uneven.",
+  "Dust motes drift in the recycled air. Nobody has cleaned here in a long time.",
+  "The ventilation rattles overhead — a loose panel somewhere in the ductwork.",
+];
+const TENSION_MID: string[] = [
+  "The floor plates groan under your treads. Metal fatigue is setting in.",
+  "Warning lights pulse amber in the corridor behind you. More systems failing.",
+  "A pipe bursts somewhere far away — the dull crack echoes through empty halls.",
+  "The air tastes metallic. Filtration is losing ground against the degradation.",
+  "Shadows dance as overhead lighting strobes. The power grid is struggling.",
+];
+const TENSION_LATE: string[] = [
+  "The walls creak with deep structural stress. The station is dying around you.",
+  "Emergency strips are the only light now. Main power is almost gone.",
+  "Something shudders deep in the station's frame — a sound that shouldn't happen.",
+  "The air is thin and acrid. Every breath costs the station a little more.",
+  "Sparks cascade from a junction box as you pass. The station won't hold much longer.",
+];
+
+function getTensionFlavor(turn: number, roomName: string): string | null {
+  // Escalating frequency: ~25% at T100-200, ~40% at T200-300, ~55% at T300+
+  const freq = turn < 200 ? 25 : turn < 300 ? 40 : 55;
+  const roll = ((turn * 53 + roomName.length * 17) % 100);
+  if (roll >= freq) return null;
+
+  const pool = turn < 200 ? TENSION_EARLY : turn < 300 ? TENSION_MID : TENSION_LATE;
+  const idx = ((turn * 31 + roomName.charCodeAt(0)) % pool.length);
+  return pool[idx];
 }
 
 /** Get a short label for an entity visible on room entry (null = skip). */

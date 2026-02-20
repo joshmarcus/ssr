@@ -275,6 +275,37 @@ export const PA_ANNOUNCEMENTS_BY_ARCHETYPE: Record<string, string[]> = {
   ],
 };
 
+// ── Tiered PA messages (deterioration-aware) ─────────────────
+// Early game: clinical, routine — the station is functional but abandoned
+export const PA_TIER_EARLY: string[] = [
+  "CORVUS-7 CENTRAL: Routine diagnostic cycle complete. All autonomous systems responding.",
+  "CORVUS-7 CENTRAL: Maintenance unit detected on patrol route. Welcome back to active duty.",
+  "CORVUS-7 CENTRAL: Environmental controls within acceptable range. Minor variance logged.",
+  "CORVUS-7 CENTRAL: Station clock synchronized. Elapsed since last crew contact: 847 days, 14 hours.",
+  "CORVUS-7 CENTRAL: Lighting grid operating at reduced capacity. Non-essential sectors dimmed per protocol.",
+  "CORVUS-7 CENTRAL: Waste reclamation operating normally. No biological input detected in 847 days.",
+];
+
+// Mid game: stressed, warning — systems are degrading, tone shifts
+export const PA_TIER_MID: string[] = [
+  "CORVUS-7 CENTRAL: WARNING — Backup power reserves at 31%. Conservation protocols recommended.",
+  "CORVUS-7 CENTRAL: Structural integrity monitoring reports intermittent sensor dropout in 3 sectors.",
+  "CORVUS-7 CENTRAL: NOTICE — Station thermal gradient exceeding design envelope. Relay intervention required.",
+  "CORVUS-7 CENTRAL: Air filtration load increasing. Particulate density above maintenance threshold.",
+  "CORVUS-7 CENTRAL: Automated repair queue: 214 outstanding items. Estimated completion: [OVERFLOW].",
+  "CORVUS-7 CENTRAL: ...multiple subsystems reporting amber status... prioritization... unclear...",
+];
+
+// Late game: desperate, failing — the station is dying
+export const PA_TIER_LATE: string[] = [
+  "CORVUS-7 CENTRAL: CRITICAL — Core system cascade failure predicted within operational window.",
+  "CORVUS-7 CENTRAL: ...station framework stress... beyond tolerance... structural yield imminent...",
+  "CORVUS-7 CENTRAL: EMERGENCY — Backup power failing. This may be the last automated broadcast.",
+  "CORVUS-7 CENTRAL: ...is anyone... maintenance unit... please respond... logging... everything...",
+  "CORVUS-7 CENTRAL: Emergency beacon power allocation redirected to life support. Beacon offline.",
+  "CORVUS-7 CENTRAL: ...I have been talking to no one for 847 days... diagnostic complete... resuming...",
+];
+
 // ── Cleanliness sensor trail hints (Item 1) ──────────────────
 // When cleanliness sensor is active, high-dirt areas reveal evacuation hints.
 export const DIRT_TRAIL_HINTS: string[] = [

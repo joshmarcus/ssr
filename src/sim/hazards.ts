@@ -17,6 +17,7 @@ import {
   PA_ANNOUNCEMENTS_GENERAL, PA_ANNOUNCEMENTS_WARNING, PA_ANNOUNCEMENTS_ATMOSPHERIC,
   PA_ANNOUNCEMENTS_INVESTIGATE, PA_ANNOUNCEMENTS_RECOVER,
   PA_ANNOUNCEMENTS_BY_ARCHETYPE,
+  PA_TIER_EARLY, PA_TIER_MID, PA_TIER_LATE,
 } from "../data/narrative.js";
 
 /**
@@ -441,7 +442,14 @@ export function tickPA(state: GameState): GameState {
   let pool: string[];
   const turnHash = (state.turn * 37) % 100;
 
-  if ((hasHotZone || hasLowPressure) && turnHash < 40) {
+  // Tiered messages based on turn count — blend with existing pools
+  // ~30% chance to use a tier-specific message instead of phase/condition pool
+  const tierPool = state.turn < 150 ? PA_TIER_EARLY : state.turn < 300 ? PA_TIER_MID : PA_TIER_LATE;
+  const useTier = (state.turn * 41) % 100 < 30;
+
+  if (useTier) {
+    pool = tierPool;
+  } else if ((hasHotZone || hasLowPressure) && turnHash < 40) {
     pool = PA_ANNOUNCEMENTS_WARNING;
   } else if (phase === "investigate" && turnHash < 60) {
     pool = PA_ANNOUNCEMENTS_INVESTIGATE;
