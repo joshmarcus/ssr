@@ -11,6 +11,9 @@ import { checkWinCondition, checkLossCondition, checkTurnLimit } from "./objecti
 import { updateVision } from "./vision.js";
 import { generateEvidenceTags, getUnlockedDeductions, solveDeduction, linkEvidence } from "./deduction.js";
 import { assignThread } from "./threads.js";
+import {
+  PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
+} from "../data/narrative.js";
 
 /**
  * Find entities adjacent to or at the player's position.
@@ -600,11 +603,33 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         props: { ...target.props, overheating: false, activated: true },
       });
 
-      // Count how many relays are now activated (excluding locked_door entities)
+      // Special: cooling relay — reduce heat in the containing room
+      if (target.props["coolsRoom"] === true) {
+        const relayRoom = state.rooms.find(r =>
+          target.pos.x >= r.x && target.pos.x < r.x + r.width &&
+          target.pos.y >= r.y && target.pos.y < r.y + r.height,
+        );
+        if (relayRoom) {
+          const newTilesForCool = (next.tiles === state.tiles)
+            ? state.tiles.map(row => row.map(t => ({ ...t })))
+            : next.tiles.map(row => row.map(t => ({ ...t })));
+          for (let dy = relayRoom.y - 1; dy < relayRoom.y + relayRoom.height + 1; dy++) {
+            for (let dx = relayRoom.x - 1; dx < relayRoom.x + relayRoom.width + 1; dx++) {
+              if (dx >= 0 && dx < state.width && dy >= 0 && dy < state.height) {
+                newTilesForCool[dy][dx].heat = Math.min(newTilesForCool[dy][dx].heat, 20);
+                newTilesForCool[dy][dx].smoke = Math.min(newTilesForCool[dy][dx].smoke, 5);
+              }
+            }
+          }
+          next.tiles = newTilesForCool;
+        }
+      }
+
+      // Count how many relays are now activated (excluding locked_door entities and cooling relays)
       let totalRelays = 0;
       let activatedRelays = 0;
       for (const [, e] of newEntities) {
-        if (e.type === EntityType.Relay && e.props["locked"] !== true) {
+        if (e.type === EntityType.Relay && e.props["locked"] !== true && e.props["coolsRoom"] !== true) {
           totalRelays++;
           if (e.props["activated"] === true) activatedRelays++;
         }
@@ -618,6 +643,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         relay_p01: "Primary power distribution rerouted. Grid load rebalanced across backup conduits.",
         relay_p03: "P03 rerouted — the relay Vasquez warned them about. Temperature dropping. The cascade is breaking.",
         relay_p04: "Vent control relay rerouted. Dampers cycling open — smoke and heat clearing from the corridors.",
+        heat_puzzle_relay: "Coolant bypass activated. Vents cycling open — temperature dropping rapidly across the section.",
       };
       const flavor = relayNarrative[targetId] || `Relay ${targetId.replace("relay_", "").toUpperCase()} rerouted.`;
 
@@ -1224,7 +1250,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             allBreachesSealed = false;
             unsealedBreachCount++;
           }
-          if (e.type === EntityType.Relay && e.props["locked"] !== true) {
+          if (e.type === EntityType.Relay && e.props["locked"] !== true && e.props["coolsRoom"] !== true) {
             totalRelayCount++;
             if (e.props["activated"] === true) activatedRelayCount++;
           }
@@ -2021,6 +2047,62 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           ];
         }
       } else if (isFound && !isFollowing) {
+        // Check rescue requirement — environmental conditions must be safe
+        const rescueReq = target.props["rescueRequirement"] as string | undefined;
+        if (rescueReq) {
+          const crewRoom = state.rooms.find(r =>
+            target.pos.x >= r.x && target.pos.x < r.x + r.width &&
+            target.pos.y >= r.y && target.pos.y < r.y + r.height,
+          );
+          let blocked = false;
+          let blockMsg = "";
+          if (rescueReq === "seal_breach" && crewRoom) {
+            // Check if any unsealed breaches in this room
+            let hasUnsealedBreach = false;
+            for (const [, e] of state.entities) {
+              if (e.type !== EntityType.Breach || e.props["sealed"] === true) continue;
+              if (e.pos.x >= crewRoom.x && e.pos.x < crewRoom.x + crewRoom.width &&
+                  e.pos.y >= crewRoom.y && e.pos.y < crewRoom.y + crewRoom.height) {
+                hasUnsealedBreach = true;
+                break;
+              }
+            }
+            // Also check ambient pressure
+            const crewTile = state.tiles[target.pos.y]?.[target.pos.x];
+            if (hasUnsealedBreach || (crewTile && crewTile.pressure < 40)) {
+              blocked = true;
+              blockMsg = `${crewName} shakes their head: "Pressure's too low — seal the breach first or we'll both suffocate out there."`;
+            }
+          } else if (rescueReq === "cool_room" && crewRoom) {
+            // Check heat in crew's room
+            let maxHeat = 0;
+            for (let dy = crewRoom.y; dy < crewRoom.y + crewRoom.height; dy++) {
+              for (let dx = crewRoom.x; dx < crewRoom.x + crewRoom.width; dx++) {
+                if (dx >= 0 && dx < state.width && dy >= 0 && dy < state.height) {
+                  maxHeat = Math.max(maxHeat, state.tiles[dy][dx].heat);
+                }
+              }
+            }
+            if (maxHeat >= 40) {
+              blocked = true;
+              blockMsg = `${crewName} winces: "It's too hot — find a way to cool this section down or I'll collapse before we reach the pods."`;
+            }
+          }
+          if (blocked) {
+            next.logs = [
+              ...state.logs,
+              {
+                id: `log_crew_rescue_blocked_${targetId}_${next.turn}`,
+                timestamp: next.turn,
+                source: "narrative",
+                text: blockMsg,
+                read: false,
+              },
+            ];
+            break;
+          }
+        }
+
         // Crew accessible — start following
         const newEntities = new Map(next.entities);
         if (isUnconscious) {
@@ -3606,6 +3688,47 @@ export function step(state: GameState, action: Action): GameState {
 
       // Apply reward
       next = applyDeductionReward(next, solved);
+
+      // Investigation milestone PA announcements
+      if (next.mystery) {
+        const allDeds = next.mystery.deductions;
+        const solvedCount = allDeds.filter(d => d.solved).length;
+        const totalDeds = allDeds.length;
+        const archetype = next.mystery.timeline.archetype;
+
+        if (solvedCount === 1) {
+          // First deduction solved — archetype-aware investigation notice
+          const msg = PA_MILESTONE_FIRST_DEDUCTION[archetype] ||
+            "CORVUS-7 CENTRAL: NOTICE — Investigation parameters detected. Monitoring.";
+          next.logs = [...next.logs, {
+            id: `log_milestone_first_${next.turn}`,
+            timestamp: next.turn,
+            source: "pa",
+            text: msg,
+            read: false,
+          }];
+        } else if (solvedCount === Math.ceil(totalDeds / 2) && solvedCount > 1) {
+          // Half deductions solved — CORVUS-7 acknowledges
+          next.logs = [...next.logs, {
+            id: `log_milestone_half_${next.turn}`,
+            timestamp: next.turn,
+            source: "pa",
+            text: PA_MILESTONE_HALF_DEDUCTIONS,
+            read: false,
+          }];
+        }
+
+        if (solvedCount === totalDeds) {
+          // All deductions solved — summary transmission
+          next.logs = [...next.logs, {
+            id: `log_milestone_all_${next.turn}`,
+            timestamp: next.turn,
+            source: "pa",
+            text: PA_MILESTONE_ALL_DEDUCTIONS,
+            read: false,
+          }];
+        }
+      }
 
       // Free action — no turn advance
       return next;

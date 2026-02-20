@@ -318,6 +318,46 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
+  // Phase 2b3: Heat puzzle — activate cooling relays to rescue crew in overheated rooms
+  {
+    for (const [, entity] of state.entities) {
+      if (entity.type !== EntityType.Relay) continue;
+      if (entity.props["locked"] !== true) continue; // already activated
+      if (entity.props["coolsRoom"] !== true) continue; // not a cooling relay
+
+      // Find the room this relay is in
+      const relayRoom = state.rooms.find(r =>
+        entity.pos.x >= r.x && entity.pos.x < r.x + r.width &&
+        entity.pos.y >= r.y && entity.pos.y < r.y + r.height,
+      );
+
+      // Check if there's crew in a nearby hot room that needs cooling
+      let hasCrewInHotRoom = false;
+      for (const [, crew] of state.entities) {
+        if (crew.type !== EntityType.CrewNPC) continue;
+        if (crew.props["evacuated"] === true || crew.props["dead"] === true) continue;
+        if (crew.props["rescueRequirement"] !== "cool_room") continue;
+        // Check if crew's room is still hot
+        const crewTile = state.tiles[crew.pos.y]?.[crew.pos.x];
+        if (crewTile && crewTile.heat >= 40) {
+          hasCrewInHotRoom = true;
+          break;
+        }
+      }
+      if (!hasCrewInHotRoom) continue;
+
+      // Activate the cooling relay
+      if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
+        return { type: ActionType.Interact, targetId: entity.id };
+      }
+      const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+        manhattan({ x, y }, entity.pos) <= 1
+      ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+        manhattan({ x, y }, entity.pos) <= 1, true);
+      if (dir) return { type: ActionType.Move, direction: dir };
+    }
+  }
+
   // Phase 2c: Endgame — evacuate crew (primary) or data core fallback
   {
     const deds = state.mystery?.deductions ?? [];
@@ -768,7 +808,8 @@ for (let turn = 0; turn < MAX_TURNS; turn++) {
       log.text.includes("boarded") ||
       log.text.includes("EVACUATION") ||
       log.text.includes("evacuation") ||
-      log.text.includes("Decision recorded")
+      log.text.includes("Decision recorded") ||
+      log.text.includes("CORVUS-7")
     )) {
       console.log(`  >> ${log.text}`);
     }

@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 30 complete (Bot Pressure Puzzle + Routing Fixes)
+- **Phase**: Sprint 31 complete (Puzzle-Gated Crew + Narrative Milestones)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -12,7 +12,7 @@
 - **Save key**: v3
 - **Turn limit**: 500 turns (warnings at 350/400/450, escalation at 200/300/400)
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 6/6 seeds VICTORY — 42 (188T), 7 (147T), 184201 (266T), 3 (254T), 5 (326T), 4 (171T)
+- **Playtest results**: 6/6 seeds VICTORY — 184201 (270T), 3 (254T), 7 (147T), 5 (409T), 42 (188T), 4 (171T)
 
 ## What Works
 
@@ -65,6 +65,27 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 31 Changes
+
+### Puzzle-Gated Crew Rescue
+- **Rescue requirement system**: CrewNPCs can now have a `rescueRequirement` prop that blocks following until room conditions are met. Two variants:
+  - **`seal_breach`**: Crew in a decompressed room refuses to follow until breach is sealed and pressure recovers (≥40). "Seal the breach first or we'll both suffocate out there."
+  - **`cool_room`**: Crew in an overheated room refuses to follow until a cooling relay is activated and heat drops (< 40). "Find a way to cool this section down."
+- **Heat puzzle**: Procgen places one crew NPC in a mid-station room with heat 50 and smoke 20. A `heat_puzzle_relay` (with `coolsRoom: true`) near the room entrance can be activated to reduce heat/smoke below rescue threshold.
+- **Cooling relay mechanics**: Activating a cooling relay reduces heat to ≤20 and smoke to ≤5 across the entire room (+ 1-tile border). Cooling relays are excluded from main relay chain counting — they don't affect Data Core unlock.
+- **crewPaths preservation**: Fixed bug where `generateCrewPaths()` would overwrite puzzle-gated crew entities. Now checks for existing `rescueRequirement` before placing "hiding" crew.
+
+### Mid-Game Narrative Beats
+- **Investigation milestone PA announcements**: Three tiers of CORVUS-7 Central messages triggered by deduction progress:
+  - **First deduction**: Archetype-specific notice (e.g. "Autonomous unit querying forensic pressure data" for HullBreach)
+  - **Half solved**: "INVESTIGATION PROTOCOL ACTIVE — Maintenance unit has assembled significant evidence"
+  - **All solved**: "ALL EVIDENCE COMPILED — Investigation complete. Crew survivors detected — evacuation is now the priority."
+- **5 archetype-specific first-deduction messages**: Each incident archetype has a unique CORVUS-7 response reflecting the type of evidence the bot is accessing.
+
+### Bot Updates
+- **Heat puzzle relay activation (Phase 2b3)**: Bot detects `coolsRoom` relays near crew with `cool_room` rescue requirement and activates them.
+- **CORVUS-7 log filter**: Bot playtest output now shows all PA messages (CORVUS-7 keyword filter added).
 
 ## Sprint 30 Changes
 

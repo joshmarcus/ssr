@@ -307,6 +307,11 @@ export function generateCrewPaths(state: GameState): void {
     }
 
     // ── Place special entities for hiding/dead crew ───────────────
+    // Skip if this crew member was already placed with a rescue requirement (puzzle-gated)
+    const existingCrewEntity = state.entities.get(`crew_npc_${crewMember.id}`);
+    if (existingCrewEntity && existingCrewEntity.props["rescueRequirement"]) {
+      continue;
+    }
     if (outcome === "hiding") {
       const endPos = path[path.length - 1];
       const posKey = `${endPos.x},${endPos.y}`;

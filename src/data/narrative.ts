@@ -162,6 +162,22 @@ export const PRESSURE_ZONE_HINTS: string[] = [
   "Pressure differential detected. The atmospheric sensor traces the leak — follow the gradient to find the breach source.",
 ];
 
+// ── Investigation milestone PA announcements ─────────────────
+// Triggered at deduction solve milestones (first, half, all)
+export const PA_MILESTONE_FIRST_DEDUCTION: Record<string, string> = {
+  coolant_cascade: "CORVUS-7 CENTRAL: NOTICE — Maintenance unit accessing restricted thermal logs. Investigation parameters match Incident Report Delta-7. Monitoring.",
+  hull_breach: "CORVUS-7 CENTRAL: ALERT — Autonomous unit querying forensic pressure data. Security file cross-reference detected. Logging access pattern.",
+  reactor_scram: "CORVUS-7 CENTRAL: ...processing... maintenance unit accessing core diagnostic archives. Query pattern: non-standard. Permitting access.",
+  sabotage: "CORVUS-7 CENTRAL: NOTICE — Cargo manifest discrepancies flagged by maintenance unit. Biological containment logs accessed. Investigation noted.",
+  signal_anomaly: "CORVUS-7 CENTRAL: ANOMALOUS QUERY PATTERN — Maintenance unit accessing communications array logs. Signal analysis files opened. Recording.",
+};
+
+export const PA_MILESTONE_HALF_DEDUCTIONS =
+  "CORVUS-7 CENTRAL: INVESTIGATION PROTOCOL ACTIVE — Maintenance unit has assembled significant evidence. Station archives cooperative. The truth is in the data.";
+
+export const PA_MILESTONE_ALL_DEDUCTIONS =
+  "CORVUS-7 CENTRAL: ALL EVIDENCE COMPILED — Investigation complete. The record is clear. Crew survivors detected — evacuation is now the priority.";
+
 // ── Pressure puzzle contextual hints ─────────────────────────
 // Crew-in-distress warnings when player approaches a decompressed room with crew
 export const CREW_DISTRESS_HINT =

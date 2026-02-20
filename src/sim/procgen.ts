@@ -1548,12 +1548,12 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
   // (interactable from corridor through the doorway), pressure recovers across
   // the room, then it's safe to enter and rescue the crew.
   let pressureCrewMember: typeof npcCandidates[0] | null = null;
+  let pressureRoomIdx = -1;
   if (npcCandidates.length >= 2 && n >= 8) {
     pressureCrewMember = npcCandidates.pop()!;
 
     // Find a suitable mid-station room (not Cargo Hold, not reserved)
     const reservedRooms = new Set([cargoHoldIdx, podBayIdx, 0]);
-    let pressureRoomIdx = -1;
     for (let ri = Math.floor(n * 0.3); ri <= Math.floor(n * 0.6); ri++) {
       if (reservedRooms.has(ri)) continue;
       const roomName = state.rooms[ri].name;
@@ -1581,6 +1581,7 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
           sealed: false,
           hp: 200,
           unconscious: isUnconscious,
+          rescueRequirement: "seal_breach",
           firstName: pressureCrewMember.firstName,
           lastName: pressureCrewMember.lastName,
           personality: pressureCrewMember.personality,
@@ -1635,6 +1636,97 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
     } else {
       npcCandidates.push(pressureCrewMember);
       pressureCrewMember = null;
+    }
+  }
+
+  // ── Heat puzzle crew rescue: split 1 crew NPC to a hot room ──
+  // Puzzle: room has elevated heat (50+). Player must activate a nearby cooling
+  // relay to reduce heat below 40, then crew agrees to follow.
+  let heatCrewMember: typeof npcCandidates[0] | null = null;
+  if (npcCandidates.length >= 2 && n >= 10) {
+    heatCrewMember = npcCandidates.pop()!;
+
+    // Find a suitable room (not Cargo Hold, not pressure room, not reserved)
+    const heatReservedRooms = new Set([cargoHoldIdx, podBayIdx, 0]);
+    if (pressureRoomIdx >= 0) heatReservedRooms.add(pressureRoomIdx);
+
+    let heatRoomIdx = -1;
+    for (let ri = Math.floor(n * 0.4); ri <= Math.floor(n * 0.7); ri++) {
+      if (heatReservedRooms.has(ri)) continue;
+      const roomName = state.rooms[ri].name;
+      if (roomName === "Cargo Hold" || roomName === "Escape Pod Bay" || roomName === "Arrival Bay") continue;
+      heatRoomIdx = ri;
+      break;
+    }
+
+    if (heatRoomIdx >= 0) {
+      const heatRoom = rooms[heatRoomIdx];
+      const crewPos = getRoomPos(heatRoom, 0, 0);
+      const isUnconscious = heatCrewMember.fate === CrewFate.InCryo;
+      state.entities.set(`crew_npc_${heatCrewMember.id}`, {
+        id: `crew_npc_${heatCrewMember.id}`,
+        type: EntityType.CrewNPC,
+        pos: crewPos,
+        props: {
+          crewId: heatCrewMember.id,
+          found: false,
+          following: false,
+          evacuated: false,
+          dead: false,
+          sealed: false,
+          hp: 200,
+          unconscious: isUnconscious,
+          rescueRequirement: "cool_room",
+          firstName: heatCrewMember.firstName,
+          lastName: heatCrewMember.lastName,
+          personality: heatCrewMember.personality,
+        },
+      });
+
+      // Raise heat in the room to create the hazard
+      for (let dy = heatRoom.getTop(); dy <= heatRoom.getBottom(); dy++) {
+        for (let dx = heatRoom.getLeft(); dx <= heatRoom.getRight(); dx++) {
+          if (dx < 0 || dx >= state.width || dy < 0 || dy >= state.height) continue;
+          if (!state.tiles[dy][dx].walkable) continue;
+          state.tiles[dy][dx].heat = Math.max(state.tiles[dy][dx].heat, 50);
+          state.tiles[dy][dx].smoke = Math.max(state.tiles[dy][dx].smoke, 20);
+        }
+      }
+
+      // Place a cooling relay near the room entrance
+      let relayPos: { x: number; y: number } | null = null;
+      for (let x = heatRoom.getLeft(); x <= heatRoom.getRight() && !relayPos; x++) {
+        for (let y = heatRoom.getTop(); y <= heatRoom.getBottom() && !relayPos; y++) {
+          if (x < 0 || x >= state.width || y < 0 || y >= state.height) continue;
+          if (!state.tiles[y][x].walkable) continue;
+          // Check if adjacent to a door (near entrance)
+          for (const d of [{ dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 }]) {
+            const nx = x + d.dx;
+            const ny = y + d.dy;
+            if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height) {
+              if (state.tiles[ny][nx].type === TileType.Door) {
+                relayPos = { x, y };
+                break;
+              }
+            }
+          }
+        }
+      }
+      if (!relayPos) relayPos = getRoomPos(heatRoom, -1, -1);
+
+      state.entities.set("heat_puzzle_relay", {
+        id: "heat_puzzle_relay",
+        type: EntityType.Relay,
+        pos: relayPos,
+        props: {
+          activated: false,
+          locked: false,
+          coolsRoom: true,
+        },
+      });
+    } else {
+      npcCandidates.push(heatCrewMember);
+      heatCrewMember = null;
     }
   }
 
