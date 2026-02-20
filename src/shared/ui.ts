@@ -199,6 +199,7 @@ const ENTITY_NAMES: Record<string, string> = {
   [EntityType.RepairCradle]: "Repair Cradle",
   [EntityType.Console]: "Console",
   [EntityType.Airlock]: "Airlock",
+  [EntityType.ToolPickup]: "Pry Bar",
 };
 
 export function entityDisplayName(entity: Entity): string {
@@ -234,6 +235,8 @@ export function isEntityExhausted(entity: Entity): boolean {
     case EntityType.EvidenceTrace:
       return entity.props["discovered"] === true || entity.props["scanHidden"] === true;
     case EntityType.SensorPickup:
+      return entity.props["collected"] === true;
+    case EntityType.ToolPickup:
       return entity.props["collected"] === true;
     case EntityType.DataCore:
       return false; // always interactable (transmit when ready)

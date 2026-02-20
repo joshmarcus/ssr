@@ -93,6 +93,8 @@ function isEntityExhausted(entity: Entity, state: GameState): boolean {
       return entity.props["powered"] === true;
     case EntityType.PowerCell:
       return entity.props["collected"] === true;
+    case EntityType.ToolPickup:
+      return entity.props["collected"] === true;
     case EntityType.EvidenceTrace:
       return entity.props["discovered"] === true;
     case EntityType.CrewNPC:
@@ -1164,6 +1166,30 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       if (doorKeyType === DoorKeyType.Clearance) {
         const requiredLevel = (target.props["clearanceLevel"] as number) || 1;
         const playerClearance = state.player.clearanceLevel || 0;
+        const hasPryBar = state.player.entity.props["hasPryBar"] === true;
+        if (playerClearance < requiredLevel && hasPryBar) {
+          // Pry bar forces open clearance door
+          const newEntities = new Map(state.entities);
+          newEntities.set(targetId, {
+            ...target,
+            props: { ...target.props, closed: false, locked: false },
+          });
+          const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
+          newTiles[target.pos.y][target.pos.x].walkable = true;
+          next.entities = newEntities;
+          next.tiles = newTiles;
+          next.logs = [
+            ...state.logs,
+            {
+              id: `log_door_pry_${targetId}_${next.turn}`,
+              timestamp: next.turn,
+              source: "system",
+              text: "PRY BAR engaged. Hydraulic pressure overrides magnetic lock. Bulkhead forced open.",
+              read: false,
+            },
+          ];
+          break;
+        }
         if (playerClearance < requiredLevel) {
           next.logs = [
             ...state.logs,
@@ -1171,7 +1197,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
               id: `log_door_clearance_deny_${targetId}_${next.turn}`,
               timestamp: next.turn,
               source: "system",
-              text: "ACCESS DENIED. Security clearance required. Solve station puzzles to gain access.",
+              text: `ACCESS DENIED. Security clearance required.${hasPryBar ? "" : " Solve station puzzles to gain access."}`,
               read: false,
             },
           ];
@@ -1763,6 +1789,40 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             read: false,
           },
         ];
+      }
+      break;
+    }
+
+    case EntityType.ToolPickup: {
+      if (target.props["collected"] === true) {
+        next.logs = [...state.logs, {
+          id: `log_tool_empty_${targetId}_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Tool rack empty. Already collected.",
+          read: false,
+        }];
+      } else {
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, collected: true },
+        });
+        const playerEntity = { ...state.player.entity, props: { ...state.player.entity.props, hasPryBar: true } };
+        newEntities.set("player", playerEntity);
+        next.player = {
+          ...state.player,
+          entity: playerEntity,
+          attachments: { ...state.player.attachments, [AttachmentSlot.Tool]: { slot: AttachmentSlot.Tool, name: "Pry Bar" } },
+        };
+        next.entities = newEntities;
+        next.logs = [...state.logs, {
+          id: `log_tool_${targetId}_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "PRY BAR acquired. Heavy-duty hydraulic lever — can force open sealed bulkheads. [Tool slot equipped]",
+          read: false,
+        }];
       }
       break;
     }

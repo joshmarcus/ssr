@@ -828,6 +828,37 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
     });
   }
 
+  // ── Pry bar tool pickup (mid-station) ────────────────────────
+  const pryBarRoomNames = ["Maintenance Corridor", "Engineering Storage", "Robotics Bay"];
+  let pryBarPlaced = false;
+  for (const name of pryBarRoomNames) {
+    const idx = state.rooms.findIndex(r => r.name === name);
+    if (idx >= 0 && !reservedRooms.has(idx)) {
+      const room = rooms[idx];
+      const pryPos = getRoomPos(room, 1, 1);
+      state.entities.set("tool_pry_bar", {
+        id: "tool_pry_bar",
+        type: EntityType.ToolPickup,
+        pos: pryPos,
+        props: { toolType: "pry_bar" },
+      });
+      pryBarPlaced = true;
+      break;
+    }
+  }
+  if (!pryBarPlaced) {
+    // Fallback: place in a mid-station room (~30%)
+    const fallbackIdx = Math.max(2, Math.floor(n * 0.3));
+    const room = rooms[fallbackIdx];
+    const pryPos = getRoomPos(room, 1, 1);
+    state.entities.set("tool_pry_bar", {
+      id: "tool_pry_bar",
+      type: EntityType.ToolPickup,
+      pos: pryPos,
+      props: { toolType: "pry_bar" },
+    });
+  }
+
   // ── Breach entities (2, placed in rooms between relays) ────
   const breachRoomCandidates: number[] = [];
   for (let ri = relay1Idx + 1; ri < relay3Idx; ri++) {

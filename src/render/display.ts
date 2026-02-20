@@ -153,6 +153,7 @@ const ENTITY_COLORS: Record<string, string> = {
   [EntityType.RepairCradle]: "#44ddff",
   [EntityType.Console]: "#66aacc",
   [EntityType.Airlock]: "#0ff",
+  [EntityType.ToolPickup]: "#ffaa44",
 };
 
 // Blue background glow for interactable (non-exhausted) entities
@@ -165,7 +166,7 @@ const STATIC_ENTITY_TYPES = new Set<string>([
   EntityType.Breach, EntityType.ClosedDoor, EntityType.SecurityTerminal,
   EntityType.PressureValve, EntityType.FuseBox, EntityType.PowerCell,
   EntityType.EscapePod, EntityType.RepairCradle, EntityType.Airlock,
-  EntityType.EvidenceTrace, EntityType.Console,
+  EntityType.EvidenceTrace, EntityType.Console, EntityType.ToolPickup,
 ]);
 
 // Entity background glow colors (subtle tint behind entities)
@@ -187,6 +188,7 @@ const ENTITY_BG_GLOW: Record<string, string> = {
   [EntityType.RepairCradle]: "#081820",
   [EntityType.Console]: "#0a1520",
   [EntityType.Airlock]: "#001a1a",
+  [EntityType.ToolPickup]: "#1a1200",
 };
 
 const ENTITY_GLYPHS: Record<string, string> = {
@@ -211,6 +213,7 @@ const ENTITY_GLYPHS: Record<string, string> = {
   [EntityType.RepairCradle]: "\u2695\ufe0f",  // ⚕️
   [EntityType.EvidenceTrace]: "\ud83d\udc63",  // 👣
   [EntityType.Console]: "\ud83d\udcbb",  // 💻 (terminal)
+  [EntityType.ToolPickup]: "\ud83d\udd27",  // 🔧
   [EntityType.Airlock]: "\u229f",        // ⊟
 };
 
@@ -450,6 +453,36 @@ export class BrowserDisplay implements IGameDisplay {
         : "Recovery teams en route. The record is preserved.")
       : "Another rover may reach the station. The data endures, waiting.";
 
+    // ── Deduction retrospective ──
+    let retrospectiveHtml = "";
+    if (deductions.length > 0) {
+      const retLines = deductions.map(d => {
+        const correctOpt = d.options.find(o => o.correct);
+        const correctLabel = correctOpt ? this.escapeHtml(correctOpt.label) : "???";
+        if (!d.solved) {
+          return `<div style="margin:3px 0;font-size:11px;font-family:monospace">` +
+            `<span style="color:#888">\u25cb ${this.escapeHtml(d.question)}</span><br>` +
+            `<span style="color:#555;margin-left:16px">Unanswered</span> ` +
+            `<span style="color:#4af;margin-left:8px">\u2192 ${correctLabel}</span></div>`;
+        }
+        const icon = d.answeredCorrectly ? "\u2713" : "\u2717";
+        const color = d.answeredCorrectly ? "#0f0" : "#f44";
+        const statusText = d.answeredCorrectly
+          ? `<span style="color:#0f0;margin-left:16px">${correctLabel}</span>`
+          : `<span style="color:#f44;margin-left:16px">Incorrect</span> <span style="color:#4af;margin-left:8px">\u2192 ${correctLabel}</span>`;
+        return `<div style="margin:3px 0;font-size:11px;font-family:monospace">` +
+          `<span style="color:${color}">${icon}</span> <span style="color:#aaa">${this.escapeHtml(d.question)}</span><br>` +
+          `${statusText}</div>`;
+      });
+      retrospectiveHtml = `
+        <div style="margin:10px 0 4px;border-top:1px solid #333;padding-top:8px">
+          <div style="color:#8ac;font-size:12px;font-weight:bold;text-align:center;margin-bottom:6px;letter-spacing:2px">
+            \u25b8 DEDUCTION RETROSPECTIVE \u25c2
+          </div>
+          ${retLines.join("")}
+        </div>`;
+    }
+
     // ── Timeline reconstruction (victory only, if mystery data available) ──
     let timelineHtml = "";
     if (isVictory && state.mystery?.timeline) {
@@ -516,6 +549,7 @@ export class BrowserDisplay implements IGameDisplay {
           <div class="gameover-stat"><span class="stat-label">Deductions:</span> <span class="stat-value ${deductionsCorrect === deductions.length ? 'good' : deductionsCorrect > 0 ? 'warn' : 'bad'}">${deductionsCorrect}/${deductions.length} correct</span></div>
           ${choicesHtml}
         </div>
+        ${retrospectiveHtml}
         ${timelineHtml}
         <div class="gameover-epilogue">${epilogue}</div>
         <div style="text-align:center;margin:6px 0;color:#556;font-size:11px;font-family:monospace">

@@ -192,6 +192,7 @@ let hubChoiceConfirming = false;      // Y/N confirmation for mystery choice
 let hubDecisionDetailIdx: number | null = null; // which decision is expanded (null = list view)
 let hubFocusRegion: "evidence" | "answers" = "evidence"; // focus region in connection detail view
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
+let lastWwkJournalCount = 0; // journal count when WHAT WE KNOW was last viewed
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
 
 // ── Wait message variety ────────────────────────────────────────
@@ -724,6 +725,7 @@ function resetGameState(newSeed: number): void {
   hubChoiceConfirming = false;
   hubDecisionDetailIdx = null;
   hubIdx = 0;
+  lastWwkJournalCount = 0;
   pendingCrewDoor = null;
   journalTab = "evidence";
   choiceSelectedIdx = 0;
@@ -2447,10 +2449,22 @@ function renderHubWhatWeKnow(): string {
   const confidenceColors: Record<string, string> = {
     none: "#555", low: "#ca8", medium: "#fa0", high: "#4a4", complete: "#0f0",
   };
+  const confidenceLabels: Record<string, string> = {
+    none: "INSUFFICIENT DATA", low: "PRELIMINARY", medium: "DEVELOPING", high: "SUBSTANTIAL", complete: "CONCLUSIVE",
+  };
   const confidenceColor = confidenceColors[wwk.confidence] || "#888";
+  const confidenceLabel = confidenceLabels[wwk.confidence] || wwk.confidence.toUpperCase();
+
+  // Track new evidence since last visit
+  const currentJournalCount = state.mystery.journal.length;
+  const newEntries = currentJournalCount - lastWwkJournalCount;
+  lastWwkJournalCount = currentJournalCount;
+  const updateBadge = newEntries > 0
+    ? ` <span style="color:#4af;font-size:11px;margin-left:8px">+${newEntries} new evidence since last analysis</span>`
+    : "";
 
   let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:12px 16px">`;
-  html += `<div style="color:${confidenceColor};font-weight:bold;margin-bottom:12px">CONFIDENCE: ${wwk.confidence.toUpperCase()}</div>`;
+  html += `<div style="margin-bottom:12px"><span style="color:${confidenceColor};font-weight:bold;font-size:14px">\u25C9 ${confidenceLabel}</span>${updateBadge}</div>`;
 
   for (const para of wwk.paragraphs) {
     html += `<div style="color:#ccc;margin-bottom:10px;line-height:1.5">${esc(para)}</div>`;

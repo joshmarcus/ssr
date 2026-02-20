@@ -52,6 +52,7 @@ export enum EntityType {
   RepairCradle = "repair_cradle",
   Console = "console",
   Airlock = "airlock",
+  ToolPickup = "tool_pickup",
 }
 
 export interface Entity {

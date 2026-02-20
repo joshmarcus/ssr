@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 40 complete (Keybind Fixes, Station Reactions, Incident Card)
+- **Phase**: Sprint 41 complete (Deduction Retrospective, Pry Bar, What We Know Polish)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -72,11 +72,35 @@
 - Help overlay: HTML modal with complete key bindings, game phases, interaction details
 - Incident summary card [g]: mission status, crew manifest, deduction progress, narrative threads — spoiler-protected archetype title
 - Station reactions: correct deductions reduce heat/smoke station-wide
+- Deduction retrospective on game-over: shows each deduction's correct answer and player accuracy
+- Pry Bar tool-slot attachment: first Tool slot item, can force open clearance doors
+- "What We Know" confidence indicator with descriptive labels and new evidence badge
 
 ## Known Issues
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 41 Changes
+
+### Deduction Retrospective on Game-Over Screen
+- **New section in game-over overlay**: After performance rating and stats, shows each deduction with its outcome
+- Correct answers shown with green checkmark, incorrect with red X and the correct answer revealed
+- Unanswered deductions shown with the answer that would have been correct
+- Helps players learn from failures and understand what evidence they needed
+
+### Pry Bar Tool-Slot Attachment
+- **First Tool slot item**: Spawns in Maintenance Corridor, Engineering Storage, or Robotics Bay (priority order)
+- **Pickup fills `AttachmentSlot.Tool`**: "PRY BAR acquired. Heavy-duty hydraulic lever — can force open sealed bulkheads."
+- **Forces open clearance doors**: When player has pry bar and encounters a clearance-locked door, hydraulic override bypasses the lock
+- **Gameplay choice**: Players can shortcut into locked areas early instead of solving deductions for clearance — trades puzzle engagement for speed
+- **Rendering**: Orange wrench glyph, interactable blue halo, memory entity on explored tiles
+
+### "What We Know" Confidence & Update Badge
+- **Descriptive confidence labels**: Instead of raw "LOW/MEDIUM/HIGH", now shows: INSUFFICIENT DATA, PRELIMINARY, DEVELOPING, SUBSTANTIAL, CONCLUSIVE
+- **Larger, more prominent confidence indicator**: Colored circle icon with 14px bold text
+- **New evidence badge**: "+N new evidence since last analysis" shown when journal has grown since last time the player viewed the section
+- **Tracks last visit**: `lastWwkJournalCount` resets on restart, updates on each section view
 
 ## Sprint 40 Changes
 
