@@ -231,6 +231,30 @@ function addJournalEntry(
     ];
   }
 
+  // ── Mystery choice unlock notification ──
+  // When journal length crosses a threshold (3, 6, 10), notify the player
+  const choiceThresholds = [3, 6, 10];
+  const prevLen = state.mystery.journal.length;
+  const newLen = newJournal.length;
+  if (state.mystery.choices) {
+    for (let ci = 0; ci < choiceThresholds.length && ci < state.mystery.choices.length; ci++) {
+      const threshold = choiceThresholds[ci];
+      if (prevLen < threshold && newLen >= threshold && !state.mystery.choices[ci].chosen) {
+        phaseLogs = [
+          ...phaseLogs,
+          {
+            id: `log_choice_unlock_${ci}_${state.turn}`,
+            timestamp: state.turn,
+            source: "system",
+            text: "CORVUS-7 CENTRAL: New decision available. Open Investigation Hub [v] → DECISIONS to review.",
+            read: false,
+          },
+        ];
+        break; // Only one notification per journal entry
+      }
+    }
+  }
+
   return {
     ...state,
     logs: phaseLogs,

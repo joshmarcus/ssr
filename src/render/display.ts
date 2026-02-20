@@ -1156,6 +1156,16 @@ export class BrowserDisplay implements IGameDisplay {
       if (unlocked.length > 0) {
         reportTag = ` | <span style="color:#ff0;font-weight:bold">[DEDUCTION READY]</span>`;
       }
+
+      // Check for available mystery choices
+      const choiceThresholds = [3, 6, 10];
+      const journalLen = state.mystery.journal.length;
+      const hasUnansweredChoice = state.mystery.choices.some((c, i) =>
+        !c.chosen && i < choiceThresholds.length && journalLen >= choiceThresholds[i]
+      );
+      if (hasUnansweredChoice) {
+        reportTag += ` | <span style="color:#8cf;font-weight:bold">[DECISION]</span>`;
+      }
     }
 
     // ── Overlay indicator line ─────────────────────────────────
@@ -1455,7 +1465,17 @@ export class BrowserDisplay implements IGameDisplay {
       const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
       if (unlocked.length > 0) {
         pinnedHtml = `<div style="color:#ff0;background:#1a1500;padding:2px 6px;border-bottom:1px solid #443;font-size:12px;font-weight:bold">[${phaseLabel}] DEDUCTION READY — press [v] to open Investigation Hub</div>`;
-      } else if (state.mystery.objectivePhase === ObjectivePhase.Recover) {
+      }
+      // Show decision available notification (can stack with deduction ready)
+      const choiceThresholds2 = [3, 6, 10];
+      const jLen2 = state.mystery.journal.length;
+      const pendingChoices = state.mystery.choices.filter((c, i) =>
+        !c.chosen && i < choiceThresholds2.length && jLen2 >= choiceThresholds2[i]
+      );
+      if (pendingChoices.length > 0) {
+        pinnedHtml += `<div style="color:#8cf;background:#0a1520;padding:2px 6px;border-bottom:1px solid #234;font-size:12px">DECISION AVAILABLE — open Investigation Hub [v] → DECISIONS tab</div>`;
+      }
+      if (!pinnedHtml && state.mystery.objectivePhase === ObjectivePhase.Recover) {
         const allDedsSolved = state.mystery.deductions.every(d => d.solved);
         if (!allDedsSolved) {
           pinnedHtml = `<div style="color:#f44;background:#1a0500;padding:2px 6px;border-bottom:1px solid #433;font-size:12px">[${phaseLabel}] Gather evidence and solve deductions to unlock the Data Core</div>`;

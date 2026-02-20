@@ -1313,6 +1313,17 @@ function handleAction(action: Action): void {
       display.addLog(TUTORIAL_HINT_FIRST_DEDUCTION, "system");
       audio.playDeductionReady();
     }
+    // Mystery choice unlock notifications
+    const choiceThresholds = [3, 6, 10];
+    for (let ci = 0; ci < state.mystery.choices.length && ci < choiceThresholds.length; ci++) {
+      const choice = state.mystery.choices[ci];
+      if (choice.chosen) continue;
+      if (state.mystery.journal.length >= choiceThresholds[ci] && !choicesPresented.has(choice.id)) {
+        choicesPresented.add(choice.id);
+        display.addLog(`CORVUS-7 CENTRAL: Decision ${ci + 1} now available. Open the Evidence Hub [v] to review.`, "milestone");
+        display.triggerScreenFlash("milestone");
+      }
+    }
   }
 
   // Item 11: Environmental ambient text when entering heated rooms
@@ -2441,13 +2452,19 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
     hubDetailDeduction = null;
   }
 
-  let listHtml = "";
+  // Progress summary
+  const solvedCount = deductions.filter(d => d.solved).length;
+  const correctCount = deductions.filter(d => d.answeredCorrectly).length;
+  const progressColor = solvedCount === deductions.length ? "#0f0" : solvedCount > 0 ? "#fa0" : "#888";
+  let listHtml = `<div style="color:${progressColor};padding:4px 8px;font-size:12px;border-bottom:1px solid #333;margin-bottom:4px">DEDUCTIONS: ${solvedCount}/${deductions.length} solved${correctCount > 0 ? ` (${correctCount} correct)` : ""}</div>`;
+
   for (let di = 0; di < deductions.length; di++) {
     const d = deductions[di];
     const isUnlocked = unlockedSet.has(d.id);
     const locked = !d.solved && !isUnlocked;
     const isActive = di === hubIdx;
 
+    const tierLabel = `Tier ${di + 1}`;
     const catLabel = categoryLabels[d.category] || d.category.toUpperCase();
     let statusIcon: string;
     let statusColor: string;
@@ -2456,10 +2473,10 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
       statusIcon = d.answeredCorrectly ? "\u2713" : "\u2717";
       statusColor = d.answeredCorrectly ? "#0f0" : "#f44";
     } else if (isUnlocked) {
-      statusIcon = "!";
+      statusIcon = "\u25c7"; // diamond
       statusColor = "#fa0";
     } else {
-      statusIcon = "?";
+      statusIcon = "\u25cb"; // circle
       statusColor = "#555";
     }
 
@@ -2469,7 +2486,7 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
     if (isActive) sectionClass += " active-section";
 
     listHtml += `<div class="${sectionClass}">`;
-    listHtml += `<div class="broadcast-section-title"><span style="color:${statusColor}">[${statusIcon}]</span> ${catLabel}</div>`;
+    listHtml += `<div class="broadcast-section-title"><span style="color:${statusColor}">[${statusIcon}]</span> <span style="color:#888;font-size:11px">${tierLabel}</span> ${catLabel}</div>`;
 
     if (d.solved) {
       const answer = d.options.find(o => o.correct === d.answeredCorrectly) || d.options[0];
@@ -2484,15 +2501,25 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
       }
     }
 
-    // Tag pills
+    // Tag pills + "all met" prompt
     if (!locked) {
       let tagPillsHtml = "";
+      let allMet = true;
       for (const tag of d.requiredTags) {
-        tagPillsHtml += allTags.has(tag)
-          ? `<span class="tag-pill tag-covered">${esc(tag)}</span>`
-          : `<span class="tag-pill tag-missing">${esc(tag)}</span>`;
+        if (allTags.has(tag)) {
+          tagPillsHtml += `<span class="tag-pill tag-covered">${esc(tag)}</span>`;
+        } else {
+          tagPillsHtml += `<span class="tag-pill tag-missing">${esc(tag)}</span>`;
+          allMet = false;
+        }
       }
       listHtml += `<div style="margin:2px 8px">${tagPillsHtml}</div>`;
+      if (allMet && isUnlocked && !d.solved) {
+        listHtml += `<div style="color:#fd0;padding:2px 8px;font-size:11px;font-weight:bold">ALL EVIDENCE GATHERED — ready to submit answer</div>`;
+      } else if (!allMet && isUnlocked && !d.solved) {
+        const missing = d.requiredTags.filter(t => !allTags.has(t));
+        listHtml += `<div style="color:#888;padding:2px 8px;font-size:10px">Still needed: ${missing.map(t => esc(t)).join(", ")}</div>`;
+      }
     }
 
     // Dev mode: show full tag requirements for locked deductions

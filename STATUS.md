@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 49 complete (Milestone System, CORVUS-7 Reactions, Scan Reveals)
+- **Phase**: Sprint 52 complete (Entity Visual Distinction, Exploration Feedback, Epilogues)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -82,6 +82,30 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 52 Changes
+
+### Entity Visual Distinction (Explored vs Fresh)
+- **`dimColor()` helper**: Reduces entity foreground color to 35% brightness for exhausted/read entities on the map
+- **Exhausted entity dimming**: Interacted entities (read terminals, activated relays, collected pickups) render with dimmed foreground color on the map
+- **Brighter interactable glow**: INTERACTABLE_BG bumped from `#0a1a2a` → `#2a55cc` through multiple iterations for clear blue halo behind fresh interactable entities
+- **LogTerminal exhaustion tracking**: LogTerminal now sets `read: true` prop on first interaction, enabling `isEntityExhausted` to properly dim it after reading
+- **Visual result**: Fresh entities pop with bright colors + blue background glow; explored entities fade to dim grey — at a glance, players see what's left to investigate
+
+## Sprint 51 Changes
+
+### Archetype-Specific Game-Over Epilogues
+- **`GAMEOVER_EPILOGUE_VICTORY`**: 5 archetype-specific victory epilogues replacing generic ending text
+- **`GAMEOVER_EPILOGUE_DEFEAT`**: 5 archetype-specific defeat epilogues
+- **CORVUS-7 Final Transmission**: 5 archetype-specific farewell messages from the station AI on victory (in `CORVUS_FINAL_TRANSMISSION`)
+- All text in `src/data/narrative.ts` for writer accessibility
+
+## Sprint 50 Changes
+
+### Exploration Feedback
+- **Room counter in sidebar**: `Rooms: N/T (P%)` shows rooms explored out of total with percentage, color-coded (grey < 50% < amber < 75% < green)
+- **Exploration milestone PA messages**: CORVUS-7 Central announces at 25%, 50%, 75%, and 100% station survey completion with escalating narrative text
+- **Unexplored room scanner hints**: SCANNER compass now shows nearest unexplored room as a low-priority target (priority 5, grey `?` marker) — nudges players toward unvisited areas
 
 ## Sprint 49 Changes
 
