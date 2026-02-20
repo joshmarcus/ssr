@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 57 complete (Onboarding, Deduction Ceremony, Escort Arcs, Corridor Ambience)
+- **Phase**: Sprint 58 complete (Insight Notifications, Archetype Atmosphere, Deduction Consequences)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -81,6 +81,27 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 58 Changes
+
+### Evidence Insight Notifications
+- **Mid-play feedback**: When new journal entries contribute tags toward active deductions, CORVUS-7 fires: "New evidence cross-referenced — N/M data points for active investigation"
+- **Deduction-ready alert**: When all tags are covered, fires gold milestone: "All data assembled for a deduction. Open CONNECTIONS [v]."
+- **Reduces investigation blindness**: Players no longer need to open the hub to know whether evidence matters
+
+### Archetype-Specific Environmental Interrupts
+- **20 atmospheric one-liners** (4 per archetype) fire every 25 turns during gameplay
+- **CoolantCascade**: Groaning pipes, waste heat, superheated coolant mist
+- **HullBreach**: Thin air, hull deformation sounds, silenced klaxons
+- **ReactorScram**: Terminals displaying "ARE YOU LISTENING?", pulsing lights from data core heartbeat, maintenance drones being rewritten
+- **Sabotage**: Scratching sounds in vents, sticky organic residue, quarantine seals peeled from inside
+- **SignalAnomaly**: 14.7 kHz sensor crackles, rhythmic light patterns, navigation pointing above the station
+
+### Tier-Aware Deduction Physical Consequences
+- **Tier 1 (WHAT)**: +50 HP — "Station systems responding to investigation"
+- **Tier 3-4 (WHY/HERO)**: Extra heat (-5) and smoke (-3) reduction station-wide — "The truth brings clarity"
+- **Tier 5-6 (RESPONSIBILITY/AGENDA)**: Massive hazard reduction (-10 heat, -8 smoke) + screen flash — "The station shudders — and goes quiet"
+- **Physical consequences match emotional weight**: Early deductions give practical help, final revelations physically transform the station
 
 ## Sprint 57 Changes
 
