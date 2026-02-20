@@ -197,7 +197,7 @@ let helpOpen = false;
 let incidentCardOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
 let investigationHubOpen = false;
-let hubSection: "evidence" | "connections" | "whatweknow" | "decisions" = "evidence";
+let hubSection: "evidence" | "connections" | "whatweknow" = "evidence";
 let hubIdx = 0;                       // selected item index within current section
 let hubOptionIdx = 0;                 // selected option within a deduction/choice
 let hubLinkedEvidence: string[] = [];  // evidence IDs linked to a deduction
@@ -205,8 +205,6 @@ let hubDetailDeduction: string | null = null; // deduction ID in evidence-linkin
 let hubEvidenceIdx = 0;               // evidence entry index in linking mode
 let hubConfirming = false;            // Y/N confirmation for deduction answer
 let hubLinkFeedback = "";             // feedback message after toggling evidence
-let hubChoiceConfirming = false;      // Y/N confirmation for mystery choice
-let hubDecisionDetailIdx: number | null = null; // which decision is expanded (null = list view)
 let hubFocusRegion: "evidence" | "answers" = "evidence"; // focus region in connection detail view
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
 let lastWwkJournalCount = 0; // journal count when WHAT WE KNOW was last viewed
@@ -956,8 +954,6 @@ function resetGameState(newSeed: number): void {
   hubEvidenceIdx = 0;
   hubConfirming = false;
   hubLinkFeedback = "";
-  hubChoiceConfirming = false;
-  hubDecisionDetailIdx = null;
   hubIdx = 0;
   lastWwkJournalCount = 0;
   pendingCrewDoor = null;
@@ -2346,12 +2342,11 @@ function renderInvestigationHub(): void {
   const journal = state.mystery.journal;
 
   // Tab bar
-  const tabs: Array<"evidence" | "connections" | "whatweknow" | "decisions"> = ["evidence", "connections", "whatweknow", "decisions"];
+  const tabs: Array<"evidence" | "connections" | "whatweknow"> = ["evidence", "connections", "whatweknow"];
   const tabLabels: Record<string, string> = {
     evidence: `EVIDENCE (${entries.length})`,
     connections: `CONNECTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`,
     whatweknow: "WHAT WE KNOW",
-    decisions: "DECISIONS",
   };
   let tabsHtml = "";
   for (const t of tabs) {
@@ -2367,8 +2362,6 @@ function renderInvestigationHub(): void {
     bodyHtml = renderHubConnections(deductions, journal);
   } else if (hubSection === "whatweknow") {
     bodyHtml = renderHubWhatWeKnow();
-  } else if (hubSection === "decisions") {
-    bodyHtml = renderHubDecisions();
   }
 
   const controlsText = hubDetailDeduction
@@ -2777,89 +2770,6 @@ function renderHubWhatWeKnow(): string {
   return html;
 }
 
-/** DECISIONS section — mystery choices with spoiler protection. */
-function renderHubDecisions(): string {
-  if (!state.mystery) return `<div style="padding:16px;color:#888">No decisions available.</div>`;
-
-  const choices = state.mystery.choices;
-  const journalCount = state.mystery.journal.length;
-  const thresholds = [3, 6, 10];
-
-  // If viewing a specific decision's detail
-  if (hubDecisionDetailIdx !== null) {
-    const ci = hubDecisionDetailIdx;
-    const choice = choices[ci];
-    if (choice && !choice.chosen && journalCount >= (thresholds[ci] ?? Infinity)) {
-      return renderHubDecisionDetail(choice, ci);
-    }
-    hubDecisionDetailIdx = null;
-  }
-
-  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:8px">`;
-
-  for (let ci = 0; ci < choices.length && ci < thresholds.length; ci++) {
-    const choice = choices[ci];
-    const available = journalCount >= thresholds[ci];
-    const isActive = ci === hubIdx;
-
-    let sectionClass = "broadcast-deduction";
-    if (!available) sectionClass += " locked";
-    if (choice.chosen) sectionClass += " solved";
-    if (isActive) sectionClass += " active-section";
-
-    html += `<div class="${sectionClass}">`;
-
-    if (choice.chosen) {
-      const chosenOption = choice.options.find(o => o.key === choice.chosen);
-      html += `<div class="broadcast-section-title"><span style="color:#0f0">[\u2713]</span> DECISION ${ci + 1}</div>`;
-      html += `<div style="color:#0f0;padding:2px 8px">\u2713 ${esc(chosenOption?.label ?? choice.chosen)}</div>`;
-    } else if (!available) {
-      html += `<div class="broadcast-section-title"><span style="color:#555">[?]</span> DECISION ${ci + 1}</div>`;
-      html += `<div style="color:#555;padding:2px 8px">Gather more evidence (need ${thresholds[ci]}, have ${journalCount})</div>`;
-    } else {
-      html += `<div class="broadcast-section-title"><span style="color:#fa0">[!]</span> DECISION ${ci + 1}</div>`;
-      html += `<div style="color:#aaa;padding:2px 8px;font-size:12px">A decision is available. [Enter] to review.</div>`;
-    }
-
-    html += `</div>`;
-  }
-
-  // Evacuation status
-  if (state.mystery.evacuation?.active) {
-    const evac = state.mystery.evacuation;
-    html += `<div style="border-top:1px solid #444;margin:8px 0;padding-top:8px">`;
-    html += `<div class="broadcast-section-title" style="color:#f0f">EVACUATION STATUS</div>`;
-    html += `<div style="padding:4px 8px;color:#ccc">`;
-    html += `<div>Crew found: <span style="color:#fff">${evac.crewFound.length}</span></div>`;
-    html += `<div>Evacuated: <span style="color:#4a4">${evac.crewEvacuated.length}</span></div>`;
-    if (evac.crewDead.length > 0) html += `<div>Lost: <span style="color:#f44">${evac.crewDead.length}</span></div>`;
-    const remaining = evac.crewFound.length - evac.crewEvacuated.length - evac.crewDead.length;
-    if (remaining > 0) html += `<div>Still need rescue: <span style="color:#fa0">${remaining}</span></div>`;
-    html += `<div>Escape pods powered: <span style="color:#4af">${evac.podsPowered.length}</span></div>`;
-    html += `</div></div>`;
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-/** Detail view for a single decision — prompt text + options revealed here. */
-function renderHubDecisionDetail(choice: import("./shared/types.js").MysteryChoice, ci: number): string {
-  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:12px 16px">`;
-  html += `<div style="color:#ca8;font-weight:bold;font-size:14px;margin-bottom:8px">DECISION ${ci + 1}</div>`;
-  html += `<div style="color:#fff;font-size:13px;margin-bottom:12px;line-height:1.4">${esc(choice.prompt)}</div>`;
-
-  for (let i = 0; i < choice.options.length; i++) {
-    const prefix = (i === hubOptionIdx) ? "\u25b6 " : "  ";
-    const cls = (i === hubOptionIdx) ? "broadcast-option selected" : "broadcast-option";
-    html += `<div class="${cls}">${prefix}${i + 1}. ${esc(choice.options[i].label)}</div>`;
-  }
-
-  html += `<div style="color:#888;font-size:12px;margin-top:12px">[&uarr;/&darr;] Select  [Enter] Confirm  [Esc] Back to list</div>`;
-  html += `</div>`;
-  return html;
-}
-
 /** Render a proportional ASCII minimap showing where evidence was found. */
 function renderEvidenceMinimap(roomName: string): string {
   if (!state.rooms || state.rooms.length === 0) return "";
@@ -2925,7 +2835,6 @@ function closeInvestigationHub(): void {
   }
   investigationHubOpen = false;
   hubDetailDeduction = null;
-  hubDecisionDetailIdx = null;
   display.addLog("[Investigation Hub closed]", "system");
   renderAll();
 }
@@ -2958,21 +2867,15 @@ function handleHubInput(e: KeyboardEvent): void {
     return;
   }
 
-  // Confirmation step: Y/N for deduction or choice
-  if (hubConfirming || hubChoiceConfirming) {
+  // Confirmation step: Y/N for deduction answer
+  if (hubConfirming) {
     if (e.key === "y" || e.key === "Y") {
-      if (hubConfirming) {
-        hubConfirming = false;
-        commitHubDeductionAnswer();
-      } else {
-        hubChoiceConfirming = false;
-        commitHubChoiceAnswer();
-      }
+      hubConfirming = false;
+      commitHubDeductionAnswer();
       return;
     }
     if (e.key === "n" || e.key === "N" || e.key === "Escape") {
       hubConfirming = false;
-      hubChoiceConfirming = false;
       renderInvestigationHub();
       return;
     }
@@ -2994,22 +2897,15 @@ function handleHubInput(e: KeyboardEvent): void {
     renderInvestigationHub();
     return;
   }
-  if (hubDecisionDetailIdx !== null && e.key === "Escape") {
-    hubDecisionDetailIdx = null;
-    hubOptionIdx = 0;
-    renderInvestigationHub();
-    return;
-  }
-
   // Close hub
-  if (e.key === "Escape" || (e.key === "r" && !hubDetailDeduction && hubDecisionDetailIdx === null) || (e.key === "v" && hubSection === "evidence" && !hubDetailDeduction)) {
+  if (e.key === "Escape" || (e.key === "r" && !hubDetailDeduction) || (e.key === "v" && hubSection === "evidence" && !hubDetailDeduction)) {
     closeInvestigationHub();
     return;
   }
 
   // Tab cycles sections
-  if (e.key === "Tab" && !hubDetailDeduction && hubDecisionDetailIdx === null) {
-    const tabs: Array<"evidence" | "connections" | "whatweknow" | "decisions"> = ["evidence", "connections", "whatweknow", "decisions"];
+  if (e.key === "Tab" && !hubDetailDeduction) {
+    const tabs: Array<"evidence" | "connections" | "whatweknow"> = ["evidence", "connections", "whatweknow"];
     const curIdx = tabs.indexOf(hubSection);
     hubSection = tabs[(curIdx + 1) % tabs.length];
     hubIdx = 0;
@@ -3026,8 +2922,6 @@ function handleHubInput(e: KeyboardEvent): void {
   } else if (hubSection === "whatweknow") {
     // No interactive elements in What We Know
     return;
-  } else if (hubSection === "decisions") {
-    handleHubDecisionsInput(e);
   }
 }
 
@@ -3202,80 +3096,6 @@ function handleHubConnectionsInput(e: KeyboardEvent): void {
   }
 }
 
-function handleHubDecisionsInput(e: KeyboardEvent): void {
-  const choices = state.mystery?.choices ?? [];
-  const journalCount = state.mystery?.journal.length ?? 0;
-  const thresholds = [3, 6, 10];
-
-  // If viewing a decision detail
-  if (hubDecisionDetailIdx !== null) {
-    const choice = choices[hubDecisionDetailIdx];
-    if (!choice || choice.chosen) {
-      hubDecisionDetailIdx = null;
-      renderInvestigationHub();
-      return;
-    }
-
-    if (e.key === "ArrowUp" || e.key === "w") {
-      hubOptionIdx = Math.max(0, hubOptionIdx - 1);
-      renderInvestigationHub();
-      return;
-    }
-    if (e.key === "ArrowDown" || e.key === "s") {
-      hubOptionIdx = Math.min(choice.options.length - 1, hubOptionIdx + 1);
-      renderInvestigationHub();
-      return;
-    }
-    if (e.key === "Enter") {
-      const chosenOption = choice.options[hubOptionIdx];
-      hubChoiceConfirming = true;
-      const overlay = document.getElementById("broadcast-overlay");
-      if (overlay) {
-        overlay.innerHTML = `
-          <div class="broadcast-box">
-            <div class="broadcast-title">\u2550\u2550\u2550 CONFIRM DECISION \u2550\u2550\u2550</div>
-            <div style="padding:20px;text-align:center">
-              <div style="color:#ca8;font-size:14px;margin-bottom:12px">${esc(choice.prompt.slice(0, 120))}${choice.prompt.length > 120 ? "..." : ""}</div>
-              <div style="color:#fff;font-size:14px;margin-bottom:16px">Your decision: <span style="color:#6cf">${esc(chosenOption.label)}</span></div>
-              <div style="color:#fa0;font-size:13px;margin-bottom:8px">This will be included in your report.</div>
-              <div style="color:#aaa;font-size:14px">Confirm? [Y] Yes  [N] Go back</div>
-            </div>
-          </div>`;
-      }
-      return;
-    }
-    const num = parseInt(e.key, 10);
-    if (num >= 1 && num <= choice.options.length) {
-      hubOptionIdx = num - 1;
-      renderInvestigationHub();
-      return;
-    }
-    return;
-  }
-
-  // List view
-  const maxIdx = Math.min(choices.length, thresholds.length) - 1;
-  if (e.key === "ArrowUp" || e.key === "w") {
-    hubIdx = Math.max(0, hubIdx - 1);
-    renderInvestigationHub();
-    return;
-  }
-  if (e.key === "ArrowDown" || e.key === "s") {
-    hubIdx = Math.min(maxIdx, hubIdx + 1);
-    renderInvestigationHub();
-    return;
-  }
-  if (e.key === "Enter") {
-    const ci = hubIdx;
-    const choice = choices[ci];
-    if (choice && !choice.chosen && journalCount >= (thresholds[ci] ?? Infinity)) {
-      hubDecisionDetailIdx = ci;
-      hubOptionIdx = 0;
-      renderInvestigationHub();
-    }
-    return;
-  }
-}
 
 /** Commit deduction answer after Y/N confirmation. Shows revelation overlay. */
 function commitHubDeductionAnswer(): void {
@@ -3355,26 +3175,6 @@ function commitHubDeductionAnswer(): void {
   }
 }
 
-/** Commit mystery choice after Y/N confirmation. */
-function commitHubChoiceAnswer(): void {
-  if (!state.mystery || hubDecisionDetailIdx === null) return;
-  const ci = hubDecisionDetailIdx;
-  const choice = state.mystery.choices[ci];
-  if (!choice || choice.chosen) return;
-
-  const chosenOption = choice.options[hubOptionIdx];
-  state.mystery.choices[ci] = {
-    ...choice,
-    chosen: chosenOption.key,
-    turnPresented: state.turn,
-  };
-  display.addLog(`Decision recorded: ${chosenOption.label}`, "milestone");
-  display.triggerScreenFlash("milestone");
-  audio.playChoice();
-  hubDecisionDetailIdx = null;
-  hubOptionIdx = 0;
-  renderInvestigationHub();
-}
 
 /** HTML-escape helper. */
 function esc(text: string): string {
