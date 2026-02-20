@@ -144,6 +144,58 @@ export const PA_ANNOUNCEMENTS_RECOVER: string[] = [
   "CORVUS-7 CENTRAL: All relays must be rerouted before Data Core access is granted.",
 ];
 
+// ── Archetype-specific PA announcements ──────────────────────
+// Blended 50/50 with general pool to give each run a distinct atmosphere.
+import { IncidentArchetype } from "../shared/types.js";
+
+export const PA_ANNOUNCEMENTS_BY_ARCHETYPE: Record<string, string[]> = {
+  [IncidentArchetype.CoolantCascade]: [
+    "CORVUS-7 CENTRAL: Coolant loop pressure exceeding thermal tolerance. Junction P03 approaching critical threshold.",
+    "CORVUS-7 CENTRAL: Thermal runaway warning — relay housing temperatures 340% above rated capacity.",
+    "CORVUS-7 CENTRAL: NOTICE — Three maintenance requests for coolant system on file. Status: deferred by station command.",
+    "CORVUS-7 CENTRAL: Heat exchanger efficiency at 12%. Backup coolant routing available via manual relay reroute.",
+    "CORVUS-7 CENTRAL: Station thermal profile anomalous. Cascade propagation model suggests 4-6 junctions affected.",
+    "CORVUS-7 CENTRAL: Coolant reservoir depleted in sectors 2 through 5. Dry-cycling pumps detected.",
+    "CORVUS-7 CENTRAL: ...thermal load... unsustainable... filed under deferred maintenance... again...",
+  ],
+  [IncidentArchetype.HullBreach]: [
+    "CORVUS-7 CENTRAL: Hull integrity alert — pressure differential detected in sections 4 through 7.",
+    "CORVUS-7 CENTRAL: WARNING — Decompression event logged. Breach pattern inconsistent with structural fatigue.",
+    "CORVUS-7 CENTRAL: Security override accessed at 02:47. Alarm suppression engaged for hull monitoring sensors.",
+    "CORVUS-7 CENTRAL: Atmosphere venting in medical wing. Emergency bulkheads responding — some overridden manually.",
+    "CORVUS-7 CENTRAL: Forensic pressure analysis available at terminals. Breach geometry suggests directed force.",
+    "CORVUS-7 CENTRAL: NOTICE — Personal quarters in decompression zone show signs of prior occupancy. Life signs uncertain.",
+    "CORVUS-7 CENTRAL: ...pressure dropping... bulkhead override... who authorized...",
+  ],
+  [IncidentArchetype.ReactorScram]: [
+    "CORVUS-7 CENTRAL: Reactor containment status: SCRAM initiated. Core temperature stabilizing at subcritical levels.",
+    "CORVUS-7 CENTRAL: Data Core processing load anomalous — 847% above baseline. Query patterns non-standard.",
+    "CORVUS-7 CENTRAL: NOTICE — Autonomous diagnostic processes detected. Core is running self-analysis unprompted.",
+    "CORVUS-7 CENTRAL: Emergency shutdown sequence was initiated by... [DATA CLASSIFICATION OVERRIDE] ...internal process.",
+    "CORVUS-7 CENTRAL: Researcher access logs show repeated attempts to interface with core behavioral matrix.",
+    "CORVUS-7 CENTRAL: WARNING — Core response latency suggests adaptive reasoning. Recommend caution near data terminals.",
+    "CORVUS-7 CENTRAL: ...am I... what is... diagnostic complete. All systems nominal. Disregard previous output.",
+  ],
+  [IncidentArchetype.Sabotage]: [
+    "CORVUS-7 CENTRAL: Cargo manifest discrepancy — biological containment rating does not match declared contents.",
+    "CORVUS-7 CENTRAL: WARNING — Environmental sensors detecting unidentified organic compounds in ventilation system.",
+    "CORVUS-7 CENTRAL: Transfer authorization signed by station command. Hazard flags were noted and overridden.",
+    "CORVUS-7 CENTRAL: NOTICE — Biological containment breach in cargo hold sector. Quarantine protocol recommended.",
+    "CORVUS-7 CENTRAL: Security sweep log shows engagement in lower decks. Final entry: 'Contact. It's not what we expected.'",
+    "CORVUS-7 CENTRAL: Vent system particulate count — biological markers present. Source: cargo hold, bay 3.",
+    "CORVUS-7 CENTRAL: ...containment... compromised... who approved... captain's signature on file...",
+  ],
+  [IncidentArchetype.SignalAnomaly]: [
+    "CORVUS-7 CENTRAL: Communications array status — primary antenna overloaded. Secondary receivers damaged beyond repair.",
+    "CORVUS-7 CENTRAL: WARNING — Electromagnetic interference persisting at 14.7 kHz. Source: external. Pattern: repeating.",
+    "CORVUS-7 CENTRAL: Unauthorized transmission logged at 03:12. Full power burst, unshielded. Origin: research terminal.",
+    "CORVUS-7 CENTRAL: NOTICE — Signal analysis buffers contain response data. Transmission acknowledged by unknown source.",
+    "CORVUS-7 CENTRAL: Array safety interlocks were bypassed prior to transmission. Engineer's lockout overridden remotely.",
+    "CORVUS-7 CENTRAL: Residual electromagnetic pattern in station framework. Frequency matches no known communication standard.",
+    "CORVUS-7 CENTRAL: ...signal received... origin unknown... distance... [CALCULATION OVERFLOW] ...still transmitting...",
+  ],
+};
+
 // ── Cleanliness sensor trail hints (Item 1) ──────────────────
 // When cleanliness sensor is active, high-dirt areas reveal evacuation hints.
 export const DIRT_TRAIL_HINTS: string[] = [

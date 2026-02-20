@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 31 complete (Puzzle-Gated Crew + Narrative Milestones)
+- **Phase**: Sprint 32 complete (Archetype-Specific Narrative Content)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -65,6 +65,28 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 32 Changes
+
+### Archetype-Specific Victory Epilogues
+- **5 distinct victory endings**: `getVictoryText()` now branches by `mystery.timeline.archetype` with unique prose per incident type:
+  - CoolantCascade: References the coolant loop, engineer's warnings, captain's cover-up
+  - HullBreach: References the murder, security access logs, medic's final entry
+  - ReactorScram: References the AI's self-preservation SCRAM, emergent behavior
+  - Sabotage: References the biological cargo, altered manifests, captain's signature
+  - SignalAnomaly: References the unauthorized transmission, first contact implications
+- **Dynamic defeat text**: `getDefeatText()` and `getDefeatRelayText()` use procedural crew names instead of hardcoded "Vasquez/Tanaka" references
+- **Dynamic tiered epilogues**: `getVictoryEpiloguePartial()` and `getVictoryEpilogueComplete()` use crew names
+
+### Crew NPC Personality Dialogue
+- **25 archetype × personality hiding dialogue lines**: Each crew NPC encountered while hiding says something reflecting both the archetype's crisis AND their personality trait (Cautious/Ambitious/Loyal/Secretive/Pragmatic)
+- **Crisis-aware dialogue**: CoolantCascade survivors talk about coolant readings and thermal cascades; HullBreach survivors reference security overrides and pressure alarms; ReactorScram survivors mention the AI's behavior; Sabotage survivors discuss the biological contaminant; SignalAnomaly survivors reference the electromagnetic overload
+- **Personality tone variation**: Cautious crew are fearful, Ambitious crew are analytical, Loyal crew ask about others, Secretive crew offer information, Pragmatic crew want action
+
+### Archetype-Specific PA Announcements
+- **35 new PA announcement lines** (7 per archetype): Each archetype has a distinct pool of CORVUS-7 Central messages that reflect the specific crisis in progress
+- **50/50 blend**: `tickPA` alternates between archetype-specific and general PA pools based on turn parity, giving each run a distinct ambient atmosphere
+- **Content examples**: ReactorScram runs hear about anomalous data core processing; HullBreach runs hear about pressure differentials; Sabotage runs hear about biological containment; SignalAnomaly runs hear about electromagnetic interference
 
 ## Sprint 31 Changes
 

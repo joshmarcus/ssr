@@ -8,12 +8,13 @@ import { AudioManager } from "./render/audio.js";
 import { GOLDEN_SEED } from "./shared/constants.js";
 import { getOpeningCrawl, STATION_NAME, STATION_SUBTITLE, TAGLINE } from "./data/lore.js";
 import {
-  VICTORY_TITLE, DEFEAT_TITLE, DEFEAT_TEXT,
-  DEFEAT_RELAY_TITLE, DEFEAT_RELAY_TEXT,
-  VICTORY_EPILOGUE_MINIMAL, VICTORY_EPILOGUE_PARTIAL, VICTORY_EPILOGUE_COMPLETE,
+  VICTORY_TITLE, DEFEAT_TITLE,
+  DEFEAT_RELAY_TITLE,
+  VICTORY_EPILOGUE_MINIMAL,
   ENDING_BY_DISCOVERY, SPECIFIC_DISCOVERIES,
   CLASSIFIED_DIRECTIVE_LOG_FRAGMENT, CLASSIFIED_DIRECTIVE_TEXT,
-  getVictoryText,
+  getVictoryText, getVictoryEpiloguePartial, getVictoryEpilogueComplete,
+  getDefeatText, getDefeatRelayText,
 } from "./data/endgame.js";
 import { getRoomDescription } from "./data/roomDescriptions.js";
 import {
@@ -1171,9 +1172,9 @@ function handleAction(action: Action): void {
       const ratio = totalDiscoverables > 0 ? discoveryCount / totalDiscoverables : 0;
       let epilogue: string[];
       if (ratio >= 0.8) {
-        epilogue = VICTORY_EPILOGUE_COMPLETE;
+        epilogue = getVictoryEpilogueComplete(state.mystery);
       } else if (ratio >= 0.4) {
-        epilogue = VICTORY_EPILOGUE_PARTIAL;
+        epilogue = getVictoryEpiloguePartial(state.mystery);
       } else {
         epilogue = VICTORY_EPILOGUE_MINIMAL;
       }
@@ -1249,10 +1250,10 @@ function handleAction(action: Action): void {
       const isHeatDeath = deathTile && deathTile.heat >= 30;
       if (isHeatDeath) {
         display.addLog("=== " + DEFEAT_RELAY_TITLE + " ===", "critical");
-        DEFEAT_RELAY_TEXT.forEach((line) => { if (line) display.addLog(line, "critical"); });
+        getDefeatRelayText(state.mystery).forEach((line) => { if (line) display.addLog(line, "critical"); });
       } else {
         display.addLog("=== " + DEFEAT_TITLE + " ===", "critical");
-        DEFEAT_TEXT.forEach((line) => { if (line) display.addLog(line, "critical"); });
+        getDefeatText(state.mystery).forEach((line) => { if (line) display.addLog(line, "critical"); });
       }
     }
     flickerThenRender();

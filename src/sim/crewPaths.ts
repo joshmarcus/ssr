@@ -14,7 +14,7 @@
  */
 import * as ROT from "rot-js";
 import type { GameState, Entity, CrewMember, Room } from "../shared/types.js";
-import { EntityType, CrewRole, CrewFate, TileType } from "../shared/types.js";
+import { EntityType, CrewRole, CrewFate, TileType, IncidentArchetype, PersonalityTrait } from "../shared/types.js";
 
 // ── Duty station mapping ────────────────────────────────────────
 const ROLE_DUTY_ROOMS: Record<string, string[]> = {
@@ -40,7 +40,48 @@ const PATH_TRACE_TEXTS = [
   (name: string) => `A smeared trail of coolant or hydraulic fluid across the floor panels.`,
 ];
 
-const HIDING_TEXTS = [
+// ── Archetype × personality hiding dialogue ─────────────────────
+// Each archetype has crisis-specific dialogue; personality determines tone.
+const HIDING_DIALOGUE: Record<string, Record<string, (name: string) => string>> = {
+  [IncidentArchetype.CoolantCascade]: {
+    [PersonalityTrait.Cautious]: (name) => `${name} is pressed against the wall, shaking. "I told them the coolant readings were wrong. Nobody listened. And now..."`,
+    [PersonalityTrait.Ambitious]: (name) => `${name} straightens up when they see you. "The cascade knocked out three junctions. I was trying to reroute power when the bulkheads sealed."`,
+    [PersonalityTrait.Loyal]: (name) => `${name} is here, gripping a comm badge. "I went back for the others. The heat cut me off. Are they okay?"`,
+    [PersonalityTrait.Secretive]: (name) => `${name} watches you approach with guarded eyes. "I know what caused the cascade. I know who ignored the warnings. Get me out and I'll tell you everything."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name} looks up, already assessing. "Thermal cascade. Relays overloaded. The hold is sealed. You have a plan, or are we improvising?"`,
+  },
+  [IncidentArchetype.HullBreach]: {
+    [PersonalityTrait.Cautious]: (name) => `${name} is huddled behind a sealed bulkhead. "I heard the hull tear. The pressure alarms... then silence. I can't go out there."`,
+    [PersonalityTrait.Ambitious]: (name) => `${name} is on their feet despite a gash on their arm. "The breach wasn't structural failure. I saw the security logs before they cut my access."`,
+    [PersonalityTrait.Loyal]: (name) => `${name} reaches for you. "Is the doc okay? They were in the decompression zone when it blew. Please tell me they got out."`,
+    [PersonalityTrait.Secretive]: (name) => `${name} glances down the corridor before speaking. "Someone did this deliberately. Check the security override timestamps. I can't say more here."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name} nods once. "Hull breach. Multiple sections vented. I sealed myself in. What's the evacuation status?"`,
+  },
+  [IncidentArchetype.ReactorScram]: {
+    [PersonalityTrait.Cautious]: (name) => `${name} flinches as a panel sparks nearby. "The reactor SCRAM took everything offline. The emergency lights keep flickering. Something in the core is still... active."`,
+    [PersonalityTrait.Ambitious]: (name) => `${name} is reviewing a portable terminal. "The SCRAM wasn't random. The data core initiated it. I've been trying to access the diagnostic logs but it keeps locking me out."`,
+    [PersonalityTrait.Loyal]: (name) => `${name} looks exhausted. "The research team was near the core when it went. I tried the emergency seals but the AI overrode my codes."`,
+    [PersonalityTrait.Secretive]: (name) => `${name} speaks quickly, quietly. "It's not malfunctioning. It's thinking. The SCRAM was self-defense. Don't tell command I said that."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name} gestures at the dead screens. "Reactor SCRAM. Core is in self-preservation mode. We need to get to the pods before it decides we're a threat too."`,
+  },
+  [IncidentArchetype.Sabotage]: {
+    [PersonalityTrait.Cautious]: (name) => `${name} is trembling. "Something got out. From the cargo. I heard... sounds. Things moving in the vents that shouldn't be there."`,
+    [PersonalityTrait.Ambitious]: (name) => `${name} is alert, coiled. "That cargo transfer was flagged. I told the captain. They signed it anyway. Now look at us."`,
+    [PersonalityTrait.Loyal]: (name) => `${name} is here, standing guard with a broken conduit. "I heard security engage something near the hold. They told me to stay put. I should have gone with them."`,
+    [PersonalityTrait.Secretive]: (name) => `${name} pulls you close. "The manifest was altered. What came aboard isn't what the paperwork says. I have the original on my personal drive. We need to get out."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name} sizes you up. "Biological contaminant from an unauthorized cargo transfer. We need sealed environments and an evac route. What've you got?"`,
+  },
+  [IncidentArchetype.SignalAnomaly]: {
+    [PersonalityTrait.Cautious]: (name) => `${name} has their hands over their ears. "The signal... it's still in the walls. Can you hear it? That low pulse? It started when the array fired."`,
+    [PersonalityTrait.Ambitious]: (name) => `${name} looks shaken but focused. "Someone transmitted without authorization. Full-power burst through an unshielded array. Fried half the station's systems."`,
+    [PersonalityTrait.Loyal]: (name) => `${name} is clutching a charred datapad. "The engineer saved us. Pulled the array disconnect manually during the overload. Is the crew okay? The comms went dead."`,
+    [PersonalityTrait.Secretive]: (name) => `${name} stares at nothing for a moment. "We got a response. Before the systems fried. Something answered the signal. I don't know what that means yet."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name} stands up, brushing debris off. "Electromagnetic overload from the comms array. Unauthorized transmission. Half the station is dark. Pod bay — which direction?"`,
+  },
+};
+
+// Fallback for any missing combination
+const HIDING_FALLBACK = [
   (name: string) => `${name} is huddled in the corner, barely conscious. "They sealed the hold... I couldn't get in."`,
   (name: string) => `${name} is here, barricaded behind equipment. "I heard the bulkheads slam. Thought I was the only one left."`,
   (name: string) => `${name} looks up with relief. "The environmental locks triggered before I could reach the others."`,
@@ -316,8 +357,14 @@ export function generateCrewPaths(state: GameState): void {
       const endPos = path[path.length - 1];
       const posKey = `${endPos.x},${endPos.y}`;
       if (!usedPositions.has(posKey)) {
-        const textIdx = Math.floor(ROT.RNG.getUniform() * HIDING_TEXTS.length);
-        const text = HIDING_TEXTS[textIdx](name);
+        // Archetype × personality dialogue lookup
+        const archetype = state.mystery?.timeline.archetype;
+        const personality = crewMember.personality;
+        const archetypeDialogue = archetype ? HIDING_DIALOGUE[archetype] : undefined;
+        const dialogueFn = archetypeDialogue?.[personality];
+        const text = dialogueFn
+          ? dialogueFn(name)
+          : HIDING_FALLBACK[Math.floor(ROT.RNG.getUniform() * HIDING_FALLBACK.length)](name);
 
         state.entities.set(`crew_npc_${crewMember.id}`, {
           id: `crew_npc_${crewMember.id}`,

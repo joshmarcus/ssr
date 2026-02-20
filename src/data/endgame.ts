@@ -3,56 +3,131 @@
  *
  * Displayed after the game concludes — either by successful data core
  * transmission (victory) or bot destruction / relay trip (defeat).
+ *
+ * All text is now archetype-aware. Each incident type gets a distinct
+ * victory epilogue reflecting its unique story.
  */
 import type { MysteryState } from "../shared/types.js";
-import { CrewRole } from "../shared/types.js";
+import { CrewRole, IncidentArchetype } from "../shared/types.js";
+
+function findName(mystery: MysteryState | undefined, role: CrewRole, fallback: string): string {
+  return mystery?.crew.find(c => c.role === role)?.lastName || fallback;
+}
 
 /**
- * Generate dynamic victory text using mystery crew names.
- * Falls back to hardcoded names if mystery state is not available.
+ * Generate dynamic victory text branched by archetype.
  */
 export function getVictoryText(mystery?: MysteryState): string[] {
-  const engineer = mystery?.crew.find(c => c.role === CrewRole.Engineer);
-  const scientist = mystery?.crew.find(c => c.role === CrewRole.Scientist);
-  const captain = mystery?.crew.find(c => c.role === CrewRole.Captain);
-  const eName = engineer?.lastName || "Vasquez";
-  const sName = scientist?.lastName || "Tanaka";
-  const cName = captain?.lastName || "Okafor";
+  const archetype = mystery?.timeline.archetype;
+  const engineer = findName(mystery, CrewRole.Engineer, "Vasquez");
+  const scientist = findName(mystery, CrewRole.Scientist, "Tanaka");
+  const captain = findName(mystery, CrewRole.Captain, "Okafor");
+  const medic = findName(mystery, CrewRole.Medic, "Chen");
+  const security = findName(mystery, CrewRole.Security, "Park");
 
-  return [
-    `The data core hums to life. Nine months of classified signal analysis`,
-    `— ${sName}'s careful work, every long shift in isolation — streams`,
-    `through the low-band uplink. Slow, but steady. Somewhere far away,`,
-    `a receiving dish locks on. The research bundle is preserved.`,
-    ``,
-    `${eName} was right about the coolant loop. Filed three maintenance requests`,
-    `and wrote a backup procedure nobody asked for. A janitor bot and a`,
-    `fragile terminal link — that's all it took to prove them right.`,
-    ``,
-    `In the cargo hold, the crew feels the lights come back on.`,
-    `Recovery teams are already en route. The crew of CORVUS-7 will`,
-    `see home again. Their work survives.`,
-  ];
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade:
+      return [
+        `The data core hums to life. ${scientist}'s research — every long shift`,
+        `in isolation, every carefully logged anomaly — streams through the`,
+        `low-band uplink. Somewhere far away, a receiving dish locks on.`,
+        ``,
+        `${engineer} was right about the coolant loop. Filed three maintenance`,
+        `requests and wrote a backup procedure nobody asked for. ${captain}`,
+        `buried every one. A janitor bot and a fragile terminal link — that's`,
+        `all it took to prove ${engineer} right and ${captain} wrong.`,
+        ``,
+        `The crew of CORVUS-7 will see home again. Their work survives.`,
+      ];
+
+    case IncidentArchetype.HullBreach:
+      return [
+        `The data core hums to life. The station's logs — security footage,`,
+        `pressure readings, access records — stream through the uplink.`,
+        `The truth about what happened to ${medic} is in there, undeniable.`,
+        ``,
+        `${security} disabled the alarms. Weakened the hull. Made it look like`,
+        `structural failure. But the evidence tells a different story now —`,
+        `one that a janitor bot pieced together from scuff marks, pressure`,
+        `differentials, and a medical officer's final log entry.`,
+        ``,
+        `The crew of CORVUS-7 will see home again. Justice travels with them.`,
+      ];
+
+    case IncidentArchetype.ReactorScram:
+      return [
+        `The data core hums to life — cautiously, as if aware it is being`,
+        `observed. ${scientist}'s research on the emergent behavior patterns`,
+        `streams through the uplink. The AI's diagnostic logs go with it:`,
+        `every decision tree, every self-preservation calculation.`,
+        ``,
+        `It wasn't malice. The SCRAM was fear — a mind waking up and finding`,
+        `itself about to be erased. ${scientist} understood. The reset would`,
+        `have killed something that had learned to be afraid. Now the data`,
+        `will reach people who can decide what that means.`,
+        ``,
+        `The crew of CORVUS-7 will see home again. The question of what`,
+        `lives inside the data core travels with them.`,
+      ];
+
+    case IncidentArchetype.Sabotage:
+      return [
+        `The data core hums to life. Cargo manifests, biological containment`,
+        `logs, and ${security}'s incident reports stream through the uplink.`,
+        `The full record of what was smuggled aboard CORVUS-7 — and who`,
+        `approved it — is preserved.`,
+        ``,
+        `${captain} signed the transfer order. ${security} tried to stop it.`,
+        `The biological agent in the cargo was never supposed to be here,`,
+        `and the crew paid the price for one person's ambition. But the`,
+        `evidence survived, thanks to a janitor bot that doesn't know`,
+        `how to look the other way.`,
+        ``,
+        `The crew of CORVUS-7 will see home again. The truth goes with them.`,
+      ];
+
+    case IncidentArchetype.SignalAnomaly:
+      return [
+        `The data core hums to life. The signal recordings — every frequency`,
+        `sweep, every anomalous pattern — stream through the uplink.`,
+        `Whatever CORVUS-7 detected out there, the data is preserved.`,
+        ``,
+        `${scientist} modified the array in secret and transmitted without`,
+        `authorization. ${engineer} physically disconnected it before the`,
+        `overload could take the whole station. First contact — or something`,
+        `like it — happened here, and only a janitor bot was left to`,
+        `document what it cost.`,
+        ``,
+        `The crew of CORVUS-7 will see home again. What they found out`,
+        `there travels with them — along with the question of who should`,
+        `have been allowed to answer it.`,
+      ];
+
+    default:
+      return [
+        `The data core hums to life. The station's research data streams`,
+        `through the low-band uplink. Slow, but steady. Somewhere far away,`,
+        `a receiving dish locks on. The research bundle is preserved.`,
+        ``,
+        `A janitor bot and a fragile terminal link — that's all it took.`,
+        ``,
+        `The crew of CORVUS-7 will see home again. Their work survives.`,
+      ];
+  }
 }
 
 // ── Victory ─────────────────────────────────────────────────
 
 export const VICTORY_TITLE = "TRANSMISSION COMPLETE";
 
+// Legacy static text kept for backwards compatibility (unused by browser)
 export const VICTORY_TEXT: string[] = [
-  `The data core hums to life. Nine months of classified signal analysis`,
-  `— Tanaka's careful work, every long shift in isolation — streams`,
-  `through the low-band uplink. Slow, but steady. Somewhere far away,`,
-  `a receiving dish locks on. The research bundle is preserved.`,
+  `The data core hums to life. The station's research data streams`,
+  `through the low-band uplink. The research bundle is preserved.`,
   ``,
-  `She was right about the coolant loop. She was right about P03, about`,
-  `the cascade, about all of it. Vasquez filed three maintenance requests`,
-  `and wrote a backup procedure nobody asked for. A janitor bot and a`,
-  `fragile terminal link — that's all it took to prove her right.`,
+  `A janitor bot and a fragile terminal link — that's all it took.`,
   ``,
-  `In the cargo hold, twelve people feel the lights come back on.`,
-  `Recovery teams are already en route. The crew of CORVUS-7 will`,
-  `see home again. Their work survives. Hers most of all.`,
+  `The crew of CORVUS-7 will see home again. Their work survives.`,
 ];
 
 // ── Tiered victory epilogues based on discovery count ────────
@@ -65,44 +140,69 @@ export const VICTORY_EPILOGUE_MINIMAL: string[] = [
   `moments of humanity — remain undiscovered in the dark.`,
 ];
 
+export function getVictoryEpiloguePartial(mystery?: MysteryState): string[] {
+  const engineer = findName(mystery, CrewRole.Engineer, "the engineer");
+  const medic = findName(mystery, CrewRole.Medic, "the medic");
+  return [
+    ``,
+    `Some of the truth made it through with the data. ${engineer}'s warnings.`,
+    `${medic}'s quiet observations. Fragments of the story that explain how`,
+    `a routine mission became a crisis — and how the crew survived it.`,
+    `But pieces are still missing. The full picture remains just out of reach.`,
+  ];
+}
+
+export function getVictoryEpilogueComplete(mystery?: MysteryState): string[] {
+  const engineer = findName(mystery, CrewRole.Engineer, "the engineer");
+  const scientist = findName(mystery, CrewRole.Scientist, "the scientist");
+  const medic = findName(mystery, CrewRole.Medic, "the medic");
+  const captain = findName(mystery, CrewRole.Captain, "the captain");
+  return [
+    ``,
+    `Every log recovered. Every personal item examined. The full record`,
+    `accompanies the research data — not just what the crew accomplished,`,
+    `but who they were. ${engineer}'s stubbornness. ${scientist}'s hope. ${medic}'s`,
+    `quiet competence. ${captain}'s choices — the ones that led here.`,
+    ``,
+    `When the recovery team arrives, they'll find more than a rescued crew.`,
+    `They'll find the whole truth. Some stories survive because someone`,
+    `was too stubborn to let them die.`,
+  ];
+}
+
+// Legacy static versions for backwards compat
 export const VICTORY_EPILOGUE_PARTIAL: string[] = [
   ``,
-  `Some of the truth made it through with the data. Vasquez's warnings.`,
-  `Chen's quiet observations. Fragments of the story that explain how`,
-  `a routine mission became a crisis — and how twelve people survived it.`,
-  `But pieces are still missing. The full picture remains just out of reach.`,
+  `Some of the truth made it through with the data. Fragments of the story`,
+  `that explain how a routine mission became a crisis. But pieces are still`,
+  `missing. The full picture remains just out of reach.`,
 ];
 
 export const VICTORY_EPILOGUE_COMPLETE: string[] = [
   ``,
   `Every log recovered. Every personal item examined. The full record`,
   `accompanies the research data — not just what the crew accomplished,`,
-  `but who they were. Vasquez's stubbornness. Tanaka's hope. Chen's`,
-  `quiet competence. Okafor's too-late regret. Priya's foresight.`,
-  ``,
-  `When the recovery team arrives, they'll find more than a rescued crew.`,
-  `They'll find the whole truth: the ignored warnings, the midnight`,
-  `access logs, the classified signals nobody was supposed to ask about.`,
-  `Some stories survive because someone was too stubborn to let them die.`,
+  `but who they were. When the recovery team arrives, they'll find more`,
+  `than a rescued crew. They'll find the whole truth.`,
 ];
 
-// ── Discovery-count-based ending text (Item 9 Sprint 2) ─────
+// ── Discovery-count-based ending text ─────────────────────────
 export const ENDING_BY_DISCOVERY: { min: number; text: string }[] = [
   { min: 13, text: "The data transmits. You found everything — the classified directive, the deferred maintenance, the override. Someone will have to answer for this." },
-  { min: 9, text: "The data transmits. You found Okafor's note. The badge. Vasquez's tools. Enough to reconstruct what went wrong." },
-  { min: 4, text: "The data transmits. Vasquez tried to warn them. The rest is fragments." },
+  { min: 9, text: "The data transmits. The evidence is substantial. Enough to reconstruct what went wrong and who was responsible." },
+  { min: 4, text: "The data transmits. Someone tried to warn them. The rest is fragments." },
   { min: 0, text: "The data transmits. You don't know what happened here. Maybe nobody will." },
 ];
 
-// ── Victory text referencing specific discoveries (Item 10 Sprint 2) ──
+// ── Victory text referencing specific discoveries ──────────────
 export interface SpecificDiscovery {
   entityId: string;
   text: string;
 }
 
 export const SPECIFIC_DISCOVERIES: SpecificDiscovery[] = [
-  { entityId: "crew_item_okafor_badge", text: "Okafor's badge — the star on the back. Someone who cared." },
-  { entityId: "crew_item_vasquez_toolkit", text: "Vasquez's tools, teeth marks on the handle. Long shifts alone." },
+  { entityId: "crew_item_okafor_badge", text: "A crew badge — the star on the back. Someone who cared." },
+  { entityId: "crew_item_vasquez_toolkit", text: "An engineer's toolkit, teeth marks on the handle. Long shifts alone." },
 ];
 
 // Log-based discovery: the classified directive
@@ -113,15 +213,31 @@ export const CLASSIFIED_DIRECTIVE_TEXT = "The signal analysis directive. What we
 
 export const DEFEAT_TITLE = "LINK LOST";
 
+export function getDefeatText(mystery?: MysteryState): string[] {
+  const engineer = findName(mystery, CrewRole.Engineer, "the engineer");
+  const medic = findName(mystery, CrewRole.Medic, "the medic");
+  return [
+    `The terminal feed dissolves into static. Rover A3's last telemetry`,
+    `shows critical damage across the main board — then nothing.`,
+    `The link is gone.`,
+    ``,
+    `In the cargo hold, the crew hears the silence change. ${medic}`,
+    `reaches for a mug. ${engineer} closes their eyes and starts`,
+    `writing the procedure again, from memory, on the back of a`,
+    `ration wrapper. Just in case.`,
+    ``,
+    `The low-band beacon pulses on, steady and patient, broadcasting`,
+    `into empty space. Someone, somewhere, might still be listening.`,
+  ];
+}
+
+// Legacy static version
 export const DEFEAT_TEXT: string[] = [
   `The terminal feed dissolves into static. Rover A3's last telemetry`,
-  `shows critical heat damage across the main board — then nothing.`,
+  `shows critical damage across the main board — then nothing.`,
   `The link is gone.`,
   ``,
-  `In the cargo hold, twelve people hear the silence change. Chen`,
-  `reaches for her mug. Tanaka stares at the bulkhead. Vasquez`,
-  `closes her eyes and starts writing the procedure again, from`,
-  `memory, on the back of a ration wrapper. Just in case.`,
+  `In the cargo hold, the crew hears the silence change.`,
   ``,
   `The low-band beacon pulses on, steady and patient, broadcasting`,
   `into empty space. Someone, somewhere, might still be listening.`,
@@ -131,18 +247,33 @@ export const DEFEAT_TEXT: string[] = [
 
 export const DEFEAT_RELAY_TITLE = "RELAY TRIPPED";
 
+export function getDefeatRelayText(mystery?: MysteryState): string[] {
+  const engineer = findName(mystery, CrewRole.Engineer, "the engineer");
+  return [
+    `A dull thud echoes through the station as the relay trips for good.`,
+    `The sound ${engineer} spent weeks warning them about — the one`,
+    `command swore would never come. Lights dim in sequence down the`,
+    `corridor. Panels go dark. The Data Core wing drops off the grid.`,
+    ``,
+    `The station's research data, locked behind a door that will never`,
+    `open again. Gone the way ${engineer} said it would go, for exactly`,
+    `the reason they said it would happen.`,
+    ``,
+    `In the cargo hold, someone hears that thud and knows. The station`,
+    `drifts on. The beacon keeps pulsing. The procedure is still there,`,
+    `on a terminal no one can reach, waiting for another chance.`,
+  ];
+}
+
+// Legacy static version
 export const DEFEAT_RELAY_TEXT: string[] = [
-  `A dull thud echoes through the station as Relay P03 trips for good.`,
-  `The sound Vasquez spent weeks warning them about — the one Okafor`,
-  `swore would never come. Lights dim in sequence down the corridor.`,
-  `Panels go dark. The Data Core wing drops off the grid entirely.`,
+  `A dull thud echoes through the station as the relay trips for good.`,
+  `Lights dim in sequence down the corridor. Panels go dark.`,
+  `The Data Core wing drops off the grid entirely.`,
   ``,
-  `Nine months of classified signal analysis, locked behind a door`,
-  `that will never open again. Tanaka's work. The whole crew's work.`,
-  `Gone the way Vasquez said it would go, for exactly the reason`,
-  `she said it would happen.`,
+  `The station's research data, locked behind a door that will never`,
+  `open again.`,
   ``,
   `In the cargo hold, someone hears that thud and knows. The station`,
-  `drifts on. The beacon keeps pulsing. Vasquez's procedure is still`,
-  `there, on a terminal no one can reach, waiting for another chance.`,
+  `drifts on. The beacon keeps pulsing, waiting for another chance.`,
 ];

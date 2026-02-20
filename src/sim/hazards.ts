@@ -10,6 +10,7 @@ import {
 import {
   PA_ANNOUNCEMENTS_GENERAL, PA_ANNOUNCEMENTS_WARNING, PA_ANNOUNCEMENTS_ATMOSPHERIC,
   PA_ANNOUNCEMENTS_INVESTIGATE, PA_ANNOUNCEMENTS_RECOVER,
+  PA_ANNOUNCEMENTS_BY_ARCHETYPE,
 } from "../data/narrative.js";
 
 /**
@@ -446,12 +447,21 @@ export function tickPA(state: GameState): GameState {
     pool = PA_ANNOUNCEMENTS_GENERAL;
   }
 
-  const msgIdx = (state.turn * 7 + 3) % pool.length;
+  // 50/50 blend with archetype-specific pool when available
+  const archetype = state.mystery?.timeline.archetype;
+  const archetypePool = archetype ? PA_ANNOUNCEMENTS_BY_ARCHETYPE[archetype] : undefined;
+  const useArchetype = archetypePool && archetypePool.length > 0 && (state.turn * 13) % 2 === 0;
+
+  const finalPool = useArchetype ? archetypePool! : pool;
+  // Use different hash for archetype pool to avoid index collisions
+  const msgIdx = useArchetype
+    ? (state.turn * 11 + 5) % finalPool.length
+    : (state.turn * 7 + 3) % finalPool.length;
   newLogs.push({
     id: `log_pa_${state.turn}`,
     timestamp: state.turn,
     source: "system",
-    text: pool[msgIdx],
+    text: finalPool[msgIdx],
     read: false,
   });
 
