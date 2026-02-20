@@ -34,6 +34,15 @@ import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave, recordRun } from "./sim/saveLoad.js";
 import { generateWhatWeKnow, formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
 
+// ── Archetype display names ─────────────────────────────────────
+const ARCHETYPE_DISPLAY_NAMES: Record<IncidentArchetype, string> = {
+  [IncidentArchetype.CoolantCascade]: "THE WHISTLEBLOWER",
+  [IncidentArchetype.HullBreach]: "THE MURDER",
+  [IncidentArchetype.ReactorScram]: "THE ROGUE AI",
+  [IncidentArchetype.Sabotage]: "THE STOWAWAY",
+  [IncidentArchetype.SignalAnomaly]: "FIRST CONTACT",
+};
+
 // ── Parse seed and difficulty from URL params ───────────────────
 const params = new URLSearchParams(window.location.search);
 let seed = parseInt(params.get("seed") || String(GOLDEN_SEED), 10);
@@ -168,6 +177,7 @@ let pendingCrewDoor: { entityId: string; crewName: string } | null = null;
 let confirmingDeduction = false; // Y/N confirmation before locking in deduction answer
 let mapOpen = false;
 let helpOpen = false;
+let incidentCardOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
 let investigationHubOpen = false;
 let hubSection: "evidence" | "connections" | "whatweknow" | "decisions" = "evidence";
@@ -565,6 +575,15 @@ function initGame(): void {
       display.addLog("Auto-explore stopped.", "system");
       renderAll();
     }
+    if (incidentCardOpen) {
+      if (e.key === "Escape" || e.key === "g") {
+        e.preventDefault();
+        incidentCardOpen = false;
+        const overlay = document.getElementById("journal-overlay");
+        if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; }
+      }
+      return; // swallow all input while incident card is open
+    }
     if (helpOpen) {
       if (e.key === "Escape" || e.key === "?") {
         e.preventDefault();
@@ -616,6 +635,18 @@ function initGame(): void {
       investigationHubOpen = true;
       hubIdx = 0;
       renderInvestigationHub();
+      return;
+    }
+    // G key toggles incident summary card
+    if (e.key === "g" && !journalOpen && !investigationHubOpen && !state.gameOver) {
+      e.preventDefault();
+      incidentCardOpen = !incidentCardOpen;
+      if (incidentCardOpen) {
+        showIncidentCard();
+      } else {
+        const overlay = document.getElementById("journal-overlay");
+        if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; }
+      }
       return;
     }
     // M key toggles station map (uses overlay, doesn't destroy log)
@@ -679,6 +710,7 @@ function resetGameState(newSeed: number): void {
   lastAmbientRoomId = "";
   mapOpen = false;
   helpOpen = false;
+  incidentCardOpen = false;
   activeDeduction = null;
   deductionSelectedIdx = 0;
   confirmingDeduction = false;
@@ -1531,6 +1563,7 @@ function showHelp(): void {
           <div><span style="color:#fff">[r]</span>  Investigation Hub (evidence, deductions, narrative)</div>
           <div><span style="color:#fff">[v]</span>  Investigation Hub → Evidence</div>
           <div><span style="color:#fff">[j] / [;]</span>  Quick journal toggle</div>
+          <div><span style="color:#fff">[g]</span>  Incident summary card</div>
           <div><span style="color:#fff">[m]</span>  Station map overlay</div>
           <div><span style="color:#fff">[?]</span>  This help screen</div>
         </div>
@@ -1616,6 +1649,126 @@ function closeMapOverlay(): void {
   }
   mapOpen = false;
   renderAll();
+}
+
+// ── Incident summary card ────────────────────────────────────────
+function showIncidentCard(): void {
+  const overlay = document.getElementById("journal-overlay");
+  if (!overlay) return;
+
+  const mystery = state.mystery;
+  if (!mystery) {
+    incidentCardOpen = false;
+    return;
+  }
+
+  const deductions = mystery.deductions;
+  const whatSolved = deductions.find(d => d.category === DeductionCategory.What)?.solved ?? false;
+  const whoSolved = deductions.find(d => d.category === DeductionCategory.Who)?.solved ?? false;
+  const whySolved = deductions.find(d => d.category === DeductionCategory.Why)?.solved ?? false;
+
+  // Archetype title: revealed only after WHAT deduction is solved
+  const archetype = mystery.timeline.archetype;
+  const archetypeTitle = whatSolved
+    ? ARCHETYPE_DISPLAY_NAMES[archetype] || archetype
+    : "CLASSIFICATION PENDING";
+  const archetypeTitleColor = whatSolved ? "#ff0" : "#888";
+
+  // Phase display
+  const phaseColors: Record<string, string> = {
+    [ObjectivePhase.Clean]: "#4a4",
+    [ObjectivePhase.Investigate]: "#fa0",
+    [ObjectivePhase.Recover]: "#f44",
+    [ObjectivePhase.Evacuate]: "#f0f",
+  };
+  const phaseLabels: Record<string, string> = {
+    [ObjectivePhase.Clean]: "MAINTENANCE",
+    [ObjectivePhase.Investigate]: "INVESTIGATION",
+    [ObjectivePhase.Recover]: "RECOVERY",
+    [ObjectivePhase.Evacuate]: "EVACUATION",
+  };
+  const phase = mystery.objectivePhase;
+  const phaseColor = phaseColors[phase] || "#ccc";
+  const phaseLabel = phaseLabels[phase] || phase.toUpperCase();
+
+  // Crew roster summary
+  const crewByFate: Record<string, number> = {};
+  for (const c of mystery.crew) {
+    crewByFate[c.fate] = (crewByFate[c.fate] || 0) + 1;
+  }
+  const fateColors: Record<string, string> = {
+    survived: "#0f0", escaped: "#4af", in_cryo: "#4af",
+    missing: "#fa0", dead: "#f44",
+  };
+  const fateLabels: Record<string, string> = {
+    survived: "Alive", escaped: "Escaped", in_cryo: "In Cryo",
+    missing: "Missing", dead: "Deceased",
+  };
+  let crewHtml = "";
+  for (const [fate, count] of Object.entries(crewByFate)) {
+    const color = fateColors[fate] || "#888";
+    const label = fateLabels[fate] || fate;
+    crewHtml += `<span style="color:${color}">${count} ${label}</span>  `;
+  }
+
+  // Deduction progress
+  const deductionHtml = deductions.map(d => {
+    const catLabel = d.category.toUpperCase();
+    if (d.solved) {
+      const correct = d.answeredCorrectly ? "#0f0" : "#f44";
+      const icon = d.answeredCorrectly ? "\u2713" : "\u2717";
+      return `<div><span style="color:${correct}">${icon} ${catLabel}</span> <span style="color:#888">${esc(d.question)}</span></div>`;
+    }
+    const tagCount = d.linkedEvidence.length;
+    const reqCount = d.requiredTags.length;
+    return `<div><span style="color:#888">\u25cb ${catLabel}</span> <span style="color:#555">${tagCount}/${reqCount} evidence linked</span></div>`;
+  }).join("");
+
+  // Evidence stats
+  const journalCount = mystery.journal.length;
+  const evidenceThresh = mystery.evidenceThreshold;
+
+  // Turn info
+  const turnsUsed = state.turn;
+  const turnsLeft = state.maxTurns - state.turn;
+  const turnColor = turnsLeft <= 30 ? "#f44" : turnsLeft <= 60 ? "#fa0" : "#0f0";
+
+  overlay.innerHTML = `
+    <div class="journal-container" style="padding:20px;overflow-y:auto;color:#ccc">
+      <div style="text-align:center;margin-bottom:16px">
+        <span style="color:${archetypeTitleColor};font-size:20px;font-weight:bold">\u2550\u2550\u2550 ${esc(archetypeTitle)} \u2550\u2550\u2550</span>
+        <div style="color:#888;font-size:12px;margin-top:4px">INCIDENT SUMMARY CARD  \u2502  [G] or [Esc] to close</div>
+      </div>
+
+      <div style="max-width:600px;margin:0 auto">
+        <div style="margin-bottom:14px;border-bottom:1px solid #333;padding-bottom:10px">
+          <div style="color:#4af;font-weight:bold;margin-bottom:6px">\u2500\u2500 MISSION STATUS \u2500\u2500</div>
+          <div>Phase: <span style="color:${phaseColor};font-weight:bold">${phaseLabel}</span></div>
+          <div>Turn: <span style="color:#fff">${turnsUsed}</span> / ${state.maxTurns}  <span style="color:${turnColor}">(${turnsLeft} remaining)</span></div>
+          <div>Rooms explored: <span style="color:#fff">${visitedRoomIds.size}</span> / ${state.rooms.length}</div>
+          <div>Journal entries: <span style="color:#fff">${journalCount}</span>${!whatSolved ? ` / ${evidenceThresh} to unlock recovery` : ""}</div>
+        </div>
+
+        <div style="margin-bottom:14px;border-bottom:1px solid #333;padding-bottom:10px">
+          <div style="color:#4af;font-weight:bold;margin-bottom:6px">\u2500\u2500 CREW MANIFEST \u2500\u2500</div>
+          <div>Total crew: <span style="color:#fff">${mystery.crew.length}</span></div>
+          <div>${crewHtml}</div>
+        </div>
+
+        <div style="margin-bottom:14px;border-bottom:1px solid #333;padding-bottom:10px">
+          <div style="color:#4af;font-weight:bold;margin-bottom:6px">\u2500\u2500 DEDUCTION PROGRESS \u2500\u2500</div>
+          ${deductionHtml}
+        </div>
+
+        <div style="margin-bottom:8px">
+          <div style="color:#4af;font-weight:bold;margin-bottom:6px">\u2500\u2500 NARRATIVE THREADS \u2500\u2500</div>
+          ${mystery.threads.length > 0
+            ? mystery.threads.map(t => `<div style="color:#a8a"><span style="color:#fa0">\u25b6</span> ${esc(t.name)}</div>`).join("")
+            : `<div style="color:#555">No threads discovered yet.</div>`}
+        </div>
+      </div>
+    </div>`;
+  overlay.classList.add("active");
 }
 
 // ── Journal display ──────────────────────────────────────────────

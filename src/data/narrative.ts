@@ -346,5 +346,5 @@ export const TUTORIAL_HINTS_EARLY: TutorialHint[] = [
 
 // Event-triggered hints (fired once per event type)
 export const TUTORIAL_HINT_FIRST_EVIDENCE = "TIP: Evidence found! Press [v] to browse your journal. Collecting evidence unlocks deductions.";
-export const TUTORIAL_HINT_FIRST_DEDUCTION = "TIP: A deduction is ready! Press [r] to open the Broadcast Report and submit your findings.";
+export const TUTORIAL_HINT_FIRST_DEDUCTION = "TIP: A deduction is ready! Press [v] to open the Investigation Hub and submit your findings.";
 export const TUTORIAL_HINT_INVESTIGATION = "TIP: Investigation phase — read terminals [i], examine items, and collect evidence to piece together what happened.";

@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 39 complete (Archetype Opening, Crew Testimony, Bot Questioning)
+- **Phase**: Sprint 40 complete (Keybind Fixes, Station Reactions, Incident Card)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -70,11 +70,33 @@
 - Tutorial hints: context-sensitive tips at early turns and on first-time events
 - Evacuation phase: RED ALERT banner, crew following, escape pod boarding with full audio
 - Help overlay: HTML modal with complete key bindings, game phases, interaction details
+- Incident summary card [g]: mission status, crew manifest, deduction progress, narrative threads — spoiler-protected archetype title
+- Station reactions: correct deductions reduce heat/smoke station-wide
 
 ## Known Issues
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 40 Changes
+
+### Tutorial Hint & Keybind Fixes
+- **Fixed 4 stale keybind references**: All "Broadcast Report [r]" → "Investigation Hub [v]" in step.ts (data core message, evacuation message), display.ts (pinned notification), narrative.ts (tutorial hint)
+- Zero remaining references to old "Broadcast Report" or "[r] to open" in src/
+
+### Per-Deduction Station Reactions
+- **Environmental reward on correct deduction**: Station-wide heat reduced by 3 and smoke by 2 across all tiles when a deduction is answered correctly
+- **CORVUS-7 cooperation log**: "CORVUS-7 cooperating — station-wide heat and smoke levels decreasing" message on correct answer
+- Makes correct deductions feel impactful beyond narrative progress — the station literally responds
+
+### Incident Summary Card [G]
+- **New overlay**: Press [G] to open a mission briefing card showing current investigation status at a glance
+- **Mission status section**: Current phase (color-coded), turn counter with urgency coloring, rooms explored, journal entries collected
+- **Crew manifest**: Crew count by fate (Alive/Missing/Deceased/Escaped/In Cryo) with color coding
+- **Deduction progress**: Each deduction shows solved status (checkmark/cross) or evidence linking progress (N/M linked)
+- **Narrative threads**: Lists all discovered narrative threads
+- **Spoiler-protected**: Archetype title shows "CLASSIFICATION PENDING" until WHAT deduction is solved, then reveals the true title (e.g., "THE MURDER")
+- **Help screen updated**: [G] keybind added to Menus & Info section
 
 ## Sprint 39 Changes
 

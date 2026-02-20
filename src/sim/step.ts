@@ -390,6 +390,27 @@ export function applyDeductionReward(state: GameState, deduction: { rewardType: 
     }
   }
 
+  // Station-wide environmental reaction: correct deductions reduce station hazards
+  if (deduction.answeredCorrectly) {
+    if (next.tiles === state.tiles) {
+      next.tiles = state.tiles.map(row => row.map(t => ({ ...t })));
+    }
+    for (let y = 0; y < next.height; y++) {
+      for (let x = 0; x < next.width; x++) {
+        const tile = next.tiles[y][x];
+        if (tile.heat > 0) tile.heat = Math.max(0, tile.heat - 3);
+        if (tile.smoke > 0) tile.smoke = Math.max(0, tile.smoke - 2);
+      }
+    }
+    rewardLogs.push({
+      id: `log_reward_station_${next.turn}`,
+      timestamp: next.turn,
+      source: "system",
+      text: "CORVUS-7 cooperating — station-wide heat and smoke levels decreasing.",
+      read: false,
+    });
+  }
+
   if (rewardLogs.length > 0) {
     next.logs = [...next.logs, ...rewardLogs];
   }
@@ -737,7 +758,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             id: `log_datacore_deductions_${next.turn}`,
             timestamp: next.turn,
             source: "data_core",
-            text: `Data core online. Uplink ready, but transmission protocol requires a complete incident report. Open the Broadcast Report [r] to submit your deductions. (${solvedCount}/${totalDeductions} answered)`,
+            text: `Data core online. Uplink ready, but transmission protocol requires a complete incident report. Open the Investigation Hub [v] to submit your deductions. (${solvedCount}/${totalDeductions} answered)`,
             read: false,
           },
         ];
@@ -2449,7 +2470,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
                   id: `log_crew_safe_${next.turn}`,
                   timestamp: next.turn,
                   source: "system",
-                  text: `All surviving crew evacuated. But the incident report is incomplete — ${solvedCount}/${deds.length} deductions filed. Complete the Broadcast Report [r] to close the case.`,
+                  text: `All surviving crew evacuated. But the incident report is incomplete — ${solvedCount}/${deds.length} deductions filed. Complete the Investigation Hub [v] to close the case.`,
                   read: false,
                 },
               ];

@@ -1371,7 +1371,7 @@ export class BrowserDisplay implements IGameDisplay {
       const phaseLabel = phaseInfo.label;
       const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
       if (unlocked.length > 0) {
-        pinnedHtml = `<div style="color:#ff0;background:#1a1500;padding:2px 6px;border-bottom:1px solid #443;font-size:12px;font-weight:bold">[${phaseLabel}] DEDUCTION READY — press [r] to open Broadcast Report</div>`;
+        pinnedHtml = `<div style="color:#ff0;background:#1a1500;padding:2px 6px;border-bottom:1px solid #443;font-size:12px;font-weight:bold">[${phaseLabel}] DEDUCTION READY — press [v] to open Investigation Hub</div>`;
       } else if (state.mystery.objectivePhase === ObjectivePhase.Recover) {
         const allDedsSolved = state.mystery.deductions.every(d => d.solved);
         if (!allDedsSolved) {
