@@ -18,13 +18,13 @@ export const HEAT_SOURCE_CAP = 85; // max heat at source tiles (was 95 — cappe
 export const HEAT_SPREAD_MIN = 20; // tiles spread heat if they have at least this much (was 15 — higher threshold)
 export const HEAT_DAMAGE_THRESHOLD = 200; // legacy — unused
 export const PLAYER_MAX_HP = 1000;
-export const HEAT_DAMAGE_PER_TURN = 8; // base HP lost per turn on tiles with heat >= HEAT_PAIN_THRESHOLD
-export const HEAT_PAIN_THRESHOLD = 40; // heat level at which the player starts taking damage
+export const HEAT_DAMAGE_PER_TURN = 12; // base HP lost per turn on tiles with heat >= HEAT_PAIN_THRESHOLD
+export const HEAT_PAIN_THRESHOLD = 35; // heat level at which the player starts taking damage
 export const COOL_RECOVERY_RATE = 0; // no passive recovery — use Bot Maintenance room
-export const HOT_ZONE_SLOW_THRESHOLD = 60; // heat level that costs extra movement
-export const SMOKE_SLOW_THRESHOLD = 40; // smoke level that costs extra movement
-export const SMOKE_DAMAGE_THRESHOLD = 60; // smoke level at which bot takes damage
-export const SMOKE_DAMAGE_PER_TURN = 2; // HP lost per turn in dense smoke
+export const HOT_ZONE_SLOW_THRESHOLD = 55; // heat level that costs extra movement
+export const SMOKE_SLOW_THRESHOLD = 35; // smoke level that costs extra movement
+export const SMOKE_DAMAGE_THRESHOLD = 55; // smoke level at which bot takes damage
+export const SMOKE_DAMAGE_PER_TURN = 5; // HP lost per turn in dense smoke
 
 // ── Turn limit ──────────────────────────────────────────────
 export const MAX_TURNS = 500;
@@ -41,9 +41,9 @@ export const DIFFICULTY_SETTINGS = {
 } as const;
 
 // ── Station deterioration ────────────────────────────────────
-export const DETERIORATION_INTERVAL = 25; // turns between station deterioration events
-export const DETERIORATION_HEAT_BOOST = 2; // extra heat added to source tiles each deterioration tick
-export const DETERIORATION_SMOKE_SPAWN = 8; // smoke added to random corridor tiles
+export const DETERIORATION_INTERVAL = 22; // turns between station deterioration events
+export const DETERIORATION_HEAT_BOOST = 3; // extra heat added to source tiles each deterioration tick
+export const DETERIORATION_SMOKE_SPAWN = 12; // smoke added to random corridor tiles
 
 // ── Vision / fog-of-war ─────────────────────────────────────
 export const VISION_RADIUS_BASE = 6;

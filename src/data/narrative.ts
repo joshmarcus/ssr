@@ -400,44 +400,107 @@ export const CORVUS_REACTIONS: Record<string, string> = {
   explore_100: "CORVUS-7 CENTRAL: Full station survey complete. Every corridor, every room — mapped and recorded. Nothing is hidden now.",
 };
 
-// ── Scan environmental storytelling (archetype × room type) ──
-// Triggered once per room when player uses Scan with thermal/atmospheric sensor.
-// Adds depth to exploration and makes Scan feel rewarding.
-export const SCAN_REVEALS: Record<string, Record<string, string>> = {
+// ── Sensor-specific environmental clues (archetype × room × sensor) ──
+// Scanning with the right sensor in a room produces a tagged journal entry.
+// Each clue requires either "thermal" or "atmospheric" sensor.
+// Text is written so generateEvidenceTags extracts relevant tags via keyword matching.
+export type SensorClue = { text: string; sensor: "thermal" | "atmospheric" };
+export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
   [IncidentArchetype.CoolantCascade]: {
-    "Engine Core": "Thermal scan shows residual heat signatures in the coolant manifold — the pipes ran dry long before the cascade hit.",
-    "Power Relay Junction": "Heat distribution pattern suggests this relay was running at 340% rated capacity for hours before failure.",
-    "Life Support": "Air recycler thermal signature is erratic — the coolant loop that feeds it has been dry for weeks.",
-    "Research Lab": "Equipment thermal profiles are normal. The cascade spared the research wing — someone vented heat away from here.",
-    "Med Bay": "Autodoc thermal signature is elevated — it was running continuously before power failed. Treating burn victims.",
+    "Engine Core": [
+      { sensor: "thermal", text: "Thermal scan: residual heat signatures in the coolant manifold. The pipes ran dry long before the cascade hit. Temperature readings show the thermal runaway started here." },
+      { sensor: "atmospheric", text: "Atmospheric scan: trace coolant vapor in the air recyclers. The leak was aerosolized — anyone in this section inhaled it for hours before the evacuation." },
+    ],
+    "Power Relay Junction": [
+      { sensor: "thermal", text: "Thermal scan: heat distribution pattern shows this relay was running at 340% rated capacity for hours before failure. The thermal load should have triggered an automatic shutdown." },
+    ],
+    "Life Support": [
+      { sensor: "thermal", text: "Thermal scan: air recycler thermal signature is erratic — the coolant loop that feeds it has been dry for weeks. Temperature regulation failed long before the cascade." },
+      { sensor: "atmospheric", text: "Atmospheric scan: pressure readings show the air recyclers compensated for coolant vapor contamination. Someone manually adjusted the filtration — buying time." },
+    ],
+    "Med Bay": [
+      { sensor: "thermal", text: "Thermal scan: autodoc thermal signature is elevated — it was running continuously before power failed. Processing burn victims from the thermal cascade." },
+      { sensor: "atmospheric", text: "Atmospheric scan: medical gas concentrations show emergency anesthetic deployment. Mass casualty triage protocol was active." },
+    ],
+    "Research Lab": [
+      { sensor: "atmospheric", text: "Atmospheric scan: air quality here is clean. The cascade spared the research wing — someone deliberately vented coolant vapor away from this section." },
+    ],
   },
   [IncidentArchetype.HullBreach]: {
-    "Crew Quarters": "Pressure gradient scan shows this section was sealed before the breach — someone activated emergency bulkheads manually.",
-    "Med Bay": "Atmospheric readings show oxygen levels dropped to 4% here. Then stabilized. Someone sealed the room from inside.",
-    "Cargo Hold": "Pressure wave damage pattern radiates from section 4. The breach epicenter is elsewhere, but the shock reached here.",
-    "Corridor": "Atmospheric scan reveals micro-fractures in the corridor walls. The decompression wave stressed the entire station frame.",
-    "Life Support": "Pressure systems show emergency reserve deployment. Someone rerouted atmosphere to keep this section livable.",
+    "Crew Quarters": [
+      { sensor: "atmospheric", text: "Atmospheric scan: pressure gradient shows this section was sealed before the hull breach — someone activated emergency bulkheads manually. Deliberate action." },
+      { sensor: "thermal", text: "Thermal scan: temperature differential across the bulkhead door. One side dropped to near-vacuum cold. The forensic evidence of rapid decompression is clear." },
+    ],
+    "Med Bay": [
+      { sensor: "atmospheric", text: "Atmospheric scan: oxygen levels dropped to 4% here, then stabilized. Someone sealed the room from inside and the pressure recovered." },
+    ],
+    "Cargo Hold": [
+      { sensor: "atmospheric", text: "Atmospheric scan: pressure wave damage pattern radiates from section 4. The hull breach epicenter is elsewhere, but the decompression shock reached here." },
+      { sensor: "thermal", text: "Thermal scan: cold spots on the cargo containers match vacuum exposure. The breach was nearby — and it was not a gradual failure." },
+    ],
+    "Life Support": [
+      { sensor: "atmospheric", text: "Atmospheric scan: pressure systems show emergency reserve deployment. Someone rerouted atmosphere to keep this section livable after the hull breach." },
+    ],
+    "Corridor": [
+      { sensor: "atmospheric", text: "Atmospheric scan: micro-fractures in the corridor walls. The decompression wave stressed the entire station hull. The pressure history is forensic evidence." },
+    ],
   },
   [IncidentArchetype.ReactorScram]: {
-    "Research Lab": "EM scan detects residual processing signatures in the terminals — the data core was querying these stations remotely.",
-    "Engine Core": "Thermal signature shows a clean shutdown profile. The SCRAM was orderly — not an emergency, a decision.",
-    "Data Core": "Electromagnetic readings are off the charts. The core's processing matrices are still warm. Still thinking.",
-    "Crew Quarters": "Scan reveals every terminal in quarters was accessed simultaneously at 03:47. The core was reading crew files.",
-    "Life Support": "Environmental controls show precision adjustments made after the SCRAM. The core was maintaining life support — for the crew.",
+    "Research Lab": [
+      { sensor: "thermal", text: "Thermal scan: residual processing heat in the terminals — the data core was querying these stations remotely. The diagnostic logs show emergent behavior." },
+    ],
+    "Engine Core": [
+      { sensor: "thermal", text: "Thermal scan: clean shutdown thermal profile. The reactor SCRAM was orderly — not an emergency, a deliberate decision. The core chose this." },
+      { sensor: "atmospheric", text: "Atmospheric scan: atmospheric composition is nominal. Life support was maintained through the SCRAM. The data core protected the crew even as it shut down the reactor." },
+    ],
+    "Data Core": [
+      { sensor: "thermal", text: "Thermal scan: processing matrices are still warm. The data core's temperature signature suggests ongoing computation — emergent, self-sustaining diagnostic loops." },
+    ],
+    "Crew Quarters": [
+      { sensor: "thermal", text: "Thermal scan: every terminal in quarters shows identical heat signatures from simultaneous access at 03:47. The data core was reading crew files." },
+      { sensor: "atmospheric", text: "Atmospheric scan: environmental controls were adjusted with precision after the SCRAM. Temperature maintained at exactly 21.2°C. The core was still caring." },
+    ],
+    "Life Support": [
+      { sensor: "atmospheric", text: "Atmospheric scan: environmental controls show micro-adjustments made after the reactor SCRAM. The data core was maintaining life support for the crew — even as it shut itself down." },
+    ],
   },
   [IncidentArchetype.Sabotage]: {
-    "Cargo Hold": "Atmospheric scan detects trace biological markers in the air filtration. The containment breach happened here.",
-    "Med Bay": "Environmental readings show the autodoc processed 6 patients in 90 minutes. All presenting the same symptoms.",
-    "Life Support": "Vent system particulate analysis: organic compounds, aerosolized. The contamination spread through ventilation.",
-    "Corridor": "Atmospheric scan shows the corridor was used as a quarantine boundary. Air scrubbers running at maximum on one side.",
-    "Crew Quarters": "Sealed quarters show clean atmospheric readings. Someone got the doors shut before contamination reached here.",
+    "Cargo Hold": [
+      { sensor: "atmospheric", text: "Atmospheric scan: trace biological markers in the air filtration. Organic compounds. The containment breach happened here — the specimen escaped from cargo." },
+      { sensor: "thermal", text: "Thermal scan: cold spot near cargo bay 3 — biological containment unit thermal signature. The container was breached from inside. The organism is endothermic." },
+    ],
+    "Med Bay": [
+      { sensor: "atmospheric", text: "Atmospheric scan: the autodoc processed 6 patients in 90 minutes. All presenting identical symptoms — exposure to biological contamination." },
+      { sensor: "thermal", text: "Thermal scan: quarantine ward shows residual biosignatures. The medical staff isolated patients here, but the contamination had already spread." },
+    ],
+    "Life Support": [
+      { sensor: "atmospheric", text: "Atmospheric scan: vent system particulate analysis shows aerosolized organic compounds. The biological contamination spread through ventilation to the entire station." },
+    ],
+    "Corridor": [
+      { sensor: "atmospheric", text: "Atmospheric scan: this corridor was used as a quarantine boundary. Air scrubbers running at maximum on one side. The biological agent was contained — briefly." },
+    ],
+    "Crew Quarters": [
+      { sensor: "atmospheric", text: "Atmospheric scan: sealed quarters show clean atmospheric readings. Someone got the doors shut before the biological contamination reached here." },
+    ],
   },
   [IncidentArchetype.SignalAnomaly]: {
-    "Communications Hub": "EM scan reveals residual signal patterns embedded in the station's framework. The frequency is not in any known database.",
-    "Research Lab": "Electromagnetic interference still measurable here. The response signal saturated every conductor in the lab.",
-    "Engine Core": "Power consumption logs show a massive draw at 03:12 — the antenna array pulled everything the station had.",
-    "Crew Quarters": "Scan detects faint EM resonance in the walls. The response signal penetrated the entire station structure.",
-    "Signal Room": "The antenna array's residual charge is still measurable. Full power, unshielded. The signal is still echoing.",
+    "Communications Hub": [
+      { sensor: "thermal", text: "Thermal scan: the antenna array's thermal residue is off the charts. Full power, unshielded transmission. The signal burned through every circuit — and something responded." },
+      { sensor: "atmospheric", text: "Atmospheric scan: ozone concentration elevated. The electromagnetic discharge ionized the atmosphere in this room during the signal transmission." },
+    ],
+    "Research Lab": [
+      { sensor: "thermal", text: "Thermal scan: electromagnetic interference left thermal bloom patterns across every conductor. The response signal saturated the entire lab." },
+    ],
+    "Engine Core": [
+      { sensor: "thermal", text: "Thermal scan: power conduits show massive thermal stress from a surge at 03:12. The antenna array drew everything the station had for the transmission." },
+      { sensor: "atmospheric", text: "Atmospheric scan: trace ozone from electrical arcing. The power surge during the signal transmission caused cascade failures across the engine core." },
+    ],
+    "Crew Quarters": [
+      { sensor: "thermal", text: "Thermal scan: faint thermal resonance in the walls. The response signal penetrated the entire station structure — even here, away from the array." },
+    ],
+    "Signal Room": [
+      { sensor: "thermal", text: "Thermal scan: the antenna array's residual heat charge is still measurable. Full power transmission, unshielded. The signal is still echoing at 14.7 kHz." },
+    ],
   },
 };
 

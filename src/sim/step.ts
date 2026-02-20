@@ -15,7 +15,7 @@ import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
   CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
   CORVUS_REACTIONS,
-  SCAN_REVEALS,
+  SENSOR_CLUES,
 } from "../data/narrative.js";
 
 /**
@@ -2897,7 +2897,7 @@ function handleScan(state: GameState): GameState {
     scanParts.push(`${revealedCount} hidden trace${revealedCount > 1 ? "s" : ""} revealed!`);
   }
 
-  const next: GameState = {
+  let next: GameState = {
     ...state,
     entities: newEntities,
     logs: [
@@ -2941,29 +2941,47 @@ function handleScan(state: GameState): GameState {
     }
   }
 
-  // ── Scan Reveals: archetype-specific environmental storytelling ──
+  // ── Sensor Clues: sensor-specific environmental evidence ──
+  // Scanning with thermal/atmospheric in a room produces a tagged journal entry.
+  // Each clue fires once per room+sensor combination.
   if (next.mystery && scanRoom) {
     const roomName = state.rooms.find(
       r => scanRoom && px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height
     )?.name;
     if (roomName) {
       const archetype = next.mystery.timeline.archetype;
-      const revealText = SCAN_REVEALS[archetype]?.[roomName];
-      const milestoneKey = `scan_reveal_${roomName}`;
-      if (revealText && !next.milestones.has(milestoneKey)) {
-        const newMilestones = new Set(next.milestones);
-        newMilestones.add(milestoneKey);
-        next.milestones = newMilestones;
-        next.logs = [
-          ...next.logs,
-          {
-            id: `log_scan_reveal_${state.turn}`,
-            timestamp: state.turn,
-            source: "sensor",
-            text: revealText,
-            read: false,
-          },
-        ];
+      const cluesForRoom = SENSOR_CLUES[archetype]?.[roomName];
+      if (cluesForRoom) {
+        for (const clue of cluesForRoom) {
+          // Check if player has the required sensor
+          if (!sensors.includes(clue.sensor as SensorType)) continue;
+          const milestoneKey = `sensor_clue_${roomName}_${clue.sensor}`;
+          if (next.milestones.has(milestoneKey)) continue;
+          // Fire the clue: milestone + log + journal entry
+          const newMilestones = new Set(next.milestones);
+          newMilestones.add(milestoneKey);
+          next.milestones = newMilestones;
+          const sensorLabel = clue.sensor === "thermal" ? "THERMAL" : "ATMOSPHERIC";
+          next.logs = [
+            ...next.logs,
+            {
+              id: `log_sensor_clue_${roomName}_${clue.sensor}_${state.turn}`,
+              timestamp: state.turn,
+              source: "sensor",
+              text: `[${sensorLabel}] ${clue.text}`,
+              read: false,
+            },
+          ];
+          // Create a tagged journal entry for deduction linking
+          next = addJournalEntry(
+            next,
+            `journal_sensor_${roomName}_${clue.sensor}`,
+            "trace",
+            `${sensorLabel} scan: ${roomName}`,
+            clue.text,
+            roomName,
+          );
+        }
       }
     }
   }
