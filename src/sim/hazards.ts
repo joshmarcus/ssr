@@ -235,7 +235,8 @@ export function tickHazards(state: GameState): GameState {
  * Heat sources get hotter, smoke spawns in corridors, breaches widen.
  */
 export function tickDeterioration(state: GameState): GameState {
-  if (state.turn === 0 || state.turn % DETERIORATION_INTERVAL !== 0) return state;
+  const interval = state.deteriorationInterval ?? DETERIORATION_INTERVAL;
+  if (state.turn === 0 || state.turn % interval !== 0) return state;
 
   const newTiles = cloneTiles(state.tiles);
   const newLogs = [...state.logs];
@@ -281,7 +282,7 @@ export function tickDeterioration(state: GameState): GameState {
     "Automated alert: Ambient temperature rising across multiple sectors.",
     "Cascade failure detected. Heat management systems non-responsive.",
   ];
-  const msgIdx = Math.floor(state.turn / DETERIORATION_INTERVAL) % deteriorationMsgs.length;
+  const msgIdx = Math.floor(state.turn / interval) % deteriorationMsgs.length;
   newLogs.push({
     id: `log_deterioration_${state.turn}`,
     timestamp: state.turn,

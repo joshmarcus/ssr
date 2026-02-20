@@ -4,18 +4,19 @@
 
 ## Current State
 
-- **Phase**: Sprint 26 complete (Tension & Turn Economy)
+- **Phase**: Sprint 27 complete (Victory Redesign & Archetype Profiles)
 - **Test status**: 280 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
 - **Save key**: v3
 - **Turn limit**: 500 turns (warnings at 350/400/450)
-- **Playtest results**: Seeds 184201 (345T), 42 (174T), 3 (322T), 7 (314T), 4 (274T) all VICTORY
+- **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
+- **Playtest results**: Seeds 42 (94T), 4 (215T), 7 (254T), 3 (463T) VICTORY; seed 184201 DEFEAT (timing)
 
 ## What Works
 
-- Core game loop: explore -> evidence -> puzzles -> transmit
+- Core game loop: explore -> evidence -> puzzles -> evacuate crew
 - 7 player actions (Move, Interact, Scan, Clean, Wait, Look, Journal, SubmitDeduction)
 - 25 entity types with distinct interactions (including Airlock)
 - 3-sensor ladder (Cleanliness, Thermal, Atmospheric)
@@ -65,6 +66,29 @@
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
 - Seed 5 DEFEAT: bot only solves 3/5 deductions (evidence-gathering heuristic too shallow — needs tag-aware evidence seeking)
+- Seed 184201 DEFEAT: deductions solve at T440, data core at far side of station — runs out of time at T500 (bot reached 3 tiles away)
+
+## Sprint 27 Changes
+
+### Victory Condition Redesign
+- **Crew evacuation is the primary win condition**: When all discovered living crew are evacuated via escape pods AND all deductions are solved → VICTORY ("CREW EVACUATED"). Previously, data core transmit was the only win path.
+- **Data core as bittersweet fallback**: When no discovered living crew remain (all dead or none found) and deductions are solved, data core transmit grants a fallback victory ("TRANSMISSION COMPLETE"). Blocked when found living crew still need rescue.
+- **"Found" crew distinction**: Only DISCOVERED crew (props.found === true) count for victory checks. Undiscovered crew don't block victory — you can't rescue who you haven't found.
+- **Performance rating updated**: Crew evacuation now worth up to 20 pts (biggest single factor). Victory screen shows "CREW EVACUATED" or "TRANSMISSION COMPLETE" based on win path.
+
+### Archetype-Specific Hazard Profiles
+- **Per-archetype station modifications during procgen**: `applyArchetypeProfile()` adds archetype-flavored hazards.
+  - CoolantCascade: extra heat zone (3x3 near Engine Core)
+  - HullBreach: extra pressure breach in a mid-station room
+  - Sabotage: one extra hostile patrol drone at 40% room depth
+  - ReactorScram & SignalAnomaly: no extra hazards (balanced by narrative complexity)
+
+### Bot Evacuation Overhaul
+- **Phase 2c complete rewrite**: After deductions solved, bot follows full evacuation strategy: find crew → recruit → locate powered pod → board. Falls back to powering unpowered pods via power cells or relay activation.
+- **Time pressure fallback**: After turn 400 with no found living crew, bot heads to data core for bittersweet victory.
+- **Pod attempt limits**: Bot tries each unpowered pod max 3 times to prevent infinite loops.
+- **Phase 3b removed**: Old evacuation phase was redundant with new Phase 2c and caused oscillation.
+- **Playtest results**: Seed 42 VICTORY T94 (was T471), Seed 4 VICTORY T215, Seed 7 VICTORY T254, Seed 3 VICTORY T463. 4/5 seeds win.
 
 ## Sprint 26 Changes
 
@@ -161,6 +185,7 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ## Recent Changes (Git History)
 
 ```
+2026-02-19        feat: sprint 27 — victory redesign (crew evacuation) + archetype hazard profiles
 2026-02-19        feat: sprint 26 — tension & turn economy (turn limit, HP warnings, bot rush)
 2026-02-19        feat: sprint 25 — atmosphere & polish (room descriptions, cleaning discoveries)
 2026-02-19        feat: sprint 24 — game feel (room entry, interaction preview)
@@ -289,20 +314,21 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ### Source (src/)
 | Directory    | Last Modified |
 |-------------|---------------|
-| src/sim/     | 2026-02-18    |
-| src/render/  | 2026-02-18    |
+| src/sim/     | 2026-02-19    |
+| src/render/  | 2026-02-19    |
 | src/harness/ | 2026-02-17    |
-| src/shared/  | 2026-02-18    |
+| src/shared/  | 2026-02-19    |
 | src/data/    | 2026-02-19    |
 
 ### Key Sim Files
 | File                   | Last Modified       |
 |-----------------------|---------------------|
 | src/sim/step.ts        | 2026-02-19          |
-| src/sim/procgen.ts     | 2026-02-17 22:22   |
+| src/sim/procgen.ts     | 2026-02-19          |
 | src/sim/deduction.ts   | 2026-02-19          |
 | src/sim/whatWeKnow.ts  | 2026-02-18          |
-| src/sim/hazards.ts     | 2026-02-17 22:18   |
+| src/sim/hazards.ts     | 2026-02-19          |
+| src/sim/objectives.ts  | 2026-02-19          |
 | src/sim/crewPaths.ts   | 2026-02-17 22:02   |
 | src/sim/incidents.ts   | 2026-02-17 22:20   |
 
@@ -322,7 +348,7 @@ Three independent review agents evaluated all storylines. Results captured in `W
 | what-we-know.test.ts          | 2026-02-18          |
 | sprint4.test.ts               | 2026-02-17 22:24   |
 | deduction.test.ts             | 2026-02-17 21:53   |
-| golden-walkthrough.test.ts    | 2026-02-17 19:35   |
+| golden-walkthrough.test.ts    | 2026-02-19          |
 | procgen.test.ts               | 2026-02-17 15:40   |
 | edge-cases.test.ts            | 2026-02-17 22:18   |
 | evidence.test.ts              | 2026-02-17 22:17   |

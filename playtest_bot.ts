@@ -273,23 +273,140 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
-  // Phase 2c: Rush to data core when all deductions solved (TOP PRIORITY after deductions)
+  // Phase 2c: Endgame — evacuate crew (primary) or data core fallback
   {
     const deds = state.mystery?.deductions ?? [];
     const allDeductionsDone = deds.length > 0 && deds.every(d => d.solved);
     if (allDeductionsDone) {
+      // Count living crew — split into found vs unfound
+      let foundLivingRemaining = 0; // found but not evacuated/dead (blocks data core)
+      const unfoundCrew: Entity[] = [];
+      const foundNotFollowing: Entity[] = [];
       for (const [, entity] of state.entities) {
-        if (entity.type === EntityType.DataCore && !isEntityExhausted(entity)) {
-          // If adjacent, interact immediately
-          if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
-            return { type: ActionType.Interact, targetId: entity.id };
+        if (entity.type === EntityType.CrewNPC &&
+            entity.props["evacuated"] !== true &&
+            entity.props["dead"] !== true) {
+          if (entity.props["found"] !== true) {
+            unfoundCrew.push(entity);
+          } else if (entity.props["following"] !== true) {
+            foundNotFollowing.push(entity);
+            foundLivingRemaining++;
+          } else {
+            foundLivingRemaining++; // following
           }
-          // Otherwise navigate to it
+        }
+      }
+
+      // Under time pressure, use data core fallback if all found crew are evacuated
+      const timePressure = state.turn > 400 && foundLivingRemaining === 0;
+      if ((foundLivingRemaining > 0 || unfoundCrew.length > 0) && !timePressure) {
+        // PRIMARY WIN PATH: evacuate all living crew
+
+        if (hasFollowingCrew(state)) {
+          // Have crew following — find a powered pod with room
+          const poweredPodId = findNearestPoweredPod(state);
+          if (poweredPodId) {
+            const podEntity = state.entities.get(poweredPodId)!;
+            if (manhattan({ x: px, y: py }, podEntity.pos) <= 1) {
+              return { type: ActionType.Interact, targetId: poweredPodId };
+            }
+            const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+              manhattan({ x, y }, podEntity.pos) <= 1
+            ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+              manhattan({ x, y }, podEntity.pos) <= 1, true);
+            if (dir) return { type: ActionType.Move, direction: dir };
+          }
+
+          // No powered pod — need to power one. Find a power cell if we don't have one.
+          const hasPowerCell = state.player.entity.props["powerCell"] === true;
+          if (!hasPowerCell) {
+            // Look for an uncollected power cell
+            for (const [, entity] of state.entities) {
+              if (entity.type === EntityType.PowerCell && entity.props["collected"] !== true) {
+                if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
+                  return { type: ActionType.Interact, targetId: entity.id };
+                }
+                const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                  manhattan({ x, y }, entity.pos) <= 1
+                ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                  manhattan({ x, y }, entity.pos) <= 1, true);
+                if (dir) return { type: ActionType.Move, direction: dir };
+              }
+            }
+            // No power cells available — try activating a relay near an unpowered pod
+            for (const [, relay] of state.entities) {
+              if (relay.type !== EntityType.Relay) continue;
+              if (relay.props["activated"] === true) continue;
+              if (manhattan({ x: px, y: py }, relay.pos) <= 1) {
+                return { type: ActionType.Interact, targetId: relay.id };
+              }
+              const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                manhattan({ x, y }, relay.pos) <= 1
+              ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                manhattan({ x, y }, relay.pos) <= 1, true);
+              if (dir) return { type: ActionType.Move, direction: dir };
+            }
+          }
+
+          // Have power cell (or last resort) — go to nearest unpowered pod to power it
+          const unpoweredPodId = findNearestPod(state);
+          if (unpoweredPodId) {
+            const podAttemptCount = interactAttempts.get(unpoweredPodId) ?? 0;
+            if (podAttemptCount < 3) { // don't get stuck on one pod
+              const podEntity = state.entities.get(unpoweredPodId)!;
+              if (manhattan({ x: px, y: py }, podEntity.pos) <= 1) {
+                interactAttempts.set(unpoweredPodId, podAttemptCount + 1);
+                return { type: ActionType.Interact, targetId: unpoweredPodId };
+              }
+              const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                manhattan({ x, y }, podEntity.pos) <= 1
+              ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                manhattan({ x, y }, podEntity.pos) <= 1, true);
+              if (dir) return { type: ActionType.Move, direction: dir };
+            }
+          }
+        } else if (foundNotFollowing.length > 0) {
+          // Found crew not yet following — go recruit nearest
+          const sorted = foundNotFollowing.sort((a, b) =>
+            manhattan({ x: px, y: py }, a.pos) - manhattan({ x: px, y: py }, b.pos)
+          );
+          const target = sorted[0];
+          if (manhattan({ x: px, y: py }, target.pos) <= 1) {
+            return { type: ActionType.Interact, targetId: target.id };
+          }
           const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
-            manhattan({ x, y }, entity.pos) <= 1
+            manhattan({ x, y }, target.pos) <= 1
           ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
-            manhattan({ x, y }, entity.pos) <= 1, true);
+            manhattan({ x, y }, target.pos) <= 1, true);
           if (dir) return { type: ActionType.Move, direction: dir };
+        } else if (unfoundCrew.length > 0) {
+          // Crew exist but haven't been discovered — go find nearest
+          const sorted = unfoundCrew.sort((a, b) =>
+            manhattan({ x: px, y: py }, a.pos) - manhattan({ x: px, y: py }, b.pos)
+          );
+          const target = sorted[0];
+          if (manhattan({ x: px, y: py }, target.pos) <= 1) {
+            return { type: ActionType.Interact, targetId: target.id };
+          }
+          const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+            manhattan({ x, y }, target.pos) <= 1
+          ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+            manhattan({ x, y }, target.pos) <= 1, true);
+          if (dir) return { type: ActionType.Move, direction: dir };
+        }
+      } else {
+        // FALLBACK: No living crew — data core transmit (bittersweet victory)
+        for (const [, entity] of state.entities) {
+          if (entity.type === EntityType.DataCore) {
+            if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
+              return { type: ActionType.Interact, targetId: entity.id };
+            }
+            const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+              manhattan({ x, y }, entity.pos) <= 1
+            ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+              manhattan({ x, y }, entity.pos) <= 1, true);
+            if (dir) return { type: ActionType.Move, direction: dir };
+          }
         }
       }
     }
@@ -342,44 +459,42 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     return { type: ActionType.Interact, targetId: target.id };
   }
 
-  // Phase 3b: Evacuation — recruit and escort crew AFTER all deductions are done
+  // Phase 3c: Evidence hunt — when unsolved deductions remain, seek unread log terminals
+  // and evidence traces rather than exploring randomly
   {
     const deds = state.mystery?.deductions ?? [];
-    const allDeductionsDone = deds.length > 0 && deds.every(d => d.solved);
-
-    if (allDeductionsDone) {
-      // Find discovered-but-unfollowing crew to recruit
-      const unrecruited: Entity[] = [];
+    const unsolvedDeds = deds.filter(d => !d.solved);
+    if (unsolvedDeds.length > 0) {
+      // Find nearest unread log terminal or uninteracted evidence trace
+      const evidenceTargets: Array<{ entity: Entity; dist: number }> = [];
       for (const [, entity] of state.entities) {
-        if (entity.type === EntityType.CrewNPC &&
-            entity.props["found"] === true &&
-            entity.props["following"] !== true &&
-            entity.props["evacuated"] !== true &&
-            entity.props["dead"] !== true) {
-          unrecruited.push(entity);
+        if (entity.id === "player") continue;
+        if (entity.type === EntityType.LogTerminal) {
+          // Skip already-read terminals
+          if (state.logs.some(l => l.id === `log_terminal_${entity.id}`)) continue;
+          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
+          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
+        } else if (entity.type === EntityType.EvidenceTrace) {
+          if (isEntityExhausted(entity)) continue;
+          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
+          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
+        } else if (entity.type === EntityType.CrewItem) {
+          if (isEntityExhausted(entity)) continue;
+          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
+          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
+        } else if (entity.type === EntityType.Console) {
+          if (isEntityExhausted(entity)) continue;
+          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
+          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
+        } else if (entity.type === EntityType.SecurityTerminal) {
+          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
+          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
         }
       }
-
-      if (hasFollowingCrew(state)) {
-        // We have crew following — escort to nearest pod (powered preferred, any as fallback)
-        const podId = findNearestPoweredPod(state) ?? findNearestPod(state);
-        if (podId) {
-          const podEntity = state.entities.get(podId);
-          if (podEntity) {
-            navTarget = podId;
-            const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
-              manhattan({ x, y }, podEntity.pos) <= 1
-            ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
-              manhattan({ x, y }, podEntity.pos) <= 1, true);
-            if (dir) return { type: ActionType.Move, direction: dir };
-          }
-        }
-      } else if (unrecruited.length > 0) {
-        // No crew following but discovered crew exist — go recruit the nearest one
-        const sorted = unrecruited.sort((a, b) =>
-          manhattan({ x: px, y: py }, a.pos) - manhattan({ x: px, y: py }, b.pos)
-        );
-        const target = sorted[0];
+      // Sort by distance to nearest
+      evidenceTargets.sort((a, b) => a.dist - b.dist);
+      if (evidenceTargets.length > 0) {
+        const target = evidenceTargets[0].entity;
         navTarget = target.id;
         const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
           manhattan({ x, y }, target.pos) <= 1

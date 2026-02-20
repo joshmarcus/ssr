@@ -364,13 +364,18 @@ export class BrowserDisplay implements IGameDisplay {
     const hpClass = hpPercent > 60 ? "good" : hpPercent > 30 ? "warn" : "bad";
 
     const isTimeOut = !isVictory && state.turn >= MAX_TURNS;
-    const title = isVictory ? "TRANSMISSION COMPLETE" : isTimeOut ? "ORBIT DECAYED" : "CONNECTION LOST";
+    const crewWereEvacuated = (state.mystery?.evacuation?.crewEvacuated.length || 0) > 0;
+    const title = isVictory
+      ? (crewWereEvacuated ? "CREW EVACUATED" : "TRANSMISSION COMPLETE")
+      : isTimeOut ? "ORBIT DECAYED" : "CONNECTION LOST";
     const titleClass = isVictory ? "victory" : "defeat";
     const subtitle = isVictory
-      ? "The crew's research data streams through the low-band relay.<br>Nine months of work, preserved."
+      ? (crewWereEvacuated
+          ? "All survivors accounted for. The mystery of CORVUS-7 is solved."
+          : "The crew is gone, but their research survives.<br>Nine months of work, transmitted through the relay.")
       : isTimeOut
         ? "Station orbit has decayed below recovery threshold.<br>Terminal link severed. CORVUS-7 falls silent."
-        : "Rover A3 signal lost. The data core remains sealed.<br>CORVUS-7 drifts on, silent.";
+        : "Rover A3 signal lost. The station drifts on, silent.";
 
     // Crew evacuation stats
     const evac = state.mystery?.evacuation;
@@ -402,10 +407,15 @@ export class BrowserDisplay implements IGameDisplay {
 
     // Performance rating based on composite score
     let score = 0;
-    if (isVictory) score += 40;
+    if (isVictory) score += 30;
     score += Math.min(20, deductionsCorrect * (20 / Math.max(deductions.length, 1)));
-    score += Math.min(15, (roomsExplored / Math.max(state.rooms.length, 1)) * 15);
-    score += Math.min(15, (hpPercent / 100) * 15);
+    // Crew evacuation bonus (up to 20 pts — biggest single factor after victory)
+    const totalCrewForScore = crewEvacuated + crewDead + totalCrewNPCs;
+    if (totalCrewForScore > 0) {
+      score += Math.min(20, (crewEvacuated / totalCrewForScore) * 20);
+    }
+    score += Math.min(10, (roomsExplored / Math.max(state.rooms.length, 1)) * 10);
+    score += Math.min(10, (hpPercent / 100) * 10);
     score += Math.min(10, isVictory && state.turn < 200 ? 10 : isVictory && state.turn < 350 ? 5 : 0);
     const rating = score >= 90 ? "S" : score >= 75 ? "A" : score >= 55 ? "B" : score >= 35 ? "C" : "D";
     const ratingColor = rating === "S" ? "#ff0" : rating === "A" ? "#0f0" : rating === "B" ? "#6cf" : rating === "C" ? "#fa0" : "#f44";
@@ -889,12 +899,16 @@ export class BrowserDisplay implements IGameDisplay {
       }
     }
 
-    const msg = state.victory ? "=== TRANSMISSION COMPLETE ===" : "=== CONNECTION LOST ===";
+    const crewEvac = (state.mystery?.evacuation?.crewEvacuated.length || 0) > 0;
+    const msg = state.victory
+      ? (crewEvac ? "=== CREW EVACUATED ===" : "=== TRANSMISSION COMPLETE ===")
+      : "=== CONNECTION LOST ===";
     const color = state.victory ? "#0f0" : "#f00";
     this.renderCenteredText(msg, centerY - 3, color, "#000");
 
     if (state.victory) {
-      this.renderCenteredText("The crew's work survives.", centerY - 1, "#8f8", "#000");
+      const subtext = crewEvac ? "All survivors accounted for." : "The crew's work survives.";
+      this.renderCenteredText(subtext, centerY - 1, "#8f8", "#000");
       this.renderCenteredText(`Mission completed in ${state.turn} turns.`, centerY + 0, "#888", "#000");
 
       // Count logs found

@@ -704,47 +704,75 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         break;
       }
 
-      // Transmit: win condition — all deductions answered
-      next.victory = true;
-      next.gameOver = true;
-
-      // Build victory text with crew evacuation stats
-      let victoryText = "Uplink locked. Nine months of research streaming through the low-band relay. The crew's work survives.";
-      if (next.mystery?.evacuation?.active) {
-        const evac = next.mystery.evacuation;
-        const totalCrew = evac.crewFound.length + evac.crewDead.length;
-        const evacuated = evac.crewEvacuated.length;
-        const dead = evac.crewDead.length;
-        // Count crew NPCs still alive but not evacuated
-        let unevacuated = 0;
+      // Check if discovered living crew still need rescue
+      // (undiscovered crew don't block the data core — you can't rescue who you haven't found)
+      {
+        let livingCrewRemaining = 0;
         for (const [, e] of next.entities) {
           if (e.type === EntityType.CrewNPC &&
+              e.props["found"] === true &&
               e.props["evacuated"] !== true &&
               e.props["dead"] !== true) {
-            unevacuated++;
+            livingCrewRemaining++;
           }
         }
-        const totalSurvivors = evacuated + unevacuated;
 
-        if (evacuated > 0 && dead === 0 && unevacuated === 0) {
-          victoryText += " Every soul accounted for.";
-        } else if (evacuated > 0) {
-          victoryText += ` ${evacuated} of ${totalSurvivors + dead} crew evacuated.${dead > 0 ? " The rest..." : ""}`;
-        } else if (totalCrew > 0) {
-          victoryText += " The data survives. The crew... you did what you could.";
+        if (livingCrewRemaining > 0) {
+          // Living crew still aboard — can't transmit yet, must evacuate
+          const evacuated = next.mystery?.evacuation?.crewEvacuated.length || 0;
+          let rescueText: string;
+          if (evacuated > 0) {
+            rescueText = `Incident report complete. Transmission ready — but ${livingCrewRemaining} crew member${livingCrewRemaining !== 1 ? "s" : ""} still aboard. Locate survivors and evacuate them before transmitting.`;
+          } else if (next.mystery?.evacuation?.active) {
+            rescueText = `Incident report complete. Crew life signs detected. The data can wait — find the survivors and get them to the escape pods.`;
+          } else {
+            rescueText = `Incident report filed. Uplink standing by. Scanning... crew life signs detected aboard the station. Evacuation protocol available — find survivors and escort them to escape pods.`;
+          }
+          next.logs = [
+            ...state.logs,
+            {
+              id: `log_datacore_rescue_${next.turn}`,
+              timestamp: next.turn,
+              source: "data_core",
+              text: rescueText,
+              read: false,
+            },
+          ];
+          break;
         }
-      }
 
-      next.logs = [
-        ...state.logs,
-        {
-          id: `log_transmit`,
-          timestamp: next.turn,
-          source: "data_core",
-          text: victoryText,
-          read: false,
-        },
-      ];
+        // No living crew remaining — bittersweet fallback victory (transmit the data)
+        next.victory = true;
+        next.gameOver = true;
+
+        const evac = next.mystery?.evacuation;
+        const dead = evac?.crewDead.length || 0;
+        const evacuated = evac?.crewEvacuated.length || 0;
+        let victoryText: string;
+        if (evacuated > 0 && dead === 0) {
+          // All crew evacuated, transmitting data — shouldn't normally reach here
+          // (victory would trigger at pod boarding), but handle gracefully
+          victoryText = "All crew evacuated. Uplink locked. Nine months of research streaming through the relay. Everyone survives.";
+        } else if (dead > 0 && evacuated > 0) {
+          victoryText = `Uplink locked. The crew's research streams through the relay. ${evacuated} evacuated. ${dead} didn't make it. The data survives — and so does the truth.`;
+        } else if (dead > 0) {
+          victoryText = `Uplink locked. Nine months of research streaming through the low-band relay. The crew is gone — ${dead} lost to the incident. But their work survives. And now, so does the truth of what happened here.`;
+        } else {
+          // No crew found at all
+          victoryText = "Uplink locked. Nine months of research streaming through the low-band relay. No crew found aboard. The data survives — cold comfort in an empty station.";
+        }
+
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_transmit`,
+            timestamp: next.turn,
+            source: "data_core",
+            text: victoryText,
+            read: false,
+          },
+        ];
+      }
       break;
     }
 
@@ -2151,10 +2179,12 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           });
           next.entities = newEntities;
 
-          // Count remaining crew who need rescue
+          // Count remaining DISCOVERED crew who need rescue
+          // (undiscovered crew don't block victory — you can't rescue who you haven't found)
           let remaining = 0;
           for (const [, entity] of newEntities) {
             if (entity.type === EntityType.CrewNPC &&
+                entity.props["found"] === true &&
                 entity.props["evacuated"] !== true &&
                 entity.props["dead"] !== true) {
               remaining++;
@@ -2187,6 +2217,47 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
                 },
               },
             };
+          }
+
+          // Victory check: all living crew evacuated + mystery solved
+          if (remaining === 0) {
+            const deds = next.mystery?.deductions ?? [];
+            const allSolved = deds.length > 0 && deds.every(d => d.solved);
+            if (allSolved) {
+              // All crew safe, mystery solved — primary victory
+              next.victory = true;
+              next.gameOver = true;
+              const totalEvac = (next.mystery?.evacuation?.crewEvacuated.length || 0);
+              const totalDead = (next.mystery?.evacuation?.crewDead.length || 0);
+              let victoryText = `All crew evacuated. ${totalEvac} soul${totalEvac !== 1 ? "s" : ""} accounted for.`;
+              if (totalDead > 0) {
+                victoryText += ` ${totalDead} lost before you could reach them.`;
+              }
+              victoryText += " The mystery of CORVUS-7 is solved. Mission complete.";
+              next.logs = [
+                ...next.logs,
+                {
+                  id: `log_evacuation_victory_${next.turn}`,
+                  timestamp: next.turn,
+                  source: "system",
+                  text: victoryText,
+                  read: false,
+                },
+              ];
+            } else {
+              // All crew safe but mystery not solved — prompt to solve deductions
+              const solvedCount = deds.filter(d => d.solved).length;
+              next.logs = [
+                ...next.logs,
+                {
+                  id: `log_crew_safe_${next.turn}`,
+                  timestamp: next.turn,
+                  source: "system",
+                  text: `All surviving crew evacuated. But the incident report is incomplete — ${solvedCount}/${deds.length} deductions filed. Complete the Broadcast Report [r] to close the case.`,
+                  read: false,
+                },
+              ];
+            }
           }
         } else {
           next.logs = [

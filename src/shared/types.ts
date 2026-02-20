@@ -159,6 +159,7 @@ export interface GameState {
   gameOver: boolean;
   victory: boolean;
   mystery?: MysteryState;
+  deteriorationInterval?: number; // Archetype-specific override (default: DETERIORATION_INTERVAL)
 }
 
 // ── Logs / evidence ──────────────────────────────────────────

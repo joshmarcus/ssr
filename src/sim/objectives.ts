@@ -8,12 +8,12 @@ import {
 } from "../shared/constants.js";
 
 /**
- * Check win condition: player has transmitted data from the data core.
- * Win is flagged via state.victory, set during the interact action with the data core.
+ * Check win condition:
+ * - Primary: all discovered living crew evacuated + all deductions solved
+ * - Fallback: data core transmit when no living crew remain (bittersweet ending)
+ * Victory is flagged via state.victory, set during escape pod boarding or data core interaction.
  */
 export function checkWinCondition(state: GameState): GameState {
-  // Victory is set during interact with data core (TRANSMIT action).
-  // This function validates it remains consistent.
   if (state.victory) {
     return { ...state, gameOver: true, victory: true };
   }

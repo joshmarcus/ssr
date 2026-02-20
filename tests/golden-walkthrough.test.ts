@@ -191,7 +191,31 @@ describe("Golden seed walkthrough (expanded station)", () => {
       state = { ...state, mystery: { ...state.mystery, deductions: solvedDeductions } };
     }
 
-    // Now data core should grant victory
+    // Mark any crew as "found" to test the discovery-based blocking
+    const crewEntities = Array.from(state.entities.entries()).filter(
+      ([, e]) => e.type === EntityType.CrewNPC
+    );
+    if (crewEntities.length > 0) {
+      const newEntities = new Map(state.entities);
+      for (const [eid, entity] of crewEntities) {
+        newEntities.set(eid, { ...entity, props: { ...entity.props, found: true } });
+      }
+      state = { ...state, entities: newEntities };
+
+      // Data core should NOT grant victory if found living crew exist (must evacuate first)
+      state = step(state, interact("data_core"));
+      expect(state.victory).toBeFalsy();
+      expect(state.gameOver).toBeFalsy();
+
+      // Mark all crew as dead to test fallback (bittersweet) victory path
+      const deadEntities = new Map(state.entities);
+      for (const [eid, entity] of crewEntities) {
+        deadEntities.set(eid, { ...entity, props: { ...entity.props, found: true, dead: true } });
+      }
+      state = { ...state, entities: deadEntities };
+    }
+
+    // With no found living crew remaining, data core transmit triggers fallback victory
     state = step(state, interact("data_core"));
     expect(state.victory).toBe(true);
     expect(state.gameOver).toBe(true);

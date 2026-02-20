@@ -1,7 +1,10 @@
 import * as ROT from "rot-js";
 import type { GameState, Entity, MysteryState, MysteryChoice } from "../shared/types.js";
 import { TileType, EntityType, SensorType, ObjectivePhase, IncidentArchetype, CrewFate, DoorKeyType } from "../shared/types.js";
-import { DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, GLYPHS, PRESSURE_NORMAL } from "../shared/constants.js";
+import {
+  DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, GLYPHS, PRESSURE_NORMAL,
+  HEAT_SOURCE_CAP, DETERIORATION_INTERVAL,
+} from "../shared/constants.js";
 import { createEmptyState } from "./state.js";
 import { updateVision } from "./vision.js";
 import AUTHORED_LOGS from "../data/logs.json" with { type: "json" };
@@ -199,8 +202,102 @@ export function generate(seed: number): GameState {
   // Place landmark consoles in themed rooms
   placeLandmarkConsoles(state, rooms);
 
+  // Apply archetype-specific hazard profile
+  applyArchetypeProfile(state, archetype);
+
   // Reveal starting room via vision system
   return updateVision(state);
+}
+
+/**
+ * Apply archetype-specific hazard modifications to make each storyline feel
+ * physically different to play, not just narratively different.
+ */
+function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): void {
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade: {
+      // "The Whistleblower" — cascading thermal failure. Slightly more heat.
+      for (let y = 0; y < state.height; y++) {
+        for (let x = 0; x < state.width; x++) {
+          const tile = state.tiles[y][x];
+          if (tile.heat > 0) {
+            tile.heat = Math.min(100, tile.heat + 8);
+            tile.smoke = Math.min(100, tile.smoke + 4);
+          }
+        }
+      }
+      break;
+    }
+
+    case IncidentArchetype.HullBreach: {
+      // "The Murder" — structural failure. Slightly more pressure loss around breaches.
+      for (let y = 0; y < state.height; y++) {
+        for (let x = 0; x < state.width; x++) {
+          const tile = state.tiles[y][x];
+          if (tile.pressure < PRESSURE_NORMAL && tile.pressure > 0) {
+            tile.pressure = Math.max(10, tile.pressure - 8);
+          }
+        }
+      }
+      break;
+    }
+
+    case IncidentArchetype.ReactorScram: {
+      // "The Rogue AI" — reactor emergency. Faster deterioration.
+      // Store a faster deterioration interval on the state (checked in hazards.ts)
+      state.deteriorationInterval = DETERIORATION_INTERVAL - 5; // 20 instead of 25
+      // Add extra smoke in corridors (reactor venting)
+      for (let y = 0; y < state.height; y++) {
+        for (let x = 0; x < state.width; x++) {
+          const tile = state.tiles[y][x];
+          if (tile.type === TileType.Corridor && tile.walkable) {
+            const smokeRng = ((state.seed + y * 37 + x * 13) >>> 0) % 10;
+            if (smokeRng < 3) { // 30% of corridor tiles
+              tile.smoke = Math.min(100, tile.smoke + 12);
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    case IncidentArchetype.Sabotage: {
+      // "The Stowaway" — sabotage scenario. Add one extra hostile patrol drone.
+      // Existing drones keep their normal behaviour (become hostile later via deterioration).
+      const rooms = state.rooms;
+      const extraDroneRoomIdx = Math.min(rooms.length - 1, Math.floor(rooms.length * 0.4));
+      const room = rooms[extraDroneRoomIdx];
+      if (room) {
+        const pos = { x: room.x + 1, y: room.y + 1 };
+        state.entities.set("patrol_drone_extra", {
+          id: "patrol_drone_extra",
+          type: EntityType.PatrolDrone,
+          pos,
+          props: { hostile: true },
+        });
+      }
+      break;
+    }
+
+    case IncidentArchetype.SignalAnomaly: {
+      // "First Contact" — alien signal overloaded systems. Standard hazards,
+      // but add electromagnetic interference: random heat pockets in corridors
+      // (representing fried electrical systems from the signal overload)
+      for (let y = 0; y < state.height; y++) {
+        for (let x = 0; x < state.width; x++) {
+          const tile = state.tiles[y][x];
+          if (tile.type === TileType.Corridor && tile.walkable && tile.heat === 0) {
+            const emRng = ((state.seed + y * 71 + x * 23) >>> 0) % 20;
+            if (emRng < 2) { // 10% of corridor tiles get fried-circuit heat pockets
+              tile.heat = 25 + (emRng * 8);
+              tile.smoke = 5;
+            }
+          }
+        }
+      }
+      break;
+    }
+  }
 }
 
 /**
