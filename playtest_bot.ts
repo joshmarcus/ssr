@@ -111,6 +111,7 @@ function interactPriority(entity: Entity, state: GameState): number {
       return deds.length > 0 && deds.every(d => d.solved) ? 1000 : -1;
     }
     case EntityType.SensorPickup: return 100;
+    case EntityType.ToolPickup: return 95; // pry bar — grab early for clearance door bypass
     case EntityType.MedKit: return state.player.hp < 800 ? 90 : -1;
     case EntityType.RepairCradle: return state.player.hp < 900 ? 85 : -1;
     case EntityType.Relay: return 80;

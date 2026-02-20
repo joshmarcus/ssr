@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 41 complete (Deduction Retrospective, Pry Bar, What We Know Polish)
+- **Phase**: Sprint 42 complete (Bot Pry Bar, Tool Sidebar, Pry Bar Hint, Repair Bot Fix)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -80,6 +80,24 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 42 Changes
+
+### Bot Pry Bar Pickup
+- Bot now picks up ToolPickup entities at priority 95 (just below sensors)
+- Validated: both seeds 42 and 184201 VICTORY with pry bar entity spawning correctly
+
+### Tool Slot in Sidebar
+- **TOOL: Pry Bar** shown in status bar when equipped (orange text, matching entity color)
+- ToolPickup added to dynamic room legend with wrench glyph
+
+### Pry Bar Hint for Clearance Doors
+- **One-time narrative hint**: First time player interacts with a clearance-locked door without the pry bar, shows "A heavy tool might be able to force this lock open. Check the maintenance areas."
+- Tracked via `hintedPryBar` player prop — fires only once per run
+
+### Repair Bot Log Spam Fix
+- **Bug fix**: Repair bot coolant flush messages now only appear when bot is within 6 Manhattan tiles of the player
+- Previously, repair bots anywhere on the station would spam logs every turn while cooling hot tiles
 
 ## Sprint 41 Changes
 

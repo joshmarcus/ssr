@@ -1223,6 +1223,7 @@ export class BrowserDisplay implements IGameDisplay {
       roomLabel + stunTag +
       `<br>` + hpTag.replace(/ \| /, '') +
       `<br>` + discoveryTag.replace(/ \| /, '') + evidenceTag.replace(/ \| /, '') + deductionTag.replace(/ \| /, '') +
+      (state.player.attachments[AttachmentSlot.Tool] ? `<br><span class="label">TOOL:</span> <span style="color:#fa4">${this.escapeHtml(state.player.attachments[AttachmentSlot.Tool].name)}</span>` : '') +
       `<br>` + unreadTag.replace(/ \| /g, '').trim() + reportTag.replace(/ \| /, '') +
       interactHint +
       `</div>` + compassHtml + overlayLine;
@@ -1281,6 +1282,7 @@ export class BrowserDisplay implements IGameDisplay {
       { key: EntityType.CrewNPC, glyph: ENTITY_GLYPHS[EntityType.CrewNPC] || "☺", color: "#fe6", label: "Crew" },
       { key: EntityType.EvidenceTrace, glyph: ENTITY_GLYPHS[EntityType.EvidenceTrace] || "※", color: "#ca8", label: "Evidence" },
       { key: EntityType.Console, glyph: ENTITY_GLYPHS[EntityType.Console] || "💻", color: "#6ac", label: "Console" },
+      { key: EntityType.ToolPickup, glyph: ENTITY_GLYPHS[EntityType.ToolPickup] || "🔧", color: "#fa4", label: "Tool" },
       { key: EntityType.Airlock, glyph: ENTITY_GLYPHS[EntityType.Airlock] || "⊟", color: "#0ff", label: "Airlock" },
       { key: "_heat", glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
       { key: "_locked", glyph: GLYPHS.lockedDoor, color: "#f00", label: "Locked" },

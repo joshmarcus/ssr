@@ -1191,16 +1191,32 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           break;
         }
         if (playerClearance < requiredLevel) {
-          next.logs = [
+          const logs = [
             ...state.logs,
             {
               id: `log_door_clearance_deny_${targetId}_${next.turn}`,
               timestamp: next.turn,
               source: "system",
-              text: `ACCESS DENIED. Security clearance required.${hasPryBar ? "" : " Solve station puzzles to gain access."}`,
+              text: "ACCESS DENIED. Security clearance required. Solve station puzzles to gain access.",
               read: false,
             },
           ];
+          // One-time pry bar hint
+          if (!hasPryBar && state.player.entity.props["hintedPryBar"] !== true) {
+            logs.push({
+              id: `log_pry_hint_${next.turn}`,
+              timestamp: next.turn,
+              source: "narrative",
+              text: "A heavy tool might be able to force this lock open. Check the maintenance areas.",
+              read: false,
+            });
+            const playerEntity = { ...state.player.entity, props: { ...state.player.entity.props, hintedPryBar: true } };
+            const newEntities = new Map(state.entities);
+            newEntities.set("player", playerEntity);
+            next.player = { ...state.player, entity: playerEntity };
+            next.entities = newEntities;
+          }
+          next.logs = logs;
           break;
         }
         // Sufficient clearance — open the door
@@ -3003,14 +3019,18 @@ function moveRepairBots(state: GameState): GameState {
         tilesCloned = true;
       }
       newTiles[ey][ex].heat = Math.max(0, newTiles[ey][ex].heat - 8);
-      const botLabel = id.replace("repair_bot_", "RB-0");
-      newLogs.push({
-        id: `log_repair_cool_${id}_${state.turn}`,
-        timestamp: state.turn,
-        source: "system",
-        text: `Repair bot ${botLabel}: [COOLANT FLUSH] — thermal load reduced.`,
-        read: false,
-      });
+      // Only log when repair bot is within 6 tiles of player (avoid log spam)
+      const distToPlayer = Math.abs(ex - state.player.entity.pos.x) + Math.abs(ey - state.player.entity.pos.y);
+      if (distToPlayer <= 6) {
+        const botLabel = id.replace("repair_bot_", "RB-0");
+        newLogs.push({
+          id: `log_repair_cool_${id}_${state.turn}`,
+          timestamp: state.turn,
+          source: "system",
+          text: `Repair bot ${botLabel}: [COOLANT FLUSH] — thermal load reduced.`,
+          read: false,
+        });
+      }
       newEntities.set(id, {
         ...entity,
         props: { ...entity.props, followTurnsLeft },
