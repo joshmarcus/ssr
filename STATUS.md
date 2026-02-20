@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 23 complete (Traversal & Tension)
+- **Phase**: Sprint 24 complete (Game Feel)
 - **Test status**: 280 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -65,6 +65,12 @@
 - No CI pipeline deployed
 - Seed 3 DEFEAT: bot times out at 500 turns on large maps (navigation efficiency)
 - Seed 5 DEFEAT: bot only solves 3/5 deductions (evidence-gathering heuristic too shallow)
+
+## Sprint 24 Changes
+
+### Game Feel
+- **Room entry entity listing**: On first visit, rooms now show "You detect: Power Relay, Log Terminal, Hull Breach" listing notable interactable entities. Exhausted/hidden entities excluded.
+- **Interaction preview**: After each move, if adjacent to an interactable entity, shows "Nearby: [i] Reroute Relay | [i] Read Terminal" hints. Helps players know what's available without memorizing controls. Skipped during auto-explore.
 
 ## Sprint 23 Changes
 
@@ -141,6 +147,7 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ## Recent Changes (Git History)
 
 ```
+2026-02-19        feat: sprint 24 — game feel (room entry, interaction preview)
 2026-02-19        feat: sprint 23 — traversal & tension (HP economy, auto-explore)
 2026-02-19        feat: sensor-gated evidence — scan reveals hidden traces
 2026-02-19        feat: sprint 22 — bot pathfinding + deduction-gated victory

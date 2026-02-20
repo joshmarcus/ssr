@@ -376,7 +376,55 @@ function checkRoomEntry(): void {
       if (desc) {
         display.addLog(desc, "narrative");
       }
+
+      // List notable entities in the room
+      const roomEntities: string[] = [];
+      for (const [id, ent] of state.entities) {
+        if (id === "player") continue;
+        if (ent.pos.x >= currentRoom.x && ent.pos.x < currentRoom.x + currentRoom.width &&
+            ent.pos.y >= currentRoom.y && ent.pos.y < currentRoom.y + currentRoom.height) {
+          const name = entityLabel(ent);
+          if (name) roomEntities.push(name);
+        }
+      }
+      if (roomEntities.length > 0) {
+        const unique = [...new Set(roomEntities)];
+        display.addLog(`You detect: ${unique.join(", ")}`, "sensor");
+      }
     }
+  }
+}
+
+/** Get a short label for an entity visible on room entry (null = skip). */
+function entityLabel(ent: { type: string; props: Record<string, unknown> }): string | null {
+  switch (ent.type) {
+    case EntityType.Relay:
+      if (ent.props["locked"] === true) return null;
+      return ent.props["activated"] ? null : "Power Relay";
+    case EntityType.SensorPickup: return ent.props["collected"] ? null : "Sensor Upgrade";
+    case EntityType.DataCore: return "Data Core";
+    case EntityType.LogTerminal: return "Log Terminal";
+    case EntityType.CrewItem:
+      if (ent.props["hidden"] === true || ent.props["examined"] === true) return null;
+      return "Crew Item";
+    case EntityType.MedKit: return ent.props["used"] ? null : "Med Kit";
+    case EntityType.RepairCradle: return "Repair Cradle";
+    case EntityType.Breach: return ent.props["sealed"] ? null : "Hull Breach";
+    case EntityType.EvidenceTrace:
+      if (ent.props["discovered"] === true || ent.props["scanHidden"] === true) return null;
+      return "Evidence Trace";
+    case EntityType.CrewNPC:
+      if (ent.props["evacuated"] === true || ent.props["dead"] === true) return null;
+      return ent.props["found"] ? `${ent.props["firstName"]} ${ent.props["lastName"]}` : "Life Signs Detected";
+    case EntityType.EscapePod: return "Escape Pod";
+    case EntityType.Console: return ent.props["read"] ? null : "Console";
+    case EntityType.SecurityTerminal: return "Security Terminal";
+    case EntityType.ServiceBot: return ent.props["activated"] ? null : "Service Bot";
+    case EntityType.FuseBox: return ent.props["powered"] ? null : "Fuse Box";
+    case EntityType.PressureValve: return ent.props["turned"] ? null : "Pressure Valve";
+    case EntityType.ClosedDoor: return ent.props["locked"] ? null : "Sealed Door";
+    case EntityType.PatrolDrone: return ent.props["disabled"] ? null : "Patrol Drone";
+    default: return null;
   }
 }
 
@@ -1160,7 +1208,83 @@ function handleAction(action: Action): void {
     return;
   }
 
+  // Show interaction preview for adjacent entities after move
+  if (action.type === ActionType.Move && !autoExploring) {
+    showInteractionPreview();
+  }
+
   renderAll();
+}
+
+/** Show a brief interaction hint for adjacent interactable entities. */
+function showInteractionPreview(): void {
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  const deltas = [
+    { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0 },
+  ];
+
+  const hints: string[] = [];
+  for (const [id, ent] of state.entities) {
+    if (id === "player") continue;
+    let adjacent = false;
+    for (const d of deltas) {
+      if (ent.pos.x === px + d.x && ent.pos.y === py + d.y) { adjacent = true; break; }
+    }
+    if (!adjacent) continue;
+
+    const hint = getInteractionHint(ent);
+    if (hint) hints.push(hint);
+  }
+
+  if (hints.length > 0) {
+    display.addLog(`Nearby: ${hints.join(" | ")}`, "sensor");
+  }
+}
+
+/** Get a short hint for an adjacent interactable entity (null = skip). */
+function getInteractionHint(ent: { type: string; props: Record<string, unknown> }): string | null {
+  switch (ent.type) {
+    case EntityType.Relay:
+      if (ent.props["locked"] === true) return null;
+      return ent.props["activated"] ? null : "[i] Reroute Relay";
+    case EntityType.SensorPickup:
+      return ent.props["collected"] ? null : "[i] Sensor Upgrade";
+    case EntityType.DataCore:
+      return "[i] Data Core";
+    case EntityType.LogTerminal:
+      return "[i] Read Terminal";
+    case EntityType.CrewItem:
+      if (ent.props["hidden"] === true || ent.props["examined"] === true) return null;
+      return "[i] Examine";
+    case EntityType.MedKit:
+      return ent.props["used"] ? null : "[i] Med Kit";
+    case EntityType.RepairCradle:
+      return "[i] Repair Cradle";
+    case EntityType.Breach:
+      return ent.props["sealed"] ? null : "[i] Seal Breach";
+    case EntityType.EvidenceTrace:
+      if (ent.props["discovered"] === true || ent.props["scanHidden"] === true) return null;
+      return "[i] Evidence";
+    case EntityType.CrewNPC:
+      if (ent.props["evacuated"] === true || ent.props["dead"] === true) return null;
+      if (ent.props["following"] === true) return null;
+      return ent.props["found"] ? `[i] ${ent.props["firstName"]}` : "[i] Life Signs";
+    case EntityType.EscapePod:
+      return "[i] Escape Pod";
+    case EntityType.Console:
+      return ent.props["read"] ? null : "[i] Console";
+    case EntityType.SecurityTerminal:
+      return "[i] Security Terminal";
+    case EntityType.ServiceBot:
+      return ent.props["activated"] ? null : "[i] Service Bot";
+    case EntityType.ClosedDoor:
+      return ent.props["locked"] ? null : "[i] Open Door";
+    case EntityType.Airlock:
+      return "[i] Airlock";
+    default:
+      return null;
+  }
 }
 
 /** Check for ambient heat messages when entering a heated room (Item 11). */
