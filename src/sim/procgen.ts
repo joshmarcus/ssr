@@ -14,7 +14,7 @@ import { selectArchetype } from "./incidents.js";
 import { generateTimeline, generateLogs } from "./timeline.js";
 import { CrewRole } from "../shared/types.js";
 import { generateMysteryChoices } from "./mysteryChoices.js";
-import { generateDeductions } from "./deduction.js";
+import { generateDeductions, generateEvidenceTags } from "./deduction.js";
 import { generateThreads } from "./threads.js";
 import { LANDMARK_CONSOLES } from "../data/consoleText.js";
 import { generateCrewPaths } from "./crewPaths.js";
@@ -205,6 +205,9 @@ export function generate(seed: number): GameState {
   // Apply archetype-specific hazard profile
   applyArchetypeProfile(state, archetype);
 
+  // Guarantee all deduction tags are covered by placed evidence
+  ensureTagCoverage(state);
+
   // Reveal starting room via vision system
   return updateVision(state);
 }
@@ -296,6 +299,127 @@ function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): 
         }
       }
       break;
+    }
+  }
+}
+
+/**
+ * Guarantee that every deduction's requiredTags can be satisfied by the placed evidence.
+ * Pre-computes what tags each evidence entity would generate, then for any missing tag
+ * injects a forceTags prop on the best-matching entity so addJournalEntry merges it in.
+ */
+function ensureTagCoverage(state: GameState): void {
+  if (!state.mystery) return;
+  const { deductions, crew, timeline } = state.mystery;
+  const archetype = timeline.archetype;
+
+  // 1. Collect all required tags across all deductions
+  const allRequired = new Set<string>();
+  for (const d of deductions) {
+    for (const tag of d.requiredTags) {
+      allRequired.add(tag);
+    }
+  }
+
+  // 2. Pre-compute tags for all evidence entities
+  interface EvidenceInfo {
+    entityId: string;
+    tags: string[];
+    category: "log" | "trace" | "item" | "crew";
+  }
+  const evidenceInfos: EvidenceInfo[] = [];
+  const evidenceTypes = new Set([
+    EntityType.LogTerminal,
+    EntityType.EvidenceTrace,
+    EntityType.CrewItem,
+    EntityType.Console,
+  ]);
+
+  for (const [entityId, entity] of state.entities) {
+    if (!evidenceTypes.has(entity.type)) continue;
+    const text = (entity.props["text"] as string)
+      || (entity.props["journalDetail"] as string)
+      || "";
+    if (!text) continue;
+
+    let category: EvidenceInfo["category"];
+    if (entity.type === EntityType.LogTerminal || entity.type === EntityType.Console) {
+      category = "log";
+    } else if (entity.type === EntityType.EvidenceTrace) {
+      category = "trace";
+    } else {
+      category = "item";
+    }
+
+    // Find crew mentions in text
+    const crewMentioned: string[] = [];
+    for (const member of crew) {
+      if (text.includes(member.lastName) || text.includes(member.firstName)) {
+        crewMentioned.push(member.id);
+      }
+    }
+
+    // Get the room name for this entity
+    const room = state.rooms.find(r =>
+      entity.pos.x >= r.x && entity.pos.x < r.x + r.width &&
+      entity.pos.y >= r.y && entity.pos.y < r.y + r.height,
+    );
+    const roomName = room?.name || "Corridor";
+
+    const tags = generateEvidenceTags(category, text, roomName, crewMentioned, crew, archetype);
+
+    // Include any existing forceTags
+    const existing = entity.props["forceTags"] as string[] | undefined;
+    if (existing) {
+      for (const t of existing) {
+        if (!tags.includes(t)) tags.push(t);
+      }
+    }
+
+    evidenceInfos.push({ entityId, tags, category });
+  }
+
+  // 3. Compute which tags are already covered
+  const covered = new Set<string>();
+  for (const info of evidenceInfos) {
+    for (const tag of info.tags) {
+      covered.add(tag);
+    }
+  }
+
+  // 4. Find missing tags and inject forceTags
+  for (const tag of allRequired) {
+    if (covered.has(tag)) continue;
+
+    // Find the best entity to receive this tag
+    // Prefer log terminals (most text, most natural place for tags)
+    // then evidence traces, then crew items
+    const prioritized = [...evidenceInfos].sort((a, b) => {
+      const catOrder = { log: 0, trace: 1, item: 2, crew: 3 };
+      return catOrder[a.category] - catOrder[b.category];
+    });
+
+    // Pick an entity that doesn't already have too many forceTags (spread coverage)
+    let bestEntity: EvidenceInfo | null = null;
+    let bestForceCount = Infinity;
+    for (const info of prioritized) {
+      const entity = state.entities.get(info.entityId);
+      const existing = (entity?.props["forceTags"] as string[] | undefined)?.length ?? 0;
+      if (existing < bestForceCount) {
+        bestForceCount = existing;
+        bestEntity = info;
+      }
+    }
+
+    if (bestEntity) {
+      const entity = state.entities.get(bestEntity.entityId)!;
+      const existing = (entity.props["forceTags"] as string[] | undefined) ?? [];
+      state.entities.set(bestEntity.entityId, {
+        ...entity,
+        props: { ...entity.props, forceTags: [...existing, tag] },
+      });
+      bestEntity.tags.push(tag);
+      covered.add(tag);
     }
   }
 }

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { generate } from "../src/sim/procgen.js";
 import { EntityType, TileType } from "../src/shared/types.js";
 import { GOLDEN_SEED, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT } from "../src/shared/constants.js";
+import { generateEvidenceTags } from "../src/sim/deduction.js";
 
 describe("Procgen entity placement", () => {
   // Seeds that produce >= 5 rooms (full entity placement)
@@ -86,6 +87,74 @@ describe("Procgen entity placement", () => {
         expect(x).toBeLessThan(state.width);
         expect(y).toBeGreaterThanOrEqual(0);
         expect(y).toBeLessThan(state.height);
+      });
+    });
+  });
+
+  // Tag coverage guarantee: every seed's deduction chain is solvable
+  const tagCoverageSeeds = [184201, 42, 3, 7, 4, 99999, 314159, 12345, 55555, 77777];
+  describe("tag coverage guarantee", () => {
+    tagCoverageSeeds.forEach((seed) => {
+      it(`seed ${seed}: all deduction requiredTags covered by evidence`, () => {
+        const state = generate(seed);
+        const mystery = state.mystery!;
+        const { deductions, crew, timeline } = mystery;
+
+        // Collect all required tags
+        const allRequired = new Set<string>();
+        for (const d of deductions) {
+          for (const tag of d.requiredTags) {
+            allRequired.add(tag);
+          }
+        }
+
+        // Simulate tag generation for all evidence entities
+        const covered = new Set<string>();
+        const evidenceTypes = new Set([
+          EntityType.LogTerminal,
+          EntityType.EvidenceTrace,
+          EntityType.CrewItem,
+          EntityType.Console,
+        ]);
+        for (const [, entity] of state.entities) {
+          if (!evidenceTypes.has(entity.type)) continue;
+          const text = (entity.props["text"] as string)
+            || (entity.props["journalDetail"] as string)
+            || "";
+          if (!text) continue;
+
+          let category: "log" | "trace" | "item" = "log";
+          if (entity.type === EntityType.EvidenceTrace) category = "trace";
+          if (entity.type === EntityType.CrewItem) category = "item";
+
+          const crewMentioned: string[] = [];
+          for (const member of crew) {
+            if (text.includes(member.lastName) || text.includes(member.firstName)) {
+              crewMentioned.push(member.id);
+            }
+          }
+
+          const room = state.rooms.find(r =>
+            entity.pos.x >= r.x && entity.pos.x < r.x + r.width &&
+            entity.pos.y >= r.y && entity.pos.y < r.y + r.height,
+          );
+          const roomName = room?.name || "Corridor";
+
+          const tags = generateEvidenceTags(category, text, roomName, crewMentioned, crew, timeline.archetype);
+
+          // Include forceTags
+          const forced = entity.props["forceTags"] as string[] | undefined;
+          if (forced) {
+            for (const t of forced) tags.push(t);
+          }
+
+          for (const tag of tags) covered.add(tag);
+        }
+
+        // Every required tag must be covered
+        for (const tag of allRequired) {
+          expect(covered.has(tag), `Missing tag "${tag}" for seed ${seed} (archetype: ${timeline.archetype})`).toBe(true);
+        }
       });
     });
   });

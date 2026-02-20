@@ -4,15 +4,15 @@
 
 ## Current State
 
-- **Phase**: Sprint 27 complete (Victory Redesign & Archetype Profiles)
-- **Test status**: 280 tests passing across 24 test files (0 failing)
+- **Phase**: Sprint 28 complete (Tag Coverage & Evidence Intelligence)
+- **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
 - **Save key**: v3
 - **Turn limit**: 500 turns (warnings at 350/400/450)
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: Seeds 42 (94T), 4 (215T), 7 (254T), 3 (463T) VICTORY; seed 184201 DEFEAT (timing)
+- **Playtest results**: All 6 seeds VICTORY — 42 (110T), 4 (166T), 7 (146T), 184201 (245T), 3 (370T), 5 (497T)
 
 ## What Works
 
@@ -65,8 +65,18 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
-- Seed 5 DEFEAT: bot only solves 3/5 deductions (evidence-gathering heuristic too shallow — needs tag-aware evidence seeking)
-- Seed 184201 DEFEAT: deductions solve at T440, data core at far side of station — runs out of time at T500 (bot reached 3 tiles away)
+- Atmospheric sensor has no required puzzle gate (provides visibility + damage reduction but not mandatory)
+
+## Sprint 28 Changes
+
+### Evidence Tag Coverage Guarantee
+- **`ensureTagCoverage()` in procgen**: Post-generation validation checks all deduction `requiredTags` are coverable by placed evidence. Pre-computes tags for every evidence entity via `generateEvidenceTags()`. For any missing tag, injects a `forceTags` prop on the best-matching entity. `addJournalEntry()` merges `forceTags` with generated tags at interaction time.
+- **10 new tag coverage tests**: Validates solvability across 10 seeds (including all 5 archetypes). Every deduction chain is guaranteed solvable on every seed.
+
+### Tag-Aware Bot Evidence Seeking
+- **Phase 3c rewrite**: Bot now computes missing deduction tags (requiredTags minus journal tags) and scores each evidence entity by how many missing tags it would provide. Entities with `forceTags` get a bonus. Prioritizes high-tag-score targets before falling back to nearest-distance.
+- **Results**: Seed 5 went from DEFEAT (3/5 deductions) to VICTORY T497 (5/5 correct). Seed 184201 went from DEFEAT T500 to VICTORY T245. All 6 seeds now VICTORY.
+- **Deduction solve speed**: Seed 184201 deductions solved at T104 (was T440), seed 42 at T28 (was T35), seed 4 at T32 (was T180).
 
 ## Sprint 27 Changes
 
@@ -185,6 +195,7 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ## Recent Changes (Git History)
 
 ```
+2026-02-19        feat: sprint 28 — tag coverage guarantee + tag-aware bot evidence seeking
 2026-02-19        feat: sprint 27 — victory redesign (crew evacuation) + archetype hazard profiles
 2026-02-19        feat: sprint 26 — tension & turn economy (turn limit, HP warnings, bot rush)
 2026-02-19        feat: sprint 25 — atmosphere & polish (room descriptions, cleaning discoveries)

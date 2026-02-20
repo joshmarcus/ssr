@@ -5,7 +5,7 @@
 import { generate } from "./src/sim/procgen.js";
 import { step } from "./src/sim/step.js";
 import { isValidAction, hasUnlockedDoorAt, isAutoSealedBulkhead } from "./src/sim/actions.js";
-import { getUnlockedDeductions } from "./src/sim/deduction.js";
+import { getUnlockedDeductions, generateEvidenceTags } from "./src/sim/deduction.js";
 import { getRoomCleanliness, getRoomAt } from "./src/sim/rooms.js";
 import { isEntityExhausted } from "./src/shared/ui.js";
 import type { GameState, Action, Position, Entity, Direction } from "./src/shared/types.js";
@@ -459,40 +459,92 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     return { type: ActionType.Interact, targetId: target.id };
   }
 
-  // Phase 3c: Evidence hunt — when unsolved deductions remain, seek unread log terminals
-  // and evidence traces rather than exploring randomly
+  // Phase 3c: Tag-aware evidence hunt — prioritize evidence that covers missing deduction tags
   {
     const deds = state.mystery?.deductions ?? [];
     const unsolvedDeds = deds.filter(d => !d.solved);
     if (unsolvedDeds.length > 0) {
-      // Find nearest unread log terminal or uninteracted evidence trace
-      const evidenceTargets: Array<{ entity: Entity; dist: number }> = [];
-      for (const [, entity] of state.entities) {
-        if (entity.id === "player") continue;
-        if (entity.type === EntityType.LogTerminal) {
-          // Skip already-read terminals
-          if (state.logs.some(l => l.id === `log_terminal_${entity.id}`)) continue;
-          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
-          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
-        } else if (entity.type === EntityType.EvidenceTrace) {
-          if (isEntityExhausted(entity)) continue;
-          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
-          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
-        } else if (entity.type === EntityType.CrewItem) {
-          if (isEntityExhausted(entity)) continue;
-          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
-          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
-        } else if (entity.type === EntityType.Console) {
-          if (isEntityExhausted(entity)) continue;
-          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
-          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
-        } else if (entity.type === EntityType.SecurityTerminal) {
-          if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
-          evidenceTargets.push({ entity, dist: manhattan({ x: px, y: py }, entity.pos) });
+      // Compute missing tags: what do unsolved deductions need that the journal doesn't have?
+      const journalTags = new Set<string>();
+      for (const entry of state.mystery?.journal ?? []) {
+        for (const tag of entry.tags) journalTags.add(tag);
+      }
+      const missingTags = new Set<string>();
+      for (const d of unsolvedDeds) {
+        for (const tag of d.requiredTags) {
+          if (!journalTags.has(tag)) missingTags.add(tag);
         }
       }
-      // Sort by distance to nearest
-      evidenceTargets.sort((a, b) => a.dist - b.dist);
+
+      // Score each evidence entity by how likely it covers missing tags
+      const evidenceTargets: Array<{ entity: Entity; dist: number; tagScore: number }> = [];
+      const crew = state.mystery?.crew ?? [];
+      const archetype = state.mystery?.timeline.archetype;
+
+      for (const [, entity] of state.entities) {
+        if (entity.id === "player") continue;
+        const isEvidence =
+          entity.type === EntityType.LogTerminal ||
+          entity.type === EntityType.EvidenceTrace ||
+          entity.type === EntityType.CrewItem ||
+          entity.type === EntityType.Console ||
+          entity.type === EntityType.SecurityTerminal;
+        if (!isEvidence) continue;
+
+        // Skip already-read/exhausted
+        if (entity.type === EntityType.LogTerminal) {
+          if (state.logs.some(l => l.id === `log_terminal_${entity.id}`)) continue;
+        } else if (isEntityExhausted(entity)) continue;
+        if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
+
+        const dist = manhattan({ x: px, y: py }, entity.pos);
+
+        // Predict tags this evidence would produce
+        let tagScore = 0;
+        const text = (entity.props["text"] as string)
+          || (entity.props["journalDetail"] as string)
+          || "";
+        if (text && missingTags.size > 0) {
+          const crewMentioned: string[] = [];
+          for (const member of crew) {
+            if (text.includes(member.lastName) || text.includes(member.firstName)) {
+              crewMentioned.push(member.id);
+            }
+          }
+          let category: "log" | "trace" | "item" = "log";
+          if (entity.type === EntityType.EvidenceTrace) category = "trace";
+          if (entity.type === EntityType.CrewItem) category = "item";
+
+          const room = state.rooms.find(r =>
+            entity.pos.x >= r.x && entity.pos.x < r.x + r.width &&
+            entity.pos.y >= r.y && entity.pos.y < r.y + r.height,
+          );
+          const roomName = room?.name || "Corridor";
+
+          const predictedTags = generateEvidenceTags(category, text, roomName, crewMentioned, crew, archetype);
+
+          // Include forceTags
+          const forced = entity.props["forceTags"] as string[] | undefined;
+          if (forced) predictedTags.push(...forced);
+
+          // Count how many missing tags this evidence covers
+          for (const t of predictedTags) {
+            if (missingTags.has(t)) tagScore++;
+          }
+        }
+
+        // Bonus: entities with forceTags are guaranteed high-value
+        if (entity.props["forceTags"]) tagScore += 2;
+
+        evidenceTargets.push({ entity, dist, tagScore });
+      }
+
+      // Sort: tag-covering evidence first, then by distance
+      evidenceTargets.sort((a, b) => {
+        if (b.tagScore !== a.tagScore) return b.tagScore - a.tagScore;
+        return a.dist - b.dist;
+      });
+
       if (evidenceTargets.length > 0) {
         const target = evidenceTargets[0].entity;
         navTarget = target.id;

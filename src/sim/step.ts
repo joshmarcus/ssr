@@ -115,6 +115,7 @@ function addJournalEntry(
   summary: string,
   detail: string,
   roomFound: string,
+  entityId?: string,
 ): GameState {
   if (!state.mystery) return state;
   // Don't add duplicate entries
@@ -136,6 +137,17 @@ function addJournalEntry(
     state.mystery.crew,
     state.mystery.timeline.archetype,
   );
+
+  // Merge forceTags from the source entity (tag coverage guarantee)
+  if (entityId) {
+    const entity = state.entities.get(entityId);
+    const forced = entity?.props["forceTags"] as string[] | undefined;
+    if (forced) {
+      for (const t of forced) {
+        if (!tags.includes(t)) tags.push(t);
+      }
+    }
+  }
 
   // Assign this entry to a narrative thread based on its tags
   const threadName = assignThread(tags, state.mystery.threads);
@@ -808,6 +820,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           `Log: ${firstLine.slice(0, 50)}`,
           terminalText,
           getPlayerRoomName(state),
+          targetId,
         );
       } else {
         next.logs = [
@@ -899,6 +912,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           `Item: ${itemName}`,
           itemText,
           getPlayerRoomName(state),
+          targetId,
         );
       }
       break;
@@ -1743,6 +1757,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             `Trace: ${phase.replace(/_/g, " ")} evidence`,
             traceText,
             getPlayerRoomName(state),
+            targetId,
           );
         }
       }
@@ -1860,6 +1875,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           `Crew found: ${crewName}`,
           `Discovered ${crewName} alive in ${getPlayerRoomName(state)}.${isSealed ? " Behind sealed emergency door." : ""}${isUnconscious ? " Currently in cryo-stasis." : ""}`,
           getPlayerRoomName(state),
+          targetId,
         );
 
         // Initialize/update evacuation state
@@ -2375,6 +2391,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             journalSummary,
             journalDetail,
             getPlayerRoomName(state),
+            targetId,
           );
         }
       }
