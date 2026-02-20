@@ -22,6 +22,7 @@ import {
   DRONE_ENCOUNTER_LOGS, DRONE_CLEANING_MESSAGE,
   TUTORIAL_HINTS_EARLY, TUTORIAL_HINT_FIRST_EVIDENCE, TUTORIAL_HINT_FIRST_DEDUCTION,
   TUTORIAL_HINT_INVESTIGATION, PRESSURE_ZONE_HINTS,
+  CREW_DISTRESS_HINT, BREACH_PROXIMITY_HINT,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction } from "./shared/types.js";
@@ -145,6 +146,8 @@ let firstDroneEncounterShown = false;
 const triggeredBotIntrospections = new Set<number>();
 const droneEncounterSet = new Set<string>(); // Track which drones have triggered unique encounter logs
 const triggeredTutorialHints = new Set<string>(); // Track which tutorial hints have been shown
+let crewDistressHintShown = false;
+let breachProximityHintShown = false;
 let cleanMsgIndex = 0;
 let lastAmbientRoomId = "";
 let journalOpen = false;
@@ -926,6 +929,42 @@ function handleAction(action: Action): void {
       if (tile && tile.pressure < 60 && tile.pressure > 0 && state.turn % 8 === 0) {
         const hintIdx = (px * 11 + py * 7) % PRESSURE_ZONE_HINTS.length;
         display.addLog(PRESSURE_ZONE_HINTS[hintIdx], "sensor");
+      }
+    }
+  }
+
+  // Pressure puzzle contextual hints (fire once each)
+  if (action.type === ActionType.Move && state.turn !== prevTurn) {
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+
+    // Crew-in-distress: warn when player approaches a decompressed room with living crew
+    if (!crewDistressHintShown) {
+      for (const [, entity] of state.entities) {
+        if (entity.type !== EntityType.CrewNPC) continue;
+        if (entity.props["evacuated"] === true || entity.props["dead"] === true) continue;
+        const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+        if (dist > 8) continue;
+        const crewTile = state.tiles[entity.pos.y]?.[entity.pos.x];
+        if (crewTile && crewTile.pressure < 30) {
+          display.addLog(CREW_DISTRESS_HINT, "warning");
+          crewDistressHintShown = true;
+          break;
+        }
+      }
+    }
+
+    // Breach proximity: hint when player is within 3 tiles of an unsealed breach
+    if (!breachProximityHintShown) {
+      for (const [, entity] of state.entities) {
+        if (entity.type !== EntityType.Breach) continue;
+        if (entity.props["sealed"] === true || entity.props["scanHidden"] === true) continue;
+        const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+        if (dist <= 3) {
+          display.addLog(BREACH_PROXIMITY_HINT, "system");
+          breachProximityHintShown = true;
+          break;
+        }
       }
     }
   }

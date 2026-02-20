@@ -273,6 +273,51 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
+  // Phase 2b2: Pressure puzzle — seal breaches blocking access to crew in decompressed rooms
+  {
+    // Find unsealed breaches that are blocking access to crew NPCs
+    for (const [, entity] of state.entities) {
+      if (entity.type !== EntityType.Breach) continue;
+      if (entity.props["sealed"] === true) continue;
+      if (entity.props["scanHidden"] === true) continue;
+
+      // Check if there's a crew NPC in the same decompressed room
+      const breachRoom = state.rooms.find(r =>
+        entity.pos.x >= r.x && entity.pos.x < r.x + r.width &&
+        entity.pos.y >= r.y && entity.pos.y < r.y + r.height,
+      );
+      if (!breachRoom) continue;
+
+      // Is the room decompressed? (pressure < 30 on breach tile)
+      const breachTile = state.tiles[entity.pos.y]?.[entity.pos.x];
+      if (!breachTile || breachTile.pressure >= 30) continue;
+
+      // Is there a living crew NPC in this room?
+      let hasCrewInRoom = false;
+      for (const [, crew] of state.entities) {
+        if (crew.type !== EntityType.CrewNPC) continue;
+        if (crew.props["evacuated"] === true || crew.props["dead"] === true) continue;
+        if (crew.pos.x >= breachRoom.x && crew.pos.x < breachRoom.x + breachRoom.width &&
+            crew.pos.y >= breachRoom.y && crew.pos.y < breachRoom.y + breachRoom.height) {
+          hasCrewInRoom = true;
+          break;
+        }
+      }
+      if (!hasCrewInRoom) continue;
+
+      // Found a breach blocking crew — seal it!
+      if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
+        return { type: ActionType.Interact, targetId: entity.id };
+      }
+      // Path to breach using allowDangerous (breach is on low-pressure tile)
+      const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+        manhattan({ x, y }, entity.pos) <= 1
+      ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+        manhattan({ x, y }, entity.pos) <= 1, true);
+      if (dir) return { type: ActionType.Move, direction: dir };
+    }
+  }
+
   // Phase 2c: Endgame — evacuate crew (primary) or data core fallback
   {
     const deds = state.mystery?.deductions ?? [];
@@ -303,6 +348,26 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
         // PRIMARY WIN PATH: evacuate all living crew
 
         if (hasFollowingCrew(state)) {
+          // Before heading to pod, recruit nearby found-not-following crew (batch pickup)
+          if (foundNotFollowing.length > 0) {
+            const nearbyCrew = foundNotFollowing.filter(c =>
+              manhattan({ x: px, y: py }, c.pos) <= 10
+            ).sort((a, b) =>
+              manhattan({ x: px, y: py }, a.pos) - manhattan({ x: px, y: py }, b.pos)
+            );
+            if (nearbyCrew.length > 0) {
+              const target = nearbyCrew[0];
+              if (manhattan({ x: px, y: py }, target.pos) <= 1) {
+                return { type: ActionType.Interact, targetId: target.id };
+              }
+              const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                manhattan({ x, y }, target.pos) <= 1
+              ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                manhattan({ x, y }, target.pos) <= 1, true);
+              if (dir) return { type: ActionType.Move, direction: dir };
+            }
+          }
+
           // Have crew following — find a powered pod with room
           const poweredPodId = findNearestPoweredPod(state);
           if (poweredPodId) {

@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 29 complete (Pressure Puzzle + Hazard Escalation)
+- **Phase**: Sprint 30 complete (Bot Pressure Puzzle + Routing Fixes)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -12,7 +12,7 @@
 - **Save key**: v3
 - **Turn limit**: 500 turns (warnings at 350/400/450, escalation at 200/300/400)
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 5/6 seeds VICTORY — 42 (110T), 7 (188T), 184201 (293T), 3 (370T), 5 (461T); 4 DEFEAT T500 (bot routing, not code issue)
+- **Playtest results**: 6/6 seeds VICTORY — 42 (188T), 7 (147T), 184201 (266T), 3 (254T), 5 (326T), 4 (171T)
 
 ## What Works
 
@@ -65,8 +65,20 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
-- Seed 4 consistently DEFEAT (bot routing inefficiency — spends too much time on relays during evacuation)
-- Pressure puzzle breach not yet solvable by bot (bot doesn't prioritize sealing breaches near crew NPCs)
+
+## Sprint 30 Changes
+
+### Bot Pressure Puzzle Solvability
+- **Breach-sealing phase (Phase 2b2)**: Bot now detects unsealed breaches in decompressed rooms containing living crew NPCs. Pathfinds to breach using `allowDangerous` (breach tiles have pressure 10), seals it, then room pressure recovers to 80 enabling safe crew rescue.
+- **All 6 seeds now solve pressure puzzle**: Bot seals `pressure_puzzle_breach` on every seed tested (T12-T86 depending on seed).
+
+### Bot Batch Crew Pickup
+- **Eliminated redundant round trips**: Before heading to escape pod with following crew, bot checks for found-not-following crew within 10 tiles and recruits them first. Seed 4 went from DEFEAT T500 → VICTORY T171 (was making 3 separate Cargo Hold → Pod Bay round trips).
+
+### Atmospheric Puzzle Clarity Hints
+- **Crew-in-distress warning**: One-time "WARNING: Life signs detected in a decompressed zone" when player approaches within 8 tiles of a living crew NPC in a low-pressure area (< 30).
+- **Breach proximity hint**: One-time "Hull breach detected nearby" when player is within 3 tiles of an unsealed breach. Directs player to interact.
+- **Pressure zone hints**: (Sprint 29) Periodic atmospheric sensor hints in low-pressure areas every 8 turns.
 
 ## Sprint 29 Changes
 
@@ -214,6 +226,8 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ## Recent Changes (Git History)
 
 ```
+2026-02-19        feat: sprint 30 — bot pressure puzzle + batch crew pickup + atmospheric hints
+2026-02-19        feat: sprint 29 — pressure puzzle + hazard escalation + atmospheric sensor hints
 2026-02-19        feat: sprint 28 — tag coverage guarantee + tag-aware bot evidence seeking
 2026-02-19        feat: sprint 27 — victory redesign (crew evacuation) + archetype hazard profiles
 2026-02-19        feat: sprint 26 — tension & turn economy (turn limit, HP warnings, bot rush)

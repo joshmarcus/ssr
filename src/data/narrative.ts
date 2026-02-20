@@ -162,6 +162,15 @@ export const PRESSURE_ZONE_HINTS: string[] = [
   "Pressure differential detected. The atmospheric sensor traces the leak — follow the gradient to find the breach source.",
 ];
 
+// ── Pressure puzzle contextual hints ─────────────────────────
+// Crew-in-distress warnings when player approaches a decompressed room with crew
+export const CREW_DISTRESS_HINT =
+  "WARNING: Life signs detected in a decompressed zone ahead. Seal the hull breach to restore pressure before entering.";
+
+// Breach proximity hint when player is near an unsealed breach
+export const BREACH_PROXIMITY_HINT =
+  "Hull breach detected nearby. Interact with the breach to deploy an emergency seal and restore atmospheric pressure.";
+
 // ── Tutorial hints (Sprint 11) ───────────────────────────────
 // Context-sensitive hints for new players. Each fires once.
 export interface TutorialHint {
