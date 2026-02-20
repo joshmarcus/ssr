@@ -1,10 +1,19 @@
 import * as ROT from "rot-js";
 import type { GameState, Entity, Room } from "../shared/types.js";
-import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from "../shared/types.js";
+import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase, IncidentArchetype } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HEAT_PAIN_THRESHOLD, MAX_TURNS, TURN_WARNING_THRESHOLD } from "../shared/constants.js";
 import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
 import type { IGameDisplay } from "./displayInterface.js";
+
+// ── Archetype display names for game-over screen ────────────────
+const ARCHETYPE_DISPLAY_NAMES: Record<IncidentArchetype, string> = {
+  [IncidentArchetype.CoolantCascade]: "THE WHISTLEBLOWER",
+  [IncidentArchetype.HullBreach]: "THE MURDER",
+  [IncidentArchetype.ReactorScram]: "THE ROGUE AI",
+  [IncidentArchetype.Sabotage]: "THE STOWAWAY",
+  [IncidentArchetype.SignalAnomaly]: "FIRST CONTACT",
+};
 
 // ── Log entry types for color-coding ────────────────────────────
 export type LogType = "system" | "narrative" | "warning" | "critical" | "milestone" | "sensor";
@@ -461,6 +470,9 @@ export class BrowserDisplay implements IGameDisplay {
           ${choicesHtml}
         </div>
         <div class="gameover-epilogue">${epilogue}</div>
+        <div style="text-align:center;margin:6px 0;color:#556;font-size:11px;font-family:monospace">
+          SEED ${state.seed} &middot; ${ARCHETYPE_DISPLAY_NAMES[state.mystery?.timeline.archetype as IncidentArchetype] ?? "UNKNOWN"}
+        </div>
         <div class="gameover-restart">Press [R] to restart</div>
       </div>`;
     overlay.classList.add("active");

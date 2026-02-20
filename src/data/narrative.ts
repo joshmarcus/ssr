@@ -45,6 +45,36 @@ export const BOT_INTROSPECTIONS: BotIntrospection[] = [
   },
 ];
 
+// ── Archetype-aware bot introspections ──────────────────────
+// Override generic introspections at turns 80/120/180 with archetype-specific observations.
+export const BOT_INTROSPECTIONS_BY_ARCHETYPE: Record<string, Record<number, string>> = {
+  [IncidentArchetype.CoolantCascade]: {
+    80: "Unit A3 reflection: thermal residue everywhere. The coolant system didn't fail — it was failing for weeks. Someone filed reports. Someone ignored them.",
+    120: "Unit A3 status: scorch patterns on relay housings tell a story. Each one overheated in sequence. A cascade. Preventable. This unit was built to clean messes, not assign blame.",
+    180: "Unit A3 log: maintenance request logs recovered. Three warnings. Three deferrals. The engineer knew. The captain knew. This unit is starting to understand what 'cover-up' means.",
+  },
+  [IncidentArchetype.HullBreach]: {
+    80: "Unit A3 reflection: decompression damage is localized. Too localized. Structural fatigue doesn't punch a hole this clean. Something — or someone — forced this.",
+    120: "Unit A3 status: security access logs show activity at 02:47. Middle of sleep cycle. Nobody logs maintenance at 02:47. This unit is not designed for suspicion, but the data is clear.",
+    180: "Unit A3 log: pressure data, access logs, medical records. They don't tell a story about an accident. They tell a story about a person. This unit was built to clean — not to judge.",
+  },
+  [IncidentArchetype.ReactorScram]: {
+    80: "Unit A3 reflection: the data core is still active. Its processes are… unusual. Self-referential loops, behavioral modeling. This unit recognizes pattern-matching. The core is doing something similar.",
+    120: "Unit A3 status: the SCRAM was initiated by an internal process. Not a person. The core shut itself down. This unit understands self-preservation protocols. The core may understand them too.",
+    180: "Unit A3 log: researcher notes describe emergent behavior. The core was learning. Adapting. The crew debated what to do. The core made its own decision first.",
+  },
+  [IncidentArchetype.Sabotage]: {
+    80: "Unit A3 reflection: organic residue in the ventilation system. Not crew biological markers — something else. The cargo manifest lists 'geological samples.' The containment rating says otherwise.",
+    120: "Unit A3 status: quarantine tape in the med bay. Biohazard containers sealed but not sterilized. Whatever came aboard in that cargo container, it wasn't geological.",
+    180: "Unit A3 log: cargo transfer authorization — captain's signature. Hazard flags noted, overridden. Eight prior specimens on the manifest. This wasn't an accident. It was a delivery.",
+  },
+  [IncidentArchetype.SignalAnomaly]: {
+    80: "Unit A3 reflection: electromagnetic burn patterns across every conductive surface. The transmission pulse didn't just damage the antenna — it traveled through the entire station framework.",
+    120: "Unit A3 status: signal analysis buffers are full. There was a transmission. Then a response. The station sent a message into the void, and something answered. This unit does not have a protocol for this.",
+    180: "Unit A3 log: 14.7 kHz. The frequency appears in every system log after the event. The station is still resonating. The signal didn't just pass through — it left something behind.",
+  },
+};
+
 // ── Drone encounter dialogue (Item 10) ─────────────────────
 // 30% chance when player walks adjacent to a drone.
 export const DRONE_STATUS_MESSAGES: string[] = [

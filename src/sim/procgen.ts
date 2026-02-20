@@ -993,23 +993,42 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
     }
   }
 
-  // ── Puzzle variation: seed determines which optional puzzles appear ──
-  // Use the seed to pick 1-2 optional puzzle types per run
+  // ── Puzzle variation: seed + archetype determine which optional puzzles appear ──
   const puzzleRng = ((state.seed * 2654435761) >>> 0) % 100;
+  const archetype = state.mystery?.timeline.archetype;
 
-  // Puzzle A: Pressure valve puzzle (appears ~60% of runs)
-  if (puzzleRng < 60) {
+  // Archetype-biased puzzle thresholds:
+  // CoolantCascade/HullBreach favor pressure puzzles (environmental hazards)
+  // ReactorScram/Sabotage favor power cell puzzles (systems/access)
+  // SignalAnomaly gets both more often (station-wide damage)
+  const pressureThreshold = archetype === IncidentArchetype.CoolantCascade ? 85
+    : archetype === IncidentArchetype.HullBreach ? 85
+    : archetype === IncidentArchetype.SignalAnomaly ? 75
+    : 60; // default
+  const powerCellFloor = archetype === IncidentArchetype.ReactorScram ? 15
+    : archetype === IncidentArchetype.Sabotage ? 15
+    : archetype === IncidentArchetype.SignalAnomaly ? 20
+    : 30; // default
+
+  // Puzzle A: Pressure valve puzzle
+  if (puzzleRng < pressureThreshold) {
     placePressureValvePuzzle(state, rooms, n, reservedRooms);
   }
 
-  // Puzzle B: Power cell / fuse box puzzle (appears ~60% of runs, different threshold)
-  if (puzzleRng >= 30) {
+  // Puzzle B: Power cell / fuse box puzzle
+  if (puzzleRng >= powerCellFloor) {
     placePowerCellPuzzle(state, rooms, n, reservedRooms);
   }
 
-  // ── Hostile patrol drones (1-3, seed-varied placement) ──────
+  // ── Hostile patrol drones (1-3, seed+archetype-varied placement) ──
   const droneCountRng = ((state.seed * 48271) >>> 0) % 100;
-  const patrolDroneCount = droneCountRng < 30 ? 1 : droneCountRng < 80 ? 2 : 3;
+  // Sabotage: more physical threats (creature scenario). ReactorScram: fewer (AI, not drones).
+  const droneBase = archetype === IncidentArchetype.Sabotage ? 1
+    : archetype === IncidentArchetype.ReactorScram ? -1
+    : 0;
+  const patrolDroneCount = Math.max(1, Math.min(3,
+    (droneCountRng < 30 ? 1 : droneCountRng < 80 ? 2 : 3) + droneBase
+  ));
   const patrolDroneExclude = new Set([0, 1, sensorIdx, dataCoreIdx]);
   // Vary starting rooms based on seed
   const droneStartOffset = ((state.seed * 16807) >>> 0) % Math.max(1, n - 4);

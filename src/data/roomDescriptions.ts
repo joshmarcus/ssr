@@ -18,7 +18,7 @@ export const ROOM_DESCRIPTIONS: Record<string, string> = {
     "Archive racks hum behind a heavy pressure door. The core bundle terminal blinks READY, waiting for a transmission that never came. Nine months of research, sealed and silent.",
 
   "Engineering Storage":
-    "Maintenance crates and replacement parts in careful rows. A thermal sensor module glints on a shelf, still factory-sealed. Vasquez's handwriting on a label: 'EMERGENCY USE.'",
+    "Maintenance crates and replacement parts in careful rows. A thermal sensor module glints on a shelf, still factory-sealed. Engineer's handwriting on a label: 'EMERGENCY USE.'",
 
   "Power Relay Junction":
     "A tangle of conduit and relay housings. One panel radiates visible heat shimmer; the air has a metallic, burnt taste. Scorch marks streak the wall behind P03.",
@@ -63,7 +63,7 @@ export const ROOM_DESCRIPTIONS: Record<string, string> = {
     "Rows of server racks generating a low drone. Temperature nominal — this section was isolated from the cascade. Data logs flicker across a wall-mounted status screen.",
 
   "Auxiliary Power":
-    "A backup generator sits idle, fuel cells full. A handwritten note taped to the housing: 'DO NOT ENGAGE WITHOUT AUTH — OKAFOR.' Someone underlined OKAFOR three times.",
+    "A backup generator sits idle, fuel cells full. A handwritten note taped to the housing: 'DO NOT ENGAGE WITHOUT AUTH — COMMAND.' Someone underlined COMMAND three times.",
 
   "Emergency Shelter":
     "A reinforced safe room. Sealed water stores, ration kits, emergency blankets — standard issue, untouched. The door log shows it was accessed at 15:12, then sealed from inside.",

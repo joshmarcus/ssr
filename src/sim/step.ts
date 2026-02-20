@@ -1,5 +1,5 @@
 import type { Action, GameState, Entity, LogEntry, Attachment, JournalEntry, Room, EvacuationState } from "../shared/types.js";
-import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType } from "../shared/types.js";
+import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType, CrewRole } from "../shared/types.js";
 import {
   GLYPHS, PATROL_DRONE_DAMAGE, PATROL_DRONE_STUN_TURNS, PATROL_DRONE_SPEED,
   PATROL_DRONE_ATTACK_COOLDOWN,
@@ -556,9 +556,10 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       newEntities.delete(targetId);
       next.entities = newEntities;
 
-      // Sensor-specific log messages
+      // Sensor-specific log messages (use actual crew names from mystery state)
+      const engineerName = state.mystery?.crew.find(c => c.role === CrewRole.Engineer)?.lastName || "Vasquez";
       const sensorLogMessages: Record<string, string> = {
-        [SensorType.Thermal]: "Thermal sensor module installed. Vasquez left this here — factory sealed, never used. Scan mode now available.",
+        [SensorType.Thermal]: `Thermal sensor module installed. ${engineerName} left this here — factory sealed, never used. Scan mode now available.`,
         [SensorType.Atmospheric]: "Atmospheric sensor module installed. Pressure differentials now visible. Breaches glow red on the overlay.",
       };
       const logMsg = sensorLogMessages[sensorType] || `${sensorType} sensor installed. Scan mode updated.`;
@@ -641,7 +642,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       // Per-relay narrative flavor
       const relayNarrative: Record<string, string> = {
         relay_p01: "Primary power distribution rerouted. Grid load rebalanced across backup conduits.",
-        relay_p03: "P03 rerouted — the relay Vasquez warned them about. Temperature dropping. The cascade is breaking.",
+        relay_p03: `P03 rerouted — the relay ${state.mystery?.crew.find(c => c.role === CrewRole.Engineer)?.lastName || "the engineer"} warned them about. Temperature dropping. The cascade is breaking.`,
         relay_p04: "Vent control relay rerouted. Dampers cycling open — smoke and heat clearing from the corridors.",
         heat_puzzle_relay: "Coolant bypass activated. Vents cycling open — temperature dropping rapidly across the section.",
       };
@@ -3506,8 +3507,8 @@ export function step(state: GameState, action: Action): GameState {
         const roomCleaningDiscoveries: Record<string, string> = {
           "Crew Quarters": "Under the dust: initials carved into the bunk frame. K.V. Someone marking their territory.",
           "Research Lab": "The floor under the grime is scored with equipment drag marks. They moved something heavy recently.",
-          "Communications Hub": "Cleaning reveals a sticky note behind a console: 'If Okafor asks, uplink was down for maintenance.'",
-          "Bridge": "Polishing the console reveals a coffee ring and a handwritten note: 'Check P03 temps — Vasquez.'",
+          "Communications Hub": `Cleaning reveals a sticky note behind a console: 'If ${state.mystery?.crew.find(c => c.role === CrewRole.Captain)?.lastName || "the captain"} asks, uplink was down for maintenance.'`,
+          "Bridge": `Polishing the console reveals a coffee ring and a handwritten note: 'Check P03 temps — ${state.mystery?.crew.find(c => c.role === CrewRole.Engineer)?.lastName || "Engineering"}.'`,
           "Engine Core": "Under the soot, scratch marks around the access panel. Someone pried it open without tools.",
           "Med Bay": "Cleaning the counter uncovers a patient log. Last entry: three names, two crossed out.",
           "Life Support": "Wiping the intake filter reveals it was deliberately clogged. Insulation foam, not dust.",

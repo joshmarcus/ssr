@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 33 complete (Environmental Storytelling)
+- **Phase**: Sprint 34 complete (Narrative Polish & Replayability)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -65,6 +65,34 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 34 Changes
+
+### Dynamic Crew Name References
+- **Fixed hardcoded "Vasquez" in sensor pickup**: Thermal sensor pickup message now uses the actual engineer name from the mystery state (e.g., "Gupta left this here" instead of always "Vasquez")
+- **Fixed relay P03 message**: "the relay [engineer] warned them about" uses actual crew name
+- **Fixed cleaning discoveries**: Communications Hub and Bridge cleaning discoveries use actual captain/engineer names instead of hardcoded "Okafor"/"Vasquez"
+- **Fixed room descriptions**: Engineering Storage and Auxiliary Power descriptions replaced "Vasquez" and "OKAFOR" with role-based references ("Engineer", "COMMAND")
+
+### Archetype-Aware Bot Introspections
+- **15 new introspection entries** (3 per archetype): At turns 80, 120, and 180, the janitor bot's self-reflections now reference the specific crisis it's investigating:
+  - CoolantCascade: coolant residue, relay housings, deferred maintenance requests
+  - HullBreach: localized decompression, security access logs at 02:47, forensic evidence
+  - ReactorScram: data core self-referential loops, autonomous SCRAM, emergent behavior
+  - Sabotage: organic residue in ventilation, quarantine tape, cargo transfer authorization
+  - SignalAnomaly: electromagnetic burn patterns, signal analysis buffers, 14.7 kHz resonance
+- **Generic fallbacks preserved**: Turns 20, 50, 240, 350 remain generic (bot's existential situation, not archetype-specific)
+
+### Post-Run Seed & Archetype Display
+- **Game-over screen now shows seed number and archetype subtitle**: e.g., "SEED 184201 · THE MURDER" or "SEED 42 · THE ROGUE AI"
+- Players can share and replay specific scenarios by seed
+
+### Variable Puzzle Density Per Archetype
+- **Archetype-biased puzzle selection**: Puzzle appearance thresholds now vary by archetype:
+  - CoolantCascade/HullBreach: 85% chance of pressure valve puzzle (environmental focus)
+  - ReactorScram/Sabotage: Power cell puzzle floor lowered to 15% (systems/access focus)
+  - SignalAnomaly: Both puzzles more likely (station-wide damage means more things broken)
+- **Archetype-biased drone count**: Sabotage gets +1 base drone (creature scenario), ReactorScram gets -1 (AI threat, not physical)
 
 ## Sprint 33 Changes
 

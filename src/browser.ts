@@ -18,7 +18,8 @@ import {
 } from "./data/endgame.js";
 import { getRoomDescription, getIncidentTrace } from "./data/roomDescriptions.js";
 import {
-  BOT_INTROSPECTIONS, DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
+  BOT_INTROSPECTIONS, BOT_INTROSPECTIONS_BY_ARCHETYPE,
+  DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
   AMBIENT_HEAT_MESSAGES, AMBIENT_HEAT_DEFAULT, CLEANING_MESSAGES, DIRT_TRAIL_HINTS,
   DRONE_ENCOUNTER_LOGS, DRONE_CLEANING_MESSAGE,
   TUTORIAL_HINTS_EARLY, TUTORIAL_HINT_FIRST_EVIDENCE, TUTORIAL_HINT_FIRST_DEDUCTION,
@@ -1030,11 +1031,14 @@ function handleAction(action: Action): void {
     }
   }
 
-  // Item 9: Bot introspection at turn milestones
+  // Item 9: Bot introspection at turn milestones (archetype-aware)
   for (const intro of BOT_INTROSPECTIONS) {
     if (state.turn >= intro.turn && !triggeredBotIntrospections.has(intro.turn)) {
       triggeredBotIntrospections.add(intro.turn);
-      display.addLog(intro.text, "narrative");
+      // Use archetype-specific introspection if available for this turn
+      const archetype = state.mystery?.timeline.archetype;
+      const archetypeText = archetype ? BOT_INTROSPECTIONS_BY_ARCHETYPE[archetype]?.[intro.turn] : undefined;
+      display.addLog(archetypeText || intro.text, "narrative");
     }
   }
 
