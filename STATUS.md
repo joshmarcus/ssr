@@ -4,16 +4,16 @@
 
 ## Current State
 
-- **Phase**: Sprint 55 complete (Sensor Clues, Background Music, TTS, Decisions Removal)
+- **Phase**: Sprint 56 complete (Ambient Events, Escort Reactions, Hazard Warnings, Turn Limit Increase)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
 - **Save key**: v7
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
-- **Turn limit**: Difficulty-scaled (Easy: 650, Normal: 500, Hard: 350) with proportional warnings at 70%/80%/90%
+- **Turn limit**: Difficulty-scaled (Easy: 1300, Normal: 1000, Hard: 700) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 7 (146T), 42 (191T), 100 (159T), 184201 (272T), 999 (153T) — all VICTORY on normal, all deductions correct
+- **Playtest results**: 42 (189T) VICTORY on normal, all deductions correct
 
 ## What Works
 
@@ -40,7 +40,7 @@
   - Post-answer narrative overlay (correct: revelation + reward + next unlock, incorrect: inconclusive)
   - ~100 authored revelation/synthesis/conclusion strings across 5 archetypes x 5-6 deduction tiers
 - Narrative threads grouping evidence
-- **Investigation Hub [r/v]**: unified 4-section overlay replacing old Evidence Browser + Broadcast Report
+- **Investigation Hub [r/v]**: unified 3-section overlay replacing old Evidence Browser + Broadcast Report
   - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, tags, thread)
   - CONNECTIONS: **split-pane deduction detail** with evidence list (left 40%) + full evidence text (right 60%)
     - Dual-focus navigation: Tab switches between evidence linking and answer selection
@@ -48,7 +48,6 @@
     - Synthesis block (gold): appears when all required tags covered
     - Linked evidence persists when navigating away
   - WHAT WE KNOW: auto-generated narrative prose summarizing investigation progress
-  - DECISIONS: spoiler-protected mystery choices (title-only list, prompt revealed on select)
 - Crew relationships displayed in evidence detail and connection linking views
 - Evidence minimap: proportional ASCII room map showing where evidence was found
 - Developer mode (?dev=1 or F5): clue graph annotations, full tag requirements, correct answers
@@ -82,6 +81,37 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 56 Changes
+
+### Turn Limit Increase
+- **Normal: 500 → 1000 turns**: Players have twice the time to explore and investigate
+- **Easy: 650 → 1300, Hard: 350 → 700**: Proportional scaling across all difficulties
+- **Warning thresholds updated**: 70%/80%/90% proportional warnings remain at correct ratios
+
+### Room Ambient Micro-Events
+- **40+ atmospheric one-liners**: 10 room types (Engine Core, Data Core, Life Support, Med Bay, Crew Quarters, Cargo Hold, Power Relay Junction, Research Lab, Communications Hub, Bridge) each have 3-4 unique ambient events
+- **4 generic fallback events**: For rooms without specific entries
+- **Trigger**: Fire every 7 turns while lingering in the same room — rewards careful investigation with atmospheric flavor
+- **Deterministic selection**: Event picked via turn + room name hash for reproducibility
+
+### Crew Escort Personality Reactions
+- **20 contextual dialogue lines**: 5 personalities × 4 contexts (heat, smoke, low-pressure, quiet)
+- **Context-sensitive**: Reactions change based on tile conditions — crew comments on heat, smoke, decompression, or eerie silence
+- **Personality-flavored**: Cautious crew flinch and worry, Ambitious crew push forward, Loyal crew ask about others, Secretive crew hint at hidden truths, Pragmatic crew give practical advice
+- **Fire every 10 turns**: While a crew member is following, one reaction per tick
+
+### Hazard Proximity Warnings
+- **Adjacent tile scanning**: When moving into a safe tile, warns if adjacent tiles have dangerous heat (≥35) or dense smoke (≥40)
+- **Rate-limited**: Only fires every 4th turn to avoid spam
+- **Only from safe tiles**: Won't trigger when already in hazardous area (redundant with existing hazard feedback)
+
+### Post-Run Seed Sharing
+- **[C] Copy Run on game-over**: Generates formatted run summary with seed, archetype, rating, stats, and deduction results
+- **Clipboard integration**: One-keypress sharing for social/community runs
+
+### Music Volume
+- **Background music volume lowered**: 0.12 → 0.06 for better balance with SFX and TTS
 
 ## Sprint 55 Changes
 
@@ -434,9 +464,9 @@
 ### Difficulty Scaling (Easy / Normal / Hard)
 - **New `Difficulty` enum** with 3 levels, parsed from `?difficulty=easy|hard` URL param
 - **Per-difficulty modifiers**:
-  - Easy: 650 turns, 1400 HP, 0.6x damage, deterioration every 35 turns
-  - Normal: 500 turns, 1000 HP, 1.0x damage, deterioration every 25 turns
-  - Hard: 350 turns, 750 HP, 1.5x damage, deterioration every 18 turns
+  - Easy: 1300 turns, 1400 HP, 0.6x damage, deterioration every 35 turns
+  - Normal: 1000 turns, 1000 HP, 1.0x damage, deterioration every 25 turns
+  - Hard: 700 turns, 750 HP, 1.5x damage, deterioration every 18 turns
 - **Proportional turn warnings** at 70%/80%/90% of max turns (instead of fixed thresholds)
 - Damage multiplier applies to heat damage, pressure damage, and patrol drone attacks
 - Archetype deterioration overrides stack with difficulty base (ReactorScram still gets -5)
