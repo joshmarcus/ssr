@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 56 complete (Ambient Events, Escort Reactions, Hazard Warnings, Turn Limit Increase)
+- **Phase**: Sprint 57 complete (Onboarding, Deduction Ceremony, Escort Arcs, Corridor Ambience)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -81,6 +81,30 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 57 Changes
+
+### Compact Onboarding
+- **Boot sequence reduced**: 6 log lines → 3 on game start (LINK ACTIVE, atmosphere line, controls hint)
+- **Action-triggered tutorials**: First interact/scan/clean now fire contextual tips instead of time-based hints at turns 3/8/15
+- **Less log flood**: New players see 3 lines before first move instead of 8+
+
+### Deduction Answer Ceremony
+- **CORVUS-7 post-deduction commentary**: When revelation overlay is dismissed, tier-specific CORVUS-7 commentary fires
+- **9 deduction tiers covered**: Each of what/who/when/where/how/why/hero/responsibility/agenda has unique correct and wrong lines
+- **Emotional weight**: Lines acknowledge the specific type of discovery — "The one who fought back. Identified." (hero), "The deeper truth revealed." (agenda)
+
+### Crew Escort 3-Step Dialogue Arcs
+- **Sequential personality arcs**: Each of 5 personality traits has a 3-step sequence (reaction → opening up → emotional payoff)
+- **Character development during escort**: Cautious crew admit they filed a prescient concern report; Ambitious crew decide to tell the truth; Loyal crew beg you to tell the others they tried; Secretive crew hand you a stolen data chip; Pragmatic crew acknowledge the bot's personhood
+- **15 authored dialogue lines** replacing flat context-pool reactions
+- **Tracked per crew member**: `escortArcSteps` Map ensures each NPC progresses through their own arc
+
+### Corridor Transit Ambient Text
+- **12 atmospheric corridor one-liners**: Fire once per corridor segment (4-tile buckets)
+- **Environmental storytelling**: Scorch marks, abandoned tools, buckling support beams, dripping condensation, personal photos
+- **Milestone-gated**: Each corridor segment fires once, preventing repetition
+- **Fills the silence**: Addresses the ~40% of turns spent moving between rooms
 
 ## Sprint 56 Changes
 
