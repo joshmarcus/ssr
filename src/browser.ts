@@ -21,7 +21,7 @@ import {
   AMBIENT_HEAT_MESSAGES, AMBIENT_HEAT_DEFAULT, CLEANING_MESSAGES, DIRT_TRAIL_HINTS,
   DRONE_ENCOUNTER_LOGS, DRONE_CLEANING_MESSAGE,
   TUTORIAL_HINTS_EARLY, TUTORIAL_HINT_FIRST_EVIDENCE, TUTORIAL_HINT_FIRST_DEDUCTION,
-  TUTORIAL_HINT_INVESTIGATION,
+  TUTORIAL_HINT_INVESTIGATION, PRESSURE_ZONE_HINTS,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction } from "./shared/types.js";
@@ -912,6 +912,20 @@ function handleAction(action: Action): void {
       const hintIdx = (px * 7 + py * 13) % DIRT_TRAIL_HINTS.length;
       if (tile.dirt > 60 && state.turn % 5 === 0) {
         display.addLog(DIRT_TRAIL_HINTS[hintIdx], "sensor");
+      }
+    }
+  }
+
+  // Atmospheric sensor pressure zone hints
+  if (action.type === ActionType.Move && state.turn !== prevTurn) {
+    const hasAtmospheric = state.player.sensors?.includes(SensorType.Atmospheric) ?? false;
+    if (hasAtmospheric) {
+      const px = state.player.entity.pos.x;
+      const py = state.player.entity.pos.y;
+      const tile = state.tiles[py]?.[px];
+      if (tile && tile.pressure < 60 && tile.pressure > 0 && state.turn % 8 === 0) {
+        const hintIdx = (px * 11 + py * 7) % PRESSURE_ZONE_HINTS.length;
+        display.addLog(PRESSURE_ZONE_HINTS[hintIdx], "sensor");
       }
     }
   }

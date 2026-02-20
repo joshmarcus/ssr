@@ -4,15 +4,15 @@
 
 ## Current State
 
-- **Phase**: Sprint 28 complete (Tag Coverage & Evidence Intelligence)
+- **Phase**: Sprint 29 complete (Pressure Puzzle + Hazard Escalation)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
 - **Save key**: v3
-- **Turn limit**: 500 turns (warnings at 350/400/450)
+- **Turn limit**: 500 turns (warnings at 350/400/450, escalation at 200/300/400)
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: All 6 seeds VICTORY — 42 (110T), 4 (166T), 7 (146T), 184201 (245T), 3 (370T), 5 (497T)
+- **Playtest results**: 5/6 seeds VICTORY — 42 (110T), 7 (188T), 184201 (293T), 3 (370T), 5 (461T); 4 DEFEAT T500 (bot routing, not code issue)
 
 ## What Works
 
@@ -65,7 +65,26 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
-- Atmospheric sensor has no required puzzle gate (provides visibility + damage reduction but not mandatory)
+- Seed 4 consistently DEFEAT (bot routing inefficiency — spends too much time on relays during evacuation)
+- Pressure puzzle breach not yet solvable by bot (bot doesn't prioritize sealing breaches near crew NPCs)
+
+## Sprint 29 Changes
+
+### Pressure Puzzle for Atmospheric Sensor
+- **Decompressed crew rescue room**: One crew NPC is placed in a separate mid-station room with a hull breach draining pressure to 25 (dangerous zone). Breach is placed near the room entrance (adjacent to door tile), accessible from the corridor.
+- **Room-wide pressure restoration on breach seal**: Sealing any breach now restores pressure to 80 across the entire room (not just the breach tile). Fixes pressure-gated gameplay where only the breach tile recovered.
+- **Scan-hidden breach support**: Extended scan reveal logic and breach interaction handler to support `scanHidden` on Breach entities (not just EvidenceTrace). Atmospheric scan now reveals hidden breaches with "hull breach revealed nearby" message.
+- **Breach entity exhaustion**: Scan-hidden breaches are treated as exhausted (not auto-targeted) until revealed by scanning.
+
+### Mid-Game Hazard Escalation
+- **3-tier escalation system**: Station conditions worsen at milestones:
+  - **T200 (Tier 1)**: "SECONDARY FAILURE" PA announcement. Heat boost increased, more smoke spawns.
+  - **T300 (Tier 2)**: "CASCADE FAILURE" PA. New breach spawns in a random room. Escalated hazard rates.
+  - **T400 (Tier 3)**: "CRITICAL FAILURE" PA. All hazard rates at maximum. Station breaking apart.
+- **Scaled deterioration**: Heat boost and smoke spawn count increase with escalation tier. Tier-appropriate warning messages replace generic deterioration text.
+
+### Atmospheric Sensor Tutorial Hints
+- **Pressure zone hints**: When player has atmospheric sensor and enters a low-pressure area (< 60), contextual hints explain the pressure system and breach mechanics. Fires every 8 turns in low-pressure zones.
 
 ## Sprint 28 Changes
 

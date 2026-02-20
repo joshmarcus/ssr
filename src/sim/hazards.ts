@@ -230,43 +230,66 @@ export function tickHazards(state: GameState): GameState {
   return { ...state, tiles: newTiles };
 }
 
+// ── Escalation milestones ────────────────────────────────────
+const ESCALATION_TIER_1 = 200; // secondary failure
+const ESCALATION_TIER_2 = 300; // cascade failure
+const ESCALATION_TIER_3 = 400; // critical failure
+
+function getEscalationTier(turn: number): number {
+  if (turn >= ESCALATION_TIER_3) return 3;
+  if (turn >= ESCALATION_TIER_2) return 2;
+  if (turn >= ESCALATION_TIER_1) return 1;
+  return 0;
+}
+
 /**
  * Station deterioration: every DETERIORATION_INTERVAL turns, the station gets worse.
  * Heat sources get hotter, smoke spawns in corridors, breaches widen.
+ * Escalation tiers at T200, T300, T400 create dramatic mid/late-game tension.
  */
 export function tickDeterioration(state: GameState): GameState {
   const interval = state.deteriorationInterval ?? DETERIORATION_INTERVAL;
-  if (state.turn === 0 || state.turn % interval !== 0) return state;
+  let next = state;
 
-  const newTiles = cloneTiles(state.tiles);
-  const newLogs = [...state.logs];
+  // ── One-time escalation milestone events ──────────────────
+  next = checkEscalationMilestones(next);
+
+  if (state.turn === 0 || state.turn % interval !== 0) return next;
+
+  const newTiles = cloneTiles(next.tiles);
+  const newLogs = [...next.logs];
+  const tier = getEscalationTier(next.turn);
+
+  // Heat boost scales with escalation tier
+  const heatBoost = DETERIORATION_HEAT_BOOST + tier;
+  const adjacentBoost = Math.ceil(heatBoost / 2);
 
   // Boost heat at all source tiles (escalation — heat zones grow faster over time)
-  for (const [, entity] of state.entities) {
+  for (const [, entity] of next.entities) {
     if (entity.type === EntityType.Relay && entity.props["overheating"] === true) {
       const { x, y } = entity.pos;
-      if (y >= 0 && y < state.height && x >= 0 && x < state.width) {
-        newTiles[y][x].heat = Math.min(100, newTiles[y][x].heat + DETERIORATION_HEAT_BOOST);
-        // Also boost adjacent tiles to make zones grow
+      if (y >= 0 && y < next.height && x >= 0 && x < next.width) {
+        newTiles[y][x].heat = Math.min(100, newTiles[y][x].heat + heatBoost);
         for (const d of ADJACENT_DELTAS) {
           const nx = x + d.x;
           const ny = y + d.y;
-          if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height && newTiles[ny][nx].walkable) {
-            newTiles[ny][nx].heat = Math.min(100, newTiles[ny][nx].heat + Math.ceil(DETERIORATION_HEAT_BOOST / 2));
+          if (nx >= 0 && nx < next.width && ny >= 0 && ny < next.height && newTiles[ny][nx].walkable) {
+            newTiles[ny][nx].heat = Math.min(100, newTiles[ny][nx].heat + adjacentBoost);
           }
         }
       }
     }
   }
 
-  // Spawn smoke in random corridor tiles near hot zones
-  const rng = ((state.turn * 7919 + state.seed) >>> 0) % 2147483647;
+  // Spawn smoke — more aggressively at higher tiers
+  const rng = ((next.turn * 7919 + next.seed) >>> 0) % 2147483647;
+  const maxSmoke = 3 + tier;
   let smokeCount = 0;
-  for (let y = 0; y < state.height && smokeCount < 3; y++) {
-    for (let x = 0; x < state.width && smokeCount < 3; x++) {
+  for (let y = 0; y < next.height && smokeCount < maxSmoke; y++) {
+    for (let x = 0; x < next.width && smokeCount < maxSmoke; x++) {
       if (newTiles[y][x].walkable && newTiles[y][x].heat > 10 && newTiles[y][x].smoke < 20) {
         const hash = ((x * 31 + y * 17 + rng) >>> 0) % 10;
-        if (hash < 2) {
+        if (hash < 2 + tier) {
           newTiles[y][x].smoke = Math.min(100, newTiles[y][x].smoke + DETERIORATION_SMOKE_SPAWN);
           smokeCount++;
         }
@@ -274,24 +297,119 @@ export function tickDeterioration(state: GameState): GameState {
     }
   }
 
-  // Warning message
-  const deteriorationMsgs = [
+  // Warning message — tier-appropriate
+  const deteriorationMsgs = tier >= 2 ? [
+    "CRITICAL: Station structural integrity compromised. Multiple system failures.",
+    "EMERGENCY: Cascade failure across all sectors. Evacuate immediately.",
+    "WARNING: Station is breaking apart. Environmental containment lost.",
+  ] : [
     "Station systems degrading. Thermal containment failing.",
     "Emergency: Heat signatures expanding. Environmental controls offline.",
     "WARNING: Station conditions declining. Environmental systems degrading.",
     "Automated alert: Ambient temperature rising across multiple sectors.",
     "Cascade failure detected. Heat management systems non-responsive.",
   ];
-  const msgIdx = Math.floor(state.turn / interval) % deteriorationMsgs.length;
+  const msgIdx = Math.floor(next.turn / interval) % deteriorationMsgs.length;
   newLogs.push({
-    id: `log_deterioration_${state.turn}`,
-    timestamp: state.turn,
+    id: `log_deterioration_${next.turn}`,
+    timestamp: next.turn,
     source: "system",
     text: deteriorationMsgs[msgIdx],
     read: false,
   });
 
-  return { ...state, tiles: newTiles, logs: newLogs };
+  return { ...next, tiles: newTiles, logs: newLogs };
+}
+
+/**
+ * Check and fire one-time escalation milestone events.
+ * Each milestone fires exactly once on the exact turn.
+ */
+function checkEscalationMilestones(state: GameState): GameState {
+  if (state.turn !== ESCALATION_TIER_1 &&
+      state.turn !== ESCALATION_TIER_2 &&
+      state.turn !== ESCALATION_TIER_3) {
+    return state;
+  }
+
+  const newLogs = [...state.logs];
+
+  if (state.turn === ESCALATION_TIER_1) {
+    // Tier 1: Warning — heat zones expand, dramatic PA
+    newLogs.push({
+      id: `log_escalation_tier1`,
+      timestamp: state.turn,
+      source: "system",
+      text: "⚠ SECONDARY FAILURE DETECTED — Thermal containment backup has failed. Heat zones expanding. Recommend immediate hazard avoidance.",
+      read: false,
+    });
+    return { ...state, logs: newLogs };
+  }
+
+  if (state.turn === ESCALATION_TIER_2) {
+    // Tier 2: New breach spawns in a random unexplored room
+    const newEntities = new Map(state.entities);
+    const newTiles = cloneTiles(state.tiles);
+
+    // Find a room that doesn't already have a breach and isn't the start room
+    let breachSpawned = false;
+    const rng = ((state.turn * 1337 + state.seed) >>> 0);
+    for (let i = 0; i < state.rooms.length && !breachSpawned; i++) {
+      const ri = (rng + i) % state.rooms.length;
+      const room = state.rooms[ri];
+      if (room.name === "Arrival Bay" || room.name === "Escape Pod Bay") continue;
+
+      // Check for existing breaches in this room
+      let hasBreach = false;
+      for (const [, entity] of newEntities) {
+        if (entity.type === EntityType.Breach &&
+            entity.pos.x >= room.x && entity.pos.x < room.x + room.width &&
+            entity.pos.y >= room.y && entity.pos.y < room.y + room.height) {
+          hasBreach = true;
+          break;
+        }
+      }
+      if (hasBreach) continue;
+
+      // Find a walkable tile in the room
+      const cx = Math.floor(room.x + room.width / 2);
+      const cy = Math.floor(room.y + room.height / 2);
+      if (cy >= 0 && cy < state.height && cx >= 0 && cx < state.width && newTiles[cy][cx].walkable) {
+        newEntities.set(`cascade_breach_${state.turn}`, {
+          id: `cascade_breach_${state.turn}`,
+          type: EntityType.Breach,
+          pos: { x: cx, y: cy },
+          props: { sealed: false },
+        });
+        newTiles[cy][cx].pressure = 20;
+        breachSpawned = true;
+      }
+    }
+
+    newLogs.push({
+      id: `log_escalation_tier2`,
+      timestamp: state.turn,
+      source: "system",
+      text: "⚠ CASCADE FAILURE — New hull breach detected. Pressure dropping in additional sectors. Station structural integrity declining rapidly.",
+      read: false,
+    });
+
+    return { ...state, entities: newEntities, tiles: newTiles, logs: newLogs };
+  }
+
+  if (state.turn === ESCALATION_TIER_3) {
+    // Tier 3: Final escalation warning — all hazards at maximum
+    newLogs.push({
+      id: `log_escalation_tier3`,
+      timestamp: state.turn,
+      source: "system",
+      text: "⚠ CRITICAL FAILURE — Station is breaking apart. All environmental systems offline. Complete evacuation required. Time is running out.",
+      read: false,
+    });
+    return { ...state, logs: newLogs };
+  }
+
+  return state;
 }
 
 /**

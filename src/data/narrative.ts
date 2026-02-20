@@ -153,6 +153,15 @@ export const DIRT_TRAIL_HINTS: string[] = [
   "The dirt concentration peaks here. A gathering point, or a bottleneck. People stopped, then moved on together.",
 ];
 
+// ── Atmospheric sensor pressure hints ────────────────────────
+// When atmospheric sensor is active, low-pressure areas reveal environmental hints.
+export const PRESSURE_ZONE_HINTS: string[] = [
+  "Pressure dropping. The atmospheric sensor highlights a gradient — there's a breach nearby pulling air out of this section.",
+  "Low-pressure zone. Joints in the station frame are groaning. Seal any breaches to restore atmospheric containment.",
+  "Atmospheric pressure critical in this area. The sensor overlay shows the decompression pattern radiating from a hull breach.",
+  "Pressure differential detected. The atmospheric sensor traces the leak — follow the gradient to find the breach source.",
+];
+
 // ── Tutorial hints (Sprint 11) ───────────────────────────────
 // Context-sensitive hints for new players. Each fires once.
 export interface TutorialHint {

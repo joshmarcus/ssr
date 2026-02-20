@@ -64,7 +64,7 @@ function getInteractableEntities(state: GameState): Entity[] {
 function isEntityExhausted(entity: Entity, state: GameState): boolean {
   switch (entity.type) {
     case EntityType.Breach:
-      return entity.props["sealed"] === true;
+      return entity.props["sealed"] === true || entity.props["scanHidden"] === true;
     case EntityType.MedKit:
       return entity.props["used"] === true;
     case EntityType.Relay:
@@ -1006,6 +1006,10 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
     }
 
     case EntityType.Breach: {
+      // Scan-hidden breaches can't be interacted with until revealed by scanning
+      if (target.props["scanHidden"] === true) {
+        break;
+      }
       // Seal a breach — requires atmospheric sensor equipped
       if (target.props["sealed"] === true) {
         next.logs = [
@@ -1027,9 +1031,32 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         });
         next.entities = newEntities;
 
-        // Restore pressure on breach tile
+        // Restore pressure in the breach's room (or 8-tile radius if no room found)
         const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
-        newTiles[target.pos.y][target.pos.x].pressure = 80;
+        const breachRoom = state.rooms.find(r =>
+          target.pos.x >= r.x && target.pos.x < r.x + r.width &&
+          target.pos.y >= r.y && target.pos.y < r.y + r.height,
+        );
+        if (breachRoom) {
+          for (let dy = breachRoom.y - 1; dy < breachRoom.y + breachRoom.height + 1; dy++) {
+            for (let dx = breachRoom.x - 1; dx < breachRoom.x + breachRoom.width + 1; dx++) {
+              if (dx >= 0 && dx < state.width && dy >= 0 && dy < state.height) {
+                newTiles[dy][dx].pressure = Math.max(newTiles[dy][dx].pressure, 80);
+              }
+            }
+          }
+        } else {
+          // Fallback: restore in 8-tile radius
+          for (let dy = -8; dy <= 8; dy++) {
+            for (let dx = -8; dx <= 8; dx++) {
+              const rx = target.pos.x + dx;
+              const ry = target.pos.y + dy;
+              if (rx >= 0 && rx < state.width && ry >= 0 && ry < state.height) {
+                newTiles[ry][rx].pressure = Math.max(newTiles[ry][rx].pressure, 80);
+              }
+            }
+          }
+        }
         next.tiles = newTiles;
 
         next.logs = [
@@ -2438,9 +2465,9 @@ function handleScan(state: GameState): GameState {
     }
   }
 
-  // Reveal scan-hidden evidence traces in the current room
+  // Reveal scan-hidden entities (evidence traces, breaches) in the current room
   for (const [id, entity] of newEntities) {
-    if (entity.type !== EntityType.EvidenceTrace) continue;
+    if (entity.type !== EntityType.EvidenceTrace && entity.type !== EntityType.Breach) continue;
     if (entity.props["scanHidden"] !== true) continue;
     if (entity.props["scanRevealed"] === true) continue;
 
@@ -2465,11 +2492,12 @@ function handleScan(state: GameState): GameState {
 
     const sensorName = sensorReq === SensorType.Thermal ? "thermal" :
       sensorReq === SensorType.Atmospheric ? "atmospheric" : "sensor";
+    const anomalyType = entity.type === EntityType.Breach ? "hull breach" : "evidence trace";
     scanLogs.push({
       id: `log_scan_reveal_${id}_${state.turn}`,
       timestamp: state.turn,
       source: "sensor",
-      text: `${sensorName[0].toUpperCase() + sensorName.slice(1)} scan detected anomaly — new evidence trace revealed nearby.`,
+      text: `${sensorName[0].toUpperCase() + sensorName.slice(1)} scan detected anomaly — ${anomalyType} revealed nearby.`,
       read: false,
     });
   }

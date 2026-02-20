@@ -1543,7 +1543,102 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
     }
   }
 
-  // Place all crew NPCs inside the Cargo Hold
+  // ── Pressure puzzle crew rescue: split 1 crew NPC to a decompressed room ──
+  // Puzzle: room has a breach draining pressure. Player must seal the breach
+  // (interactable from corridor through the doorway), pressure recovers across
+  // the room, then it's safe to enter and rescue the crew.
+  let pressureCrewMember: typeof npcCandidates[0] | null = null;
+  if (npcCandidates.length >= 2 && n >= 8) {
+    pressureCrewMember = npcCandidates.pop()!;
+
+    // Find a suitable mid-station room (not Cargo Hold, not reserved)
+    const reservedRooms = new Set([cargoHoldIdx, podBayIdx, 0]);
+    let pressureRoomIdx = -1;
+    for (let ri = Math.floor(n * 0.3); ri <= Math.floor(n * 0.6); ri++) {
+      if (reservedRooms.has(ri)) continue;
+      const roomName = state.rooms[ri].name;
+      if (roomName === "Cargo Hold" || roomName === "Escape Pod Bay" || roomName === "Arrival Bay") continue;
+      pressureRoomIdx = ri;
+      break;
+    }
+
+    if (pressureRoomIdx >= 0) {
+      const pressureRoom = rooms[pressureRoomIdx];
+      const crewPos = getRoomPos(pressureRoom, 0, 0);
+      const isUnconscious = pressureCrewMember.fate === CrewFate.InCryo;
+
+      // Place the crew NPC deep in the room
+      state.entities.set(`crew_npc_${pressureCrewMember.id}`, {
+        id: `crew_npc_${pressureCrewMember.id}`,
+        type: EntityType.CrewNPC,
+        pos: crewPos,
+        props: {
+          crewId: pressureCrewMember.id,
+          found: false,
+          following: false,
+          evacuated: false,
+          dead: false,
+          sealed: false,
+          hp: 200,
+          unconscious: isUnconscious,
+          firstName: pressureCrewMember.firstName,
+          lastName: pressureCrewMember.lastName,
+          personality: pressureCrewMember.personality,
+        },
+      });
+
+      // Find a door tile at the room entrance to place the breach nearby
+      let breachPos: { x: number; y: number } | null = null;
+      for (let x = pressureRoom.getLeft(); x <= pressureRoom.getRight() && !breachPos; x++) {
+        for (let y = pressureRoom.getTop(); y <= pressureRoom.getBottom() && !breachPos; y++) {
+          if (x < 0 || x >= state.width || y < 0 || y >= state.height) continue;
+          if (!state.tiles[y][x].walkable) continue;
+          // Check if this tile is adjacent to a door
+          const dirs = [{ dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 }];
+          for (const d of dirs) {
+            const nx = x + d.dx;
+            const ny = y + d.dy;
+            if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height) {
+              if (state.tiles[ny][nx].type === TileType.Door) {
+                breachPos = { x, y };
+                break;
+              }
+            }
+          }
+        }
+      }
+      // Fallback: place near room entrance
+      if (!breachPos) {
+        breachPos = getRoomPos(pressureRoom, -1, -1);
+      }
+
+      state.entities.set("pressure_puzzle_breach", {
+        id: "pressure_puzzle_breach",
+        type: EntityType.Breach,
+        pos: breachPos,
+        props: { sealed: false },
+      });
+
+      // Drop pressure in the room to create the hazard
+      for (let dy = pressureRoom.getTop(); dy <= pressureRoom.getBottom(); dy++) {
+        for (let dx = pressureRoom.getLeft(); dx <= pressureRoom.getRight(); dx++) {
+          if (dx < 0 || dx >= state.width || dy < 0 || dy >= state.height) continue;
+          if (!state.tiles[dy][dx].walkable) continue;
+          state.tiles[dy][dx].pressure = 25;
+        }
+      }
+      // Breach tile gets very low pressure
+      if (breachPos.y >= 0 && breachPos.y < state.height &&
+          breachPos.x >= 0 && breachPos.x < state.width) {
+        state.tiles[breachPos.y][breachPos.x].pressure = 10;
+      }
+    } else {
+      npcCandidates.push(pressureCrewMember);
+      pressureCrewMember = null;
+    }
+  }
+
+  // Place remaining crew NPCs inside the Cargo Hold
   let npcCount = 0;
   for (const member of npcCandidates) {
     const offsetX = (npcCount % 3) - 1; // -1, 0, 1
@@ -1561,7 +1656,7 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
         following: false,
         evacuated: false,
         dead: false,
-        sealed: false, // no longer individually sealed — the room door is locked instead
+        sealed: false,
         hp: 200,
         unconscious: isUnconscious,
         firstName: member.firstName,
