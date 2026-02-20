@@ -24,7 +24,7 @@ import {
   TUTORIAL_HINT_INVESTIGATION,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
-import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory } from "./shared/types.js";
+import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction } from "./shared/types.js";
 import { computeChoiceEndings } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence, getTagExplanation } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
@@ -191,6 +191,149 @@ const WAIT_MESSAGES_HOT = [
 ];
 let waitMsgIndex = 0;
 
+// ── Auto-explore state ─────────────────────────────────────────
+let autoExploring = false;
+let autoExploreTimer: ReturnType<typeof setTimeout> | null = null;
+const AUTO_EXPLORE_DELAY = 80; // ms between auto-steps
+
+/** Stop auto-explore mode. */
+function stopAutoExplore(): void {
+  autoExploring = false;
+  if (autoExploreTimer) {
+    clearTimeout(autoExploreTimer);
+    autoExploreTimer = null;
+  }
+}
+
+/** BFS to find direction toward nearest unexplored walkable tile. */
+function autoExploreBFS(): Direction | null {
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  const key = (x: number, y: number) => `${x},${y}`;
+
+  // BFS from player position
+  const visited = new Set<string>();
+  const queue: { x: number; y: number; firstDir: Direction }[] = [];
+
+  const dirs: { dx: number; dy: number; dir: Direction }[] = [
+    { dx: 0, dy: -1, dir: Direction.North },
+    { dx: 0, dy: 1, dir: Direction.South },
+    { dx: -1, dy: 0, dir: Direction.West },
+    { dx: 1, dy: 0, dir: Direction.East },
+    { dx: -1, dy: -1, dir: Direction.NorthWest },
+    { dx: 1, dy: -1, dir: Direction.NorthEast },
+    { dx: -1, dy: 1, dir: Direction.SouthWest },
+    { dx: 1, dy: 1, dir: Direction.SouthEast },
+  ];
+
+  visited.add(key(px, py));
+  for (const { dx, dy, dir } of dirs) {
+    const nx = px + dx;
+    const ny = py + dy;
+    if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
+    if (!state.tiles[ny][nx].walkable) continue;
+    visited.add(key(nx, ny));
+    queue.push({ x: nx, y: ny, firstDir: dir });
+  }
+
+  let head = 0;
+  while (head < queue.length) {
+    const { x, y, firstDir } = queue[head++];
+    const tile = state.tiles[y][x];
+
+    // Goal: an unexplored walkable tile
+    if (!tile.explored) {
+      return firstDir;
+    }
+
+    for (const { dx, dy } of dirs) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
+      const k = key(nx, ny);
+      if (visited.has(k)) continue;
+      if (!state.tiles[ny][nx].walkable) continue;
+      visited.add(k);
+      queue.push({ x: nx, y: ny, firstDir });
+    }
+  }
+
+  return null; // no unexplored tiles reachable
+}
+
+/** Check if there are non-exhausted interactable entities adjacent to player. */
+function hasAdjacentInteractable(): boolean {
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  const deltas = [
+    { x: 0, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 },
+    { x: -1, y: 0 }, { x: 1, y: 0 },
+  ];
+  for (const [id, ent] of state.entities) {
+    if (id === "player") continue;
+    for (const d of deltas) {
+      if (ent.pos.x === px + d.x && ent.pos.y === py + d.y) {
+        // Check if not exhausted using simple heuristics
+        if (ent.type === EntityType.SensorPickup && ent.props["collected"] !== true) return true;
+        if (ent.type === EntityType.Relay && ent.props["activated"] !== true && ent.props["locked"] !== true) return true;
+        if (ent.type === EntityType.LogTerminal && !state.logs.some(l => l.id === `log_terminal_${ent.id}`)) return true;
+        if (ent.type === EntityType.DataCore) return true;
+        if (ent.type === EntityType.CrewNPC && ent.props["evacuated"] !== true && ent.props["dead"] !== true) return true;
+        if (ent.type === EntityType.EscapePod) return true;
+        if (ent.type === EntityType.MedKit && ent.props["used"] !== true) return true;
+        if (ent.type === EntityType.EvidenceTrace && ent.props["discovered"] !== true && ent.props["scanHidden"] !== true) return true;
+        if (ent.type === EntityType.CrewItem && ent.props["examined"] !== true && ent.props["hidden"] !== true) return true;
+        if (ent.type === EntityType.Console && ent.props["read"] !== true) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Execute one auto-explore step. */
+function autoExploreStep(): void {
+  if (!autoExploring || state.gameOver) {
+    stopAutoExplore();
+    return;
+  }
+
+  const prevHp = state.player.hp;
+  const dir = autoExploreBFS();
+
+  if (!dir) {
+    display.addLog("No unexplored areas reachable.", "system");
+    stopAutoExplore();
+    renderAll();
+    return;
+  }
+
+  // Execute the move
+  handleAction({ type: ActionType.Move, direction: dir });
+
+  // Check stopping conditions
+  if (state.player.hp < prevHp) {
+    display.addLog("Auto-explore stopped: taking damage.", "warning");
+    stopAutoExplore();
+    renderAll();
+    return;
+  }
+
+  if (hasAdjacentInteractable()) {
+    display.addLog("Auto-explore stopped: something nearby.", "system");
+    stopAutoExplore();
+    renderAll();
+    return;
+  }
+
+  if (state.gameOver) {
+    stopAutoExplore();
+    return;
+  }
+
+  // Schedule next step
+  autoExploreTimer = setTimeout(autoExploreStep, AUTO_EXPLORE_DELAY);
+}
+
 /** Flicker the ROT.js canvas visibility before showing the game-over overlay. */
 function flickerThenRender(): void {
   const canvas = containerEl.querySelector("canvas");
@@ -345,6 +488,12 @@ function initGame(): void {
   window.addEventListener("keydown", handleToggleKey);
   // Listen for choice/deduction/crew-door input
   window.addEventListener("keydown", (e) => {
+    // Any non-Tab key stops auto-explore
+    if (autoExploring && e.key !== "Tab") {
+      stopAutoExplore();
+      display.addLog("Auto-explore stopped.", "system");
+      renderAll();
+    }
     if (helpOpen) {
       if (e.key === "Escape" || e.key === "?") {
         e.preventDefault();
@@ -556,6 +705,27 @@ function handleToggleKey(e: KeyboardEvent): void {
 // ── Action handler ──────────────────────────────────────────────
 function handleAction(action: Action): void {
   if (state.gameOver) return;
+
+  // Any non-auto-explore action stops auto-explore
+  if (autoExploring && action.type !== ActionType.AutoExplore && action.type !== ActionType.Move) {
+    stopAutoExplore();
+  }
+
+  // Auto-explore: start walking toward nearest unexplored tile
+  if (action.type === ActionType.AutoExplore) {
+    if (autoExploring) {
+      // Toggle off
+      stopAutoExplore();
+      display.addLog("Auto-explore cancelled.", "system");
+      renderAll();
+      return;
+    }
+    autoExploring = true;
+    display.addLog("Auto-exploring... (press Tab or any key to stop)", "system");
+    renderAll();
+    autoExploreTimer = setTimeout(autoExploreStep, AUTO_EXPLORE_DELAY);
+    return;
+  }
 
   // Journal toggle — free action, no turn advance
   if (action.type === ActionType.Journal) {

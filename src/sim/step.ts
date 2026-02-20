@@ -1386,7 +1386,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
     }
 
     case EntityType.MedKit: {
-      // One-time use med kit: restores 50 HP (Item 5)
+      // One-time use med kit: restores 150 HP
       if (target.props["used"] === true) {
         next.logs = [
           ...state.logs,
@@ -1399,7 +1399,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           },
         ];
       } else {
-        const healAmount = 50;
+        const healAmount = 150;
         const newHp = Math.min(state.player.maxHp, state.player.hp + healAmount);
         const actualHeal = newHp - state.player.hp;
         next.player = {
@@ -3138,6 +3138,8 @@ export function step(state: GameState, action: Action): GameState {
     }
     case ActionType.Wait:
       break;
+    case ActionType.AutoExplore:
+      break; // handled by browser layer, sim treats as no-op
     case ActionType.Interact:
       next = { ...handleInteract(next, action.targetId), turn: next.turn };
       break;

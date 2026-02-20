@@ -4,12 +4,13 @@
 
 ## Current State
 
-- **Phase**: Sprint 21 (Unlock the Archetypes)
+- **Phase**: Sprint 23 complete (Traversal & Tension)
 - **Test status**: 280 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
 - **Save key**: v3
+- **Playtest results**: Seeds 184201 (940 HP), 42 (976 HP), 7, 4 all VICTORY
 
 ## What Works
 
@@ -62,7 +63,31 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
-- Bot pathfinding: playtest bot gets stuck escorting survivors on some seeds (184201, 4, 5)
+- Seed 3 DEFEAT: bot times out at 500 turns on large maps (navigation efficiency)
+- Seed 5 DEFEAT: bot only solves 3/5 deductions (evidence-gathering heuristic too shallow)
+
+## Sprint 23 Changes
+
+### Traversal & Tension
+- **HP economy rebalance**: Heat and pressure damage increased from 3 to 8 HP/turn. MedKit healing increased from 50 to 150 HP. Patrol drone damage increased from 5 to 15. Players now end runs at 940-980 HP instead of 990+.
+- **Second MedKit**: Emergency Shelter now contains a MedKit alongside the one in Med Bay. Two healing stations spread across the station.
+- **Auto-explore (Tab)**: Press Tab in the browser to auto-walk toward nearest unexplored tile. Stops on: damage taken, interactable entity nearby, no unexplored tiles reachable, or any keypress. BFS pathfinding in the render layer keeps sim pure.
+- **Bot MedKit/RepairCradle tuning**: Bot only uses healing when HP < 800/900 respectively (was using at full HP, wasting them).
+
+## Sprint 22 Changes
+
+### Bot Pathfinding + Deduction-Gated Victory
+- **Bot Phase 3a**: After deductions solved, bot recruits discovered-but-not-following crew NPCs
+- **Bot Phase 3b**: Comprehensive evacuation escort — powered pod preference, unpowered pod fallback
+- **Distance-independent pod boarding**: Following crew boards regardless of distance when player interacts with powered pod
+- **Deduction-gated DataCore victory**: Transmission now allowed when all deductions are solved, regardless of objective phase. Fixes soft-lock where bot skipped cleaning → phase stuck at Clean → DataCore blocked.
+- **Crew HP 200**: Crew NPCs now have 200 HP (up from 50) for better hazard survivability during escort
+
+### Sensor-Gated Evidence Discovery
+- **Scan-hidden evidence traces**: Some evidence traces start invisible (`scanHidden: true`) and require actively scanning with the correct sensor to reveal them
+- **Enhanced scan action**: `handleScan()` now reveals hidden evidence in the current room when player has the right sensor
+- **Bot scanning**: Bot Phase 2c scans rooms for hidden evidence (one scan per room)
+- **UI**: Scan-hidden traces treated as exhausted (not shown as interactable until revealed)
 
 ## Sprint 21 Changes
 
@@ -116,6 +141,9 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ## Recent Changes (Git History)
 
 ```
+2026-02-19        feat: sprint 23 — traversal & tension (HP economy, auto-explore)
+2026-02-19        feat: sensor-gated evidence — scan reveals hidden traces
+2026-02-19        feat: sprint 22 — bot pathfinding + deduction-gated victory
 2026-02-19        feat: sprint 20 — deduction quality polish (P0/P1/P2 fixes)
 2026-02-18        feat: sprint 19 — storyline overhaul, ContainmentBreach removed, writers room review
 2026-02-18        feat: sprint 18 — mystery revelation system (revelation cascade, split-pane UI, post-answer overlay)

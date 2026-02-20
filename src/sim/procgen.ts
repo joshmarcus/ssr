@@ -490,7 +490,7 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
     AUTHORED_LOGS[18],  // Vasquez — made it back, burns, data can be saved
   ];
 
-  // ── Med kit in Med Bay (Item 5: one-time use, 50 HP) ────────
+  // ── Med kits: one in Med Bay, one in Emergency Shelter ──────
   const medBayIdx = state.rooms.findIndex(r => r.name === "Med Bay");
   if (medBayIdx >= 0 && medBayIdx < n) {
     const medBayRoom = rooms[medBayIdx];
@@ -499,6 +499,17 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
       id: "med_kit_1",
       type: EntityType.MedKit,
       pos: medKitPos,
+      props: { used: false },
+    });
+  }
+  const shelterIdx = state.rooms.findIndex(r => r.name === "Emergency Shelter");
+  if (shelterIdx >= 0 && shelterIdx < n) {
+    const shelterRoom = rooms[shelterIdx];
+    const medKit2Pos = getRoomPos(shelterRoom, -1, 1);
+    state.entities.set("med_kit_2", {
+      id: "med_kit_2",
+      type: EntityType.MedKit,
+      pos: medKit2Pos,
       props: { used: false },
     });
   }

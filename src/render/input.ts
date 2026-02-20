@@ -116,6 +116,9 @@ export class InputHandler {
       // Journal / notes
       case ";":
         return { type: ActionType.Journal };
+      // Auto-explore
+      case "Tab":
+        return { type: ActionType.AutoExplore };
       default:
         return null;
     }

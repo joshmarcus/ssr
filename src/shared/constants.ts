@@ -18,7 +18,7 @@ export const HEAT_SOURCE_CAP = 85; // max heat at source tiles (was 95 — cappe
 export const HEAT_SPREAD_MIN = 20; // tiles spread heat if they have at least this much (was 15 — higher threshold)
 export const HEAT_DAMAGE_THRESHOLD = 200; // legacy — unused
 export const PLAYER_MAX_HP = 1000;
-export const HEAT_DAMAGE_PER_TURN = 3; // base HP lost per turn on tiles with heat >= HEAT_PAIN_THRESHOLD
+export const HEAT_DAMAGE_PER_TURN = 8; // base HP lost per turn on tiles with heat >= HEAT_PAIN_THRESHOLD
 export const HEAT_PAIN_THRESHOLD = 40; // heat level at which the player starts taking damage
 export const COOL_RECOVERY_RATE = 0; // no passive recovery — use Bot Maintenance room
 export const HOT_ZONE_SLOW_THRESHOLD = 60; // heat level that costs extra movement
@@ -40,12 +40,12 @@ export const PRESSURE_NORMAL = 100;
 export const PRESSURE_BREACH_DRAIN = 4; // pressure lost per turn on breach tile
 export const PRESSURE_SPREAD_RATE = 1; // pressure leaks to adjacent tiles per turn
 export const PRESSURE_DAMAGE_THRESHOLD = 40; // below this, bot takes damage
-export const PRESSURE_DAMAGE_PER_TURN = 3; // HP lost per turn in low-pressure zone
+export const PRESSURE_DAMAGE_PER_TURN = 8; // HP lost per turn in low-pressure zone
 export const PRESSURE_BULKHEAD_THRESHOLD = 10; // below this, adjacent doors auto-seal
 export const AIRLOCK_PRESSURE_DRAIN = 8; // pressure drained per turn at open airlock tile
 
 // ── Patrol drone ─────────────────────────────────────────────
-export const PATROL_DRONE_DAMAGE = 5; // HP lost on contact with hostile patrol drone
+export const PATROL_DRONE_DAMAGE = 15; // HP lost on contact with hostile patrol drone
 export const PATROL_DRONE_STUN_TURNS = 0; // turns player is stunned after drone contact (0 = no stun)
 export const PATROL_DRONE_SPEED = 3; // drone moves every N turns
 export const PATROL_DRONE_ATTACK_COOLDOWN = 4; // turns between attacks (drone retreats after hitting)

@@ -111,6 +111,7 @@ export enum ActionType {
   Journal = "journal",
   SubmitDeduction = "submitDeduction",
   SubmitChoice = "submitChoice",
+  AutoExplore = "autoExplore",
 }
 
 export enum Direction {
