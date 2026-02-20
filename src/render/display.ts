@@ -372,7 +372,7 @@ export class BrowserDisplay implements IGameDisplay {
     const hpPercent = Math.round((state.player.hp / state.player.maxHp) * 100);
     const hpClass = hpPercent > 60 ? "good" : hpPercent > 30 ? "warn" : "bad";
 
-    const isTimeOut = !isVictory && state.turn >= MAX_TURNS;
+    const isTimeOut = !isVictory && state.turn >= (state.maxTurns ?? MAX_TURNS);
     const crewWereEvacuated = (state.mystery?.evacuation?.crewEvacuated.length || 0) > 0;
     const title = isVictory
       ? (crewWereEvacuated ? "CREW EVACUATED" : "TRANSMISSION COMPLETE")
@@ -449,6 +449,52 @@ export class BrowserDisplay implements IGameDisplay {
         : "Recovery teams en route. The record is preserved.")
       : "Another rover may reach the station. The data endures, waiting.";
 
+    // ── Timeline reconstruction (victory only, if mystery data available) ──
+    let timelineHtml = "";
+    if (isVictory && state.mystery?.timeline) {
+      const events = state.mystery.timeline.events;
+      const crew = state.mystery.crew;
+      const getCrewName = (id: string) => {
+        const m = crew.find(c => c.id === id);
+        return m ? m.lastName : id;
+      };
+      const phaseLabels: Record<string, string> = {
+        normal_ops: "NORMAL OPS",
+        trigger: "TRIGGER",
+        escalation: "ESCALATION",
+        collapse: "COLLAPSE",
+        aftermath: "AFTERMATH",
+      };
+      const phaseColors: Record<string, string> = {
+        normal_ops: "#6a8",
+        trigger: "#ca8",
+        escalation: "#fa0",
+        collapse: "#f44",
+        aftermath: "#88c",
+      };
+      const eventLines = events.map(e => {
+        const phase = phaseLabels[e.phase] || e.phase.toUpperCase();
+        const color = phaseColors[e.phase] || "#aaa";
+        const actor = getCrewName(e.actorId);
+        return `<div style="margin:2px 0;font-size:11px;font-family:monospace;color:#bbb">` +
+          `<span style="color:${color};font-weight:bold;display:inline-block;width:80px">[${phase}]</span> ` +
+          `<span style="color:#888">${e.timestamp}</span> ` +
+          `<span style="color:#aac">${actor}</span> ` +
+          `${e.action}` +
+          `<span style="color:#666"> — ${e.location}</span>` +
+          `</div>`;
+      });
+      timelineHtml = `
+        <div style="margin:10px 0 4px;border-top:1px solid #333;padding-top:8px">
+          <div style="color:#8ac;font-size:12px;font-weight:bold;text-align:center;margin-bottom:6px;letter-spacing:2px">
+            ▸ INCIDENT RECONSTRUCTION ◂
+          </div>
+          <div style="max-height:180px;overflow-y:auto;padding:0 4px;scrollbar-width:thin;scrollbar-color:#444 #1a1a2e">
+            ${eventLines.join("")}
+          </div>
+        </div>`;
+    }
+
     overlay.innerHTML = `
       <div class="gameover-box ${titleClass}">
         <div class="gameover-title ${titleClass}">${title}</div>
@@ -469,9 +515,10 @@ export class BrowserDisplay implements IGameDisplay {
           <div class="gameover-stat"><span class="stat-label">Deductions:</span> <span class="stat-value ${deductionsCorrect === deductions.length ? 'good' : deductionsCorrect > 0 ? 'warn' : 'bad'}">${deductionsCorrect}/${deductions.length} correct</span></div>
           ${choicesHtml}
         </div>
+        ${timelineHtml}
         <div class="gameover-epilogue">${epilogue}</div>
         <div style="text-align:center;margin:6px 0;color:#556;font-size:11px;font-family:monospace">
-          SEED ${state.seed} &middot; ${ARCHETYPE_DISPLAY_NAMES[state.mystery?.timeline.archetype as IncidentArchetype] ?? "UNKNOWN"}
+          SEED ${state.seed} &middot; ${ARCHETYPE_DISPLAY_NAMES[state.mystery?.timeline.archetype as IncidentArchetype] ?? "UNKNOWN"}${state.difficulty && state.difficulty !== "normal" ? ` &middot; ${state.difficulty.toUpperCase()}` : ""}
         </div>
         <div class="gameover-restart">Press [R] to restart</div>
       </div>`;
@@ -1075,8 +1122,10 @@ export class BrowserDisplay implements IGameDisplay {
     }
 
     // Turn counter with remaining turns warning
-    const remaining = MAX_TURNS - state.turn;
-    const turnWarning = state.turn >= TURN_WARNING_THRESHOLD
+    const maxTurns = state.maxTurns ?? MAX_TURNS;
+    const remaining = maxTurns - state.turn;
+    const warnThreshold = Math.floor(maxTurns * 0.70);
+    const turnWarning = state.turn >= warnThreshold
       ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold">[${remaining} left]</span>`
       : "";
 

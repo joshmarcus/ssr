@@ -1,11 +1,6 @@
 import type { GameState } from "../shared/types.js";
 import { EntityType } from "../shared/types.js";
-import {
-  MAX_TURNS,
-  TURN_WARNING_THRESHOLD,
-  TURN_URGENT_THRESHOLD,
-  TURN_CRITICAL_THRESHOLD,
-} from "../shared/constants.js";
+import { MAX_TURNS } from "../shared/constants.js";
 
 /**
  * Check win condition:
@@ -83,10 +78,16 @@ export function checkTurnLimit(state: GameState): GameState {
   if (state.gameOver) return state;
 
   const turn = state.turn;
+  const maxTurns = state.maxTurns ?? MAX_TURNS;
   const logs = [...state.logs];
 
+  // Proportional thresholds based on difficulty-adjusted turn limit
+  const warningThreshold = Math.floor(maxTurns * 0.70);
+  const urgentThreshold  = Math.floor(maxTurns * 0.80);
+  const criticalThreshold = Math.floor(maxTurns * 0.90);
+
   // Hard limit — defeat
-  if (turn >= MAX_TURNS) {
+  if (turn >= maxTurns) {
     logs.push({
       id: `log_turn_limit_${turn}`,
       timestamp: turn,
@@ -98,32 +99,32 @@ export function checkTurnLimit(state: GameState): GameState {
   }
 
   // Countdown warnings (only fire once per threshold)
-  if (turn === TURN_CRITICAL_THRESHOLD) {
+  if (turn === criticalThreshold) {
     logs.push({
       id: `log_turn_critical`,
       timestamp: turn,
       source: "system",
-      text: `WARNING: IMMINENT POWER FAILURE — ${MAX_TURNS - turn} cycles remaining. Complete mission NOW.`,
+      text: `WARNING: IMMINENT POWER FAILURE — ${maxTurns - turn} cycles remaining. Complete mission NOW.`,
       read: false,
     });
     return { ...state, logs };
   }
-  if (turn === TURN_URGENT_THRESHOLD) {
+  if (turn === urgentThreshold) {
     logs.push({
       id: `log_turn_urgent`,
       timestamp: turn,
       source: "system",
-      text: `WARNING: POWER RESERVES CRITICAL — ${MAX_TURNS - turn} cycles remaining. Station orbit unstable.`,
+      text: `WARNING: POWER RESERVES CRITICAL — ${maxTurns - turn} cycles remaining. Station orbit unstable.`,
       read: false,
     });
     return { ...state, logs };
   }
-  if (turn === TURN_WARNING_THRESHOLD) {
+  if (turn === warningThreshold) {
     logs.push({
       id: `log_turn_warning`,
       timestamp: turn,
       source: "system",
-      text: `Station power reserves declining. ${MAX_TURNS - turn} cycles until orbit decay.`,
+      text: `Station power reserves declining. ${maxTurns - turn} cycles until orbit decay.`,
       read: false,
     });
     return { ...state, logs };

@@ -29,6 +29,14 @@ export const TURN_WARNING_THRESHOLD = 350; // "Station power reserves declining"
 export const TURN_URGENT_THRESHOLD = 400;  // "Power reserves critical"
 export const TURN_CRITICAL_THRESHOLD = 450; // "Imminent power failure"
 
+// ── Difficulty modifiers ────────────────────────────────────
+// Each difficulty adjusts turn limit, player HP, hazard damage, and deterioration pacing.
+export const DIFFICULTY_SETTINGS = {
+  easy:   { maxTurns: 650, maxHp: 1400, damageMultiplier: 0.6, deteriorationInterval: 35 },
+  normal: { maxTurns: 500, maxHp: 1000, damageMultiplier: 1.0, deteriorationInterval: 25 },
+  hard:   { maxTurns: 350, maxHp:  750, damageMultiplier: 1.5, deteriorationInterval: 18 },
+} as const;
+
 // ── Station deterioration ────────────────────────────────────
 export const DETERIORATION_INTERVAL = 25; // turns between station deterioration events
 export const DETERIORATION_HEAT_BOOST = 2; // extra heat added to source tiles each deterioration tick

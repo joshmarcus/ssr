@@ -6,7 +6,7 @@ import {
 } from "../shared/constants.js";
 import { isValidAction, getDirectionDelta, hasUnlockedDoorAt, isAutoSealedBulkhead } from "./actions.js";
 import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex } from "./rooms.js";
-import { tickHazards, tickDeterioration, tickPA, applyHazardDamage } from "./hazards.js";
+import { tickHazards, tickDeterioration, tickPA, applyHazardDamage, getDamageMultiplier } from "./hazards.js";
 import { checkWinCondition, checkLossCondition, checkTurnLimit } from "./objectives.js";
 import { updateVision } from "./vision.js";
 import { generateEvidenceTags, getUnlockedDeductions, solveDeduction, linkEvidence } from "./deduction.js";
@@ -2949,9 +2949,10 @@ function movePatrolDrones(state: GameState): GameState {
       newEntities.set(id, { ...entity, pos: { x: nx, y: ny } });
       changed = true;
 
-      // Hostile collision — deal damage
+      // Hostile collision — deal damage (difficulty-scaled)
       if (nx === px && ny === py && !onCooldown) {
-        playerHp = Math.max(0, playerHp - PATROL_DRONE_DAMAGE);
+        const droneDmg = Math.ceil(PATROL_DRONE_DAMAGE * getDamageMultiplier(state));
+        playerHp = Math.max(0, playerHp - droneDmg);
         if (PATROL_DRONE_STUN_TURNS > 0) {
           playerStun = PATROL_DRONE_STUN_TURNS;
         }
@@ -2964,7 +2965,7 @@ function movePatrolDrones(state: GameState): GameState {
           id: `log_drone_hit_${id}_${state.turn}`,
           timestamp: state.turn,
           source: "system",
-          text: `ALERT: Rogue drone attack! Systems damaged (-${PATROL_DRONE_DAMAGE} HP). Drone retreating to recharge.`,
+          text: `ALERT: Rogue drone attack! Systems damaged (-${droneDmg} HP). Drone retreating to recharge.`,
           read: false,
         });
       }

@@ -1,12 +1,17 @@
 import type { GameState, Tile } from "../shared/types.js";
-import { TileType, EntityType, SensorType } from "../shared/types.js";
+import { TileType, EntityType, SensorType, Difficulty } from "../shared/types.js";
 import {
   HEAT_SPREAD_RATE, SMOKE_SPREAD_RATE, HEAT_DECAY_RATE, HEAT_SOURCE_RATE, HEAT_SOURCE_CAP,
   HEAT_DAMAGE_PER_TURN, HEAT_PAIN_THRESHOLD, COOL_RECOVERY_RATE, HEAT_SPREAD_MIN,
   PRESSURE_BREACH_DRAIN, PRESSURE_SPREAD_RATE, PRESSURE_DAMAGE_THRESHOLD, PRESSURE_DAMAGE_PER_TURN,
   PRESSURE_BULKHEAD_THRESHOLD, AIRLOCK_PRESSURE_DRAIN, DETERIORATION_INTERVAL, DETERIORATION_HEAT_BOOST, DETERIORATION_SMOKE_SPAWN,
-  PA_INTERVAL, GLYPHS,
+  PA_INTERVAL, GLYPHS, DIFFICULTY_SETTINGS,
 } from "../shared/constants.js";
+
+/** Get damage multiplier for the current difficulty. */
+export function getDamageMultiplier(state: GameState): number {
+  return DIFFICULTY_SETTINGS[state.difficulty ?? Difficulty.Normal].damageMultiplier;
+}
 import {
   PA_ANNOUNCEMENTS_GENERAL, PA_ANNOUNCEMENTS_WARNING, PA_ANNOUNCEMENTS_ATMOSPHERIC,
   PA_ANNOUNCEMENTS_INVESTIGATE, PA_ANNOUNCEMENTS_RECOVER,
@@ -486,8 +491,9 @@ export function applyHazardDamage(inputState: GameState): GameState {
 
   // Pressure damage: low-pressure tiles damage the bot
   // Atmospheric sensor halves pressure damage (better seals awareness)
+  const dmgMul = getDamageMultiplier(state);
   if (tile.pressure < PRESSURE_DAMAGE_THRESHOLD && tile.pressure >= 0) {
-    const pressureDamage = hasAtmospheric ? Math.ceil(PRESSURE_DAMAGE_PER_TURN / 2) : PRESSURE_DAMAGE_PER_TURN;
+    const pressureDamage = Math.ceil((hasAtmospheric ? Math.ceil(PRESSURE_DAMAGE_PER_TURN / 2) : PRESSURE_DAMAGE_PER_TURN) * dmgMul);
     const pressureHp = Math.max(0, state.player.hp - pressureDamage);
     const pressureLogs = [...state.logs];
     if (state.turn % 2 === 0) {
@@ -521,7 +527,7 @@ export function applyHazardDamage(inputState: GameState): GameState {
   // Thermal sensor reduces heat damage by 40% (better heat routing knowledge)
   if (tile.heat >= HEAT_PAIN_THRESHOLD) {
     const intensity = Math.min(1, (tile.heat - HEAT_PAIN_THRESHOLD) / 60);
-    const baseDamage = Math.ceil(HEAT_DAMAGE_PER_TURN * (0.5 + intensity * 1.5));
+    const baseDamage = Math.ceil(HEAT_DAMAGE_PER_TURN * (0.5 + intensity * 1.5) * dmgMul);
     const damage = hasThermal ? Math.ceil(baseDamage * 0.6) : baseDamage;
     const newHp = Math.max(0, state.player.hp - damage);
 

@@ -27,16 +27,20 @@ import {
   CREW_DISTRESS_HINT, BREACH_PROXIMITY_HINT,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction } from "./shared/types.js";
-import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction } from "./shared/types.js";
+import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype } from "./shared/types.js";
 import { computeChoiceEndings } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence, getTagExplanation } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave } from "./sim/saveLoad.js";
 import { generateWhatWeKnow, formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
 
-// ── Parse seed from URL params or use golden seed ───────────────
+// ── Parse seed and difficulty from URL params ───────────────────
 const params = new URLSearchParams(window.location.search);
 const seed = parseInt(params.get("seed") || String(GOLDEN_SEED), 10);
+const difficultyParam = params.get("difficulty") || "normal";
+const difficulty: Difficulty = difficultyParam === "easy" ? Difficulty.Easy
+  : difficultyParam === "hard" ? Difficulty.Hard
+  : Difficulty.Normal;
 
 // ── DOM elements ────────────────────────────────────────────────
 const containerEl = document.getElementById("rot-display")!;
@@ -133,7 +137,7 @@ function showOpeningCrawl(): void {
 }
 
 // ── Game initialization ─────────────────────────────────────────
-let state = generate(seed);
+let state = generate(seed, difficulty);
 let display: IGameDisplay = undefined!; // assigned in initGame()
 let is3D = false;
 
@@ -539,6 +543,11 @@ function initGame(): void {
   display.addLog("MAINTENANCE SUBROUTINE: Clean rooms to 80% standard. Use [c] to clean.", "system");
   lastObjectivePhase = ObjectivePhase.Clean;
 
+  // Start archetype-specific ambient soundscape
+  if (state.mystery?.timeline?.archetype) {
+    audio.startAmbient(state.mystery.timeline.archetype);
+  }
+
   checkRoomEntry();
   renderAll();
 
@@ -650,7 +659,7 @@ function handleRestartKey(e: KeyboardEvent): void {
     e.preventDefault();
     // Reset game state
     deleteSave();
-    state = generate(seed);
+    state = generate(seed, difficulty);
     lastPlayerRoomId = "";
     visitedRoomIds.clear();
     journalOpen = false;
@@ -1172,6 +1181,7 @@ function handleAction(action: Action): void {
 
   if (state.gameOver) {
     deleteSave(); // Clear save on game end
+    audio.stopAmbient(); // Silence the ambient drone
     if (state.victory) {
       audio.playVictory();
       display.addLog("", "system");

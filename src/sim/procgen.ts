@@ -1,9 +1,9 @@
 import * as ROT from "rot-js";
 import type { GameState, Entity, MysteryState, MysteryChoice } from "../shared/types.js";
-import { TileType, EntityType, SensorType, ObjectivePhase, IncidentArchetype, CrewFate, DoorKeyType } from "../shared/types.js";
+import { TileType, EntityType, SensorType, ObjectivePhase, IncidentArchetype, CrewFate, DoorKeyType, Difficulty } from "../shared/types.js";
 import {
   DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, GLYPHS, PRESSURE_NORMAL,
-  HEAT_SOURCE_CAP, DETERIORATION_INTERVAL,
+  HEAT_SOURCE_CAP, DETERIORATION_INTERVAL, DIFFICULTY_SETTINGS,
 } from "../shared/constants.js";
 import { createEmptyState } from "./state.js";
 import { updateVision } from "./vision.js";
@@ -84,8 +84,8 @@ type DiggerRoom = {
 /**
  * Generate a station map from a seed.
  */
-export function generate(seed: number): GameState {
-  const state = createEmptyState(seed, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT);
+export function generate(seed: number, difficulty: Difficulty = Difficulty.Normal): GameState {
+  const state = createEmptyState(seed, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, difficulty);
 
   // Seed ROT.js global RNG for deterministic map generation
   ROT.RNG.setSeed(seed);
@@ -202,6 +202,9 @@ export function generate(seed: number): GameState {
   // Place landmark consoles in themed rooms
   placeLandmarkConsoles(state, rooms);
 
+  // Apply difficulty-based deterioration interval (archetype may override further)
+  state.deteriorationInterval = DIFFICULTY_SETTINGS[difficulty].deteriorationInterval;
+
   // Apply archetype-specific hazard profile
   applyArchetypeProfile(state, archetype);
 
@@ -248,7 +251,7 @@ function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): 
     case IncidentArchetype.ReactorScram: {
       // "The Rogue AI" — reactor emergency. Faster deterioration.
       // Store a faster deterioration interval on the state (checked in hazards.ts)
-      state.deteriorationInterval = DETERIORATION_INTERVAL - 5; // 20 instead of 25
+      state.deteriorationInterval = (state.deteriorationInterval ?? DETERIORATION_INTERVAL) - 5;
       // Add extra smoke in corridors (reactor venting)
       for (let y = 0; y < state.height; y++) {
         for (let x = 0; x < state.width; x++) {

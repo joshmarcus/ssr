@@ -4,15 +4,16 @@
 
 ## Current State
 
-- **Phase**: Sprint 35 complete (Player Agency & Crew Connection)
+- **Phase**: Sprint 36 complete (Difficulty, Timeline, Audio)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
-- **Save key**: v3
-- **Turn limit**: 500 turns (warnings at 350/400/450, escalation at 200/300/400)
+- **Save key**: v4
+- **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
+- **Turn limit**: Difficulty-scaled (Easy: 650, Normal: 500, Hard: 350) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 6/6 seeds VICTORY — 184201 (270T), 3 (254T), 7 (147T), 5 (409T), 42 (188T), 4 (171T)
+- **Playtest results**: 6/6 seeds VICTORY (normal) — 184201 (270T), 42 (188T), 7 (147T); Hard mode tested: 42 (188T, 715/750 HP)
 
 ## What Works
 
@@ -55,8 +56,9 @@
 - Harness CLI for AI playtesting (with deduction support)
 - Heuristic playtest bot (playtest_bot.ts)
 - Mystery choices: 3 narrative decisions with spoiler protection
-- Procedural sound effects: 12 Web Audio SFX
-- Game-over overlay: performance rating (S/A/B/C/D), stats summary, mystery choices recap
+- Procedural sound effects: 12 Web Audio SFX + 5 archetype ambient soundscapes
+- Game-over overlay: performance rating (S/A/B/C/D), stats summary, mystery choices recap, incident timeline reconstruction
+- Difficulty system: Easy/Normal/Hard with URL param, adjusting HP, turn limit, damage, deterioration
 - Tutorial hints: context-sensitive tips at early turns and on first-time events
 - Evacuation phase: RED ALERT banner, crew following, escape pod boarding with full audio
 - Help overlay: HTML modal with complete key bindings, game phases, interaction details
@@ -65,6 +67,36 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 36 Changes
+
+### Difficulty Scaling (Easy / Normal / Hard)
+- **New `Difficulty` enum** with 3 levels, parsed from `?difficulty=easy|hard` URL param
+- **Per-difficulty modifiers**:
+  - Easy: 650 turns, 1400 HP, 0.6x damage, deterioration every 35 turns
+  - Normal: 500 turns, 1000 HP, 1.0x damage, deterioration every 25 turns
+  - Hard: 350 turns, 750 HP, 1.5x damage, deterioration every 18 turns
+- **Proportional turn warnings** at 70%/80%/90% of max turns (instead of fixed thresholds)
+- Damage multiplier applies to heat damage, pressure damage, and patrol drone attacks
+- Archetype deterioration overrides stack with difficulty base (ReactorScram still gets -5)
+- Playtest bot accepts optional difficulty arg: `npx tsx playtest_bot.ts 42 hard`
+- Save key bumped to v4
+
+### Timeline Reconstruction on Victory Screen
+- **Incident reconstruction section** on victory screen: scrollable ASCII timeline of all incident events
+- Each event shows phase tag (color-coded), timestamp, actor name, action, and location
+- Phase colors: NORMAL OPS (green), TRIGGER (amber), ESCALATION (orange), COLLAPSE (red), AFTERMATH (blue)
+- Only shown on victory (full investigation required to unlock the reconstruction)
+
+### Archetype Ambient Soundscapes
+- **5 procedural Web Audio ambient pads**, one per archetype — starts when game begins:
+  - CoolantCascade: Low sawtooth rumble (45Hz) with slow LFO pitch modulation + metallic triangle shimmer
+  - HullBreach: Deep sine bass (35Hz) + looping filtered noise with sweeping bandpass (wind gusts)
+  - ReactorScram: 60Hz square hum with breathing-pattern amplitude LFO + intermittent digital beeps
+  - Sabotage: Detuned sine pair (55/56.5Hz beat frequency) + burst-gated highpass noise (scratching)
+  - SignalAnomaly: Eerie detuned fifth (110/164.5Hz) + pulsing 1470Hz sine signal (alien beacon echo)
+- All ambient stops on game over (before victory/defeat SFX plays)
+- Difficulty label shown on game-over seed line when not "normal" (e.g., "SEED 42 · THE ROGUE AI · HARD")
 
 ## Sprint 35 Changes
 

@@ -145,6 +145,13 @@ export interface Room {
   zone?: string;
 }
 
+// ── Difficulty ───────────────────────────────────────────────
+export enum Difficulty {
+  Easy = "easy",
+  Normal = "normal",
+  Hard = "hard",
+}
+
 // ── Game state ───────────────────────────────────────────────
 export interface GameState {
   seed: number;
@@ -158,6 +165,8 @@ export interface GameState {
   logs: LogEntry[];
   gameOver: boolean;
   victory: boolean;
+  difficulty: Difficulty;
+  maxTurns: number; // difficulty-adjusted turn limit
   mystery?: MysteryState;
   deteriorationInterval?: number; // Archetype-specific override (default: DETERIORATION_INTERVAL)
 }

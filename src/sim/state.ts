@@ -1,8 +1,8 @@
 import type { GameState, Tile, TileType, Entity, EntityId, PlayerBot, Room, LogEntry, Attachment } from "../shared/types.js";
-import { PLAYER_MAX_HP, GLYPHS } from "../shared/constants.js";
-import { AttachmentSlot, SensorType } from "../shared/types.js";
+import { PLAYER_MAX_HP, GLYPHS, DIFFICULTY_SETTINGS, MAX_TURNS } from "../shared/constants.js";
+import { AttachmentSlot, SensorType, Difficulty } from "../shared/types.js";
 
-export function createEmptyState(seed: number, width: number, height: number): GameState {
+export function createEmptyState(seed: number, width: number, height: number, difficulty: Difficulty = Difficulty.Normal): GameState {
   const tiles: Tile[][] = [];
   for (let y = 0; y < height; y++) {
     tiles[y] = [];
@@ -25,13 +25,15 @@ export function createEmptyState(seed: number, width: number, height: number): G
     sensorType: SensorType.Cleanliness,
   };
 
+  const settings = DIFFICULTY_SETTINGS[difficulty];
+
   const player: PlayerBot = {
     entity: playerEntity,
     attachments: { [AttachmentSlot.Sensor]: cleanlinessSensor },
     sensors: [SensorType.Cleanliness],
     alive: true,
-    hp: PLAYER_MAX_HP,
-    maxHp: PLAYER_MAX_HP,
+    hp: settings.maxHp,
+    maxHp: settings.maxHp,
     stunTurns: 0,
     clearanceLevel: 0,
   };
@@ -48,5 +50,7 @@ export function createEmptyState(seed: number, width: number, height: number): G
     logs: [],
     gameOver: false,
     victory: false,
+    difficulty,
+    maxTurns: settings.maxTurns,
   };
 }

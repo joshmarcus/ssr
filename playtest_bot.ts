@@ -9,10 +9,13 @@ import { getUnlockedDeductions, generateEvidenceTags } from "./src/sim/deduction
 import { getRoomCleanliness, getRoomAt } from "./src/sim/rooms.js";
 import { isEntityExhausted } from "./src/shared/ui.js";
 import type { GameState, Action, Position, Entity, Direction } from "./src/shared/types.js";
-import { ActionType, EntityType, ObjectivePhase } from "./src/shared/types.js";
+import { ActionType, EntityType, ObjectivePhase, Difficulty } from "./src/shared/types.js";
 
 const SEED = parseInt(process.argv[2] || "42", 10);
-const MAX_TURNS = 500;
+const diffArg = process.argv[3] || "normal";
+const DIFFICULTY: Difficulty = diffArg === "easy" ? Difficulty.Easy
+  : diffArg === "hard" ? Difficulty.Hard
+  : Difficulty.Normal;
 
 const DIRS: Array<{ dir: Direction; dx: number; dy: number }> = [
   { dir: "north" as Direction, dx: 0, dy: -1 },
@@ -744,10 +747,10 @@ function chooseValidAction(state: GameState, visited: Set<string>): Action {
 
 // ── Main ──────────────────────────────────────────────────
 
-let state = generate(SEED);
+let state = generate(SEED, DIFFICULTY);
 const visited = new Set<string>();
 
-console.log(`=== SSR Heuristic Bot — Seed ${SEED} ===`);
+console.log(`=== SSR Heuristic Bot — Seed ${SEED} (${DIFFICULTY}) ===`);
 console.log(`Map: ${state.width}x${state.height}, ${state.rooms.length} rooms`);
 console.log(`Entities: ${state.entities.size}`);
 console.log(`Starting at (${state.player.entity.pos.x}, ${state.player.entity.pos.y})`);
@@ -757,7 +760,7 @@ const roomsVisited = new Set<string>();
 let lastRoom = "";
 let issueLog: string[] = [];
 
-for (let turn = 0; turn < MAX_TURNS; turn++) {
+for (let turn = 0; turn < state.maxTurns; turn++) {
   if (state.gameOver) break;
 
   const action = chooseValidAction(state, visited);
