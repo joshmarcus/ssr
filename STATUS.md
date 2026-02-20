@@ -4,13 +4,14 @@
 
 ## Current State
 
-- **Phase**: Sprint 25 complete (Atmosphere & Polish)
+- **Phase**: Sprint 26 complete (Tension & Turn Economy)
 - **Test status**: 280 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
 - **Save key**: v3
-- **Playtest results**: Seeds 184201 (940 HP), 42 (976 HP), 7, 4 all VICTORY
+- **Turn limit**: 500 turns (warnings at 350/400/450)
+- **Playtest results**: Seeds 184201 (345T), 42 (174T), 3 (322T), 7 (314T), 4 (274T) all VICTORY
 
 ## What Works
 
@@ -63,8 +64,15 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
-- Seed 3 DEFEAT: bot times out at 500 turns on large maps (navigation efficiency)
-- Seed 5 DEFEAT: bot only solves 3/5 deductions (evidence-gathering heuristic too shallow)
+- Seed 5 DEFEAT: bot only solves 3/5 deductions (evidence-gathering heuristic too shallow — needs tag-aware evidence seeking)
+
+## Sprint 26 Changes
+
+### Tension & Turn Economy
+- **Hard turn limit (500 turns)**: Station orbit decays at turn 500 — auto-defeat with narrative "Signal lost" ending. Countdown warnings at turn 350 ("power reserves declining"), 400 ("power reserves critical"), 450 ("imminent power failure"). Turn counter shows `[N left]` in sidebar when past 350.
+- **Hull integrity warnings**: Persistent "HULL INTEGRITY LOW" banner when HP <= 30%, blinking "CRITICAL" banner when HP <= 15%. "ORBIT DECAYED" defeat title when turn limit reached (distinct from "CONNECTION LOST" HP death).
+- **Bot data-core rush**: After all deductions solved, bot immediately navigates to data core (highest priority). Eliminates 100-200 turns of wasted exploration. Seed 3: DEFEAT → VICTORY (322T). Seed 184201: 431→345T. Seed 7: 434→314T. Seed 4: 442→274T.
+- **Bot escape pod fix**: Bot no longer wastes turns interacting with escape pods when no crew is following.
 
 ## Sprint 25 Changes
 
@@ -153,6 +161,7 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ## Recent Changes (Git History)
 
 ```
+2026-02-19        feat: sprint 26 — tension & turn economy (turn limit, HP warnings, bot rush)
 2026-02-19        feat: sprint 25 — atmosphere & polish (room descriptions, cleaning discoveries)
 2026-02-19        feat: sprint 24 — game feel (room entry, interaction preview)
 2026-02-19        feat: sprint 23 — traversal & tension (HP economy, auto-explore)

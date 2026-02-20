@@ -23,6 +23,12 @@ export const HEAT_PAIN_THRESHOLD = 40; // heat level at which the player starts 
 export const COOL_RECOVERY_RATE = 0; // no passive recovery — use Bot Maintenance room
 export const HOT_ZONE_SLOW_THRESHOLD = 60; // heat level that costs extra movement
 
+// ── Turn limit ──────────────────────────────────────────────
+export const MAX_TURNS = 500;
+export const TURN_WARNING_THRESHOLD = 350; // "Station power reserves declining"
+export const TURN_URGENT_THRESHOLD = 400;  // "Power reserves critical"
+export const TURN_CRITICAL_THRESHOLD = 450; // "Imminent power failure"
+
 // ── Station deterioration ────────────────────────────────────
 export const DETERIORATION_INTERVAL = 25; // turns between station deterioration events
 export const DETERIORATION_HEAT_BOOST = 2; // extra heat added to source tiles each deterioration tick

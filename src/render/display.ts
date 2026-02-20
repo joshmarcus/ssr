@@ -1,7 +1,7 @@
 import * as ROT from "rot-js";
 import type { GameState, Entity, Room } from "../shared/types.js";
 import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from "../shared/types.js";
-import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
+import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HEAT_PAIN_THRESHOLD, MAX_TURNS, TURN_WARNING_THRESHOLD } from "../shared/constants.js";
 import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
 import type { IGameDisplay } from "./displayInterface.js";
@@ -363,11 +363,14 @@ export class BrowserDisplay implements IGameDisplay {
     const hpPercent = Math.round((state.player.hp / state.player.maxHp) * 100);
     const hpClass = hpPercent > 60 ? "good" : hpPercent > 30 ? "warn" : "bad";
 
-    const title = isVictory ? "TRANSMISSION COMPLETE" : "CONNECTION LOST";
+    const isTimeOut = !isVictory && state.turn >= MAX_TURNS;
+    const title = isVictory ? "TRANSMISSION COMPLETE" : isTimeOut ? "ORBIT DECAYED" : "CONNECTION LOST";
     const titleClass = isVictory ? "victory" : "defeat";
     const subtitle = isVictory
       ? "The crew's research data streams through the low-band relay.<br>Nine months of work, preserved."
-      : "Rover A3 signal lost. The data core remains sealed.<br>CORVUS-7 drifts on, silent.";
+      : isTimeOut
+        ? "Station orbit has decayed below recovery threshold.<br>Terminal link severed. CORVUS-7 falls silent."
+        : "Rover A3 signal lost. The data core remains sealed.<br>CORVUS-7 drifts on, silent.";
 
     // Crew evacuation stats
     const evac = state.mystery?.evacuation;
@@ -1045,8 +1048,14 @@ export class BrowserDisplay implements IGameDisplay {
         `OVERLAY: off  <span style="color:#666">[t] to activate</span></div>`;
     }
 
+    // Turn counter with remaining turns warning
+    const remaining = MAX_TURNS - state.turn;
+    const turnWarning = state.turn >= TURN_WARNING_THRESHOLD
+      ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold">[${remaining} left]</span>`
+      : "";
+
     const statusHtml = `<div class="status-bar">` +
-      `<span class="label">T:</span><span class="value">${state.turn}</span>` +
+      `<span class="label">T:</span><span class="value">${state.turn}</span>${turnWarning}` +
       roomLabel + stunTag +
       `<br>` + hpTag.replace(/ \| /, '') +
       `<br>` + discoveryTag.replace(/ \| /, '') + evidenceTag.replace(/ \| /, '') + deductionTag.replace(/ \| /, '') +
@@ -1218,6 +1227,14 @@ export class BrowserDisplay implements IGameDisplay {
       miniMapHtml = `<div style="font-size:10px;line-height:1.1;padding:2px 0;border-bottom:1px solid #222;white-space:pre;font-family:monospace">${mapStr}</div>`;
     }
 
+    // ── Hull integrity warning banner ──────────────────────────
+    let hullBannerHtml = "";
+    if (hpPercent <= 15) {
+      hullBannerHtml = `<div style="color:#fff;background:#600;padding:3px 6px;border-bottom:2px solid #f00;font-size:13px;font-weight:bold;text-align:center;animation:blink 0.8s step-end infinite">⚠ HULL INTEGRITY CRITICAL — ${state.player.hp}/${state.player.maxHp} HP ⚠</div>`;
+    } else if (hpPercent <= 30) {
+      hullBannerHtml = `<div style="color:#f44;background:#1a0500;padding:2px 6px;border-bottom:1px solid #633;font-size:12px;font-weight:bold">HULL INTEGRITY LOW — ${state.player.hp}/${state.player.maxHp} HP — seek repair station</div>`;
+    }
+
     // ── Pinned notification (persistent at top of log) ──────────
     let pinnedHtml = "";
     if (state.mystery) {
@@ -1243,7 +1260,7 @@ export class BrowserDisplay implements IGameDisplay {
           .join("")
       : '<span class="log log-system">-- awaiting telemetry --</span>';
 
-    const logHtml = `<div class="log-panel">${pinnedHtml}${logEntries}</div>`;
+    const logHtml = `<div class="log-panel">${hullBannerHtml}${pinnedHtml}${logEntries}</div>`;
 
     const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${statusHtml}${proximityHtml}${miniMapHtml}${roomListHtml}${infoHtml}</div>`;
     panel.innerHTML = logHtml + bottomHtml;

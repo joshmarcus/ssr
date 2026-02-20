@@ -1,5 +1,11 @@
 import type { GameState } from "../shared/types.js";
 import { EntityType } from "../shared/types.js";
+import {
+  MAX_TURNS,
+  TURN_WARNING_THRESHOLD,
+  TURN_URGENT_THRESHOLD,
+  TURN_CRITICAL_THRESHOLD,
+} from "../shared/constants.js";
 
 /**
  * Check win condition: player has transmitted data from the data core.
@@ -64,6 +70,63 @@ export function checkLossCondition(state: GameState): GameState {
         },
       ],
     };
+  }
+
+  return state;
+}
+
+/**
+ * Check turn limit: if we've hit MAX_TURNS, the station's orbit has decayed
+ * and the terminal link is lost. Also emits countdown warnings at thresholds.
+ */
+export function checkTurnLimit(state: GameState): GameState {
+  if (state.gameOver) return state;
+
+  const turn = state.turn;
+  const logs = [...state.logs];
+
+  // Hard limit — defeat
+  if (turn >= MAX_TURNS) {
+    logs.push({
+      id: `log_turn_limit_${turn}`,
+      timestamp: turn,
+      source: "system",
+      text: "CORVUS-7 orbit has decayed below recovery threshold. Terminal link severed. Signal lost.",
+      read: false,
+    });
+    return { ...state, logs, gameOver: true, victory: false };
+  }
+
+  // Countdown warnings (only fire once per threshold)
+  if (turn === TURN_CRITICAL_THRESHOLD) {
+    logs.push({
+      id: `log_turn_critical`,
+      timestamp: turn,
+      source: "system",
+      text: `WARNING: IMMINENT POWER FAILURE — ${MAX_TURNS - turn} cycles remaining. Complete mission NOW.`,
+      read: false,
+    });
+    return { ...state, logs };
+  }
+  if (turn === TURN_URGENT_THRESHOLD) {
+    logs.push({
+      id: `log_turn_urgent`,
+      timestamp: turn,
+      source: "system",
+      text: `WARNING: POWER RESERVES CRITICAL — ${MAX_TURNS - turn} cycles remaining. Station orbit unstable.`,
+      read: false,
+    });
+    return { ...state, logs };
+  }
+  if (turn === TURN_WARNING_THRESHOLD) {
+    logs.push({
+      id: `log_turn_warning`,
+      timestamp: turn,
+      source: "system",
+      text: `Station power reserves declining. ${MAX_TURNS - turn} cycles until orbit decay.`,
+      read: false,
+    });
+    return { ...state, logs };
   }
 
   return state;

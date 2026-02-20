@@ -7,7 +7,7 @@ import {
 import { isValidAction, getDirectionDelta, hasUnlockedDoorAt, isAutoSealedBulkhead } from "./actions.js";
 import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex } from "./rooms.js";
 import { tickHazards, tickDeterioration, tickPA, applyHazardDamage } from "./hazards.js";
-import { checkWinCondition, checkLossCondition } from "./objectives.js";
+import { checkWinCondition, checkLossCondition, checkTurnLimit } from "./objectives.js";
 import { updateVision } from "./vision.js";
 import { generateEvidenceTags, getUnlockedDeductions, solveDeduction, linkEvidence } from "./deduction.js";
 import { assignThread } from "./threads.js";
@@ -3033,6 +3033,7 @@ export function step(state: GameState, action: Action): GameState {
     next = applyHazardDamage(next);
     next = checkWinCondition(next);
     next = checkLossCondition(next);
+    next = checkTurnLimit(next);
     next = updateVision(next);
     return next;
   }
@@ -3131,6 +3132,7 @@ export function step(state: GameState, action: Action): GameState {
         next = applyHazardDamage(next);
         next = checkWinCondition(next);
         next = checkLossCondition(next);
+        next = checkTurnLimit(next);
         next = updateVision(next);
         return next;
       }
@@ -3601,9 +3603,10 @@ export function step(state: GameState, action: Action): GameState {
   // Cleaning directive pressure check
   next = checkCleaningDirective(next);
 
-  // Check win/loss conditions
+  // Check win/loss/turn-limit conditions
   next = checkWinCondition(next);
   next = checkLossCondition(next);
+  next = checkTurnLimit(next);
 
   // Update fog-of-war vision
   next = updateVision(next);

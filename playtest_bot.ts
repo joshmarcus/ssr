@@ -131,12 +131,12 @@ function interactPriority(entity: Entity, state: GameState): number {
       return allDedsSolved ? 200 : -1; // recruit only when ready to escort
     }
     case EntityType.EscapePod: {
-      if (!evacuating) return 20;
-      // During evacuation: board crew into pods
-      // Only high priority if we have following crew
+      if (!evacuating) return -1; // don't interact before evacuation
+      // During evacuation: only board when we have following crew
       const hasFollowers = hasFollowingCrew(state);
-      if (entity.props["powered"] !== true) return 30; // unpowered pod, still worth checking
-      return hasFollowers ? 180 : 15; // rush to pod if crew following
+      if (!hasFollowers) return -1; // no point — pod says "no crew following"
+      if (entity.props["powered"] !== true) return 30;
+      return 180; // rush to powered pod with crew
     }
     case EntityType.ServiceBot: return 15;
     case EntityType.ClosedDoor: {
@@ -273,7 +273,29 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
-  // Phase 2c: Scan in rooms to reveal hidden evidence
+  // Phase 2c: Rush to data core when all deductions solved (TOP PRIORITY after deductions)
+  {
+    const deds = state.mystery?.deductions ?? [];
+    const allDeductionsDone = deds.length > 0 && deds.every(d => d.solved);
+    if (allDeductionsDone) {
+      for (const [, entity] of state.entities) {
+        if (entity.type === EntityType.DataCore && !isEntityExhausted(entity)) {
+          // If adjacent, interact immediately
+          if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
+            return { type: ActionType.Interact, targetId: entity.id };
+          }
+          // Otherwise navigate to it
+          const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+            manhattan({ x, y }, entity.pos) <= 1
+          ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+            manhattan({ x, y }, entity.pos) <= 1, true);
+          if (dir) return { type: ActionType.Move, direction: dir };
+        }
+      }
+    }
+  }
+
+  // Phase 2d: Scan in rooms to reveal hidden evidence
   // Only scan once per room, and only if player has sensors beyond base cleanliness
   if (state.player.sensors && state.player.sensors.length > 1) {
     const room = getRoomAt(state, { x: px, y: py });
