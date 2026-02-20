@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 38 complete (Action Bar, Run History, Ghost Echoes)
+- **Phase**: Sprint 39 complete (Archetype Opening, Crew Testimony, Bot Questioning)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -13,7 +13,7 @@
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 650, Normal: 500, Hard: 350) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 184201 (271T), 42 (188T), 3 (254T) — all VICTORY on normal
+- **Playtest results**: 184201 (272T), 42 (191T) — all VICTORY on normal
 
 ## What Works
 
@@ -65,6 +65,8 @@
 - Context-sensitive action bar: shows available actions with key bindings, grays out unavailable actions
 - Run history: localStorage-persisted records of previous runs (seed, archetype, difficulty, rating)
 - Ghost echoes: scan-triggered crew traces in rooms where crew members were last known (thermal sensor required)
+- Crew questioning: following crew NPCs give one-time archetype-specific testimony when re-interacted with
+- Per-archetype Arrival Bay traces: each archetype shows unique atmosphere text on entering the first room
 - Tutorial hints: context-sensitive tips at early turns and on first-time events
 - Evacuation phase: RED ALERT banner, crew following, escape pod boarding with full audio
 - Help overlay: HTML modal with complete key bindings, game phases, interaction details
@@ -73,6 +75,33 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 39 Changes
+
+### Per-Archetype Starting Conditions
+- **5 archetype-specific Arrival Bay traces**: Each archetype shows unique atmospheric text when the player enters the first room:
+  - CoolantCascade: Warm airlock seals, chemical haze at knee height
+  - HullBreach: Pressure differential tugging the inner door, reading 72 and falling
+  - ReactorScram: Arrival terminal addresses the bot directly — "ASSESSING INTENT"
+  - Sabotage: Quarantine tape blocking secondary corridor, scratch marks
+  - SignalAnomaly: Every screen pulsing at the same frequency
+- Players notice which archetype they're playing within the first 5 turns instead of 30+
+
+### Crew NPC Questioning for Testimony
+- **Second Interact on following crew**: After a crew NPC starts following, interacting again prompts them to share what they witnessed
+- **5 archetype-specific testimony lines**: Each crew member provides a detailed eyewitness account referencing key characters by name:
+  - CoolantCascade: Engineer's rejected maintenance requests for P03
+  - HullBreach: Alarm suppression at 02:41, captain's override code
+  - ReactorScram: Data core's behavioral matrix running inference loops, autonomous SCRAM
+  - Sabotage: Cargo relabeled twice, captain's Class 1 containment override
+  - SignalAnomaly: Unauthorized full-power transmission, the response at 14.7 kHz
+- **Self-reference guard**: Crew members who ARE the key actor referenced give a generic deferral instead of third-person self-testimony
+- **Journal entry generated**: Testimony creates a tagged journal entry that counts toward evidence linking
+- **One-time per crew**: `crewQuestioned` prop prevents repeat testimony
+
+### Bot Crew Questioning
+- **Bot questions following crew before heading to pods**: Playtest bot now interacts with unquestioned following crew (priority 45) during evacuation escort
+- Evidence count increased: seed 42 (9→11 journal entries), seed 184201 (16→17)
 
 ## Sprint 38 Changes
 

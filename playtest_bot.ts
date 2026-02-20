@@ -125,7 +125,11 @@ function interactPriority(entity: Entity, state: GameState): number {
     case EntityType.Breach: return 30;
     case EntityType.CrewNPC: {
       if (entity.props["evacuated"] === true || entity.props["dead"] === true) return -1;
-      if (entity.props["following"] === true) return 5; // already following, low priority
+      if (entity.props["following"] === true) {
+        // Question following crew for testimony (one-time clue)
+        if (entity.props["crewQuestioned"] !== true) return 45;
+        return 5; // already questioned, low priority
+      }
       // Only discover crew (first interaction) if not yet found
       if (entity.props["found"] !== true) return 25; // discover crew
       // Already found — only recruit (second interaction) when all deductions are done
@@ -408,6 +412,16 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
               ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
                 manhattan({ x, y }, target.pos) <= 1, true);
               if (dir) return { type: ActionType.Move, direction: dir };
+            }
+          }
+
+          // Question following crew for testimony before heading to pods
+          for (const [, entity] of state.entities) {
+            if (entity.type === EntityType.CrewNPC &&
+                entity.props["following"] === true &&
+                entity.props["crewQuestioned"] !== true &&
+                manhattan({ x: px, y: py }, entity.pos) <= 1) {
+              return { type: ActionType.Interact, targetId: entity.id };
             }
           }
 
@@ -807,6 +821,7 @@ for (let turn = 0; turn < state.maxTurns; turn++) {
       log.text.includes("Deduction") ||
       log.text.includes("Crew found") ||
       log.text.includes("following") ||
+      log.id.startsWith("log_crew_testimony") ||
       log.text.includes("unsealed") ||
       log.text.includes("boarded") ||
       log.text.includes("EVACUATION") ||

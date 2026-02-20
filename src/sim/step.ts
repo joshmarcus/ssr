@@ -1,5 +1,5 @@
 import type { Action, GameState, Entity, LogEntry, Attachment, JournalEntry, Room, EvacuationState } from "../shared/types.js";
-import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType, CrewRole, CrewFate } from "../shared/types.js";
+import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType, CrewRole, CrewFate, IncidentArchetype } from "../shared/types.js";
 import {
   GLYPHS, PATROL_DRONE_DAMAGE, PATROL_DRONE_STUN_TURNS, PATROL_DRONE_SPEED,
   PATROL_DRONE_ATTACK_COOLDOWN, SMOKE_SLOW_THRESHOLD,
@@ -13,7 +13,7 @@ import { generateEvidenceTags, getUnlockedDeductions, solveDeduction, linkEviden
 import { assignThread } from "./threads.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
-  CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE,
+  CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY,
 } from "../data/narrative.js";
 
 /**
@@ -2144,16 +2144,65 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           ];
         }
       } else if (isFollowing) {
-        next.logs = [
-          ...state.logs,
-          {
-            id: `log_crew_following_${targetId}_${next.turn}`,
-            timestamp: next.turn,
-            source: "system",
-            text: `${crewName} is already following you. Find the Escape Pod Bay.`,
-            read: false,
-          },
-        ];
+        // Check if crew can be questioned for an archetype-specific clue
+        const crewQuestioned = target.props["crewQuestioned"] === true;
+        const archetype = next.mystery?.timeline.archetype;
+        const testimonyFn = archetype ? CREW_QUESTIONING_TESTIMONY[archetype] : undefined;
+        if (!crewQuestioned && archetype && testimonyFn && next.mystery) {
+          // Find key crew members by role for testimony references
+          const engineerLast = next.mystery.crew.find(c => c.role === CrewRole.Engineer)?.lastName ?? "the engineer";
+          const captainLast = next.mystery.crew.find(c => c.role === CrewRole.Captain)?.lastName ?? "the captain";
+          const scientistLast = next.mystery.crew.find(c => c.role === CrewRole.Scientist)?.lastName ?? "the scientist";
+          // Don't let crew testify about themselves in third person
+          const crewLast = crewLastName;
+          const isSelfReference = crewLast === engineerLast || crewLast === captainLast || crewLast === scientistLast;
+          const testimony = isSelfReference
+            ? { text: `${crewName}: "I saw things. I know what happened. But you need to check the logs — the terminal data tells the story better than I can."`, summary: `Crew testimony: ${crewName} defers to terminal records` }
+            : testimonyFn(crewName, engineerLast, captainLast, scientistLast);
+
+          // Mark as questioned
+          const newEntities = new Map(next.entities);
+          newEntities.set(targetId, {
+            ...target,
+            props: { ...target.props, crewQuestioned: true },
+          });
+          next.entities = newEntities;
+
+          // Add testimony log
+          next.logs = [
+            ...state.logs,
+            {
+              id: `log_crew_testimony_${targetId}_${next.turn}`,
+              timestamp: next.turn,
+              source: "narrative",
+              text: testimony.text,
+              read: false,
+            },
+          ];
+
+          // Add journal entry with crew testimony
+          const crewId = target.props["crewId"] as string || targetId;
+          next = addJournalEntry(
+            next,
+            `journal_testimony_${crewId}`,
+            "crew",
+            testimony.summary,
+            testimony.text,
+            getPlayerRoomName(next),
+            targetId,
+          );
+        } else {
+          next.logs = [
+            ...state.logs,
+            {
+              id: `log_crew_following_${targetId}_${next.turn}`,
+              timestamp: next.turn,
+              source: "system",
+              text: `${crewName} is already following you. Find the Escape Pod Bay.`,
+              read: false,
+            },
+          ];
+        }
       }
       break;
     }

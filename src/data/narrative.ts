@@ -97,6 +97,33 @@ export const CREW_BOARDING_DIALOGUE: Record<string, (name: string) => string> = 
   [PersonalityTrait.Pragmatic]: (name) => `${name} buckles in with practiced efficiency. "Good work, little bot. Get yourself out too."`,
 };
 
+// ── Crew questioning dialogue (archetype-specific testimony) ──
+// When player interacts with a following crew NPC, they provide a clue.
+// Each archetype has a pool of testimony lines that reference the incident.
+// The testimony includes crew-mentioning details that generate evidence tags.
+export const CREW_QUESTIONING_TESTIMONY: Record<string, (crewName: string, engineerLast: string, captainLast: string, scientistLast: string) => { text: string; summary: string }> = {
+  [IncidentArchetype.CoolantCascade]: (crewName, engineerLast) => ({
+    text: `${crewName}: "I saw ${engineerLast} filing a third maintenance request for the P03 relay — same junction, same thermal readings. Command rejected it every time. ${engineerLast} was right. The cascade started exactly where they said it would."`,
+    summary: `Crew testimony: ${engineerLast}'s rejected maintenance warnings`,
+  }),
+  [IncidentArchetype.HullBreach]: (crewName, _eng, captainLast) => ({
+    text: `${crewName}: "I was on night shift when the alarms should have gone off. They didn't. Someone suppressed hull monitoring in section 4 at 02:41 — only ${captainLast} had that override code. I didn't say anything then. I'm saying it now."`,
+    summary: `Crew testimony: alarm suppression at 02:41`,
+  }),
+  [IncidentArchetype.ReactorScram]: (crewName, _eng, _cap, scientistLast) => ({
+    text: `${crewName}: "The data core was talking to itself. Not errors — conversation. ${scientistLast} showed me the logs, said the behavioral matrix was running inference loops it wasn't programmed for. Then the SCRAM hit, and ${scientistLast} said: 'It chose this.'"`,
+    summary: `Crew testimony: data core's autonomous SCRAM decision`,
+  }),
+  [IncidentArchetype.Sabotage]: (crewName, _eng, captainLast) => ({
+    text: `${crewName}: "The cargo was relabeled twice before it came aboard. I saw the original manifest — biological, Class 4 containment required. ${captainLast} signed off on a Class 1 override. Said the samples were inert. They weren't."`,
+    summary: `Crew testimony: cargo reclassification and containment override`,
+  }),
+  [IncidentArchetype.SignalAnomaly]: (crewName, _eng, _cap, scientistLast) => ({
+    text: `${crewName}: "The antenna array wasn't scheduled for transmission — it was receive-only. ${scientistLast} rewired the feed at 03:00. Full power burst. No shielding. When the response came back, every screen on the station lit up at once. ${scientistLast} just stared and said: 'They heard us.'"`,
+    summary: `Crew testimony: unauthorized transmission and response`,
+  }),
+};
+
 // ── Drone encounter dialogue (Item 10) ─────────────────────
 // 30% chance when player walks adjacent to a drone.
 export const DRONE_STATUS_MESSAGES: string[] = [

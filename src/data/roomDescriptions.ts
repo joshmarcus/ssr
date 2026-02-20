@@ -136,8 +136,26 @@ const INCIDENT_TRACES: Record<string, Record<string, string>> = {
   },
 };
 
+/** Archetype-specific opening atmosphere for Arrival Bay — sets the tone in the first room. */
+const ARRIVAL_BAY_TRACES: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]:
+    "The airlock seals are warm to the touch. A faint chemical haze hangs at knee height — coolant vapor, blown in from deeper in the station. The recyclers can't keep up.",
+  [IncidentArchetype.HullBreach]:
+    "A pressure differential tugs at the airlock's inner door — somewhere deeper, atmosphere is leaking. The emergency pressure readout by the door reads 72 and falling.",
+  [IncidentArchetype.ReactorScram]:
+    "The arrival terminal's screen flickers with text you didn't request: 'MAINTENANCE UNIT DETECTED. ASSESSING INTENT.' The data core is already aware of you.",
+  [IncidentArchetype.Sabotage]:
+    "A strip of quarantine tape blocks the secondary corridor. Someone sealed this path with a manual latch — not station protocol. Scratch marks on the tape dispensing edge.",
+  [IncidentArchetype.SignalAnomaly]:
+    "Every inactive screen in the vestibule pulses faintly at the same frequency — a slow, rhythmic flicker. It started during the overload and hasn't stopped.",
+};
+
 /** Get an archetype-specific incident trace for a room. */
 export function getIncidentTrace(roomName: string, archetype?: string): string | null {
   if (!archetype) return null;
+  // Arrival Bay gets archetype opening traces
+  if (roomName === "Arrival Bay") {
+    return ARRIVAL_BAY_TRACES[archetype] || null;
+  }
   return INCIDENT_TRACES[archetype]?.[roomName] || null;
 }
