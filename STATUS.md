@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 32 complete (Archetype-Specific Narrative Content)
+- **Phase**: Sprint 33 complete (Environmental Storytelling)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -65,6 +65,17 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 33 Changes
+
+### Environmental Incident Traces
+- **25 archetype × room incident trace descriptions**: When entering key rooms (Power Relay Junction, Life Support, Engine Core, etc.) for the first time, an additional narrative line describes visible physical evidence of the archetype's incident:
+  - CoolantCascade: dried coolant residue, warped relay housings, burst coolant lines
+  - HullBreach: microparticle debris from decompression, sucked curtains, stress fractures
+  - ReactorScram: flickering self-referential diagnostics, researcher's whiteboard notes, autonomous SCRAM logs
+  - Sabotage: broken biological containment seals, organic residue in air recyclers, quarantine tape
+  - SignalAnomaly: EM burn marks, signal analysis printouts with "IT RESPONDED", 14.7 kHz static on every screen
+- **5 rooms per archetype**: Power Relay Junction / Life Support / Engine Core / specific rooms per archetype get unique incident trace text
 
 ## Sprint 32 Changes
 

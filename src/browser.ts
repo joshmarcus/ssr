@@ -16,7 +16,7 @@ import {
   getVictoryText, getVictoryEpiloguePartial, getVictoryEpilogueComplete,
   getDefeatText, getDefeatRelayText,
 } from "./data/endgame.js";
-import { getRoomDescription } from "./data/roomDescriptions.js";
+import { getRoomDescription, getIncidentTrace } from "./data/roomDescriptions.js";
 import {
   BOT_INTROSPECTIONS, DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
   AMBIENT_HEAT_MESSAGES, AMBIENT_HEAT_DEFAULT, CLEANING_MESSAGES, DIRT_TRAIL_HINTS,
@@ -379,6 +379,15 @@ function checkRoomEntry(): void {
       const desc = getRoomDescription(currentRoom.name, state.seed);
       if (desc) {
         display.addLog(desc, "narrative");
+      }
+
+      // Archetype-specific environmental incident trace
+      const incidentTrace = getIncidentTrace(
+        currentRoom.name,
+        state.mystery?.timeline.archetype,
+      );
+      if (incidentTrace) {
+        display.addLog(incidentTrace, "narrative");
       }
 
       // List notable entities in the room

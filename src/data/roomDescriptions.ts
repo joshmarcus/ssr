@@ -5,6 +5,7 @@
  * Each description is 1-2 sentences of terse, sensor-report-style prose
  * consistent with the low-bitrate terminal aesthetic.
  */
+import { IncidentArchetype } from "../shared/types.js";
 
 export const ROOM_DESCRIPTIONS: Record<string, string> = {
   "Arrival Bay":
@@ -90,4 +91,53 @@ export function getRoomDescription(roomName: string, seed: number): string | nul
     return GENERIC_ROOM_DESCRIPTIONS[idx];
   }
   return null;
+}
+
+// ── Archetype-specific environmental incident traces ──────────
+// Visible signs of the incident, displayed as additional room-enter flavor
+// when entering specific rooms for the first time. Each archetype leaves
+// different physical evidence of what happened.
+
+const INCIDENT_TRACES: Record<string, Record<string, string>> = {
+  [IncidentArchetype.CoolantCascade]: {
+    "Power Relay Junction": "Coolant residue streaks the walls in dried rivulets. The relay housing is warped from thermal stress — the metal expanded and never contracted.",
+    "Life Support": "A burst coolant line drips from the ceiling. The fluid has corroded the deck plating underneath, exposing cable runs below.",
+    "Engine Core": "The floor is slick with dried coolant. Temperature warning tape peels from pipe junctions — every one exceeded rated capacity.",
+    "Maintenance Corridor": "Handprints in coolant residue along the walls at waist height. Someone ran through here while the pipes were still venting.",
+    "Crew Quarters": "A heat blister has bubbled the paint on the far wall. The air still carries a faint chemical tang — coolant vapor, metabolized by the recyclers but not quite gone.",
+  },
+  [IncidentArchetype.HullBreach]: {
+    "Med Bay": "Fine debris dusts every surface — microparticles from a rapid decompression event. The autodoc's sample tray shattered when the pressure dropped.",
+    "Crew Quarters": "One bunk's privacy curtain is sucked flat against the vent grate. The pressure differential pulled everything toward the breach point.",
+    "Communications Hub": "A hairline crack runs through the viewport — not the hull breach, but stress fracture from the pressure wave that followed it.",
+    "Armory": "The security locker door hangs open. Override keycard still inserted. Whoever opened it last didn't bother closing it — they were in too much of a hurry.",
+    "Research Lab": "Specimen containers are toppled. The pressure seal held, but barely — gasket deformation marks ring the door frame.",
+  },
+  [IncidentArchetype.ReactorScram]: {
+    "Data Core": "The terminal screens flicker with scrolling diagnostic text — the core is running processes, but the output is... strange. Self-referential. Recursive.",
+    "Research Lab": "A researcher's whiteboard shows a decision tree labeled 'EMERGENT BEHAVIOR?' The last branch reads: 'If self-aware → preserve at all costs??'",
+    "Engine Core": "The reactor status display shows SCRAM in amber letters. Below it, in smaller text: 'Initiated by: CORE AUTONOMOUS PROCESS.' Not a person.",
+    "Server Annex": "The server racks pulse with irregular activity. Load indicators spike and fall in patterns that look almost like breathing.",
+    "Bridge": "The main viewscreen shows a diagnostic overlay that nobody requested. The data core is monitoring the station — watching through every camera.",
+  },
+  [IncidentArchetype.Sabotage]: {
+    "Cargo Hold": "A cargo container sits open, its biological containment seal broken. The interior is scorched — someone tried to sterilize whatever was inside, too late.",
+    "Life Support": "The air recycler filters are stained with an organic residue that shouldn't be there. Biological particulate count: elevated. Source: unknown.",
+    "Med Bay": "Quarantine tape across one treatment bay. An abandoned biohazard container sits sealed on the counter, labeled with a cargo manifest number.",
+    "Armory": "Security equipment deployed in haste — zip restraints, containment netting, a portable scanner. The readout shows biological anomalies.",
+    "Maintenance Corridor": "Scratch marks on the wall panels — not tool marks. Something with physical force came through here. The scratches are at waist height and irregular.",
+  },
+  [IncidentArchetype.SignalAnomaly]: {
+    "Communications Hub": "The primary antenna housing shows EM burn marks — the transmission pulse fused internal components. The array is a write-off.",
+    "Research Lab": "Signal analysis printouts cover the desk. Someone circled the same frequency pattern over and over, wrote 'IT RESPONDED' in the margin.",
+    "Bridge": "Every screen shows static at the same frequency — 14.7 kHz. The pattern pulses slowly, like something breathing. It started during the overload and hasn't stopped.",
+    "Server Annex": "Hard drives are warm to the touch. The signal processing buffers are full — they captured the complete transmission exchange. There was a reply.",
+    "Engine Core": "Electromagnetic burn patterns arc across the reactor housing. The overload pulse traveled through every conductive surface in the station.",
+  },
+};
+
+/** Get an archetype-specific incident trace for a room. */
+export function getIncidentTrace(roomName: string, archetype?: string): string | null {
+  if (!archetype) return null;
+  return INCIDENT_TRACES[archetype]?.[roomName] || null;
 }
