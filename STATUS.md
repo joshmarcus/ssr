@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 53 complete (Mystery Choice Notifications, Deduction Progress UI)
+- **Phase**: Sprint 54 complete (Room Investigation Progress, Legend Dimming, Airlock Fix)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -82,6 +82,20 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 54 Changes
+
+### Room Investigation Progress
+- **Entity count on room re-entry**: "N objects to investigate" shown when re-entering a room with fresh (non-exhausted) interactable entities
+- **"Room fully investigated"**: Shown when all entities in the current room have been interacted with
+- Helps players know at a glance whether to linger or move on to the next room
+
+### Legend Dimming
+- **Exhausted entity types dim in legend**: When ALL entities of a type in the current room are exhausted, that legend entry dims to grey
+- Visual consistency with the dimmed exhausted entities on the map
+
+### Airlock Pressure Fix
+- **Open airlock tiles now re-zeroed after pressure spreading**: Prevents pressure from creeping back onto open airlock tiles via neighbor spreading in tickHazards()
 
 ## Sprint 53 Changes
 
