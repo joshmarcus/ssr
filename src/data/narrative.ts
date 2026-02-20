@@ -97,37 +97,37 @@ export const CREW_BOARDING_DIALOGUE: Record<string, (name: string) => string> = 
   [PersonalityTrait.Pragmatic]: (name) => `${name} buckles in with practiced efficiency. "Good work, little bot. Get yourself out too."`,
 };
 
-// ── Crew escort reactions (contextual dialogue while following) ──
-// Keyed by context trigger, then by personality. Each returns a one-liner.
-export const CREW_ESCORT_REACTIONS: Record<string, Record<string, (name: string) => string>> = {
-  heat: {
-    [PersonalityTrait.Cautious]: (name) => `${name} flinches. "It's getting hot. Are you sure about this route?"`,
-    [PersonalityTrait.Ambitious]: (name) => `${name} wipes sweat from their brow. "Keep moving. We can take it."`,
-    [PersonalityTrait.Loyal]: (name) => `${name} pulls their collar up. "The others — were they in this heat too?"`,
-    [PersonalityTrait.Secretive]: (name) => `${name} glances at a vent panel. "There's a reason the thermal regulators failed here."`,
-    [PersonalityTrait.Pragmatic]: (name) => `${name} checks the wall temperature with their hand. "We have maybe two minutes before this gets dangerous."`,
-  },
-  smoke: {
-    [PersonalityTrait.Cautious]: (name) => `${name} coughs. "I can't see. I can't—" They grab onto your chassis.`,
-    [PersonalityTrait.Ambitious]: (name) => `${name} pulls their shirt over their nose. "Smoke means fire means we need to move faster."`,
-    [PersonalityTrait.Loyal]: (name) => `${name} looks back through the haze. "Anyone else back there? Hello?"`,
-    [PersonalityTrait.Secretive]: (name) => `${name} breathes shallow. "This smoke... it's not from the fire. Check the ventilation logs."`,
-    [PersonalityTrait.Pragmatic]: (name) => `${name} drops low. "Stay below the smoke line. Crawl if you have to."`,
-  },
-  dark: {
-    [PersonalityTrait.Cautious]: (name) => `${name} stumbles in the dark. "Wait — slow down. I can't see where I'm stepping."`,
-    [PersonalityTrait.Ambitious]: (name) => `${name}: "Power's out here too. They really did a number on this place."`,
-    [PersonalityTrait.Loyal]: (name) => `${name} whispers: "Is someone there? I keep hearing—" They shake their head. "Never mind."`,
-    [PersonalityTrait.Secretive]: (name) => `${name} is quiet for a long time. Then: "The lights went out the night it happened, too."`,
-    [PersonalityTrait.Pragmatic]: (name) => `${name}: "Emergency lighting should still work. Someone pulled the breakers intentionally."`,
-  },
-  quiet: {
-    [PersonalityTrait.Cautious]: (name) => `${name} glances around nervously. "It's too quiet. That's never good."`,
-    [PersonalityTrait.Ambitious]: (name) => `${name}: "How much further to the pods? We're wasting time."`,
-    [PersonalityTrait.Loyal]: (name) => `${name}: "I keep thinking about the people who didn't make it to cryo."`,
-    [PersonalityTrait.Secretive]: (name) => `${name} stares at a wall panel. "There's something I should tell you. When we get to the pod."`,
-    [PersonalityTrait.Pragmatic]: (name) => `${name}: "Bot — you're doing good work. Just get us there in one piece."`,
-  },
+// ── Crew escort dialogue arc (3-step sequential per personality) ──
+// Each personality has a 3-step arc that builds from reaction → deepening → payoff.
+// Step 0: initial context-sensitive reaction (environmental trigger)
+// Step 1: the crew member starts to open up (fires after more time together)
+// Step 2: emotional payoff that pays off their personality trait
+export const CREW_ESCORT_ARC: Record<string, [(name: string) => string, (name: string) => string, (name: string) => string]> = {
+  [PersonalityTrait.Cautious]: [
+    (name) => `${name} glances around nervously. "It's too quiet. That's never good."`,
+    (name) => `${name}: "I keep flinching at every sound. Before the incident, I slept with the lights on. The others laughed. Now none of them are laughing."`,
+    (name) => `${name} takes a shaky breath. "I knew something was wrong. Three days before it happened, I filed a concern report. They told me I was being paranoid. I wasn't."`,
+  ],
+  [PersonalityTrait.Ambitious]: [
+    (name) => `${name}: "How much further to the pods? We're wasting time."`,
+    (name) => `${name}: "I pushed for the promotion. Pushed hard. Stepped on people to get the clearance level. And the first thing I learned with that clearance was that none of us should be here."`,
+    (name) => `${name} stops walking. "When we get out of here... I'm going to tell them everything. Not the sanitized version. Everything. It's the only thing I've done that might actually matter."`,
+  ],
+  [PersonalityTrait.Loyal]: [
+    (name) => `${name}: "I keep thinking about the people who didn't make it to cryo."`,
+    (name) => `${name}: "We had a pact — the six of us on night shift. If anything ever went wrong, we'd meet at the pods. I was the only one who showed up."`,
+    (name) => `${name}'s voice breaks. "If you find the others... tell them I tried. Tell them I came back twice before the corridors sealed. Tell them I didn't just leave."`,
+  ],
+  [PersonalityTrait.Secretive]: [
+    (name) => `${name} stares at a wall panel. "There's something I should tell you. When we get to the pod."`,
+    (name) => `${name}: "I've been carrying something. A data chip. I took it from the commander's quarters the night it happened. I don't know if that makes me smart or complicit."`,
+    (name) => `${name} presses something small into your sensor housing. "The chip. It has the original orders — before they were edited. Make sure someone outside sees this. Promise me."`,
+  ],
+  [PersonalityTrait.Pragmatic]: [
+    (name) => `${name}: "Bot — you're doing good work. Just get us there in one piece."`,
+    (name) => `${name}: "I've run this route in my head a hundred times since cryo. Distance, air supply, hazard windows. The math says we make it. Barely."`,
+    (name) => `${name} looks at you directly. "You know you're more than a cleaning bot, right? Whatever they programmed you for — you chose to come find us. That's not maintenance. That's something else."`,
+  ],
 };
 
 // ── Crew questioning dialogue (archetype-specific testimony) ──
@@ -344,6 +344,22 @@ export const ROOM_AMBIENT_EVENTS: Record<string, string[]> = {
   ],
 };
 
+// Corridor transit ambient text — fires once per corridor segment
+export const CORRIDOR_AMBIENT: string[] = [
+  "The corridor smells of ozone and old coolant. Something overloaded here.",
+  "Boot prints in the deck plating. Someone ran this route in a hurry.",
+  "A failed emergency light flickers overhead, trying and failing to illuminate the passage.",
+  "The ventilation grate rattles. Air pressure differential — somewhere nearby, the station is open to vacuum.",
+  "Scorch marks along the wall. A fire burned here and extinguished itself when the oxygen ran out.",
+  "A maintenance panel hangs open. Tools scattered on the floor, abandoned mid-repair.",
+  "The corridor narrows where a support beam has buckled. Structural stress is winning.",
+  "Someone wedged a fire extinguisher into the doorframe here. It held the door open until the cylinder ran dry.",
+  "Condensation drips from the ceiling. The thermal regulation in this section gave up months ago.",
+  "A personal photo is taped to the wall — a reminder of somewhere else. The tape is giving way.",
+  "Cable bundles dangle from an open ceiling panel. Someone was rerouting power by hand.",
+  "The floor plating vibrates beneath your treads. The station's heartbeat, faint but present.",
+];
+
 // Default ambient events for rooms without specific entries
 export const ROOM_AMBIENT_DEFAULT: string[] = [
   "A distant clang reverberates through the station frame.",
@@ -501,6 +517,48 @@ export const CORVUS_REACTIONS: Record<string, string> = {
   explore_50: "CORVUS-7 CENTRAL: Half the station surveyed. The scope of the incident is becoming clearer. Press on.",
   explore_75: "CORVUS-7 CENTRAL: Survey nearly complete. You have seen the worst this station endured. Only a few sections remain.",
   explore_100: "CORVUS-7 CENTRAL: Full station survey complete. Every corridor, every room — mapped and recorded. Nothing is hidden now.",
+};
+
+// ── CORVUS-7 deduction ceremony commentary (tier-specific) ──
+// Fired after the revelation overlay is dismissed. Each deduction category
+// gets a unique CORVUS-7 line acknowledging the player's discovery.
+export const CORVUS_DEDUCTION_CEREMONY: Record<string, { correct: string; wrong: string }> = {
+  deduction_what: {
+    correct: "CORVUS-7 CENTRAL: Incident classification confirmed. Now you know what happened here. The question is why.",
+    wrong: "CORVUS-7 CENTRAL: Analysis inconclusive. The incident type remains unclear. Seek more evidence.",
+  },
+  deduction_who: {
+    correct: "CORVUS-7 CENTRAL: Key personnel identified. The crew manifest is more than names now — it's a chain of events.",
+    wrong: "CORVUS-7 CENTRAL: Personnel identification inconclusive. The crew records hold more detail than surface readings suggest.",
+  },
+  deduction_when: {
+    correct: "CORVUS-7 CENTRAL: Timeline established. The sequence of events is crystallizing. Every timestamp matters.",
+    wrong: "CORVUS-7 CENTRAL: Timeline uncertain. Correlate terminal logs with environmental data for better chronology.",
+  },
+  deduction_where: {
+    correct: "CORVUS-7 CENTRAL: Origin point confirmed. Mapping cause to location. The station's layout tells a story.",
+    wrong: "CORVUS-7 CENTRAL: Location analysis inconclusive. Cross-reference room evidence with crew movement patterns.",
+  },
+  deduction_how: {
+    correct: "CORVUS-7 CENTRAL: Mechanism confirmed. The physical evidence aligns. You understand how it was done.",
+    wrong: "CORVUS-7 CENTRAL: Mechanism unclear. Look at what the systems were doing, not just what the crew was saying.",
+  },
+  deduction_why: {
+    correct: "CORVUS-7 CENTRAL: Motive established. The hardest question answered. Now get the survivors out.",
+    wrong: "CORVUS-7 CENTRAL: Motive remains unclear. The answer may lie in what someone had to gain — or what they were trying to hide.",
+  },
+  deduction_hero: {
+    correct: "CORVUS-7 CENTRAL: The one who fought back. Identified. Their story deserves to be told.",
+    wrong: "CORVUS-7 CENTRAL: The hero's identity remains uncertain. Someone tried to stop this — who?",
+  },
+  deduction_responsibility: {
+    correct: "CORVUS-7 CENTRAL: Accountability established. The full picture is clear. This was not an accident.",
+    wrong: "CORVUS-7 CENTRAL: Responsibility still unclear. The evidence is there — it just needs the right lens.",
+  },
+  deduction_agenda: {
+    correct: "CORVUS-7 CENTRAL: The deeper truth revealed. Some stories go beyond one station, one incident.",
+    wrong: "CORVUS-7 CENTRAL: There is something beneath the surface. Keep digging.",
+  },
 };
 
 // ── Sensor-specific environmental clues (archetype × room × sensor) ──
@@ -662,19 +720,24 @@ export const TUTORIAL_HINTS_EARLY: TutorialHint[] = [
   {
     id: "move_explore",
     turn: 3,
-    text: "TIP: Use arrow keys to move. Explore rooms and look for terminals [i] to interact.",
+    text: "TIP: Explore rooms and look for glowing objects to interact with [i].",
   },
   {
     id: "clean_rooms",
     turn: 8,
-    text: "TIP: Press [c] to clean dirty tiles. Reach 80% cleanliness in each room to unlock the next phase.",
+    text: "TIP: Press [c] to clean dirty tiles. Cleanliness matters for the maintenance phase.",
   },
   {
     id: "scan_overlay",
     turn: 15,
-    text: "TIP: Press [t] to toggle sensor overlays. Cleanliness overlay shows dirt levels across the station.",
+    text: "TIP: Press [t] to toggle sensor overlays. Reveals hidden environmental data.",
   },
 ];
+
+// Action-triggered hints (fire once when player first performs each action type)
+export const TUTORIAL_HINT_FIRST_INTERACT = "Objects with a blue glow can be interacted with. Terminals contain logs, relays restore power.";
+export const TUTORIAL_HINT_FIRST_SCAN = "Scanning reveals environmental data. Different sensors detect different things — thermal finds heat signatures, atmospheric finds pressure changes.";
+export const TUTORIAL_HINT_FIRST_CLEAN = "Cleaning improves room cleanliness. Reach 80% in each room to progress to the investigation phase.";
 
 // Event-triggered hints (fired once per event type)
 export const TUTORIAL_HINT_FIRST_EVIDENCE = "TIP: Evidence found! Press [v] to browse your journal. Collecting evidence unlocks deductions.";

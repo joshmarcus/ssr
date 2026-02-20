@@ -17,17 +17,18 @@ import {
   getDefeatText, getDefeatRelayText,
 } from "./data/endgame.js";
 import { getRoomDescription, getIncidentTrace } from "./data/roomDescriptions.js";
-import { CORVUS_REACTIONS, CORVUS_FINAL_TRANSMISSION } from "./data/narrative.js";
+import { CORVUS_REACTIONS, CORVUS_FINAL_TRANSMISSION, CORVUS_DEDUCTION_CEREMONY } from "./data/narrative.js";
 import {
   BOT_INTROSPECTIONS, BOT_INTROSPECTIONS_BY_ARCHETYPE,
   DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
   AMBIENT_HEAT_MESSAGES, AMBIENT_HEAT_DEFAULT, CLEANING_MESSAGES, DIRT_TRAIL_HINTS,
   DRONE_ENCOUNTER_LOGS, DRONE_CLEANING_MESSAGE,
   TUTORIAL_HINTS_EARLY, TUTORIAL_HINT_FIRST_EVIDENCE, TUTORIAL_HINT_FIRST_DEDUCTION,
-  TUTORIAL_HINT_INVESTIGATION, PRESSURE_ZONE_HINTS,
+  TUTORIAL_HINT_INVESTIGATION, TUTORIAL_HINT_FIRST_INTERACT, TUTORIAL_HINT_FIRST_SCAN,
+  TUTORIAL_HINT_FIRST_CLEAN, PRESSURE_ZONE_HINTS,
   CREW_DISTRESS_HINT, BREACH_PROXIMITY_HINT,
-  ROOM_AMBIENT_EVENTS, ROOM_AMBIENT_DEFAULT,
-  CREW_ESCORT_REACTIONS,
+  ROOM_AMBIENT_EVENTS, ROOM_AMBIENT_DEFAULT, CORRIDOR_AMBIENT,
+  CREW_ESCORT_ARC,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
@@ -186,6 +187,8 @@ let cleanMsgIndex = 0;
 let lastAmbientRoomId = "";
 let currentRoomTurns = 0; // turns spent in current room (for ambient events)
 let lastRoomIdForAmbient = ""; // track room changes for ambient counter
+const escortArcSteps = new Map<string, number>(); // track escort dialogue arc step per crew NPC
+const corridorAmbientFired = new Set<string>(); // track corridor segments that have triggered ambient text
 let journalOpen = false;
 let journalTab: "evidence" | "deductions" = "evidence";
 let activeChoice: MysteryChoice | null = null;
@@ -211,6 +214,7 @@ let hubConfirming = false;            // Y/N confirmation for deduction answer
 let hubLinkFeedback = "";             // feedback message after toggling evidence
 let hubFocusRegion: "evidence" | "answers" = "evidence"; // focus region in connection detail view
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
+let pendingCeremonyDeduction: { id: string; correct: boolean } | null = null; // for post-overlay CORVUS-7 commentary
 let lastWwkJournalCount = 0; // journal count when WHAT WE KNOW was last viewed
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
 
@@ -724,13 +728,10 @@ function initGame(): void {
     ? new BrowserDisplay3D(containerEl, state.width, state.height)
     : new BrowserDisplay(containerEl, state.width, state.height);
 
-  // ── Dramatic link establishment sequence ────────────────────────
-  display.addLog("ESTABLISHING LINK...", "system");
-  display.addLog("Carrier signal acquired. Handshake with Rover A3... OK.", "system");
-  display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. No video, no audio.", "milestone");
-  display.addLog("Rover A3 responds. Battery 98%. Cleanliness sensor online.", "system");
+  // ── Dramatic link establishment sequence (compact) ──────────────
+  display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. Rover A3 online.", "milestone");
   display.addLog("The station is quiet. What happened here?", "narrative");
-  display.addLog("MAINTENANCE SUBROUTINE: Clean rooms to 80% standard. Use [c] to clean.", "system");
+  display.addLog("Use arrow keys or h/j/k/l to move. Approach objects and press [i] to interact.", "system");
   lastObjectivePhase = ObjectivePhase.Clean;
 
   // Start archetype-specific ambient soundscape
@@ -945,12 +946,17 @@ function resetGameState(newSeed: number): void {
   cleanMsgIndex = 0;
   waitMsgIndex = 0;
   lastAmbientRoomId = "";
+  currentRoomTurns = 0;
+  lastRoomIdForAmbient = "";
+  escortArcSteps.clear();
+  corridorAmbientFired.clear();
   mapOpen = false;
   helpOpen = false;
   incidentCardOpen = false;
   activeDeduction = null;
   deductionSelectedIdx = 0;
   confirmingDeduction = false;
+  pendingCeremonyDeduction = null;
   hubSection = "evidence";
   hubOptionIdx = 0;
   hubLinkedEvidence = [];
@@ -1117,6 +1123,22 @@ function handleAction(action: Action): void {
 
   // Start background music on first player interaction
   audio.startBgMusic();
+
+  // Action-triggered tutorial hints (fire once per action type)
+  if (state.turn !== prevTurn) {
+    if (action.type === ActionType.Interact && !triggeredTutorialHints.has("first_interact")) {
+      triggeredTutorialHints.add("first_interact");
+      display.addLog(TUTORIAL_HINT_FIRST_INTERACT, "system");
+    }
+    if (action.type === ActionType.Scan && !triggeredTutorialHints.has("first_scan")) {
+      triggeredTutorialHints.add("first_scan");
+      display.addLog(TUTORIAL_HINT_FIRST_SCAN, "system");
+    }
+    if (action.type === ActionType.Clean && !triggeredTutorialHints.has("first_clean")) {
+      triggeredTutorialHints.add("first_clean");
+      display.addLog(TUTORIAL_HINT_FIRST_CLEAN, "system");
+    }
+  }
 
   // Show sim-generated log messages (from interactions) with proper classification
   if (state.logs.length > prevLogs) {
@@ -1319,29 +1341,36 @@ function handleAction(action: Action): void {
     }
   }
 
-  // Crew escort personality reactions: contextual dialogue while following
-  if (state.turn !== prevTurn && state.turn % 10 === 0) {
+  // Corridor transit ambient text: fire once per corridor segment
+  if (action.type === ActionType.Move && state.turn !== prevTurn) {
     const px = state.player.entity.pos.x;
     const py = state.player.entity.pos.y;
-    const tile = state.tiles[py]?.[px];
-    for (const [, entity] of state.entities) {
+    const playerRoom = getRoomAt(state, { x: px, y: py });
+    if (!playerRoom) {
+      // Player is in a corridor — bucket by every 4 tiles
+      const segKey = `${Math.floor(px / 4)}_${Math.floor(py / 4)}`;
+      if (!corridorAmbientFired.has(segKey)) {
+        corridorAmbientFired.add(segKey);
+        const idx = (px * 7 + py * 13) % CORRIDOR_AMBIENT.length;
+        display.addLog(CORRIDOR_AMBIENT[idx], "narrative");
+      }
+    }
+  }
+
+  // Crew escort dialogue arc: sequential personality-driven lines while following
+  if (state.turn !== prevTurn && state.turn % 12 === 0) {
+    for (const [entityId, entity] of state.entities) {
       if (entity.type !== EntityType.CrewNPC) continue;
       if (entity.props["following"] !== true) continue;
       if (entity.props["dead"] === true || entity.props["evacuated"] === true) continue;
       const personality = (entity.props["personality"] as string) || "cautious";
       const crewName = `${entity.props["firstName"]} ${entity.props["lastName"]}`;
-      // Pick context based on current tile conditions
-      let context = "quiet";
-      if (tile && tile.heat >= 25) context = "heat";
-      else if (tile && tile.smoke >= 10) context = "smoke";
-      else if (tile && tile.pressure < 50) context = "dark";
-      const reactionPool = CREW_ESCORT_REACTIONS[context];
-      if (reactionPool) {
-        const fn = reactionPool[personality];
-        if (fn) {
-          display.addLog(fn(crewName), "narrative");
-          break; // one reaction per tick
-        }
+      const step = (escortArcSteps.get(entityId) ?? 0);
+      const arc = CREW_ESCORT_ARC[personality];
+      if (arc && step < arc.length) {
+        display.addLog(arc[step](crewName), "narrative");
+        escortArcSteps.set(entityId, step + 1);
+        break; // one line per tick
       }
     }
   }
@@ -2937,6 +2966,16 @@ function handleHubInput(e: KeyboardEvent): void {
       overlay.classList.remove("active");
       overlay.innerHTML = "";
     }
+    // Fire CORVUS-7 post-deduction ceremony commentary
+    if (pendingCeremonyDeduction) {
+      const ceremony = CORVUS_DEDUCTION_CEREMONY[pendingCeremonyDeduction.id];
+      if (ceremony) {
+        const line = pendingCeremonyDeduction.correct ? ceremony.correct : ceremony.wrong;
+        display.addLog(line, "milestone");
+        audio.playPA();
+      }
+      pendingCeremonyDeduction = null;
+    }
     renderInvestigationHub();
     return;
   }
@@ -3221,12 +3260,14 @@ function commitHubDeductionAnswer(): void {
       hubRevelationOverlay = true;
     }
 
+    pendingCeremonyDeduction = { id: solved.id, correct: true };
     if (devModeEnabled) {
       display.addLog(`[DEV] Deduction ${solved.id} solved correctly`, "system");
     }
   } else {
     display.addLog(`\u2717 Incorrect. The evidence doesn't support that conclusion.`, "warning");
     audio.playDeductionWrong();
+    pendingCeremonyDeduction = { id: solved.id, correct: false };
 
     if (overlay) {
       overlay.classList.add("active");
