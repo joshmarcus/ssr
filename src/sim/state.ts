@@ -52,5 +52,6 @@ export function createEmptyState(seed: number, width: number, height: number, di
     victory: false,
     difficulty,
     maxTurns: settings.maxTurns,
+    milestones: new Set<string>(),
   };
 }

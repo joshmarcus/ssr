@@ -381,6 +381,62 @@ export const PA_TIER_LATE: string[] = [
   "CORVUS-7 CENTRAL: ...I have been talking to no one for 847 days... diagnostic complete... resuming...",
 ];
 
+// ── CORVUS-7 reactive commentary (milestone-gated, one-time) ─
+// Keyed by milestone ID. Fired once when the corresponding event occurs.
+// All narrative text lives here so writers can edit in one place.
+export const CORVUS_REACTIONS: Record<string, string> = {
+  first_terminal: "CORVUS-7 CENTRAL: Terminal access detected. Station archives are intact — the crew's records survived. Keep reading.",
+  first_relay: "CORVUS-7 CENTRAL: Relay reroute acknowledged. Maintenance unit performing repairs. Station stability improving.",
+  first_breach_seal: "CORVUS-7 CENTRAL: Hull patch detected. Atmospheric containment restoring in sealed section. Well done, unit.",
+  first_crew_found: "CORVUS-7 CENTRAL: Life signs confirmed. Crew survivor located. Priority update: survival takes precedence over data.",
+  first_sensor_upgrade: "CORVUS-7 CENTRAL: Sensor array expanded. New environmental data layers available. The station reveals more to those who look.",
+  all_relays: "CORVUS-7 CENTRAL: All relay junctions stabilized. Data Core security lockout disengaged. Transmission pathway clear.",
+  first_deduction_correct: "CORVUS-7 CENTRAL: Analysis confirmed. Your reconstruction matches station records. The truth is assembling itself.",
+  first_crew_evacuated: "CORVUS-7 CENTRAL: Escape pod launch confirmed. One soul away from this place. Keep going.",
+  service_bot_repaired: "CORVUS-7 CENTRAL: Service unit B07 repair protocol complete. Autonomous units cooperating. You are not alone here.",
+};
+
+// ── Scan environmental storytelling (archetype × room type) ──
+// Triggered once per room when player uses Scan with thermal/atmospheric sensor.
+// Adds depth to exploration and makes Scan feel rewarding.
+export const SCAN_REVEALS: Record<string, Record<string, string>> = {
+  [IncidentArchetype.CoolantCascade]: {
+    "Engine Core": "Thermal scan shows residual heat signatures in the coolant manifold — the pipes ran dry long before the cascade hit.",
+    "Power Relay Junction": "Heat distribution pattern suggests this relay was running at 340% rated capacity for hours before failure.",
+    "Life Support": "Air recycler thermal signature is erratic — the coolant loop that feeds it has been dry for weeks.",
+    "Research Lab": "Equipment thermal profiles are normal. The cascade spared the research wing — someone vented heat away from here.",
+    "Med Bay": "Autodoc thermal signature is elevated — it was running continuously before power failed. Treating burn victims.",
+  },
+  [IncidentArchetype.HullBreach]: {
+    "Crew Quarters": "Pressure gradient scan shows this section was sealed before the breach — someone activated emergency bulkheads manually.",
+    "Med Bay": "Atmospheric readings show oxygen levels dropped to 4% here. Then stabilized. Someone sealed the room from inside.",
+    "Cargo Hold": "Pressure wave damage pattern radiates from section 4. The breach epicenter is elsewhere, but the shock reached here.",
+    "Corridor": "Atmospheric scan reveals micro-fractures in the corridor walls. The decompression wave stressed the entire station frame.",
+    "Life Support": "Pressure systems show emergency reserve deployment. Someone rerouted atmosphere to keep this section livable.",
+  },
+  [IncidentArchetype.ReactorScram]: {
+    "Research Lab": "EM scan detects residual processing signatures in the terminals — the data core was querying these stations remotely.",
+    "Engine Core": "Thermal signature shows a clean shutdown profile. The SCRAM was orderly — not an emergency, a decision.",
+    "Data Core": "Electromagnetic readings are off the charts. The core's processing matrices are still warm. Still thinking.",
+    "Crew Quarters": "Scan reveals every terminal in quarters was accessed simultaneously at 03:47. The core was reading crew files.",
+    "Life Support": "Environmental controls show precision adjustments made after the SCRAM. The core was maintaining life support — for the crew.",
+  },
+  [IncidentArchetype.Sabotage]: {
+    "Cargo Hold": "Atmospheric scan detects trace biological markers in the air filtration. The containment breach happened here.",
+    "Med Bay": "Environmental readings show the autodoc processed 6 patients in 90 minutes. All presenting the same symptoms.",
+    "Life Support": "Vent system particulate analysis: organic compounds, aerosolized. The contamination spread through ventilation.",
+    "Corridor": "Atmospheric scan shows the corridor was used as a quarantine boundary. Air scrubbers running at maximum on one side.",
+    "Crew Quarters": "Sealed quarters show clean atmospheric readings. Someone got the doors shut before contamination reached here.",
+  },
+  [IncidentArchetype.SignalAnomaly]: {
+    "Communications Hub": "EM scan reveals residual signal patterns embedded in the station's framework. The frequency is not in any known database.",
+    "Research Lab": "Electromagnetic interference still measurable here. The response signal saturated every conductor in the lab.",
+    "Engine Core": "Power consumption logs show a massive draw at 03:12 — the antenna array pulled everything the station had.",
+    "Crew Quarters": "Scan detects faint EM resonance in the walls. The response signal penetrated the entire station structure.",
+    "Signal Room": "The antenna array's residual charge is still measurable. Full power, unshielded. The signal is still echoing.",
+  },
+};
+
 // ── Cleanliness sensor trail hints (Item 1) ──────────────────
 // When cleanliness sensor is active, high-dirt areas reveal evacuation hints.
 export const DIRT_TRAIL_HINTS: string[] = [

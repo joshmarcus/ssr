@@ -170,6 +170,7 @@ export interface GameState {
   maxTurns: number; // difficulty-adjusted turn limit
   mystery?: MysteryState;
   deteriorationInterval?: number; // Archetype-specific override (default: DETERIORATION_INTERVAL)
+  milestones: Set<string>; // One-time event flags (e.g. "first_terminal", "first_relay")
 }
 
 // ── Logs / evidence ──────────────────────────────────────────

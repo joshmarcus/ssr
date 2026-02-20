@@ -14,7 +14,35 @@ import { assignThread } from "./threads.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
   CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
+  CORVUS_REACTIONS,
+  SCAN_REVEALS,
 } from "../data/narrative.js";
+
+/**
+ * Fire a one-time CORVUS-7 reactive comment if the milestone hasn't been triggered yet.
+ * Returns the updated state with the milestone recorded and log appended.
+ */
+function fireMilestone(state: GameState, milestoneId: string): GameState {
+  if (state.milestones.has(milestoneId)) return state;
+  const text = CORVUS_REACTIONS[milestoneId];
+  if (!text) return state;
+  const newMilestones = new Set(state.milestones);
+  newMilestones.add(milestoneId);
+  return {
+    ...state,
+    milestones: newMilestones,
+    logs: [
+      ...state.logs,
+      {
+        id: `log_corvus_${milestoneId}`,
+        timestamp: state.turn,
+        source: "system",
+        text,
+        read: false,
+      },
+    ],
+  };
+}
 
 /**
  * Find entities adjacent to or at the player's position.
@@ -601,6 +629,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         : [{ id: `log_pickup_${targetId}`, timestamp: next.turn, source: "system" as const, text: `${sensorType} sensor installed. Scan mode updated.`, read: false }];
 
       next.logs = [...state.logs, ...sensorLogs];
+      next = fireMilestone(next, "first_sensor_upgrade");
       break;
     }
 
@@ -716,6 +745,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           read: false,
         },
       ];
+      next = fireMilestone(next, "first_relay");
+      if (allActivated) next = fireMilestone(next, "all_relays");
       break;
     }
 
@@ -879,6 +910,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             },
           ];
         }
+        next = fireMilestone(next, "first_terminal");
         // Add journal entry for this log
         const logSource = target.props["source"] as string || "unknown";
         const firstLine = terminalText.split("\n")[0] || terminalText.slice(0, 60);
@@ -1030,6 +1062,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             read: false,
           },
         ];
+        next = fireMilestone(next, "service_bot_repaired");
       } else {
         // Already repaired
         next.logs = [
@@ -1176,6 +1209,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             read: false,
           },
         ];
+        next = fireMilestone(next, "first_breach_seal");
       }
       break;
     }
@@ -2073,6 +2107,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             },
           ];
         }
+        next = fireMilestone(next, "first_crew_found");
 
         // Add journal entry
         const crewId = target.props["crewId"] as string || targetId;
@@ -2577,6 +2612,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             };
           }
 
+          next = fireMilestone(next, "first_crew_evacuated");
+
           // Victory check: all living crew evacuated + mystery solved
           if (remaining === 0) {
             const deds = next.mystery?.deductions ?? [];
@@ -2872,6 +2909,33 @@ function handleScan(state: GameState): GameState {
       if (echoLogs.length > 0) {
         next.logs = [...next.logs, ...echoLogs];
         next.mystery = { ...next.mystery, triggeredEchoes: newEchoes };
+      }
+    }
+  }
+
+  // ── Scan Reveals: archetype-specific environmental storytelling ──
+  if (next.mystery && scanRoom) {
+    const roomName = state.rooms.find(
+      r => scanRoom && px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height
+    )?.name;
+    if (roomName) {
+      const archetype = next.mystery.timeline.archetype;
+      const revealText = SCAN_REVEALS[archetype]?.[roomName];
+      const milestoneKey = `scan_reveal_${roomName}`;
+      if (revealText && !next.milestones.has(milestoneKey)) {
+        const newMilestones = new Set(next.milestones);
+        newMilestones.add(milestoneKey);
+        next.milestones = newMilestones;
+        next.logs = [
+          ...next.logs,
+          {
+            id: `log_scan_reveal_${state.turn}`,
+            timestamp: state.turn,
+            source: "sensor",
+            text: revealText,
+            read: false,
+          },
+        ];
       }
     }
   }
@@ -4208,6 +4272,7 @@ export function step(state: GameState, action: Action): GameState {
 
       // Apply reward
       next = applyDeductionReward(next, solved);
+      if (correct) next = fireMilestone(next, "first_deduction_correct");
 
       // Investigation milestone PA announcements
       if (next.mystery) {
