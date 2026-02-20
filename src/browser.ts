@@ -17,7 +17,7 @@ import {
   getDefeatText, getDefeatRelayText,
 } from "./data/endgame.js";
 import { getRoomDescription, getIncidentTrace } from "./data/roomDescriptions.js";
-import { CORVUS_REACTIONS, CORVUS_FINAL_TRANSMISSION, CORVUS_DEDUCTION_CEREMONY } from "./data/narrative.js";
+import { CORVUS_REACTIONS, CORVUS_FINAL_TRANSMISSION, CORVUS_DEDUCTION_CEREMONY, ARCHETYPE_ATMOSPHERE } from "./data/narrative.js";
 import {
   BOT_INTROSPECTIONS, BOT_INTROSPECTIONS_BY_ARCHETYPE,
   DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
@@ -189,6 +189,7 @@ let currentRoomTurns = 0; // turns spent in current room (for ambient events)
 let lastRoomIdForAmbient = ""; // track room changes for ambient counter
 const escortArcSteps = new Map<string, number>(); // track escort dialogue arc step per crew NPC
 const corridorAmbientFired = new Set<string>(); // track corridor segments that have triggered ambient text
+let lastJournalLength = 0; // track journal size for insight notifications
 let journalOpen = false;
 let journalTab: "evidence" | "deductions" = "evidence";
 let activeChoice: MysteryChoice | null = null;
@@ -950,6 +951,7 @@ function resetGameState(newSeed: number): void {
   lastRoomIdForAmbient = "";
   escortArcSteps.clear();
   corridorAmbientFired.clear();
+  lastJournalLength = 0;
   mapOpen = false;
   helpOpen = false;
   incidentCardOpen = false;
@@ -1357,6 +1359,18 @@ function handleAction(action: Action): void {
     }
   }
 
+  // Archetype-specific environmental interrupts: make each archetype feel physically distinct
+  if (state.turn !== prevTurn && state.turn >= 50 && state.turn % 25 === 0) {
+    const archetype = state.mystery?.timeline.archetype;
+    if (archetype) {
+      const pool = ARCHETYPE_ATMOSPHERE[archetype];
+      if (pool) {
+        const idx = ((state.turn / 25) | 0) % pool.length;
+        display.addLog(pool[idx], "narrative");
+      }
+    }
+  }
+
   // Crew escort dialogue arc: sequential personality-driven lines while following
   if (state.turn !== prevTurn && state.turn % 12 === 0) {
     for (const [entityId, entity] of state.entities) {
@@ -1458,6 +1472,34 @@ function handleAction(action: Action): void {
       triggeredTutorialHints.add("first_deduction");
       display.addLog(TUTORIAL_HINT_FIRST_DEDUCTION, "system");
       audio.playDeductionReady();
+    }
+    // Evidence insight notification: fire when new journal entry contributes tags to an unlocked deduction
+    if (state.mystery.journal.length > lastJournalLength) {
+      const journal = state.mystery.journal;
+      const newEntries = journal.slice(lastJournalLength);
+      const newTags = new Set(newEntries.flatMap(j => j.tags));
+      lastJournalLength = journal.length;
+      // Check if any unsolved deduction gained new tag coverage
+      const solvedIds = new Set(state.mystery.deductions.filter(d => d.solved).map(d => d.id));
+      let insightFired = false;
+      for (const d of state.mystery.deductions) {
+        if (d.solved) continue;
+        if (d.unlockAfter && !solvedIds.has(d.unlockAfter)) continue;
+        const relevantNewTags = d.requiredTags.filter(t => newTags.has(t));
+        if (relevantNewTags.length > 0) {
+          const allTags = new Set(journal.flatMap(j => j.tags));
+          const covered = d.requiredTags.filter(t => allTags.has(t)).length;
+          const total = d.requiredTags.length;
+          if (covered === total && !insightFired) {
+            display.addLog(`CORVUS-7 CENTRAL: Evidence cross-referenced. All data assembled for a deduction. Open CONNECTIONS [v].`, "milestone");
+            audio.playDeductionReady();
+            insightFired = true;
+          } else if (!insightFired) {
+            display.addLog(`CORVUS-7 CENTRAL: New evidence cross-referenced — ${covered}/${total} data points for active investigation.`, "system");
+            insightFired = true;
+          }
+        }
+      }
     }
     // Mystery choice unlock notifications
     const choiceThresholds = [3, 6, 10];
@@ -2966,13 +3008,43 @@ function handleHubInput(e: KeyboardEvent): void {
       overlay.classList.remove("active");
       overlay.innerHTML = "";
     }
-    // Fire CORVUS-7 post-deduction ceremony commentary
+    // Fire CORVUS-7 post-deduction ceremony commentary + tier-specific physical effects
     if (pendingCeremonyDeduction) {
       const ceremony = CORVUS_DEDUCTION_CEREMONY[pendingCeremonyDeduction.id];
       if (ceremony) {
         const line = pendingCeremonyDeduction.correct ? ceremony.correct : ceremony.wrong;
         display.addLog(line, "milestone");
         audio.playPA();
+      }
+      // Tier-specific physical consequences for correct answers
+      if (pendingCeremonyDeduction.correct) {
+        const id = pendingCeremonyDeduction.id;
+        if (id === "deduction_what") {
+          // Tier 1: HP recovery — the station acknowledges you
+          state.player = { ...state.player, hp: Math.min(state.player.hp + 50, state.player.maxHp ?? 1000) };
+          display.addLog("Station systems responding to investigation. Emergency repair cycle: +50 HP.", "system");
+        } else if (id === "deduction_hero" || id === "deduction_why") {
+          // Tier 3-4: Extra hazard reduction — the station calms
+          for (let y = 0; y < state.height; y++) {
+            for (let x = 0; x < state.width; x++) {
+              const tile = state.tiles[y][x];
+              if (tile.heat > 0) tile.heat = Math.max(0, tile.heat - 5);
+              if (tile.smoke > 0) tile.smoke = Math.max(0, tile.smoke - 3);
+            }
+          }
+          display.addLog("Station hazard levels dropping. The truth brings clarity — and calmer systems.", "system");
+        } else if (id === "deduction_responsibility" || id === "deduction_agenda") {
+          // Tier 5-6: Massive hazard reduction + audio shift
+          for (let y = 0; y < state.height; y++) {
+            for (let x = 0; x < state.width; x++) {
+              const tile = state.tiles[y][x];
+              if (tile.heat > 0) tile.heat = Math.max(0, tile.heat - 10);
+              if (tile.smoke > 0) tile.smoke = Math.max(0, tile.smoke - 8);
+            }
+          }
+          display.addLog("The full picture is clear. The station shudders — and goes quiet.", "milestone");
+          display.triggerScreenFlash("milestone");
+        }
       }
       pendingCeremonyDeduction = null;
     }

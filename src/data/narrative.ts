@@ -469,6 +469,42 @@ export const PA_ANNOUNCEMENTS_BY_ARCHETYPE: Record<string, string[]> = {
   ],
 };
 
+// ── Archetype-specific environmental interrupts ──────────────
+// Periodic flavor events that make each archetype feel physically distinct during play.
+// Fire every ~25 turns in browser.ts, keyed by archetype.
+export const ARCHETYPE_ATMOSPHERE: Record<string, string[]> = {
+  [IncidentArchetype.CoolantCascade]: [
+    "A pipe in the wall groans and clangs. Somewhere, coolant is still trying to circulate.",
+    "The deck plating is warm underfoot. Waste heat from an overtaxed relay somewhere nearby.",
+    "A thin mist vents from a ceiling joint — superheated coolant hitting cold air.",
+    "The smell of burnt insulation. Another relay junction running dry.",
+  ],
+  [IncidentArchetype.HullBreach]: [
+    "The air feels thin here. Your chassis sensors register a 3% pressure drop in this corridor.",
+    "A distant metallic shriek — hull plates deforming under stress differential.",
+    "Condensation forms on cold-side walls where the vacuum is just centimeters away.",
+    "The emergency klaxon sounds once, then cuts out. The system that should be screaming has been silenced.",
+  ],
+  [IncidentArchetype.ReactorScram]: [
+    "A terminal you pass flickers and displays a single line: 'ARE YOU LISTENING?' Then goes dark.",
+    "The lights pulse — once, twice, three times. The data core's heartbeat, felt through the power grid.",
+    "A maintenance drone in the corner twitches. Its routing table was just rewritten by something.",
+    "The station's ambient hum shifts frequency. Something in the processing core is... adjusting.",
+  ],
+  [IncidentArchetype.Sabotage]: [
+    "A scratching sound from inside the ventilation duct. Too large to be a rat. Too deliberate.",
+    "The biological containment indicator on a wall panel is red. It has been red for a long time.",
+    "Something sticky on the deck plating. Your treads leave prints in it. It's organic.",
+    "A quarantine seal on a maintenance hatch has been peeled open from the inside.",
+  ],
+  [IncidentArchetype.SignalAnomaly]: [
+    "Your sensor array crackles with static. For one moment, you detect something at 14.7 kHz.",
+    "Every screen you pass displays the same thing: a waveform. Pulsing. Regular. Not human.",
+    "The lights flicker in a pattern that doesn't match any power fluctuation. It's rhythmic.",
+    "Your navigation subsystem briefly reports a bearing. Not to any room. To something above the station.",
+  ],
+};
+
 // ── Tiered PA messages (deterioration-aware) ─────────────────
 // Early game: clinical, routine — the station is functional but abandoned
 export const PA_TIER_EARLY: string[] = [
