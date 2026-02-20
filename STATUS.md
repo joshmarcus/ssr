@@ -4,12 +4,12 @@
 
 ## Current State
 
-- **Phase**: Sprint 47 complete (Heat Penalty Tuning, Crew Self-Testimony, Exploration Reward)
+- **Phase**: Sprint 49 complete (Milestone System, CORVUS-7 Reactions, Scan Reveals)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
-- **Save key**: v6
+- **Save key**: v7
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 650, Normal: 500, Hard: 350) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
@@ -82,6 +82,43 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 49 Changes
+
+### Milestone System
+- **`milestones: Set<string>` on GameState**: Tracks one-time fired events for CORVUS-7 reactive commentary and scan reveals
+- **`fireMilestone()` helper**: Pure function in step.ts — checks Set, looks up narrative text, appends log + records milestone
+- **Save key v6 → v7**: Structural change to GameState (new field)
+
+### CORVUS-7 Reactive Commentary
+- **9 milestone-keyed reactions**: One-time CORVUS-7 Central messages triggered on key player actions:
+  - `first_terminal`: "Station archives are intact — the crew's records survived."
+  - `first_relay`: "Relay reroute acknowledged. Station stability improving."
+  - `first_breach_seal`: "Hull patch detected. Atmospheric containment restoring."
+  - `first_crew_found`: "Life signs confirmed. Priority update: survival takes precedence."
+  - `first_sensor_upgrade`: "Sensor array expanded. The station reveals more to those who look."
+  - `all_relays`: "All relay junctions stabilized. Data Core security lockout disengaged."
+  - `first_deduction_correct`: "Analysis confirmed. The truth is assembling itself."
+  - `first_crew_evacuated`: "Escape pod launch confirmed. One soul away from this place."
+  - `service_bot_repaired`: "Service unit B07 repair protocol complete. You are not alone here."
+- All narrative text in `src/data/narrative.ts` for writer accessibility
+
+### Scan Environmental Storytelling
+- **25 archetype × room scan reveals**: First scan in a room with archetype-specific content triggers a one-time environmental storytelling log
+- Milestone-gated (`scan_reveal_${roomName}`) — each room fires once
+- Examples: CoolantCascade Engine Core shows "coolant manifold ran dry"; ReactorScram Data Core shows "processing matrices are still warm, still thinking"
+
+## Sprint 48 Changes
+
+### Service Bot Two-Phase Interaction
+- **Phase 1 (Activate)**: Standard activation message, service bot starts patrolling
+- **Phase 2 (Repair)**: Re-interacting with activated service bot grants +75 HP repair ("Emergency hull repair protocol")
+- Replaces single-use cosmetic activation with meaningful gameplay reward
+
+### Log Terminal Discovery HP Bonus
+- **+8 HP on first read**: First time reading any log terminal grants a small HP recovery
+- Tracked via `terminalHealGranted` entity prop — each terminal heals once
+- Incentivizes terminal interaction beyond narrative value
 
 ## Sprint 47 Changes
 
