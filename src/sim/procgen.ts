@@ -179,6 +179,7 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
     evidenceThreshold,
     cleaningDirective: true,
     roomCleanlinessGoal: 60,
+    triggeredEchoes: new Set<string>(),
   };
 
   placeEntities(state, rooms);

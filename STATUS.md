@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 37 complete (Replayability, Navigation, Smoke Hazard)
+- **Phase**: Sprint 38 complete (Action Bar, Run History, Ghost Echoes)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -62,6 +62,9 @@
 - New Game [N] / Replay [R]: random seed generation for replayability, game-over shows both options
 - Objective compass: sensor-gated directional hints (Thermal → relays, Atmospheric → crew/breaches)
 - Smoke hazard: movement slow (>40 smoke), toxic fume damage (>60 smoke), Clean action clears 3x3 area
+- Context-sensitive action bar: shows available actions with key bindings, grays out unavailable actions
+- Run history: localStorage-persisted records of previous runs (seed, archetype, difficulty, rating)
+- Ghost echoes: scan-triggered crew traces in rooms where crew members were last known (thermal sensor required)
 - Tutorial hints: context-sensitive tips at early turns and on first-time events
 - Evacuation phase: RED ALERT banner, crew following, escape pod boarding with full audio
 - Help overlay: HTML modal with complete key bindings, game phases, interaction details
@@ -70,6 +73,26 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 38 Changes
+
+### Context-Sensitive Action Bar
+- **Action bar in sidebar**: Shows all available actions with key bindings ([h/j/k/l] Move, [i] Interact, [c] Clean, [t] Scan, [l] Look, [v] Evidence Hub)
+- **Context-aware**: Interact shows target name when adjacent, sensor type displayed, unavailable actions shown dimmed
+- **Grayed-out states**: Actions like Interact (no target nearby) or Clean (area already clean) shown as unavailable
+
+### Run History Tracking
+- **`RunRecord` interface**: Stores seed, archetype, difficulty, victory, turns, deduction accuracy, crew evacuated, rating
+- **Persisted in localStorage**: Up to 10 most recent runs stored under `ssr_run_history`
+- **`recordRun()` called on game over**: Rating calculated inline (same formula as display.ts)
+- **`renderRunHistory()` on game-over screen**: Shows PREVIOUS RUNS section with formatted history
+
+### Crew Ghost Echoes
+- **Scan-triggered crew traces**: When scanning with thermal sensor in a room where a crew member was last known, faint environmental traces appear
+- **Role-specific echo text**: 16 unique echo descriptions (2 per crew role) referencing thermal residue, tool marks, pharmaceutical traces, boot scuffs, etc.
+- **Fate-specific postfix**: Each echo ends with a fate hint — "may still be alive" (survived), "trail goes cold" (missing), "no active biosigns" (dead), "rapid departure toward escape pods" (escaped), "cryo-coolant signature" (in cryo)
+- **No repeats**: `triggeredEchoes` Set on MysteryState tracks which crew echoes have fired
+- **Thermal sensor gated**: Echoes only trigger when player has thermal sensor upgrade
 
 ## Sprint 37 Changes
 

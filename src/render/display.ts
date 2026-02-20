@@ -4,6 +4,7 @@ import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase, Incid
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HEAT_PAIN_THRESHOLD, MAX_TURNS, TURN_WARNING_THRESHOLD } from "../shared/constants.js";
 import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
+import { getRunHistory } from "../sim/saveLoad.js";
 import type { IGameDisplay } from "./displayInterface.js";
 
 // ── Archetype display names for game-over screen ────────────────
@@ -520,6 +521,7 @@ export class BrowserDisplay implements IGameDisplay {
         <div style="text-align:center;margin:6px 0;color:#556;font-size:11px;font-family:monospace">
           SEED ${state.seed} &middot; ${ARCHETYPE_DISPLAY_NAMES[state.mystery?.timeline.archetype as IncidentArchetype] ?? "UNKNOWN"}${state.difficulty && state.difficulty !== "normal" ? ` &middot; ${state.difficulty.toUpperCase()}` : ""}
         </div>
+        ${this.renderRunHistory(state.seed)}
         <div class="gameover-restart">[R] Replay Seed ${state.seed} &nbsp;&nbsp;|&nbsp;&nbsp; [N] New Story</div>
       </div>`;
     overlay.classList.add("active");
@@ -1390,7 +1392,40 @@ export class BrowserDisplay implements IGameDisplay {
 
     const logHtml = `<div class="log-panel">${hullBannerHtml}${pinnedHtml}${logEntries}</div>`;
 
-    const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${statusHtml}${proximityHtml}${miniMapHtml}${roomListHtml}${infoHtml}</div>`;
+    // ── Action bar — context-sensitive available actions ──────────
+    let actionBarHtml = "";
+    if (!state.gameOver) {
+      const actions: { key: string; label: string; active: boolean }[] = [];
+      // Move is always available unless stunned
+      actions.push({ key: "hjkl", label: "Move", active: state.player.stunTurns === 0 });
+      // Interact — show target name if available
+      const nearby = this.getAdjacentInteractables(state);
+      if (nearby.length > 0) {
+        const name = entityDisplayName(nearby[0]);
+        actions.push({ key: "i", label: `Interact: ${name}`, active: true });
+      } else {
+        actions.push({ key: "i", label: "Interact", active: false });
+      }
+      // Clean
+      actions.push({ key: "c", label: "Clean", active: true });
+      // Scan/Sensor toggle
+      const sensorNames = (state.player.sensors ?? []).map(s => s.charAt(0).toUpperCase() + s.slice(1));
+      const sensorLabel = sensorNames.length > 1 ? `Sensor (${sensorNames.join("/")})` : "Sensor";
+      actions.push({ key: "t", label: sensorLabel, active: sensorNames.length > 0 });
+      // Look
+      actions.push({ key: "l", label: "Look", active: true });
+      // Journal/Investigation Hub
+      actions.push({ key: "v", label: "Evidence Hub", active: true });
+
+      actionBarHtml = `<div style="padding:2px 0;border-bottom:1px solid #222;font-size:11px;color:#888">` +
+        actions.map(a => {
+          const color = a.active ? "#9ab" : "#444";
+          const keyColor = a.active ? "#ce8" : "#555";
+          return `<span style="color:${keyColor};font-weight:bold">[${a.key}]</span><span style="color:${color}"> ${this.escapeHtml(a.label)} </span>`;
+        }).join("") + `</div>`;
+    }
+
+    const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${statusHtml}${actionBarHtml}${proximityHtml}${miniMapHtml}${roomListHtml}${infoHtml}</div>`;
     panel.innerHTML = logHtml + bottomHtml;
 
     // Auto-scroll log panel to bottom
@@ -1445,6 +1480,39 @@ export class BrowserDisplay implements IGameDisplay {
     if (hash < 4) return COLORS.wallDark;
     if (hash > 11) return COLORS.wallLight;
     return COLORS.wall;
+  }
+
+  private renderRunHistory(currentSeed: number): string {
+    const history = getRunHistory();
+    // Show up to 5 previous runs (excluding the current one which was just added)
+    const pastRuns = history.filter(r => r.seed !== currentSeed || history.indexOf(r) > 0).slice(0, 5);
+    if (pastRuns.length <= 1) return ""; // Don't show if only current run exists
+
+    const archetypeShort: Record<string, string> = {
+      coolant_cascade: "WHISTLEBLOWER",
+      hull_breach: "MURDER",
+      reactor_scram: "ROGUE AI",
+      sabotage: "STOWAWAY",
+      signal_anomaly: "FIRST CONTACT",
+    };
+
+    const rows = pastRuns.slice(1).map(r => {
+      const result = r.victory
+        ? `<span style="color:#0f0">WIN</span>`
+        : `<span style="color:#f44">LOSS</span>`;
+      const ratingColor = r.rating === "S" ? "#ff0" : r.rating === "A" ? "#0f0" : r.rating === "B" ? "#6cf" : r.rating === "C" ? "#fa0" : "#f44";
+      const arch = archetypeShort[r.archetype] || r.archetype;
+      return `<div style="font-size:10px;color:#888;font-family:monospace">` +
+        `${result} <span style="color:${ratingColor}">${r.rating}</span> ` +
+        `T${r.turns} · ${arch} · ${r.seed}` +
+        `</div>`;
+    });
+
+    if (rows.length === 0) return "";
+
+    return `<div style="margin:6px 0;border-top:1px solid #333;padding-top:6px">` +
+      `<div style="color:#556;font-size:10px;text-align:center;margin-bottom:3px">PREVIOUS RUNS</div>` +
+      rows.join("") + `</div>`;
   }
 
   private escapeHtml(text: string): string {

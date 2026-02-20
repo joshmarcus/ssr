@@ -351,6 +351,7 @@ export interface MysteryState {
   roomCleanlinessGoal: number; // percentage (default 80)
   directiveOverrideTurn?: number; // turn when directive was overridden
   evacuation?: EvacuationState;
+  triggeredEchoes: Set<string>; // crew IDs whose ghost echoes have been triggered
 }
 
 // ── What We Know (narrative summary) ─────────────────────────

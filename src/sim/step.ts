@@ -1,5 +1,5 @@
 import type { Action, GameState, Entity, LogEntry, Attachment, JournalEntry, Room, EvacuationState } from "../shared/types.js";
-import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType, CrewRole } from "../shared/types.js";
+import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType, CrewRole, CrewFate } from "../shared/types.js";
 import {
   GLYPHS, PATROL_DRONE_DAMAGE, PATROL_DRONE_STUN_TURNS, PATROL_DRONE_SPEED,
   PATROL_DRONE_ATTACK_COOLDOWN, SMOKE_SLOW_THRESHOLD,
@@ -2637,7 +2637,87 @@ function handleScan(state: GameState): GameState {
     ],
   };
 
+  // ── Ghost Echoes: scan-triggered crew traces ──────────────────
+  if (next.mystery && sensors.includes(SensorType.Thermal) && scanRoom) {
+    const currentRoomName = state.rooms.find(
+      r => scanRoom && px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height
+    )?.name;
+    if (currentRoomName) {
+      const echoLogs: LogEntry[] = [];
+      const newEchoes = new Set(next.mystery.triggeredEchoes);
+      for (const crew of next.mystery.crew) {
+        if (crew.lastKnownRoom !== currentRoomName) continue;
+        if (newEchoes.has(crew.id)) continue;
+        newEchoes.add(crew.id);
+        const echo = generateGhostEcho(crew.firstName, crew.lastName, crew.role, crew.fate);
+        echoLogs.push({
+          id: `log_echo_${crew.id}_${state.turn}`,
+          timestamp: state.turn,
+          source: "sensor",
+          text: echo,
+          read: false,
+        });
+      }
+      if (echoLogs.length > 0) {
+        next.logs = [...next.logs, ...echoLogs];
+        next.mystery = { ...next.mystery, triggeredEchoes: newEchoes };
+      }
+    }
+  }
+
   return next;
+}
+
+/** Generate atmospheric ghost echo text for a crew member trace. */
+function generateGhostEcho(first: string, last: string, role: CrewRole, fate: CrewFate): string {
+  const name = `${first} ${last}`;
+  const roleEchoes: Record<CrewRole, string[]> = {
+    [CrewRole.Captain]: [
+      `Thermal residue — command-grade biosignature. ${name} (Captain) was here recently.`,
+      `Faint thermal outline near the console — Captain ${last}'s access card was last swiped here.`,
+    ],
+    [CrewRole.Engineer]: [
+      `Tool marks and residual heat on a junction panel — Eng. ${last} was working here.`,
+      `Thermal ghost on a calibration bench — ${name} (Engineering) left in a hurry.`,
+    ],
+    [CrewRole.Medic]: [
+      `Trace pharmaceutical residue detected — Dr. ${last} treated someone here.`,
+      `Thermal echo near a med-kit station — Dr. ${last} was last recorded in this area.`,
+    ],
+    [CrewRole.Security]: [
+      `Boot scuffs and a fading heat trail — Sec. ${last} patrolled through here.`,
+      `Residual thermal bloom near the doorframe — ${name} (Security) stood watch here.`,
+    ],
+    [CrewRole.Scientist]: [
+      `Warm sample containers — ${name} (Research) was running experiments here.`,
+      `Thermal trace on a data terminal — ${last}'s research session ended abruptly.`,
+    ],
+    [CrewRole.Robotics]: [
+      `Servo lubricant residue and a warm soldering iron — ${last} (Robotics) was here.`,
+      `Thermal shadow near a maintenance cradle — ${name} was servicing a unit.`,
+    ],
+    [CrewRole.LifeSupport]: [
+      `Recalibrated air scrubber and a warm coffee mug — ${last} (Life Support) was stationed here.`,
+      `Thermal trace on the ventilation panel — ${name} adjusted something before leaving.`,
+    ],
+    [CrewRole.Comms]: [
+      `Warm headset left on the console — ${last} (Comms) was monitoring channels here.`,
+      `Signal buffer still holding ${name}'s last transmission attempt.`,
+    ],
+  };
+
+  const fatePostfix: Record<CrewFate, string> = {
+    [CrewFate.Survived]: "Biosigns suggest they may still be alive somewhere aboard.",
+    [CrewFate.Missing]: "No further trace. Trail goes cold.",
+    [CrewFate.Dead]: "The trace ends here. No active biosigns.",
+    [CrewFate.Escaped]: "Trajectory suggests rapid departure toward escape pods.",
+    [CrewFate.InCryo]: "Faint cryo-coolant signature detected in the residue.",
+  };
+
+  const echoes = roleEchoes[role] ?? [`Thermal residue — ${name} was here.`];
+  // Deterministic pick based on name length
+  const echoText = echoes[last.length % echoes.length];
+  return `${echoText} ${fatePostfix[fate]}`;
 }
 
 /**

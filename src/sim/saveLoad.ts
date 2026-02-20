@@ -4,6 +4,7 @@
  */
 
 import type { GameState, Entity, EntityId } from "../shared/types.js";
+import { EntityType } from "../shared/types.js";
 
 const SAVE_KEY = "ssr_save_v4";
 
@@ -73,4 +74,57 @@ export function hasSave(): boolean {
 /** Delete the save */
 export function deleteSave(): void {
   localStorage.removeItem(SAVE_KEY);
+}
+
+// ── Run History ──────────────────────────────────────────────
+
+const HISTORY_KEY = "ssr_run_history";
+const MAX_HISTORY = 10;
+
+export interface RunRecord {
+  seed: number;
+  archetype: string;
+  difficulty: string;
+  victory: boolean;
+  turns: number;
+  deductionsCorrect: number;
+  deductionsTotal: number;
+  crewEvacuated: number;
+  rating: string;
+  timestamp: number; // epoch ms
+}
+
+/** Record a completed run in localStorage. */
+export function recordRun(state: GameState, rating: string): void {
+  try {
+    const history = getRunHistory();
+    const evac = state.mystery?.evacuation;
+    const deds = state.mystery?.deductions ?? [];
+    const record: RunRecord = {
+      seed: state.seed,
+      archetype: state.mystery?.timeline.archetype ?? "unknown",
+      difficulty: state.difficulty ?? "normal",
+      victory: state.victory,
+      turns: state.turn,
+      deductionsCorrect: deds.filter(d => d.answeredCorrectly).length,
+      deductionsTotal: deds.length,
+      crewEvacuated: evac?.crewEvacuated.length ?? 0,
+      rating,
+      timestamp: Date.now(),
+    };
+    history.unshift(record);
+    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch { /* ignore storage errors */ }
+}
+
+/** Get run history from localStorage. */
+export function getRunHistory(): RunRecord[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as RunRecord[];
+  } catch {
+    return [];
+  }
 }

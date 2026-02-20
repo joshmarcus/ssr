@@ -31,7 +31,7 @@ import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, 
 import { computeChoiceEndings } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence, getTagExplanation } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
-import { saveGame, loadGame, hasSave, deleteSave } from "./sim/saveLoad.js";
+import { saveGame, loadGame, hasSave, deleteSave, recordRun } from "./sim/saveLoad.js";
 import { generateWhatWeKnow, formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
 
 // ── Parse seed and difficulty from URL params ───────────────────
@@ -1196,6 +1196,25 @@ function handleAction(action: Action): void {
   if (state.gameOver) {
     deleteSave(); // Clear save on game end
     audio.stopAmbient(); // Silence the ambient drone
+
+    // Record run in history
+    const deds = state.mystery?.deductions ?? [];
+    const evac = state.mystery?.evacuation;
+    const hpPct = Math.round((state.player.hp / state.player.maxHp) * 100);
+    const dedsCorrect = deds.filter(d => d.answeredCorrectly).length;
+    const crewEvac = evac?.crewEvacuated.length ?? 0;
+    const crewDead = evac?.crewDead.length ?? 0;
+    let crewTotal = crewEvac + crewDead;
+    for (const [, e] of state.entities) { if (e.type === EntityType.CrewNPC) crewTotal++; }
+    let sc = 0;
+    if (state.victory) sc += 30;
+    sc += Math.min(20, dedsCorrect * (20 / Math.max(deds.length, 1)));
+    if (crewTotal > 0) sc += Math.min(20, (crewEvac / crewTotal) * 20);
+    sc += Math.min(10, (hpPct / 100) * 10);
+    sc += Math.min(10, state.victory && state.turn < 200 ? 10 : state.victory && state.turn < 350 ? 5 : 0);
+    const runRating = sc >= 90 ? "S" : sc >= 75 ? "A" : sc >= 55 ? "B" : sc >= 35 ? "C" : "D";
+    recordRun(state, runRating);
+
     if (state.victory) {
       audio.playVictory();
       display.addLog("", "system");
