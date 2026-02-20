@@ -5,6 +5,7 @@ import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT
 import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
 import { getRunHistory } from "../sim/saveLoad.js";
+import { GAMEOVER_EPILOGUE_VICTORY, GAMEOVER_EPILOGUE_DEFEAT } from "../data/narrative.js";
 import type { IGameDisplay } from "./displayInterface.js";
 
 // ── Archetype display names for game-over screen ────────────────
@@ -447,11 +448,10 @@ export class BrowserDisplay implements IGameDisplay {
       choicesHtml = `<div class="gameover-stat"><span class="stat-label">Decisions Made:</span> <span class="stat-value">${choicesMade}/${choices.length}</span></div>`;
     }
 
+    const archetype = state.mystery?.timeline.archetype as IncidentArchetype | undefined;
     const epilogue = isVictory
-      ? (crewEvacuated > 0 && crewDead === 0 && totalCrewNPCs === 0
-        ? "Recovery teams en route. Every soul accounted for."
-        : "Recovery teams en route. The record is preserved.")
-      : "Another rover may reach the station. The data endures, waiting.";
+      ? (archetype && GAMEOVER_EPILOGUE_VICTORY[archetype]) || "Recovery teams en route. The record is preserved."
+      : (archetype && GAMEOVER_EPILOGUE_DEFEAT[archetype]) || "Another rover may reach the station. The data endures, waiting.";
 
     // ── Deduction retrospective ──
     let retrospectiveHtml = "";

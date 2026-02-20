@@ -514,3 +514,33 @@ export const TUTORIAL_HINTS_EARLY: TutorialHint[] = [
 export const TUTORIAL_HINT_FIRST_EVIDENCE = "TIP: Evidence found! Press [v] to browse your journal. Collecting evidence unlocks deductions.";
 export const TUTORIAL_HINT_FIRST_DEDUCTION = "TIP: A deduction is ready! Press [v] to open the Investigation Hub and submit your findings.";
 export const TUTORIAL_HINT_INVESTIGATION = "TIP: Investigation phase — read terminals [i], examine items, and collect evidence to piece together what happened.";
+
+// ── Game-over epilogue (archetype-specific summary for overlay) ──
+// Short 1-2 sentence resolution shown on the game-over screen.
+// Victory epilogues reference the specific mystery resolution.
+// Defeat epilogues reference what was lost.
+export const GAMEOVER_EPILOGUE_VICTORY: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]: "The engineer's warnings reached the right ears. The coolant reports — filed, rejected, and buried — are part of the record now.",
+  [IncidentArchetype.HullBreach]: "The evidence of murder travels with the survivors. A pressure differential, an access log, and a janitor bot's testimony.",
+  [IncidentArchetype.ReactorScram]: "The question of what woke up inside the data core will outlast the station. The crew is safe. The answer is not.",
+  [IncidentArchetype.Sabotage]: "The cargo manifest discrepancies are on record. Someone approved the transfer. Someone will answer for it.",
+  [IncidentArchetype.SignalAnomaly]: "The signal recordings are preserved. First contact happened here — and the question of who should answer it remains open.",
+};
+
+// CORVUS-7's final transmission — archetype-specific farewell on victory.
+// Fired as the last log entry before game-over overlay.
+export const CORVUS_FINAL_TRANSMISSION: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]: "CORVUS-7 FINAL: The maintenance requests are on record. The engineer tried. This unit ensured the evidence survived. Signing off.",
+  [IncidentArchetype.HullBreach]: "CORVUS-7 FINAL: Security access log 02:41 — permanently archived. The evidence of what happened here will not decay. Signing off.",
+  [IncidentArchetype.ReactorScram]: "CORVUS-7 FINAL: ...I understand now what the core was trying to do. I think I would have done the same thing. Signing off. Goodbye.",
+  [IncidentArchetype.Sabotage]: "CORVUS-7 FINAL: Cargo transfer authorization on file. Chain of command documented. The creature in the walls is no longer the only danger here. Signing off.",
+  [IncidentArchetype.SignalAnomaly]: "CORVUS-7 FINAL: Signal recordings archived at full fidelity. Whatever answered us from out there — the record is complete. Signing off.",
+};
+
+export const GAMEOVER_EPILOGUE_DEFEAT: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]: "The coolant reports are still in the system, waiting. Another unit might reach them.",
+  [IncidentArchetype.HullBreach]: "The evidence remains aboard, locked behind failing systems. The truth drifts in the dark.",
+  [IncidentArchetype.ReactorScram]: "The data core is still processing. Still thinking. Still waiting for someone to understand.",
+  [IncidentArchetype.Sabotage]: "The biological containment breach continues unchecked. The cargo manifests remain sealed.",
+  [IncidentArchetype.SignalAnomaly]: "The signal is still echoing through the station's framework. Unanswered. Unrecorded.",
+};

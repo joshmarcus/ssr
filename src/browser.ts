@@ -17,7 +17,7 @@ import {
   getDefeatText, getDefeatRelayText,
 } from "./data/endgame.js";
 import { getRoomDescription, getIncidentTrace } from "./data/roomDescriptions.js";
-import { CORVUS_REACTIONS } from "./data/narrative.js";
+import { CORVUS_REACTIONS, CORVUS_FINAL_TRANSMISSION } from "./data/narrative.js";
 import {
   BOT_INTROSPECTIONS, BOT_INTROSPECTIONS_BY_ARCHETYPE,
   DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
@@ -1522,6 +1522,14 @@ function handleAction(action: Action): void {
         if (journalCount > 0) {
           display.addLog(`Evidence collected: ${journalCount} pieces`, "sensor");
           display.addLog(`Deductions: ${correct.length}/${deductions.length} correct`, "sensor");
+        }
+
+        // CORVUS-7 final transmission — archetype-specific farewell
+        const finalArchetype = state.mystery.timeline.archetype;
+        const finalMsg = CORVUS_FINAL_TRANSMISSION[finalArchetype];
+        if (finalMsg) {
+          display.addLog("", "system");
+          display.addLog(finalMsg, "milestone");
         }
       }
     } else {
