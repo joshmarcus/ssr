@@ -232,7 +232,7 @@ export function isEntityExhausted(entity: Entity): boolean {
     case EntityType.PowerCell:
       return entity.props["collected"] === true;
     case EntityType.EvidenceTrace:
-      return entity.props["discovered"] === true;
+      return entity.props["discovered"] === true || entity.props["scanHidden"] === true;
     case EntityType.SensorPickup:
       return entity.props["collected"] === true;
     case EntityType.DataCore:

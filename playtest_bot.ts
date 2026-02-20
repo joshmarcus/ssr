@@ -200,6 +200,8 @@ const interactAttempts = new Map<string, number>();
 let navTarget: string | null = null;
 // Track previous position for anti-oscillation in BFS
 let lastPos: Position | null = null;
+// Track rooms where we've already scanned for hidden evidence
+const scannedRooms = new Set<string>();
 
 function chooseAction(state: GameState, visited: Set<string>): Action {
   const px = state.player.entity.pos.x;
@@ -268,6 +270,31 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
         choiceId: choice.id,
         answerKey: choice.options[0].key,
       };
+    }
+  }
+
+  // Phase 2c: Scan in rooms to reveal hidden evidence
+  // Only scan once per room, and only if player has sensors beyond base cleanliness
+  if (state.player.sensors && state.player.sensors.length > 1) {
+    const room = getRoomAt(state, { x: px, y: py });
+    if (room && !scannedRooms.has(room.id)) {
+      // Check if there might be hidden evidence in this room
+      let hasHidden = false;
+      for (const [, entity] of state.entities) {
+        if (entity.type === EntityType.EvidenceTrace &&
+            entity.props["scanHidden"] === true &&
+            entity.pos.x >= room.x && entity.pos.x < room.x + room.width &&
+            entity.pos.y >= room.y && entity.pos.y < room.y + room.height) {
+          hasHidden = true;
+          break;
+        }
+      }
+      if (hasHidden) {
+        scannedRooms.add(room.id);
+        return { type: ActionType.Scan };
+      }
+      // Even if no hidden evidence, scan rooms we haven't scanned yet (may discover things)
+      scannedRooms.add(room.id);
     }
   }
 

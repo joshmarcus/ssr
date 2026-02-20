@@ -938,6 +938,10 @@ function placeEvidenceTraces(state: GameState, rooms: DiggerRoom[]): void {
       traceDesc += ` A badge reader nearby shows ${actor.badgeId} was the last access.`;
     }
 
+    // Make some traces scan-hidden: they require scanning with the right sensor
+    // to even become visible. First trace and traces with no sensor req are always visible.
+    const scanHidden = sensorRequired !== null && i > 0 && i % 2 === 0;
+
     state.entities.set(`evidence_trace_${i}`, {
       id: `evidence_trace_${i}`,
       type: EntityType.EvidenceTrace,
@@ -947,6 +951,7 @@ function placeEvidenceTraces(state: GameState, rooms: DiggerRoom[]): void {
         phase: event.phase,
         sensorRequired,
         discovered: false,
+        scanHidden, // true = invisible until player scans the room with right sensor
         crewMemberId: actor?.id || null,
       },
     });

@@ -689,8 +689,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       }
 
       if (deductions.length > 0 && !allDeductionsSolved) {
-        const totalDeductions = next.mystery.deductions.length;
-        const solvedCount = next.mystery.deductions.filter(d => d.solved).length;
+        const totalDeductions = deductions.length;
+        const solvedCount = deductions.filter(d => d.solved).length;
         next.logs = [
           ...state.logs,
           {
@@ -1650,6 +1650,11 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
     }
 
     case EntityType.EvidenceTrace: {
+      // Scan-hidden traces can't be interacted with until revealed by scanning
+      if (target.props["scanHidden"] === true) {
+        break;
+      }
+
       // Discover an evidence trace — check if player has the right sensor
       const traceText = (target.props["text"] as string) || "An unusual mark on the surface.";
       const sensorReq = target.props["sensorRequired"] as string | null;
@@ -2318,9 +2323,24 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
  */
 function handleScan(state: GameState): GameState {
   const sensors = state.player.sensors ?? [];
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+
+  // Find the room the player is in (for scan radius)
+  let scanRoom: { x: number; y: number; width: number; height: number } | null = null;
+  for (const room of state.rooms) {
+    if (px >= room.x && px < room.x + room.width &&
+        py >= room.y && py < room.y + room.height) {
+      scanRoom = room;
+      break;
+    }
+  }
+
+  const newEntities = new Map(state.entities);
+  const scanLogs: LogEntry[] = [];
+  let revealedCount = 0;
 
   // Mark overheating relays as scanned hotspots
-  const newEntities = new Map(state.entities);
   for (const [id, entity] of newEntities) {
     if (entity.type === EntityType.Relay && entity.props["overheating"] === true) {
       newEntities.set(id, {
@@ -2328,6 +2348,42 @@ function handleScan(state: GameState): GameState {
         props: { ...entity.props, scannedHotspot: true },
       });
     }
+  }
+
+  // Reveal scan-hidden evidence traces in the current room
+  for (const [id, entity] of newEntities) {
+    if (entity.type !== EntityType.EvidenceTrace) continue;
+    if (entity.props["scanHidden"] !== true) continue;
+    if (entity.props["scanRevealed"] === true) continue;
+
+    // Check if evidence is in the same room or within scan radius (5 tiles)
+    const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+    const inRoom = scanRoom &&
+      entity.pos.x >= scanRoom.x && entity.pos.x < scanRoom.x + scanRoom.width &&
+      entity.pos.y >= scanRoom.y && entity.pos.y < scanRoom.y + scanRoom.height;
+
+    if (!inRoom && dist > 5) continue;
+
+    // Check if player has the required sensor
+    const sensorReq = entity.props["sensorRequired"] as string | null;
+    if (sensorReq && !sensors.includes(sensorReq as SensorType)) continue;
+
+    // Reveal the evidence
+    newEntities.set(id, {
+      ...entity,
+      props: { ...entity.props, scanRevealed: true, scanHidden: false },
+    });
+    revealedCount++;
+
+    const sensorName = sensorReq === SensorType.Thermal ? "thermal" :
+      sensorReq === SensorType.Atmospheric ? "atmospheric" : "sensor";
+    scanLogs.push({
+      id: `log_scan_reveal_${id}_${state.turn}`,
+      timestamp: state.turn,
+      source: "sensor",
+      text: `${sensorName[0].toUpperCase() + sensorName.slice(1)} scan detected anomaly — new evidence trace revealed nearby.`,
+      read: false,
+    });
   }
 
   // Build scan message based on equipped sensors
@@ -2340,6 +2396,9 @@ function handleScan(state: GameState): GameState {
   }
   if (sensors.length <= 1) {
     scanParts.push("Basic scan only — find sensor upgrades for more detail.");
+  }
+  if (revealedCount > 0) {
+    scanParts.push(`${revealedCount} hidden trace${revealedCount > 1 ? "s" : ""} revealed!`);
   }
 
   const next: GameState = {
@@ -2354,6 +2413,7 @@ function handleScan(state: GameState): GameState {
         text: scanParts.join(" "),
         read: false,
       },
+      ...scanLogs,
     ],
   };
 
