@@ -221,8 +221,10 @@ export function isEntityExhausted(entity: Entity): boolean {
     case EntityType.Airlock:
       return false; // always toggleable
     case EntityType.SecurityTerminal:
-      return false; // always interactable (door lock toggle after first access)
+      return entity.props["accessed"] === true; // dim after first access (still toggleable)
     case EntityType.Console:
+      return entity.props["read"] === true;
+    case EntityType.LogTerminal:
       return entity.props["read"] === true;
     case EntityType.CrewItem:
       return entity.props["examined"] === true || entity.props["hidden"] === true;

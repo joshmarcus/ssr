@@ -60,7 +60,7 @@ function parseArgs(): {
 // ── Start Vite dev server ───────────────────────────────────
 async function startVite(): Promise<{ proc: ChildProcess; url: string }> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("npx", ["vite", "--port", "5199", "--strictPort"], {
+    const proc = spawn("npx", ["vite", "--port", "5198"], {
       cwd: __dirname,
       shell: true,
       stdio: ["ignore", "pipe", "pipe"],
@@ -72,8 +72,7 @@ async function startVite(): Promise<{ proc: ChildProcess; url: string }> {
       proc.kill();
     }, 30000);
 
-    proc.stdout!.on("data", (data: Buffer) => {
-      output += data.toString();
+    const checkForUrl = () => {
       // Strip ANSI escape codes before matching
       const clean = output.replace(/\x1b\[[0-9;]*m/g, "");
       const match = clean.match(/Local:\s+(http:\/\/localhost:\d+\S*)/);
@@ -83,10 +82,16 @@ async function startVite(): Promise<{ proc: ChildProcess; url: string }> {
         const baseUrl = match[1].replace(/\/+$/, "");
         resolve({ proc, url: baseUrl });
       }
+    };
+
+    proc.stdout!.on("data", (data: Buffer) => {
+      output += data.toString();
+      checkForUrl();
     });
 
     proc.stderr!.on("data", (data: Buffer) => {
       output += data.toString();
+      checkForUrl();
     });
 
     proc.on("error", (err) => {

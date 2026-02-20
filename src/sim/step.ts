@@ -877,6 +877,10 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       const terminalText = (target.props["text"] as string) || "Terminal offline. No data available.";
       const alreadyRead = state.logs.find((l) => l.id === `log_terminal_${targetId}`);
       if (!alreadyRead) {
+        // Mark the terminal entity as read so isEntityExhausted can dim it
+        const newEntities = new Map(next.entities);
+        newEntities.set(targetId, { ...target, props: { ...target.props, read: true } });
+        next.entities = newEntities;
         next.logs = [
           ...state.logs,
           {

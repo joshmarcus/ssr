@@ -159,7 +159,7 @@ const ENTITY_COLORS: Record<string, string> = {
 
 // Blue background glow for interactable (non-exhausted) entities
 // Must be clearly visible against dark backgrounds — serves as "here's something to interact with"
-const INTERACTABLE_BG = "#1a4488";
+const INTERACTABLE_BG = "#2255bb";
 
 /** Dim a hex color to ~35% brightness for exhausted/read entities on the map. */
 function dimColor(hex: string): string {
