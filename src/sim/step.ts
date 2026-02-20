@@ -2,7 +2,7 @@ import type { Action, GameState, Entity, LogEntry, Attachment, JournalEntry, Roo
 import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType, CrewRole } from "../shared/types.js";
 import {
   GLYPHS, PATROL_DRONE_DAMAGE, PATROL_DRONE_STUN_TURNS, PATROL_DRONE_SPEED,
-  PATROL_DRONE_ATTACK_COOLDOWN,
+  PATROL_DRONE_ATTACK_COOLDOWN, SMOKE_SLOW_THRESHOLD,
 } from "../shared/constants.js";
 import { isValidAction, getDirectionDelta, hasUnlockedDoorAt, isAutoSealedBulkhead } from "./actions.js";
 import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex } from "./rooms.js";
@@ -3521,6 +3521,33 @@ export function step(state: GameState, action: Action): GameState {
             timestamp: next.turn,
             source: "system" as const,
             text: "Heat slows movement. Systems struggling.",
+            read: false,
+          },
+        ];
+        next = movePatrolDrones(next);
+        next = applyHazardDamage(next);
+        next = checkWinCondition(next);
+        next = checkLossCondition(next);
+        next = checkTurnLimit(next);
+        next = updateVision(next);
+        return next;
+      }
+
+      // Smoke zone movement penalty: dense smoke costs an extra turn
+      if (state.tiles[newPos.y][newPos.x].smoke >= SMOKE_SLOW_THRESHOLD &&
+          state.tiles[newPos.y][newPos.x].heat < 80) { // don't double-penalize
+        next.turn += 1;
+        next = tickHazards(next);
+        next = tickHazards(next);
+        next = tickDeterioration(next);
+        next = tickPA(next);
+        next.logs = [
+          ...next.logs,
+          {
+            id: `log_smoke_slow_${next.turn}`,
+            timestamp: next.turn,
+            source: "system" as const,
+            text: "Thick smoke. Movement slowed — sensors compensating.",
             read: false,
           },
         ];

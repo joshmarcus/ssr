@@ -520,7 +520,7 @@ export class BrowserDisplay implements IGameDisplay {
         <div style="text-align:center;margin:6px 0;color:#556;font-size:11px;font-family:monospace">
           SEED ${state.seed} &middot; ${ARCHETYPE_DISPLAY_NAMES[state.mystery?.timeline.archetype as IncidentArchetype] ?? "UNKNOWN"}${state.difficulty && state.difficulty !== "normal" ? ` &middot; ${state.difficulty.toUpperCase()}` : ""}
         </div>
-        <div class="gameover-restart">Press [R] to restart</div>
+        <div class="gameover-restart">[R] Replay Seed ${state.seed} &nbsp;&nbsp;|&nbsp;&nbsp; [N] New Story</div>
       </div>`;
     overlay.classList.add("active");
   }
@@ -1129,6 +1129,59 @@ export class BrowserDisplay implements IGameDisplay {
       ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold">[${remaining} left]</span>`
       : "";
 
+    // ── Objective compass — sensor-gated directional hints ──────
+    let compassHtml = "";
+    if (!state.gameOver) {
+      const sensors = state.player.sensors ?? [];
+      const hasThermal = sensors.includes(SensorType.Thermal);
+      const hasAtmo = sensors.includes(SensorType.Atmospheric);
+      const px = state.player.entity.pos.x;
+      const py = state.player.entity.pos.y;
+
+      interface CompassTarget { glyph: string; label: string; dist: number; dir: string; color: string; priority: number }
+      const targets: CompassTarget[] = [];
+
+      const dirLabel = (dx: number, dy: number): string => {
+        const ns = dy < 0 ? "N" : dy > 0 ? "S" : "";
+        const ew = dx < 0 ? "W" : dx > 0 ? "E" : "";
+        return ns + ew || "here";
+      };
+
+      for (const [, ent] of state.entities) {
+        const dx = ent.pos.x - px;
+        const dy = ent.pos.y - py;
+        const dist = Math.abs(dx) + Math.abs(dy);
+        if (dist < 2) continue; // don't show things right next to you
+
+        // Thermal sensor reveals relays and repair cradles
+        if (hasThermal && ent.type === EntityType.Relay && ent.props["activated"] !== true && ent.props["locked"] !== true) {
+          targets.push({ glyph: "⚡", label: "Relay", dist, dir: dirLabel(dx, dy), color: "#fa0", priority: 1 });
+        }
+        // Atmospheric sensor reveals crew NPCs and breaches
+        if (hasAtmo && ent.type === EntityType.CrewNPC && ent.props["following"] !== true && ent.props["evacuated"] !== true) {
+          targets.push({ glyph: "🙋", label: "Life Signs", dist, dir: dirLabel(dx, dy), color: "#f0f", priority: 0 });
+        }
+        if (hasAtmo && ent.type === EntityType.Breach && ent.props["sealed"] !== true) {
+          targets.push({ glyph: "💨", label: "Breach", dist, dir: dirLabel(dx, dy), color: "#4af", priority: 2 });
+        }
+        // Always show escape pods during evacuation phase
+        if (state.mystery?.objectivePhase === ObjectivePhase.Evacuate && ent.type === EntityType.EscapePod && ent.props["powered"] !== true) {
+          targets.push({ glyph: "⬡", label: "Pod", dist, dir: dirLabel(dx, dy), color: "#8f8", priority: 0 });
+        }
+      }
+
+      // Sort by priority (lower = more important), then distance
+      targets.sort((a, b) => a.priority - b.priority || a.dist - b.dist);
+      const shown = targets.slice(0, 2);
+      if (shown.length > 0) {
+        const items = shown.map(t =>
+          `<span style="color:${t.color}">${t.glyph} ${t.label}</span> <span class="label">${t.dist} ${t.dir}</span>`
+        );
+        compassHtml = `<div style="color:#8ac;font-size:11px;padding:2px 0;border-bottom:1px solid #222">` +
+          `<span style="color:#556;font-weight:bold">SCANNER:</span> ${items.join(" &middot; ")}</div>`;
+      }
+    }
+
     const statusHtml = `<div class="status-bar">` +
       `<span class="label">T:</span><span class="value">${state.turn}</span>${turnWarning}` +
       roomLabel + stunTag +
@@ -1136,7 +1189,7 @@ export class BrowserDisplay implements IGameDisplay {
       `<br>` + discoveryTag.replace(/ \| /, '') + evidenceTag.replace(/ \| /, '') + deductionTag.replace(/ \| /, '') +
       `<br>` + unreadTag.replace(/ \| /g, '').trim() + reportTag.replace(/ \| /, '') +
       interactHint +
-      `</div>` + overlayLine;
+      `</div>` + compassHtml + overlayLine;
 
     // Room list removed from main UI — available via [m] map command
     const roomListHtml = "";

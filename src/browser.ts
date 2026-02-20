@@ -36,7 +36,7 @@ import { generateWhatWeKnow, formatRelationship, formatCrewMemberDetail, getDedu
 
 // ── Parse seed and difficulty from URL params ───────────────────
 const params = new URLSearchParams(window.location.search);
-const seed = parseInt(params.get("seed") || String(GOLDEN_SEED), 10);
+let seed = parseInt(params.get("seed") || String(GOLDEN_SEED), 10);
 const difficultyParam = params.get("difficulty") || "normal";
 const difficulty: Difficulty = difficultyParam === "easy" ? Difficulty.Easy
   : difficultyParam === "hard" ? Difficulty.Hard
@@ -652,69 +652,83 @@ function renderAll(): void {
   display.renderUI(state, uiPanel, visitedRoomIds);
 }
 
-// ── Restart handler ──────────────────────────────────────────────
+// ── Restart / New Game handler ───────────────────────────────────
+function resetGameState(newSeed: number): void {
+  deleteSave();
+  seed = newSeed;
+  state = generate(seed, difficulty);
+  lastPlayerRoomId = "";
+  visitedRoomIds.clear();
+  journalOpen = false;
+  activeChoice = null;
+  investigationHubOpen = false;
+  // Close overlays on restart
+  const broadcastEl = document.getElementById("broadcast-overlay");
+  if (broadcastEl) { broadcastEl.classList.remove("active"); broadcastEl.innerHTML = ""; }
+  const journalEl = document.getElementById("journal-overlay");
+  if (journalEl) { journalEl.classList.remove("active"); journalEl.innerHTML = ""; }
+  choicesPresented.clear();
+
+  // Reset per-run narrative/tutorial state
+  firstDroneEncounterShown = false;
+  droneEncounterSet.clear();
+  triggeredBotIntrospections.clear();
+  triggeredTutorialHints.clear();
+  cleanMsgIndex = 0;
+  waitMsgIndex = 0;
+  lastAmbientRoomId = "";
+  mapOpen = false;
+  helpOpen = false;
+  activeDeduction = null;
+  deductionSelectedIdx = 0;
+  confirmingDeduction = false;
+  hubSection = "evidence";
+  hubOptionIdx = 0;
+  hubLinkedEvidence = [];
+  hubDetailDeduction = null;
+  hubEvidenceIdx = 0;
+  hubConfirming = false;
+  hubLinkFeedback = "";
+  hubChoiceConfirming = false;
+  hubDecisionDetailIdx = null;
+  hubIdx = 0;
+  pendingCrewDoor = null;
+  journalTab = "evidence";
+  choiceSelectedIdx = 0;
+
+  // Clear overlays and display, rebuild
+  const gameoverEl = document.getElementById("gameover-overlay");
+  if (gameoverEl) { gameoverEl.classList.remove("active"); gameoverEl.innerHTML = ""; }
+  display.destroy();
+  containerEl.innerHTML = "";
+  display = (is3D && BrowserDisplay3D)
+    ? new BrowserDisplay3D(containerEl, state.width, state.height)
+    : new BrowserDisplay(containerEl, state.width, state.height);
+}
+
 function handleRestartKey(e: KeyboardEvent): void {
   if (!state.gameOver) return;
   if (e.key === "r" || e.key === "R") {
     e.preventDefault();
-    // Reset game state
-    deleteSave();
-    state = generate(seed, difficulty);
-    lastPlayerRoomId = "";
-    visitedRoomIds.clear();
-    journalOpen = false;
-    activeChoice = null;
-    investigationHubOpen = false;
-    // Close overlays on restart
-    const broadcastEl = document.getElementById("broadcast-overlay");
-    if (broadcastEl) { broadcastEl.classList.remove("active"); broadcastEl.innerHTML = ""; }
-    const journalEl = document.getElementById("journal-overlay");
-    if (journalEl) { journalEl.classList.remove("active"); journalEl.innerHTML = ""; }
-    choicesPresented.clear();
-
-    // Reset per-run narrative/tutorial state
-    firstDroneEncounterShown = false;
-    droneEncounterSet.clear();
-    triggeredBotIntrospections.clear();
-    triggeredTutorialHints.clear();
-    cleanMsgIndex = 0;
-    waitMsgIndex = 0;
-    lastAmbientRoomId = "";
-    mapOpen = false;
-    helpOpen = false;
-    activeDeduction = null;
-    deductionSelectedIdx = 0;
-    confirmingDeduction = false;
-    hubSection = "evidence";
-    hubOptionIdx = 0;
-    hubLinkedEvidence = [];
-    hubDetailDeduction = null;
-    hubEvidenceIdx = 0;
-    hubConfirming = false;
-    hubLinkFeedback = "";
-    hubChoiceConfirming = false;
-    hubDecisionDetailIdx = null;
-    hubIdx = 0;
-    pendingCrewDoor = null;
-    journalTab = "evidence";
-    choiceSelectedIdx = 0;
-
-    // Clear overlays and display, rebuild
-    const gameoverEl = document.getElementById("gameover-overlay");
-    if (gameoverEl) { gameoverEl.classList.remove("active"); gameoverEl.innerHTML = ""; }
-    display.destroy();
-    containerEl.innerHTML = "";
-    display = (is3D && BrowserDisplay3D)
-      ? new BrowserDisplay3D(containerEl, state.width, state.height)
-      : new BrowserDisplay(containerEl, state.width, state.height);
-
+    resetGameState(seed);
     display.addLog("RESTARTING LINK...", "system");
     display.addLog("Rover A3 rebooted. All systems reset.", "milestone");
     display.addLog("MAINTENANCE SUBROUTINE: Clean rooms to 80% standard. Use [c] to clean.", "system");
     lastObjectivePhase = ObjectivePhase.Clean;
-
+    // Start ambient for same archetype
+    if (state.mystery?.timeline?.archetype) {
+      audio.startAmbient(state.mystery.timeline.archetype);
+    }
     checkRoomEntry();
     renderAll();
+  }
+  if (e.key === "n" || e.key === "N") {
+    e.preventDefault();
+    const newSeed = Date.now() % 1000000;
+    resetGameState(newSeed);
+    // Show full opening crawl for the new storyline
+    gameStarted = false;
+    showOpeningCrawl();
   }
 }
 

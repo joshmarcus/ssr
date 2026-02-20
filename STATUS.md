@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 36 complete (Difficulty, Timeline, Audio)
+- **Phase**: Sprint 37 complete (Replayability, Navigation, Smoke Hazard)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -13,7 +13,7 @@
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 650, Normal: 500, Hard: 350) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 6/6 seeds VICTORY (normal) — 184201 (270T), 42 (188T), 7 (147T); Hard mode tested: 42 (188T, 715/750 HP)
+- **Playtest results**: 184201 (271T), 42 (188T), 3 (254T) — all VICTORY on normal
 
 ## What Works
 
@@ -59,6 +59,9 @@
 - Procedural sound effects: 12 Web Audio SFX + 5 archetype ambient soundscapes
 - Game-over overlay: performance rating (S/A/B/C/D), stats summary, mystery choices recap, incident timeline reconstruction
 - Difficulty system: Easy/Normal/Hard with URL param, adjusting HP, turn limit, damage, deterioration
+- New Game [N] / Replay [R]: random seed generation for replayability, game-over shows both options
+- Objective compass: sensor-gated directional hints (Thermal → relays, Atmospheric → crew/breaches)
+- Smoke hazard: movement slow (>40 smoke), toxic fume damage (>60 smoke), Clean action clears 3x3 area
 - Tutorial hints: context-sensitive tips at early turns and on first-time events
 - Evacuation phase: RED ALERT banner, crew following, escape pod boarding with full audio
 - Help overlay: HTML modal with complete key bindings, game phases, interaction details
@@ -67,6 +70,28 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 37 Changes
+
+### New Game with Random Seed
+- **[N] for New Story**: Game-over screen now offers `[R] Replay Seed 184201 | [N] New Story`
+- [N] generates a random seed via `Date.now() % 1000000`, regenerates the full game, and shows the opening crawl for the new archetype
+- [R] replays the same seed (existing behavior, now clearly labeled)
+- Seed variable is now mutable — players can chain runs through different archetypes without URL editing
+
+### Objective Compass / Scanner
+- **SCANNER sidebar section**: Shows nearest priority objectives with direction and Manhattan distance
+- Sensor-gated: Thermal sensor reveals unactivated relays, Atmospheric sensor reveals crew NPCs and unsealed breaches
+- Escape pods shown during Evacuation phase
+- Priority ordering: crew > relays > breaches > pods
+- Up to 2 targets displayed simultaneously (e.g., "⚡ Relay 12 NE · 🙋 Life Signs 8 S")
+
+### Smoke as Sim-Layer Hazard
+- **Movement slow**: Tiles with smoke ≥ 40 cost an extra turn to traverse (same pattern as heat slow at ≥ 80)
+- **Toxic fume damage**: Tiles with smoke ≥ 60 deal 2 HP/turn (scaled by difficulty damage multiplier)
+- **Clean action now matters all game**: Already cleared 3x3 area of smoke/dirt; with smoke having gameplay consequences, cleaning is a genuine tactical tool for path clearing
+- No double-penalty: smoke slow doesn't trigger on tiles that also trigger heat slow
+- Recovery only on tiles below both heat and smoke thresholds
 
 ## Sprint 36 Changes
 

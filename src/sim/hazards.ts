@@ -6,6 +6,7 @@ import {
   PRESSURE_BREACH_DRAIN, PRESSURE_SPREAD_RATE, PRESSURE_DAMAGE_THRESHOLD, PRESSURE_DAMAGE_PER_TURN,
   PRESSURE_BULKHEAD_THRESHOLD, AIRLOCK_PRESSURE_DRAIN, DETERIORATION_INTERVAL, DETERIORATION_HEAT_BOOST, DETERIORATION_SMOKE_SPAWN,
   PA_INTERVAL, GLYPHS, DIFFICULTY_SETTINGS,
+  SMOKE_DAMAGE_THRESHOLD, SMOKE_DAMAGE_PER_TURN,
 } from "../shared/constants.js";
 
 /** Get damage multiplier for the current difficulty. */
@@ -579,8 +580,30 @@ export function applyHazardDamage(inputState: GameState): GameState {
     };
   }
 
+  // Smoke damage: dense smoke causes minor toxic fume damage
+  if (tile.smoke >= SMOKE_DAMAGE_THRESHOLD && tile.heat < HEAT_PAIN_THRESHOLD) {
+    const smokeDmg = Math.ceil(SMOKE_DAMAGE_PER_TURN * dmgMul);
+    const smokeHp = Math.max(0, state.player.hp - smokeDmg);
+    const smokeLogs = [...state.logs];
+    if (state.turn % 3 === 0) {
+      smokeLogs.push({
+        id: `log_smoke_dmg_${state.turn}`,
+        timestamp: state.turn,
+        source: "system",
+        text: `Toxic fumes detected. Ventilation filters degrading. (-${smokeDmg} HP)`,
+        read: false,
+      });
+    }
+    state = {
+      ...state,
+      player: { ...state.player, hp: smokeHp, alive: smokeHp > 0 },
+      logs: smokeLogs,
+    };
+    if (smokeHp <= 0) return state;
+  }
+
   // Recovery: slow heal on cool tiles only
-  if (tile.heat < HEAT_PAIN_THRESHOLD && tile.pressure >= PRESSURE_DAMAGE_THRESHOLD && state.player.hp < state.player.maxHp) {
+  if (tile.heat < HEAT_PAIN_THRESHOLD && tile.smoke < SMOKE_DAMAGE_THRESHOLD && tile.pressure >= PRESSURE_DAMAGE_THRESHOLD && state.player.hp < state.player.maxHp) {
     const healedHp = Math.min(state.player.maxHp, state.player.hp + COOL_RECOVERY_RATE);
     return {
       ...state,

@@ -22,6 +22,9 @@ export const HEAT_DAMAGE_PER_TURN = 8; // base HP lost per turn on tiles with he
 export const HEAT_PAIN_THRESHOLD = 40; // heat level at which the player starts taking damage
 export const COOL_RECOVERY_RATE = 0; // no passive recovery — use Bot Maintenance room
 export const HOT_ZONE_SLOW_THRESHOLD = 60; // heat level that costs extra movement
+export const SMOKE_SLOW_THRESHOLD = 40; // smoke level that costs extra movement
+export const SMOKE_DAMAGE_THRESHOLD = 60; // smoke level at which bot takes damage
+export const SMOKE_DAMAGE_PER_TURN = 2; // HP lost per turn in dense smoke
 
 // ── Turn limit ──────────────────────────────────────────────
 export const MAX_TURNS = 500;
