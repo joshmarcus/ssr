@@ -17,6 +17,7 @@ import {
   getDefeatText, getDefeatRelayText,
 } from "./data/endgame.js";
 import { getRoomDescription, getIncidentTrace } from "./data/roomDescriptions.js";
+import { CORVUS_REACTIONS } from "./data/narrative.js";
 import {
   BOT_INTROSPECTIONS, BOT_INTROSPECTIONS_BY_ARCHETYPE,
   DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
@@ -459,6 +460,34 @@ function checkRoomEntry(): void {
         state.player = { ...state.player, hp: state.player.hp + healAmt };
         if (healAmt > 0) {
           display.addLog(`Systems recalibrated in new sector. (+${healAmt} HP)`, "system");
+        }
+      }
+
+      // Exploration milestones: fire CORVUS-7 commentary at 25/50/75/100% room coverage
+      if (state.rooms.length > 0) {
+        const pct = Math.round((visitedRoomIds.size / state.rooms.length) * 100);
+        const thresholds = [
+          { pct: 25, key: "explore_25" },
+          { pct: 50, key: "explore_50" },
+          { pct: 75, key: "explore_75" },
+          { pct: 100, key: "explore_100" },
+        ];
+        for (const t of thresholds) {
+          if (pct >= t.pct && !state.milestones.has(t.key)) {
+            const text = CORVUS_REACTIONS[t.key];
+            if (text) {
+              const newMilestones = new Set(state.milestones);
+              newMilestones.add(t.key);
+              state = {
+                ...state,
+                milestones: newMilestones,
+                logs: [
+                  ...state.logs,
+                  { id: `log_corvus_${t.key}`, timestamp: state.turn, source: "system", text, read: false },
+                ],
+              };
+            }
+          }
         }
       }
 

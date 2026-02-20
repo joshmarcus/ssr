@@ -394,6 +394,10 @@ export const CORVUS_REACTIONS: Record<string, string> = {
   first_deduction_correct: "CORVUS-7 CENTRAL: Analysis confirmed. Your reconstruction matches station records. The truth is assembling itself.",
   first_crew_evacuated: "CORVUS-7 CENTRAL: Escape pod launch confirmed. One soul away from this place. Keep going.",
   service_bot_repaired: "CORVUS-7 CENTRAL: Service unit B07 repair protocol complete. Autonomous units cooperating. You are not alone here.",
+  explore_25: "CORVUS-7 CENTRAL: Structural survey 25% complete. Keep mapping — every room holds answers.",
+  explore_50: "CORVUS-7 CENTRAL: Half the station surveyed. The scope of the incident is becoming clearer. Press on.",
+  explore_75: "CORVUS-7 CENTRAL: Survey nearly complete. You have seen the worst this station endured. Only a few sections remain.",
+  explore_100: "CORVUS-7 CENTRAL: Full station survey complete. Every corridor, every room — mapped and recorded. Nothing is hidden now.",
 };
 
 // ── Scan environmental storytelling (archetype × room type) ──

@@ -1206,6 +1206,25 @@ export class BrowserDisplay implements IGameDisplay {
         }
       }
 
+      // Add nearest unexplored room as a low-priority compass target
+      if (visitedRoomIds && state.rooms.length > 0) {
+        let nearestUnexplored: { name: string; dist: number; dir: string } | null = null;
+        for (const room of state.rooms) {
+          if (visitedRoomIds.has(room.id)) continue;
+          const cx = room.x + Math.floor(room.width / 2);
+          const cy = room.y + Math.floor(room.height / 2);
+          const dx = cx - px;
+          const dy = cy - py;
+          const dist = Math.abs(dx) + Math.abs(dy);
+          if (!nearestUnexplored || dist < nearestUnexplored.dist) {
+            nearestUnexplored = { name: room.name, dist, dir: dirLabel(dx, dy) };
+          }
+        }
+        if (nearestUnexplored) {
+          targets.push({ glyph: "?", label: nearestUnexplored.name, dist: nearestUnexplored.dist, dir: nearestUnexplored.dir, color: "#666", priority: 5 });
+        }
+      }
+
       // Sort by priority (lower = more important), then distance
       targets.sort((a, b) => a.priority - b.priority || a.dist - b.dist);
       const shown = targets.slice(0, 2);
@@ -1218,11 +1237,21 @@ export class BrowserDisplay implements IGameDisplay {
       }
     }
 
+    // ── Rooms explored counter ──────────────────────────────────
+    const roomsTotal = state.rooms.length;
+    const roomsExplored = visitedRoomIds ? visitedRoomIds.size : 0;
+    const roomsPct = roomsTotal > 0 ? Math.round((roomsExplored / roomsTotal) * 100) : 0;
+    const roomsColor = roomsPct >= 75 ? "#0f0" : roomsPct >= 50 ? "#ca8" : "#888";
+    const roomsTag = roomsTotal > 0
+      ? ` | <span class="label">Rooms:</span> <span style="color:${roomsColor}">${roomsExplored}/${roomsTotal} (${roomsPct}%)</span>`
+      : "";
+
     const statusHtml = `<div class="status-bar">` +
       `<span class="label">T:</span><span class="value">${state.turn}</span>${turnWarning}` +
       roomLabel + stunTag +
       `<br>` + hpTag.replace(/ \| /, '') +
       `<br>` + discoveryTag.replace(/ \| /, '') + evidenceTag.replace(/ \| /, '') + deductionTag.replace(/ \| /, '') +
+      `<br>` + roomsTag.replace(/ \| /, '') +
       (state.player.attachments[AttachmentSlot.Tool] ? `<br><span class="label">TOOL:</span> <span style="color:#fa4">${this.escapeHtml(state.player.attachments[AttachmentSlot.Tool].name)}</span>` : '') +
       `<br>` + unreadTag.replace(/ \| /g, '').trim() + reportTag.replace(/ \| /, '') +
       interactHint +
