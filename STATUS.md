@@ -1,15 +1,15 @@
 # SSR — Project Status
 
-*Last updated: 2026-02-19*
+*Last updated: 2026-02-20*
 
 ## Current State
 
-- **Phase**: Sprint 42 complete (Bot Pry Bar, Tool Sidebar, Pry Bar Hint, Repair Bot Fix)
+- **Phase**: Sprint 43 complete (Sensor Milestones, Deduction Hints, Auto-Explore Indicator)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
-- **Save key**: v4
+- **Save key**: v5
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 650, Normal: 500, Hard: 350) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
@@ -80,6 +80,26 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 43 Changes
+
+### Sensor Unlock Milestone Messages
+- **Two-line milestone + capability messages**: Thermal and atmospheric sensor pickups now show a headline ("THERMAL IMAGING ONLINE") plus a follow-up explaining what the sensor unlocks ("Press [t] to activate thermal overlay...")
+- Makes sensor upgrades feel like significant progression moments rather than inventory pickups
+
+### Deduction Hint Surfacing in CONNECTIONS
+- **Missing evidence guidance**: When viewing a deduction in the Investigation Hub, shows which evidence categories are still needed (e.g., "Still needed: crew_testimony, environmental")
+- **"All requirements met" prompt**: When all required tags are covered, shows a green prompt encouraging the player to submit their answer
+- Reduces frustration from players not knowing what evidence they still need
+
+### Auto-Explore Visual Indicator
+- **Pulsing "AUTO" badge**: Green overlay badge appears in top-right of map area while auto-exploring
+- **Enhanced start message**: "[AUTO] Exploring... any key to stop. Stops on: damage, nearby interactables."
+- **Enhanced completion message**: "All accessible areas explored. Time to investigate — press [r] for Investigation Hub."
+- Badge element created dynamically on game init, toggled by renderAll()
+
+### Save Key Bump
+- **v4 → v5**: Invalidates old saves to prevent loading errors from ToolPickup entity type changes
 
 ## Sprint 42 Changes
 

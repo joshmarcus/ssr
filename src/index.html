@@ -532,6 +532,28 @@
     .revelation-overlay-box { max-width: 600px; width: 90%; border: 1px solid #553; padding: 1.5rem 2rem; text-align: center; }
     .revelation-overlay-box.correct { border-color: #553; }
     .revelation-overlay-box.incorrect { border-color: #433; }
+
+    /* ── Auto-explore badge ─────────────────────────────── */
+    #auto-explore-badge {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      background: rgba(0, 255, 0, 0.15);
+      color: #0f0;
+      font-family: monospace;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      padding: 2px 8px;
+      border: 1px solid rgba(0, 255, 0, 0.3);
+      border-radius: 2px;
+      z-index: 10;
+      animation: auto-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes auto-pulse {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 0.4; }
+    }
   </style>
 </head>
 <body>

@@ -321,7 +321,7 @@ function autoExploreStep(): void {
   const dir = autoExploreBFS();
 
   if (!dir) {
-    display.addLog("No unexplored areas reachable.", "system");
+    display.addLog("All accessible areas explored. Time to investigate — press [r] for Investigation Hub.", "milestone");
     stopAutoExplore();
     renderAll();
     return;
@@ -564,6 +564,15 @@ function initGame(): void {
 
   inputHandler = new InputHandler(handleAction, handleScan);
 
+  // Create auto-explore badge (floating indicator on map)
+  if (!document.getElementById("auto-explore-badge")) {
+    const badge = document.createElement("div");
+    badge.id = "auto-explore-badge";
+    badge.textContent = "AUTO";
+    badge.style.display = "none";
+    containerEl.appendChild(badge);
+  }
+
   // Listen for restart key when game is over
   window.addEventListener("keydown", handleRestartKey);
   // Listen for F3 to toggle 2D/3D renderer
@@ -682,6 +691,11 @@ function renderAll(): void {
   display.updateRoomFlash(state);
   display.render(state);
   display.renderUI(state, uiPanel, visitedRoomIds);
+  // Auto-explore badge
+  const autoEl = document.getElementById("auto-explore-badge");
+  if (autoEl) {
+    autoEl.style.display = autoExploring ? "block" : "none";
+  }
 }
 
 // ── Restart / New Game handler ───────────────────────────────────
@@ -840,7 +854,7 @@ function handleAction(action: Action): void {
       return;
     }
     autoExploring = true;
-    display.addLog("Auto-exploring... (press Tab or any key to stop)", "system");
+    display.addLog("[AUTO] Exploring... any key to stop. Stops on: damage, nearby interactables.", "system");
     renderAll();
     autoExploreTimer = setTimeout(autoExploreStep, AUTO_EXPLORE_DELAY);
     return;
@@ -2331,6 +2345,17 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
   html += `<div style="color:#fa0;font-weight:bold;font-size:14px;margin-bottom:4px">${esc(deduction.question)}</div>`;
   if (deduction.hintText) {
     html += `<div style="color:#6cf;font-size:11px;font-style:italic;margin-bottom:4px">\u2139 ${esc(deduction.hintText)}</div>`;
+  }
+
+  // Contextual guidance based on tag coverage
+  if (!allCovered && missingTags.length > 0 && hubLinkedEvidence.length > 0) {
+    const missingCategories = missingTags.map(t => {
+      const explanation = getTagExplanation(t, state.mystery?.timeline.archetype);
+      return explanation ? `${t}` : t;
+    });
+    html += `<div style="color:#886;font-size:10px;margin-bottom:4px;padding:3px 6px;background:#1a1800;border-left:2px solid #886">\u26a0 Missing evidence categories: <span style="color:#fa0">${missingCategories.map(c => esc(c)).join(", ")}</span></div>`;
+  } else if (allCovered && !deduction.solved) {
+    html += `<div style="color:#4a4;font-size:10px;margin-bottom:4px;padding:3px 6px;background:#0a1a0a;border-left:2px solid #0f0">\u2713 All evidence requirements met. Press [Tab] to switch to answers and submit.</div>`;
   }
 
   // Tag coverage bar

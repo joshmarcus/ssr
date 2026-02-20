@@ -580,25 +580,27 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       newEntities.delete(targetId);
       next.entities = newEntities;
 
-      // Sensor-specific log messages (use actual crew names from mystery state)
+      // Sensor-specific milestone messages (use actual crew names from mystery state)
       const engineerName = state.mystery?.crew.find(c => c.role === CrewRole.Engineer)?.lastName || "Vasquez";
-      const sensorLogMessages: Record<string, string> = {
-        [SensorType.Thermal]: `Thermal sensor module installed. ${engineerName} left this here — factory sealed, never used. Scan mode now available.`,
-        [SensorType.Atmospheric]: "Atmospheric sensor module installed. Pressure differentials now visible. Breaches glow red on the overlay.",
-      };
-      const logMsg = sensorLogMessages[sensorType] || `${sensorType} sensor installed. Scan mode updated.`;
-
-      // Add log entry
-      next.logs = [
-        ...state.logs,
-        {
-          id: `log_pickup_${targetId}`,
-          timestamp: next.turn,
-          source: "system",
-          text: logMsg,
-          read: false,
+      const sensorMessages: Record<string, { primary: string; capability: string }> = {
+        [SensorType.Thermal]: {
+          primary: `THERMAL IMAGING ONLINE. ${engineerName} left this here — factory sealed, never used.`,
+          capability: "Heat signatures now visible. Press [t] to activate thermal overlay — relays and hazards glow through walls. Scanner will detect relay positions.",
         },
-      ];
+        [SensorType.Atmospheric]: {
+          primary: "PRESSURE SENSORS CALIBRATED. Atmospheric data stream connected.",
+          capability: "Decompressed zones and breaches now detectable. Press [t] to cycle to atmospheric overlay — air flow arrows show leak directions. Scanner will locate crew and breaches.",
+        },
+      };
+      const msgs = sensorMessages[sensorType];
+      const sensorLogs = msgs
+        ? [
+            { id: `log_pickup_${targetId}`, timestamp: next.turn, source: "milestone" as const, text: msgs.primary, read: false },
+            { id: `log_pickup_cap_${targetId}`, timestamp: next.turn, source: "system" as const, text: msgs.capability, read: false },
+          ]
+        : [{ id: `log_pickup_${targetId}`, timestamp: next.turn, source: "system" as const, text: `${sensorType} sensor installed. Scan mode updated.`, read: false }];
+
+      next.logs = [...state.logs, ...sensorLogs];
       break;
     }
 
