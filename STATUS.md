@@ -4,12 +4,12 @@
 
 ## Current State
 
-- **Phase**: Sprint 43 complete (Sensor Milestones, Deduction Hints, Auto-Explore Indicator)
+- **Phase**: Sprint 44 complete (Seed Persistence, Autosave, Restart Key, Save Resilience)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
 - **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
-- **Save key**: v5
+- **Save key**: v6
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 650, Normal: 500, Hard: 350) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
@@ -82,6 +82,32 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 44 Changes
+
+### Seed Persistence & Sequential New Games
+- **Last seed stored in localStorage**: Each game persists its seed under `ssr_last_seed`
+- **New Game increments by 1**: Pressing [N] on game-over or [Esc][Esc] mid-game starts with `seed+1`, guaranteeing a different archetype each time
+- **URL param still overrides**: `?seed=X` ignores stored seed
+
+### Mid-Game Restart (Escape x2)
+- **Double-Escape to restart**: Press Escape once for confirmation prompt ("Press Escape again for New Game, or any other key to cancel"), press again to start a new game with next seed
+- Any other key cancels the restart and continues normally
+- Updated help screen with Escape, Tab, R/N keybind documentation
+
+### Autosave Frequency
+- **Every 3 turns** (was 5): More responsive save state for browser tab closures
+
+### Save Resilience
+- **Structural validation**: `loadGame()` now validates that deserialized state has critical fields (seed, turn, player entity with pos, entities Map, tiles Map, rooms array)
+- **Auto-delete corrupt saves**: Invalid saves are removed from localStorage automatically
+- **Double try-catch in browser.ts**: Catches both deserialization errors AND initialization crashes from structurally invalid state
+- **Graceful recovery**: Falls through to opening crawl with fresh game instead of black screen
+- **Save key v5 → v6**: Invalidates all old saves
+
+### Help Screen Fix
+- Removed incorrect `[j]` for journal (j is vim south movement, journal is `;`)
+- Added `[Tab]` auto-explore, `[N]` new game, `[Esc]` restart documentation
 
 ## Sprint 43 Changes
 

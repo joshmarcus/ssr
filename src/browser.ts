@@ -44,8 +44,21 @@ const ARCHETYPE_DISPLAY_NAMES: Record<IncidentArchetype, string> = {
 };
 
 // ── Parse seed and difficulty from URL params ───────────────────
+const LAST_SEED_KEY = "ssr_last_seed";
 const params = new URLSearchParams(window.location.search);
-let seed = parseInt(params.get("seed") || String(GOLDEN_SEED), 10);
+
+function getNextSeed(): number {
+  try {
+    const stored = localStorage.getItem(LAST_SEED_KEY);
+    if (stored) return (parseInt(stored, 10) + 1) % 1000000;
+  } catch { /* ignore */ }
+  return GOLDEN_SEED;
+}
+
+// URL param takes priority, then stored seed+1, then golden seed
+let seed = params.has("seed")
+  ? parseInt(params.get("seed")!, 10)
+  : getNextSeed();
 const difficultyParam = params.get("difficulty") || "normal";
 const difficulty: Difficulty = difficultyParam === "easy" ? Difficulty.Easy
   : difficultyParam === "hard" ? Difficulty.Hard
@@ -146,6 +159,8 @@ function showOpeningCrawl(): void {
 }
 
 // ── Game initialization ─────────────────────────────────────────
+// Persist initial seed for next-game sequencing
+try { localStorage.setItem(LAST_SEED_KEY, String(seed)); } catch { /* ignore */ }
 let state = generate(seed, difficulty);
 let display: IGameDisplay = undefined!; // assigned in initGame()
 let is3D = false;
@@ -210,6 +225,9 @@ const WAIT_MESSAGES_HOT = [
   "Holding. Thermal warnings climbing. Move soon.",
 ];
 let waitMsgIndex = 0;
+
+// ── Restart confirmation state ────────────────────────────────
+let restartPending = false;
 
 // ── Auto-explore state ─────────────────────────────────────────
 let autoExploring = false;
@@ -622,6 +640,30 @@ function initGame(): void {
       handleDeductionInput(e);
       return;
     }
+    // Escape: restart confirmation (two-press)
+    if (e.key === "Escape" && !state.gameOver) {
+      e.preventDefault();
+      if (restartPending) {
+        // Second Escape — restart with next seed
+        restartPending = false;
+        const newSeed = (seed + 1) % 1000000;
+        resetGameState(newSeed);
+        gameStarted = false;
+        showOpeningCrawl();
+        return;
+      }
+      restartPending = true;
+      display.addLog("Press Escape again for New Game, or any other key to cancel.", "warning");
+      renderAll();
+      return;
+    }
+    // Any non-Escape key cancels restart prompt
+    if (restartPending) {
+      restartPending = false;
+      display.addLog("Restart cancelled.", "system");
+      renderAll();
+      // Don't return — let the key do its normal action too
+    }
     // Mystery choices are handled via the Investigation Hub now
     // V key opens Investigation Hub directly to EVIDENCE section
     if (e.key === "v" && !journalOpen && !state.gameOver) {
@@ -702,12 +744,15 @@ function renderAll(): void {
 function resetGameState(newSeed: number): void {
   deleteSave();
   seed = newSeed;
+  // Persist seed so next "New Game" increments from here
+  try { localStorage.setItem(LAST_SEED_KEY, String(seed)); } catch { /* ignore */ }
   state = generate(seed, difficulty);
   lastPlayerRoomId = "";
   visitedRoomIds.clear();
   journalOpen = false;
   activeChoice = null;
   investigationHubOpen = false;
+  restartPending = false;
   // Close overlays on restart
   const broadcastEl = document.getElementById("broadcast-overlay");
   if (broadcastEl) { broadcastEl.classList.remove("active"); broadcastEl.innerHTML = ""; }
@@ -772,7 +817,7 @@ function handleRestartKey(e: KeyboardEvent): void {
   }
   if (e.key === "n" || e.key === "N") {
     e.preventDefault();
-    const newSeed = Date.now() % 1000000;
+    const newSeed = (seed + 1) % 1000000;
     resetGameState(newSeed);
     // Show full opening crawl for the new storyline
     gameStarted = false;
@@ -1236,8 +1281,8 @@ function handleAction(action: Action): void {
     }
   }
 
-  // Auto-save after each action (unless game is over)
-  if (!state.gameOver && state.turn % 5 === 0) {
+  // Auto-save every 3 turns (unless game is over)
+  if (!state.gameOver && state.turn % 3 === 0) {
     saveGame(state);
   }
 
@@ -1572,13 +1617,14 @@ function showHelp(): void {
           <div><span style="color:#fff">[t] / [q]</span>  Cycle sensor overlay</div>
           <div><span style="color:#fff">[x]</span>  Look (examine surroundings)</div>
           <div><span style="color:#fff">[.] [Space] [5]</span>  Wait one turn</div>
+          <div><span style="color:#fff">[Tab]</span>  Auto-explore (any key to stop)</div>
         </div>
 
         <div>
           <div style="color:#4af;font-weight:bold;margin-bottom:6px">── Menus & Info ──</div>
           <div><span style="color:#fff">[r]</span>  Investigation Hub (evidence, deductions, narrative)</div>
           <div><span style="color:#fff">[v]</span>  Investigation Hub → Evidence</div>
-          <div><span style="color:#fff">[j] / [;]</span>  Quick journal toggle</div>
+          <div><span style="color:#fff">[;]</span>  Quick journal toggle</div>
           <div><span style="color:#fff">[g]</span>  Incident summary card</div>
           <div><span style="color:#fff">[m]</span>  Station map overlay</div>
           <div><span style="color:#fff">[?]</span>  This help screen</div>
@@ -1589,8 +1635,9 @@ function showHelp(): void {
           <div><span style="color:#fff">[Tab]</span>  Switch sections / tabs</div>
           <div><span style="color:#fff">[Enter]</span>  Submit deduction answer</div>
           <div><span style="color:#fff">[Y] / [N]</span>  Confirm or cancel prompts</div>
-          <div><span style="color:#fff">[Esc]</span>  Close any overlay</div>
-          <div><span style="color:#fff">[R]</span>  Restart (game over screen)</div>
+          <div><span style="color:#fff">[Esc]</span>  Close overlay / New Game (press twice)</div>
+          <div><span style="color:#fff">[R]</span>  Replay same seed (game over)</div>
+          <div><span style="color:#fff">[N]</span>  New Game (game over)</div>
         </div>
       </div>
 
@@ -3140,6 +3187,7 @@ if (savedState) {
     console.warn("[browser] Loaded save caused crash — starting fresh game:", err);
     deleteSave();
     state = generate(seed, difficulty);
+    initGame(); // Re-init display for the fresh state
     showOpeningCrawl();
   }
 } else {
