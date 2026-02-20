@@ -366,13 +366,13 @@ describe("Escape Pod Boarding", () => {
     expect(updatedPod.props["boarded"]).toBe(1);
   });
 
-  it("should not board crew who are too far from pod", () => {
+  it("should board following crew regardless of distance from pod", () => {
     let state = makeTestState();
     state = addMysteryState(state, ObjectivePhase.Evacuate);
     const pod = makeEscapePod("escape_pod_1", 5, 4, true);
     state.entities.set(pod.id, pod);
-    // Place following crew far from the pod (>2 tiles away)
-    const crew = makeCrewNPC("crew_1", 5, 0, { found: true, following: true });
+    // Place following crew far from the pod — they still board
+    const crew = makeCrewNPC("crew_1", 0, 0, { found: true, following: true });
     state.entities.set(crew.id, crew);
     state = {
       ...state,
@@ -392,10 +392,9 @@ describe("Escape Pod Boarding", () => {
     const next = step(state, { type: ActionType.Interact, targetId: "escape_pod_1" });
 
     const updatedCrew = next.entities.get("crew_1")!;
-    expect(updatedCrew.props["evacuated"]).toBeFalsy();
-    // Log should mention no crew following nearby
-    const noCrew = next.logs.find(l => l.text.includes("No crew following nearby"));
-    expect(noCrew).toBeDefined();
+    expect(updatedCrew.props["evacuated"]).toBeTruthy();
+    const boarded = next.logs.find(l => l.text.includes("boards"));
+    expect(boarded).toBeDefined();
   });
 
   it("should respect pod capacity", () => {

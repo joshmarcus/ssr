@@ -655,10 +655,16 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
     }
 
     case EntityType.DataCore: {
-      // Check if player has gathered enough evidence to transmit
+      // Gate transmission behind deductions: all deductions must be answered
+      // (completing all deductions proves sufficient investigation regardless of phase)
+      const deductions = next.mystery?.deductions ?? [];
+      const allDeductionsSolved = deductions.length > 0 && deductions.every(d => d.solved);
+
+      // Can transmit if: no mystery, in Recover/Evacuate phase, or all deductions solved
       const canTransmit = !next.mystery ||
         next.mystery.objectivePhase === ObjectivePhase.Recover ||
-        next.mystery.objectivePhase === ObjectivePhase.Evacuate;
+        next.mystery.objectivePhase === ObjectivePhase.Evacuate ||
+        allDeductionsSolved;
 
       if (!canTransmit) {
         // Not ready to transmit yet
@@ -682,24 +688,20 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         break;
       }
 
-      // Gate transmission behind deductions: all deductions must be answered
-      if (next.mystery?.deductions) {
-        const allSolved = next.mystery.deductions.every(d => d.solved);
-        if (!allSolved) {
-          const totalDeductions = next.mystery.deductions.length;
-          const solvedCount = next.mystery.deductions.filter(d => d.solved).length;
-          next.logs = [
-            ...state.logs,
-            {
-              id: `log_datacore_deductions_${next.turn}`,
-              timestamp: next.turn,
-              source: "data_core",
-              text: `Data core online. Uplink ready, but transmission protocol requires a complete incident report. Open the Broadcast Report [r] to submit your deductions. (${solvedCount}/${totalDeductions} answered)`,
-              read: false,
-            },
-          ];
-          break;
-        }
+      if (deductions.length > 0 && !allDeductionsSolved) {
+        const totalDeductions = next.mystery.deductions.length;
+        const solvedCount = next.mystery.deductions.filter(d => d.solved).length;
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_datacore_deductions_${next.turn}`,
+            timestamp: next.turn,
+            source: "data_core",
+            text: `Data core online. Uplink ready, but transmission protocol requires a complete incident report. Open the Broadcast Report [r] to submit your deductions. (${solvedCount}/${totalDeductions} answered)`,
+            read: false,
+          },
+        ];
+        break;
       }
 
       // Transmit: win condition — all deductions answered
@@ -2111,7 +2113,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           },
         ];
       } else {
-        // Pod is powered — board any following crew within 2 tiles
+        // Pod is powered — board all following crew (they find their way to the pod)
         const newEntities = new Map(next.entities);
         let boardedThisTurn = 0;
         const boardedNames: string[] = [];
@@ -2124,20 +2126,16 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           if (entity.props["evacuated"] === true || entity.props["dead"] === true) continue;
           if (currentBoarded >= capacity) break;
 
-          // Check if crew NPC is within 2 tiles of the pod
-          const dist = Math.abs(entity.pos.x - target.pos.x) + Math.abs(entity.pos.y - target.pos.y);
-          if (dist <= 2) {
-            const crewName = `${entity.props["firstName"]} ${entity.props["lastName"]}`;
-            newEntities.set(eid, {
-              ...entity,
-              props: { ...entity.props, following: false, evacuated: true },
-            });
-            boardedThisTurn++;
-            currentBoarded++;
-            boardedNames.push(crewName);
-            const crewId = entity.props["crewId"] as string || eid;
-            newEvacuated.push(crewId);
-          }
+          const crewName = `${entity.props["firstName"]} ${entity.props["lastName"]}`;
+          newEntities.set(eid, {
+            ...entity,
+            props: { ...entity.props, following: false, evacuated: true },
+          });
+          boardedThisTurn++;
+          currentBoarded++;
+          boardedNames.push(crewName);
+          const crewId = entity.props["crewId"] as string || eid;
+          newEvacuated.push(crewId);
         }
 
         if (boardedThisTurn > 0) {
@@ -2842,8 +2840,11 @@ function moveCrewNPCs(state: GameState): GameState {
     }
 
     // Validate move
-    if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height ||
-        !state.tiles[ny][nx].walkable) {
+    const isWalkable = (cx: number, cy: number) =>
+      cx >= 0 && cx < state.width && cy >= 0 && cy < state.height &&
+      state.tiles[cy][cx].walkable && !(cx === px && cy === py);
+
+    if (!isWalkable(nx, ny)) {
       // Try alternate axis
       nx = ex;
       ny = ey;
@@ -2852,20 +2853,43 @@ function moveCrewNPCs(state: GameState): GameState {
       } else {
         nx = ex + (dx > 0 ? 1 : dx < 0 ? -1 : 0);
       }
-      if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height ||
-          !state.tiles[ny][nx].walkable) {
-        // Can't move - just update HP
-        if (crewHp !== (entity.props["hp"] as number)) {
-          newEntities.set(id, { ...entity, props: { ...entity.props, hp: crewHp } });
-          changed = true;
+      if (!isWalkable(nx, ny)) {
+        // Try diagonal toward player
+        nx = ex + (dx > 0 ? 1 : dx < 0 ? -1 : 0);
+        ny = ey + (dy > 0 ? 1 : dy < 0 ? -1 : 0);
+        if (!isWalkable(nx, ny)) {
+          // Last resort: try all 8 directions, pick the one closest to player
+          let bestDir: { nx: number; ny: number; dist: number } | null = null;
+          for (const ddx of [-1, 0, 1]) {
+            for (const ddy of [-1, 0, 1]) {
+              if (ddx === 0 && ddy === 0) continue;
+              const tnx = ex + ddx;
+              const tny = ey + ddy;
+              if (isWalkable(tnx, tny)) {
+                const tdist = Math.abs(px - tnx) + Math.abs(py - tny);
+                if (!bestDir || tdist < bestDir.dist) {
+                  bestDir = { nx: tnx, ny: tny, dist: tdist };
+                }
+              }
+            }
+          }
+          if (bestDir) {
+            nx = bestDir.nx;
+            ny = bestDir.ny;
+          } else {
+            // Truly stuck - just update HP
+            if (crewHp !== (entity.props["hp"] as number)) {
+              newEntities.set(id, { ...entity, props: { ...entity.props, hp: crewHp } });
+              changed = true;
+            }
+            continue;
+          }
         }
-        continue;
       }
     }
 
-    // Don't move onto the player's tile
+    // Don't move onto the player's tile (safety check — isWalkable already excludes it)
     if (nx === px && ny === py) {
-      // Stay put but update HP
       if (crewHp !== (entity.props["hp"] as number)) {
         newEntities.set(id, { ...entity, props: { ...entity.props, hp: crewHp } });
         changed = true;

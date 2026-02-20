@@ -121,11 +121,14 @@ function interactPriority(entity: Entity, state: GameState): number {
     case EntityType.PressureValve: return 35;
     case EntityType.Breach: return 30;
     case EntityType.CrewNPC: {
-      if (!evacuating) return 25;
-      // During evacuation: high priority for undiscovered/unfollowing crew
       if (entity.props["evacuated"] === true || entity.props["dead"] === true) return -1;
       if (entity.props["following"] === true) return 5; // already following, low priority
-      return 200; // recruit crew to follow
+      // Only discover crew (first interaction) if not yet found
+      if (entity.props["found"] !== true) return 25; // discover crew
+      // Already found — only recruit (second interaction) when all deductions are done
+      // This prevents crew getting lost during long exploration traversals
+      const allDedsSolved = (state.mystery?.deductions ?? []).every(d => d.solved);
+      return allDedsSolved ? 200 : -1; // recruit only when ready to escort
     }
     case EntityType.EscapePod: {
       if (!evacuating) return 20;
@@ -156,6 +159,39 @@ function hasFollowingCrew(state: GameState): boolean {
     }
   }
   return false;
+}
+
+/** Find the nearest powered escape pod entity ID */
+function findNearestPoweredPod(state: GameState): string | null {
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  let best: { id: string; dist: number } | null = null;
+  for (const [id, entity] of state.entities) {
+    if (entity.type !== EntityType.EscapePod) continue;
+    if (entity.props["powered"] !== true) continue;
+    const boarded = (entity.props["boarded"] as number) || 0;
+    const capacity = (entity.props["capacity"] as number) || 3;
+    if (boarded >= capacity) continue;
+    const dist = manhattan({ x: px, y: py }, entity.pos);
+    if (!best || dist < best.dist) best = { id, dist };
+  }
+  return best?.id ?? null;
+}
+
+/** Find the nearest escape pod (powered or not) */
+function findNearestPod(state: GameState): string | null {
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  let best: { id: string; dist: number } | null = null;
+  for (const [id, entity] of state.entities) {
+    if (entity.type !== EntityType.EscapePod) continue;
+    const boarded = (entity.props["boarded"] as number) || 0;
+    const capacity = (entity.props["capacity"] as number) || 3;
+    if (boarded >= capacity) continue;
+    const dist = manhattan({ x: px, y: py }, entity.pos);
+    if (!best || dist < best.dist) best = { id, dist };
+  }
+  return best?.id ?? null;
 }
 
 // Track entities we've tried interacting with and they didn't change
@@ -240,13 +276,69 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
   const prioritized = interactables
     .map(e => ({ entity: e, priority: interactPriority(e, state) }))
     .filter(p => p.priority > 0)
-    .filter(p => (interactAttempts.get(p.entity.id) ?? 0) < 2) // skip after 2 failed attempts
+    .filter(p => {
+      const attempts = interactAttempts.get(p.entity.id) ?? 0;
+      // Sealed crew need 3 interactions: discover → unseal → recruit
+      if (p.entity.type === EntityType.CrewNPC && p.entity.props["following"] !== true &&
+          p.entity.props["evacuated"] !== true && p.entity.props["dead"] !== true) {
+        return attempts < 4;
+      }
+      return attempts < 2; // skip after 2 failed attempts for other entities
+    })
     .sort((a, b) => b.priority - a.priority);
 
   if (prioritized.length > 0) {
     const target = prioritized[0].entity;
     interactAttempts.set(target.id, (interactAttempts.get(target.id) ?? 0) + 1);
     return { type: ActionType.Interact, targetId: target.id };
+  }
+
+  // Phase 3b: Evacuation — recruit and escort crew AFTER all deductions are done
+  {
+    const deds = state.mystery?.deductions ?? [];
+    const allDeductionsDone = deds.length > 0 && deds.every(d => d.solved);
+
+    if (allDeductionsDone) {
+      // Find discovered-but-unfollowing crew to recruit
+      const unrecruited: Entity[] = [];
+      for (const [, entity] of state.entities) {
+        if (entity.type === EntityType.CrewNPC &&
+            entity.props["found"] === true &&
+            entity.props["following"] !== true &&
+            entity.props["evacuated"] !== true &&
+            entity.props["dead"] !== true) {
+          unrecruited.push(entity);
+        }
+      }
+
+      if (hasFollowingCrew(state)) {
+        // We have crew following — escort to nearest pod (powered preferred, any as fallback)
+        const podId = findNearestPoweredPod(state) ?? findNearestPod(state);
+        if (podId) {
+          const podEntity = state.entities.get(podId);
+          if (podEntity) {
+            navTarget = podId;
+            const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+              manhattan({ x, y }, podEntity.pos) <= 1
+            ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+              manhattan({ x, y }, podEntity.pos) <= 1, true);
+            if (dir) return { type: ActionType.Move, direction: dir };
+          }
+        }
+      } else if (unrecruited.length > 0) {
+        // No crew following but discovered crew exist — go recruit the nearest one
+        const sorted = unrecruited.sort((a, b) =>
+          manhattan({ x: px, y: py }, a.pos) - manhattan({ x: px, y: py }, b.pos)
+        );
+        const target = sorted[0];
+        navTarget = target.id;
+        const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+          manhattan({ x, y }, target.pos) <= 1
+        ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+          manhattan({ x, y }, target.pos) <= 1, true);
+        if (dir) return { type: ActionType.Move, direction: dir };
+      }
+    }
   }
 
   // Phase 4: Committed navigation — pick a target and stick with it
@@ -265,7 +357,12 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     const candidates: Array<{ entity: Entity; priority: number; dist: number }> = [];
     for (const [, entity] of state.entities) {
       if (entity.id === "player") continue;
-      if ((interactAttempts.get(entity.id) ?? 0) >= 2) continue;
+      const attempts = interactAttempts.get(entity.id) ?? 0;
+      const crewLimit = entity.type === EntityType.CrewNPC &&
+        entity.props["following"] !== true &&
+        entity.props["evacuated"] !== true &&
+        entity.props["dead"] !== true ? 4 : 2;
+      if (attempts >= crewLimit) continue;
       const pri = interactPriority(entity, state);
       if (pri <= 0) continue;
       if (entity.type === EntityType.LogTerminal &&
@@ -367,17 +464,14 @@ for (let turn = 0; turn < MAX_TURNS; turn++) {
 
   const pos = `(${state.player.entity.pos.x},${state.player.entity.pos.y})`;
 
-  // Log EVERY turn between 55-80 to diagnose stuck bot
-  if (turn >= 55 && turn <= 80) {
-    console.log(`T${state.turn} [loop=${turn}]: ${pos} | ${actionStr}`);
-  } else if (hpDelta < 0 ||
+  if (hpDelta < 0 ||
     (action.type !== ActionType.Move && action.type !== ActionType.Wait && action.type !== ActionType.Clean) ||
     state.turn % 50 === 0) {
     console.log(`T${state.turn}: ${currentRoom} ${pos} | HP ${state.player.hp}/${state.player.maxHp}${hpDelta < 0 ? ` (${hpDelta})` : ""} | ${actionStr}`);
   }
 
   // Check for new logs about important events
-  const newLogs = state.logs.slice(-1);
+  const newLogs = state.logs.slice(-3);
   for (const log of newLogs) {
     if (log.timestamp === state.turn && (
       log.text.includes("VICTORY") ||
@@ -389,6 +483,7 @@ for (let turn = 0; turn < MAX_TURNS; turn++) {
       log.text.includes("Deduction") ||
       log.text.includes("Crew found") ||
       log.text.includes("following") ||
+      log.text.includes("unsealed") ||
       log.text.includes("boarded") ||
       log.text.includes("EVACUATION") ||
       log.text.includes("evacuation") ||

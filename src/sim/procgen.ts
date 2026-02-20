@@ -1325,7 +1325,7 @@ function placeCrewAndPods(state: GameState, rooms: DiggerRoom[]): void {
         evacuated: false,
         dead: false,
         sealed: false, // no longer individually sealed — the room door is locked instead
-        hp: 50,
+        hp: 200,
         unconscious: isUnconscious,
         firstName: member.firstName,
         lastName: member.lastName,
