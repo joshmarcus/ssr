@@ -13,6 +13,7 @@ import { generateEvidenceTags, getUnlockedDeductions, solveDeduction, linkEviden
 import { assignThread } from "./threads.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
+  CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE,
 } from "../data/narrative.js";
 
 /**
@@ -2128,13 +2129,16 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             props: { ...target.props, following: true },
           });
           next.entities = newEntities;
+          const personality = target.props["personality"] as string || "cautious";
+          const followDialogueFn = CREW_FOLLOW_DIALOGUE[personality];
+          const followLine = followDialogueFn ? followDialogueFn(crewName) : `${crewName} is following you.`;
           next.logs = [
             ...state.logs,
             {
               id: `log_crew_follow_${targetId}_${next.turn}`,
               timestamp: next.turn,
               source: "narrative",
-              text: `${crewName} is following you. Get them to the Escape Pod Bay.`,
+              text: `${followLine} Get them to the Escape Pod Bay.`,
               read: false,
             },
           ];
@@ -2278,6 +2282,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         const boardedNames: string[] = [];
         const newEvacuated: string[] = [];
         let currentBoarded = boarded;
+        let firstBoardPersonality = "";
+        let firstBoardName = "";
 
         for (const [eid, entity] of state.entities) {
           if (entity.type !== EntityType.CrewNPC) continue;
@@ -2285,14 +2291,18 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           if (entity.props["evacuated"] === true || entity.props["dead"] === true) continue;
           if (currentBoarded >= capacity) break;
 
-          const crewName = `${entity.props["firstName"]} ${entity.props["lastName"]}`;
+          const crewNameBoarding = `${entity.props["firstName"]} ${entity.props["lastName"]}`;
+          if (!firstBoardPersonality) {
+            firstBoardPersonality = entity.props["personality"] as string || "cautious";
+            firstBoardName = crewNameBoarding;
+          }
           newEntities.set(eid, {
             ...entity,
             props: { ...entity.props, following: false, evacuated: true },
           });
           boardedThisTurn++;
           currentBoarded++;
-          boardedNames.push(crewName);
+          boardedNames.push(crewNameBoarding);
           const crewId = entity.props["crewId"] as string || eid;
           newEvacuated.push(crewId);
         }
@@ -2319,8 +2329,9 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
 
           const names = boardedNames.join(", ");
           const totalEvacuated = (next.mystery?.evacuation?.crewEvacuated.length || 0) + newEvacuated.length;
-          next.logs = [
-            ...state.logs,
+          const boardDialogueFn = CREW_BOARDING_DIALOGUE[firstBoardPersonality];
+          const boardingLine = boardDialogueFn ? boardDialogueFn(firstBoardName) : "";
+          const boardingLogs: LogEntry[] = [
             {
               id: `log_pod_board_${targetId}_${next.turn}`,
               timestamp: next.turn,
@@ -2329,6 +2340,16 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
               read: false,
             },
           ];
+          if (boardingLine) {
+            boardingLogs.push({
+              id: `log_pod_dialogue_${targetId}_${next.turn}`,
+              timestamp: next.turn,
+              source: "narrative",
+              text: boardingLine,
+              read: false,
+            });
+          }
+          next.logs = [...state.logs, ...boardingLogs];
 
           // Update evacuation state
           if (next.mystery?.evacuation) {
@@ -3183,6 +3204,181 @@ function moveCrewNPCs(state: GameState): GameState {
 }
 
 /**
+ * Apply mechanical consequences of mystery choices.
+ * Called when a player submits a choice answer.
+ */
+function applyChoiceConsequence(state: GameState, consequence: string, answerKey: string): GameState {
+  let next = { ...state };
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+
+  switch (consequence) {
+    case "blame": {
+      if (answerKey === "engineer_right") {
+        // Acknowledging the truth restores bot HP (crew morale data stream)
+        next.player = { ...next.player, hp: Math.min(next.player.maxHp, next.player.hp + 25) };
+        next.logs = [...next.logs, {
+          id: `log_choice_fx_blame_${next.turn}`,
+          timestamp: next.turn, source: "system",
+          text: "CORVUS-7: Assessment logged. Maintenance data corroborated. System diagnostics boosted. (+25 HP)",
+          read: false,
+        }];
+      } else if (answerKey === "captain_right") {
+        // Preserving command structure: station AI cooperates, reduce heat 5 everywhere
+        const newTiles = next.tiles.map(row => row.map(t => ({ ...t, heat: Math.max(0, t.heat - 5) })));
+        next.tiles = newTiles;
+        next.logs = [...next.logs, {
+          id: `log_choice_fx_blame_${next.turn}`,
+          timestamp: next.turn, source: "system",
+          text: "CORVUS-7: Command authority recognized. Station climate controls temporarily boosted.",
+          read: false,
+        }];
+      }
+      break;
+    }
+    case "data_handling": {
+      if (answerKey === "transmit_all") {
+        // Full transmission: reveal nearest hidden evidence trace
+        let closest: Entity | null = null;
+        let closestDist = Infinity;
+        const newEntities = new Map(next.entities);
+        for (const [, e] of next.entities) {
+          if (e.type !== EntityType.EvidenceTrace) continue;
+          if (e.props["scanHidden"] !== true) continue;
+          const dist = Math.abs(e.pos.x - px) + Math.abs(e.pos.y - py);
+          if (dist < closestDist) { closestDist = dist; closest = e; }
+        }
+        if (closest) {
+          newEntities.set(closest.id, { ...closest, props: { ...closest.props, scanHidden: false } });
+          next.entities = newEntities;
+          next.logs = [...next.logs, {
+            id: `log_choice_fx_data_${next.turn}`,
+            timestamp: next.turn, source: "system",
+            text: "Full data access granted — additional evidence trace detected on sensors.",
+            read: false,
+          }];
+        }
+      } else if (answerKey === "research_only") {
+        // Cautious approach: restore HP
+        next.player = { ...next.player, hp: Math.min(next.player.maxHp, next.player.hp + 50) };
+        next.logs = [...next.logs, {
+          id: `log_choice_fx_data_${next.turn}`,
+          timestamp: next.turn, source: "system",
+          text: "Classified files sealed. System load reduced — diagnostic repair cycle engaged. (+50 HP)",
+          read: false,
+        }];
+      }
+      break;
+    }
+    case "signal_response": {
+      if (answerKey === "jam") {
+        // Jamming: clear smoke in current room
+        const room = next.rooms.find(r =>
+          px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height);
+        if (room) {
+          const newTiles = next.tiles.map(row => row.map(t => ({ ...t })));
+          for (let ry = room.y; ry < room.y + room.height; ry++) {
+            for (let rx = room.x; rx < room.x + room.width; rx++) {
+              if (ry >= 0 && ry < next.height && rx >= 0 && rx < next.width) {
+                newTiles[ry][rx].smoke = 0;
+                newTiles[ry][rx].heat = Math.max(0, newTiles[ry][rx].heat - 10);
+              }
+            }
+          }
+          next.tiles = newTiles;
+          next.logs = [...next.logs, {
+            id: `log_choice_fx_signal_${next.turn}`,
+            timestamp: next.turn, source: "system",
+            text: "Signal jammed. Electromagnetic interference cleared from local section.",
+            read: false,
+          }];
+        }
+      } else if (answerKey === "record") {
+        // Recording: slow deterioration (station stabilizes from analysis)
+        next.deteriorationInterval = (next.deteriorationInterval ?? 25) + 5;
+        next.logs = [...next.logs, {
+          id: `log_choice_fx_signal_${next.turn}`,
+          timestamp: next.turn, source: "system",
+          text: "Signal recording active. Station systems recalibrating around transmission pattern. Deterioration slowed.",
+          read: false,
+        }];
+      }
+      break;
+    }
+    case "accusation": {
+      if (answerKey === "accuse") {
+        // Naming the saboteur: disable nearest patrol drone
+        const newEntities = new Map(next.entities);
+        for (const [eid, e] of newEntities) {
+          if (e.type === EntityType.PatrolDrone && e.props["hostile"] === true) {
+            newEntities.set(eid, { ...e, props: { ...e.props, hostile: false, disabled: true } });
+            next.entities = newEntities;
+            next.logs = [...next.logs, {
+              id: `log_choice_fx_accuse_${next.turn}`,
+              timestamp: next.turn, source: "system",
+              text: "Security protocols updated. Hostile drone disarmed by command override.",
+              read: false,
+            }];
+            break;
+          }
+        }
+      }
+      break;
+    }
+    case "rescue_priority": {
+      if (answerKey === "majority") {
+        // Healing following crew
+        const newEntities = new Map(next.entities);
+        let healed = 0;
+        for (const [eid, e] of newEntities) {
+          if (e.type !== EntityType.CrewNPC) continue;
+          if (e.props["following"] !== true) continue;
+          const hp = (e.props["hp"] as number) || 200;
+          if (hp < 200) {
+            newEntities.set(eid, { ...e, props: { ...e.props, hp: Math.min(200, hp + 50) } });
+            healed++;
+          }
+        }
+        if (healed > 0) {
+          next.entities = newEntities;
+          next.logs = [...next.logs, {
+            id: `log_choice_fx_priority_${next.turn}`,
+            timestamp: next.turn, source: "system",
+            text: "Rescue priority logged. Emergency medical protocols activated for crew in transit.",
+            read: false,
+          }];
+        }
+      } else if (answerKey === "individual") {
+        // Reveal nearest undiscovered crew location
+        let closestCrew: Entity | null = null;
+        let closestDist = Infinity;
+        for (const [, e] of next.entities) {
+          if (e.type !== EntityType.CrewNPC) continue;
+          if (e.props["found"] === true || e.props["dead"] === true) continue;
+          const dist = Math.abs(e.pos.x - px) + Math.abs(e.pos.y - py);
+          if (dist < closestDist) { closestDist = dist; closestCrew = e; }
+        }
+        if (closestCrew) {
+          // Find which room the crew is in
+          const crewRoom = next.rooms.find(r =>
+            closestCrew!.pos.x >= r.x && closestCrew!.pos.x < r.x + r.width &&
+            closestCrew!.pos.y >= r.y && closestCrew!.pos.y < r.y + r.height);
+          const roomHint = crewRoom?.name || "an unknown section";
+          next.logs = [...next.logs, {
+            id: `log_choice_fx_priority_${next.turn}`,
+            timestamp: next.turn, source: "system",
+            text: `Weak life sign triangulated: ${roomHint}. Prioritizing individual rescue.`,
+            read: false,
+          }];
+        }
+      }
+      break;
+    }
+  }
+  return next;
+}
+
+/**
  * Pure function: apply one action to produce the next game state.
  * Returns a new state (immutable style for replay determinism).
  */
@@ -3808,6 +4004,9 @@ export function step(state: GameState, action: Action): GameState {
         text: `Decision recorded: ${validOption.label}`,
         read: false,
       }];
+
+      // Apply mechanical consequence based on choice
+      next = applyChoiceConsequence(next, choice.consequence, action.answerKey!);
 
       // Free action — no turn advance
       return next;

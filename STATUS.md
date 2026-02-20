@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 34 complete (Narrative Polish & Replayability)
+- **Phase**: Sprint 35 complete (Player Agency & Crew Connection)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -65,6 +65,34 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 35 Changes
+
+### Crew Rescue Dialogue
+- **5 personality-flavored follow dialogue lines**: When crew NPC starts following the bot, they say something reflecting their personality trait:
+  - Cautious: "Okay. Okay. Stay close — I'll follow your lead."
+  - Ambitious: "About time. Let's move — every second counts."
+  - Loyal: "Are there others? ...Never mind. Let's go."
+  - Secretive: "I'll explain everything once we're safe."
+  - Pragmatic: "Right. Which way to the pods?"
+- **5 personality-flavored boarding dialogue lines**: When crew boards escape pod, first crew member gets a farewell line:
+  - Cautious: "Thank you. I didn't think anyone was coming."
+  - Ambitious: "Make sure the data gets out too. None of this was for nothing."
+  - Loyal: "The others — did they make it?"
+  - Secretive: "There are things in those logs... make sure someone reads them."
+  - Pragmatic: "Good work, little bot. Get yourself out too."
+
+### Mystery Choice Mechanical Consequences
+- **Choices now affect gameplay** — previously only affected ending text:
+  - **Blame → Engineer Right**: +25 HP, "System diagnostics boosted"
+  - **Blame → Captain Right**: Station heat reduced by 5 globally, "Climate controls boosted"
+  - **Data → Transmit All**: Reveals nearest hidden evidence trace
+  - **Data → Research Only**: +50 HP, "System load reduced"
+  - **Signal → Jam**: Clear all smoke and reduce heat in current room
+  - **Signal → Record**: Slow deterioration rate (+5 interval), "Station recalibrating"
+  - **Saboteur → Accuse**: Disable nearest hostile patrol drone
+  - **Priority → Majority**: Heal following crew by 50 HP
+  - **Priority → Individual**: Reveal location hint for nearest undiscovered crew NPC
 
 ## Sprint 34 Changes
 

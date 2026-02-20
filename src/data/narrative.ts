@@ -75,6 +75,28 @@ export const BOT_INTROSPECTIONS_BY_ARCHETYPE: Record<string, Record<number, stri
   },
 };
 
+// ── Crew follow dialogue (personality-flavored) ─────────────
+// Shown when crew NPC agrees to follow the bot. Keyed by PersonalityTrait.
+import { PersonalityTrait } from "../shared/types.js";
+
+export const CREW_FOLLOW_DIALOGUE: Record<string, (name: string) => string> = {
+  [PersonalityTrait.Cautious]: (name) => `${name} nods slowly. "Okay. Okay. Stay close — I'll follow your lead."`,
+  [PersonalityTrait.Ambitious]: (name) => `${name} straightens up. "About time. Let's move — every second counts."`,
+  [PersonalityTrait.Loyal]: (name) => `${name} glances back down the corridor. "Are there others? ...Never mind. Let's go."`,
+  [PersonalityTrait.Secretive]: (name) => `${name} hesitates, then falls in behind you. "I'll explain everything once we're safe."`,
+  [PersonalityTrait.Pragmatic]: (name) => `${name} checks their boots and stands. "Right. Which way to the pods?"`,
+};
+
+// ── Crew boarding dialogue (personality-flavored) ────────────
+// Shown when crew boards an escape pod. Keyed by PersonalityTrait.
+export const CREW_BOARDING_DIALOGUE: Record<string, (name: string) => string> = {
+  [PersonalityTrait.Cautious]: (name) => `${name} climbs into the pod, hands shaking. "Thank you. I didn't think anyone was coming."`,
+  [PersonalityTrait.Ambitious]: (name) => `${name} straps in quickly. "Make sure the data gets out too. None of this was for nothing."`,
+  [PersonalityTrait.Loyal]: (name) => `${name} pauses at the hatch. "The others — did they make it?" They climb in without waiting for an answer.`,
+  [PersonalityTrait.Secretive]: (name) => `${name} slides into the pod seat. "There are things in those logs... make sure someone reads them."`,
+  [PersonalityTrait.Pragmatic]: (name) => `${name} buckles in with practiced efficiency. "Good work, little bot. Get yourself out too."`,
+};
+
 // ── Drone encounter dialogue (Item 10) ─────────────────────
 // 30% chance when player walks adjacent to a drone.
 export const DRONE_STATUS_MESSAGES: string[] = [
