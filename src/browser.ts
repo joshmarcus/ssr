@@ -3117,14 +3117,31 @@ function esc(text: string): string {
 }
 
 // ── Start: check for save or show opening crawl ─────────────────
-const savedState = hasSave() ? loadGame() : null;
+let savedState: ReturnType<typeof loadGame> = null;
+try {
+  savedState = hasSave() ? loadGame() : null;
+} catch {
+  // Corrupt save — delete it and start fresh
+  console.warn("[browser] Save load crashed — starting fresh game");
+  deleteSave();
+  savedState = null;
+}
+
 if (savedState) {
-  state = savedState;
-  gameStarted = true;
-  initGame();
-  // display is now assigned by initGame
-  display.addLog("[Save loaded — resuming session]", "milestone");
-  renderAll();
+  try {
+    state = savedState;
+    gameStarted = true;
+    initGame();
+    // display is now assigned by initGame
+    display.addLog("[Save loaded — resuming session]", "milestone");
+    renderAll();
+  } catch (err) {
+    // State loaded but is structurally broken — start fresh
+    console.warn("[browser] Loaded save caused crash — starting fresh game:", err);
+    deleteSave();
+    state = generate(seed, difficulty);
+    showOpeningCrawl();
+  }
 } else {
   showOpeningCrawl();
 }

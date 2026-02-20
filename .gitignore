@@ -12,5 +12,6 @@ batch*.txt
 playtest.jsonl
 playtest_log.txt
 screenshots/
+screenshot*.png
 public/
 space_station_roguelike_docs_v10.zip

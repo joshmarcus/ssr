@@ -75,6 +75,8 @@
 - Deduction retrospective on game-over: shows each deduction's correct answer and player accuracy
 - Pry Bar tool-slot attachment: first Tool slot item, can force open clearance doors
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
+- Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
+- **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
 
 ## Known Issues
 

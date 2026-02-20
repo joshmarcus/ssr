@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "harness": "tsx src/harness/cli.ts",
     "harness:claude": "tsx src/harness/claudeDriver.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "screenshot": "tsx screenshot.ts"
   },
   "keywords": [
     "roguelike",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@types/node": "^25.2.3",
     "fbx2gltf": "^0.9.7-p1",
+    "playwright": "^1.58.2",
     "three-stdlib": "^2.36.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

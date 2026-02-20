@@ -53,15 +53,51 @@ export function saveGame(state: GameState): boolean {
   }
 }
 
-/** Load game state from localStorage. Returns null if no save exists. */
+/** Validate that a deserialized state has the critical structure needed to run. */
+function isValidGameState(s: unknown): s is GameState {
+  if (!s || typeof s !== "object") return false;
+  const gs = s as Record<string, unknown>;
+  // Must have core fields
+  if (typeof gs.seed !== "number") return false;
+  if (typeof gs.turn !== "number") return false;
+  if (typeof gs.width !== "number" || typeof gs.height !== "number") return false;
+  if (!gs.player || typeof gs.player !== "object") return false;
+  // Player must have entity with pos
+  const player = gs.player as Record<string, unknown>;
+  if (!player.entity || typeof player.entity !== "object") return false;
+  const pe = player.entity as Record<string, unknown>;
+  if (!pe.pos || typeof pe.pos !== "object") return false;
+  // Must have entities Map
+  if (!(gs.entities instanceof Map)) return false;
+  // Must have tiles Map
+  if (!(gs.tiles instanceof Map)) return false;
+  // Must have rooms array
+  if (!Array.isArray(gs.rooms)) return false;
+  return true;
+}
+
+/** Load game state from localStorage. Returns null if no save exists or save is corrupt.
+ *  Automatically deletes corrupt saves to prevent repeated load failures. */
 export function loadGame(): GameState | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data: SerializedGameState = JSON.parse(raw);
-    if (data._version !== 1) return null;
-    return deserialize(data);
-  } catch {
+    if (data._version !== 1) {
+      localStorage.removeItem(SAVE_KEY);
+      return null;
+    }
+    const state = deserialize(data);
+    if (!isValidGameState(state)) {
+      console.warn("[saveLoad] Corrupt save detected — missing critical fields. Deleting.");
+      localStorage.removeItem(SAVE_KEY);
+      return null;
+    }
+    return state;
+  } catch (err) {
+    console.warn("[saveLoad] Failed to load save:", err);
+    // Delete corrupt save so next load doesn't hit same error
+    try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
     return null;
   }
 }
