@@ -452,6 +452,16 @@ function checkRoomEntry(): void {
     if (!visitedRoomIds.has(currentRoom.id)) {
       visitedRoomIds.add(currentRoom.id);
 
+      // Exploration reward: small HP recovery on first room visit
+      const EXPLORE_HEAL = 5;
+      if (state.player.hp < state.player.maxHp && !state.gameOver) {
+        const healAmt = Math.min(EXPLORE_HEAL, state.player.maxHp - state.player.hp);
+        state.player = { ...state.player, hp: state.player.hp + healAmt };
+        if (healAmt > 0) {
+          display.addLog(`Systems recalibrated in new sector. (+${healAmt} HP)`, "system");
+        }
+      }
+
       // Item 11: Environmental sound cues BEFORE room description
       emitRoomEntryCues(currentRoom);
 

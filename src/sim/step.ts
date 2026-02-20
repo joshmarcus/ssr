@@ -13,7 +13,7 @@ import { generateEvidenceTags, getUnlockedDeductions, solveDeduction, linkEviden
 import { assignThread } from "./threads.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
-  CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY,
+  CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
 } from "../data/narrative.js";
 
 /**
@@ -2252,12 +2252,21 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           const engineerLast = next.mystery.crew.find(c => c.role === CrewRole.Engineer)?.lastName ?? "the engineer";
           const captainLast = next.mystery.crew.find(c => c.role === CrewRole.Captain)?.lastName ?? "the captain";
           const scientistLast = next.mystery.crew.find(c => c.role === CrewRole.Scientist)?.lastName ?? "the scientist";
-          // Don't let crew testify about themselves in third person
+          // Key crew members give first-person accounts instead of third-person references
           const crewLast = crewLastName;
+          const crewRole = target.props["role"] as string || "";
           const isSelfReference = crewLast === engineerLast || crewLast === captainLast || crewLast === scientistLast;
-          const testimony = isSelfReference
-            ? { text: `${crewName}: "I saw things. I know what happened. But you need to check the logs — the terminal data tells the story better than I can."`, summary: `Crew testimony: ${crewName} defers to terminal records` }
-            : testimonyFn(crewName, engineerLast, captainLast, scientistLast);
+          let testimony: { text: string; summary: string };
+          if (isSelfReference) {
+            // Look up role-specific self-testimony
+            const selfPool = archetype ? CREW_SELF_TESTIMONY[archetype] : undefined;
+            const selfFn = selfPool?.[crewRole];
+            testimony = selfFn
+              ? selfFn(crewName)
+              : { text: `${crewName}: "I was there. I know what happened. The terminal logs have the details — but I can tell you, it wasn't an accident."`, summary: `Crew testimony: ${crewName} confirms the incident was not accidental` };
+          } else {
+            testimony = testimonyFn(crewName, engineerLast, captainLast, scientistLast);
+          }
 
           // Mark as questioned
           const newEntities = new Map(next.entities);
@@ -3739,8 +3748,8 @@ export function step(state: GameState, action: Action): GameState {
       newEntities.set("player", next.player.entity);
       next.entities = newEntities;
 
-      // Hot zone movement penalty: extreme heat costs an extra turn
-      if (state.tiles[newPos.y][newPos.x].heat >= 80) {
+      // Hot zone movement penalty: high heat costs an extra turn
+      if (state.tiles[newPos.y][newPos.x].heat >= 60) {
         next.turn += 1; // extra turn (2 total instead of 1)
         next = tickHazards(next);
         next = tickHazards(next);

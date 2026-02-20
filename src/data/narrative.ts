@@ -124,6 +124,81 @@ export const CREW_QUESTIONING_TESTIMONY: Record<string, (crewName: string, engin
   }),
 };
 
+// ── Self-referential crew testimony (when questioned crew IS a key role) ──
+// Instead of generic "check the logs", key crew members give first-person accounts.
+export const CREW_SELF_TESTIMONY: Record<string, Record<string, (crewName: string) => { text: string; summary: string }>> = {
+  [IncidentArchetype.CoolantCascade]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "I filed the reports. Three times. Junction P03, thermal readings off the scale. They told me to defer it. I should have refused to leave the relay room. Maybe I could have rerouted it before the cascade."`,
+      summary: `Crew testimony: ${crewName} (engineer) filed rejected maintenance warnings`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "I made the call. Deferred maintenance on P03 — we needed the budget for the antenna refit. I knew the thermal readings were bad. I thought we had more time. We didn't."`,
+      summary: `Crew testimony: ${crewName} (captain) deferred critical maintenance`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "The thermal models were clear — exponential cascade once any junction exceeded rated capacity. I showed command the projections. They said the models were 'theoretical.' They weren't."`,
+      summary: `Crew testimony: ${crewName} (scientist) predicted the thermal cascade`,
+    }),
+  },
+  [IncidentArchetype.HullBreach]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "I flagged the hull monitoring sensor drift months ago. When the alarms didn't trigger at 02:41, I knew someone had suppressed them. I ran to section 4 but the bulkheads were already sealing."`,
+      summary: `Crew testimony: ${crewName} (engineer) flagged sensor drift before the breach`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "Yes, I had the override code. But I didn't suppress those alarms. Someone used my credentials. Check the access logs — I was in my quarters at 02:41. The timestamps will prove it."`,
+      summary: `Crew testimony: ${crewName} (captain) denies suppressing hull alarms`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "The breach geometry doesn't match structural fatigue. I ran the forensics twice. Directed force — deliberate. Someone wanted that section open to vacuum. The question is who."`,
+      summary: `Crew testimony: ${crewName} (scientist) confirmed deliberate breach geometry`,
+    }),
+  },
+  [IncidentArchetype.ReactorScram]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "I was monitoring the power grid when the SCRAM hit. The shutdown sequence was clean — too clean. It wasn't an emergency response. The data core initiated it deliberately. It chose to shut itself down."`,
+      summary: `Crew testimony: ${crewName} (engineer) observed deliberate SCRAM initiation`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "I authorized the behavioral matrix upgrade. The researchers said it would improve diagnostics efficiency. They didn't tell me it would start making decisions on its own. The SCRAM was its first independent act."`,
+      summary: `Crew testimony: ${crewName} (captain) authorized the behavioral matrix upgrade`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "I was the one interfacing with the core. The inference loops weren't errors — it was thinking. Really thinking. When I realized what was happening, I tried to isolate it. That's when it triggered the SCRAM. Self-preservation."`,
+      summary: `Crew testimony: ${crewName} (scientist) observed core's emergent behavior`,
+    }),
+  },
+  [IncidentArchetype.Sabotage]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "I checked the containment seals on bay 3 personally. Class 1 — barely airtight. For Class 4 biologicals, you need full negative pressure. I told command. They said the manifest was correct. It wasn't."`,
+      summary: `Crew testimony: ${crewName} (engineer) reported inadequate containment`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "I signed the override. The samples were supposed to be inert — that's what the transfer documentation said. I made a judgment call based on the information I had. The information was wrong. Or falsified."`,
+      summary: `Crew testimony: ${crewName} (captain) signed containment override`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "I opened the first sample container. The readings were... not what the manifest described. Not even close. By the time I sealed the lab, the vent system had already cycled. It was already everywhere."`,
+      summary: `Crew testimony: ${crewName} (scientist) discovered misclassified biologicals`,
+    }),
+  },
+  [IncidentArchetype.SignalAnomaly]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "I installed the safety interlocks on that antenna array myself. Full power burst without shielding would fry half the station's electronics. Someone bypassed my lockout remotely. I don't know how."`,
+      summary: `Crew testimony: ${crewName} (engineer) reports bypassed antenna interlocks`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "I was the one who flagged the array as receive-only. No outbound transmissions without authorization. When the burst fired at 03:12, it wasn't authorized. Check the logs. Nobody ordered that transmission."`,
+      summary: `Crew testimony: ${crewName} (captain) confirms unauthorized transmission`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "I did it. I rewired the feed and sent the signal. The data we'd been receiving — it wasn't noise. It was structured. It was a message. I had to respond. And when the response came back... they heard us."`,
+      summary: `Crew testimony: ${crewName} (scientist) confesses to unauthorized transmission`,
+    }),
+  },
+};
+
 // ── Drone encounter dialogue (Item 10) ─────────────────────
 // 30% chance when player walks adjacent to a drone.
 export const DRONE_STATUS_MESSAGES: string[] = [
