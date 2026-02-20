@@ -863,6 +863,22 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             read: false,
           },
         ];
+        // Discovery bonus: small HP recovery for reading new terminals
+        const LOG_READ_HEAL = 8;
+        const logHealAmt = Math.min(LOG_READ_HEAL, next.player.maxHp - next.player.hp);
+        if (logHealAmt > 0) {
+          next.player = { ...next.player, hp: next.player.hp + logHealAmt };
+          next.logs = [
+            ...next.logs,
+            {
+              id: `log_terminal_heal_${targetId}`,
+              timestamp: next.turn,
+              source: "system",
+              text: `New data integrated into incident analysis. Systems optimized. (+${logHealAmt} HP)`,
+              read: false,
+            },
+          ];
+        }
         // Add journal entry for this log
         const logSource = target.props["source"] as string || "unknown";
         const firstLine = terminalText.split("\n")[0] || terminalText.slice(0, 60);
@@ -972,23 +988,61 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
     }
 
     case EntityType.ServiceBot: {
-      // Activate dormant service bot (recovery option)
-      const newEntities = new Map(state.entities);
-      newEntities.set(targetId, {
-        ...target,
-        props: { ...target.props, active: true },
-      });
-      next.entities = newEntities;
-      next.logs = [
-        ...state.logs,
-        {
-          id: `log_bot_${targetId}`,
-          timestamp: next.turn,
-          source: "system",
-          text: "Service bot B07 powered up — badge override PRIYA-7741 accepted. Backup unit standing by for emergency transfer.",
-          read: false,
-        },
-      ];
+      const botActive = target.props["active"] === true;
+      if (!botActive) {
+        // First interaction: activate the bot
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, active: true },
+        });
+        next.entities = newEntities;
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_bot_${targetId}`,
+            timestamp: next.turn,
+            source: "system",
+            text: "Service bot B07 powered up — badge override PRIYA-7741 accepted. Interact again for emergency hull patch and system recalibration.",
+            read: false,
+          },
+        ];
+      } else if (target.props["repairUsed"] !== true) {
+        // Second interaction: repair the player
+        const REPAIR_AMOUNT = 75;
+        const healAmt = Math.min(REPAIR_AMOUNT, next.player.maxHp - next.player.hp);
+        next.player = { ...next.player, hp: next.player.hp + healAmt };
+        const newEntities = new Map(next.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, repairUsed: true },
+        });
+        next.entities = newEntities;
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_bot_repair_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: healAmt > 0
+              ? `B07 performs emergency hull patch and recalibration. (+${healAmt} HP) "Repair complete. Resuming standby."`
+              : `B07 scans your chassis. "No damage detected. Resuming standby."`,
+            read: false,
+          },
+        ];
+      } else {
+        // Already repaired
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_bot_done_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: `B07: "Repair kit depleted. Standby mode. Good luck out there."`,
+            read: false,
+          },
+        ];
+      }
       break;
     }
 

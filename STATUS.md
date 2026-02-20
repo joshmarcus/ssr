@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 45 complete (Scoring Sync, Crew Memory Fragments, Playtest Validation)
+- **Phase**: Sprint 47 complete (Heat Penalty Tuning, Crew Self-Testimony, Exploration Reward)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -82,6 +82,39 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 47 Changes
+
+### Heat Movement Penalty Tuning
+- **Threshold lowered from 80 to 60**: More tiles now trigger the extra-turn movement penalty, creating meaningful route-planning decisions around hot zones
+- Heat damage still starts at 40 (unchanged), but moving through 60+ heat now costs 2 turns instead of 1
+
+### Crew Self-Testimony System
+- **15 new role-specific first-person testimony lines**: Engineer, captain, and scientist for each of the 5 archetypes now give unique accounts when questioned
+- Previously, key crew members gave generic "I saw things. Check the logs." — now they give first-person confessions and revelations
+- Examples: CoolantCascade engineer: "I filed the reports. Three times. Junction P03..." / ReactorScram scientist: "I was the one interfacing with the core. The inference loops weren't errors..."
+- Non-key crew members get improved fallback: "I was there. I know what happened... it wasn't an accident."
+
+### Exploration HP Reward
+- **+5 HP on first room visit**: Entering a new room for the first time grants a small HP recovery ("Systems recalibrated in new sector")
+- Incentivizes exploration beyond the critical path without being overpowered
+- With ~15-28 rooms per map, exploration can recover 75-140 HP total
+
+## Sprint 46 Changes
+
+### Tiered PA Message Escalation
+- **Three turn-based tiers**: Early (T0-150) clinical/routine, Mid (T150-300) stressed/warning, Late (T300+) desperate/failing
+- **6 messages per tier**: 18 new atmospheric PA messages blended at ~30% rate with existing phase-based pools
+- Early: "Routine diagnostic cycle complete", "Station clock synchronized — 847 days since last crew contact"
+- Mid: "Backup power reserves at 31%", "Automated repair queue: 214 outstanding items. ETA: [OVERFLOW]"
+- Late: "Core system cascade failure predicted", "...I have been talking to no one for 847 days..."
+- Creates a palpable sense of the station deteriorating as the game progresses
+
+### Tension-Based Room Entry Flavor
+- **Atmospheric text on room transitions**: After turn 100, entering a different room can trigger environmental tension text
+- **Escalating frequency**: ~25% at T100-200, ~40% at T200-300, ~55% at T300+
+- **Three escalation pools**: Early (flickering lights, dust, rattling vents), Mid (groaning floors, amber warnings, bursting pipes), Late (structural stress, sparking junctions, dying station)
+- Deterministic selection via turn + room name hash — no randomness needed
 
 ## Sprint 45 Changes
 
