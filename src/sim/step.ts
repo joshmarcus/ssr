@@ -3307,13 +3307,22 @@ export function step(state: GameState, action: Action): GameState {
           "Crew Quarters": "Under the dust: initials carved into the bunk frame. K.V. Someone marking their territory.",
           "Research Lab": "The floor under the grime is scored with equipment drag marks. They moved something heavy recently.",
           "Communications Hub": "Cleaning reveals a sticky note behind a console: 'If Okafor asks, uplink was down for maintenance.'",
+          "Bridge": "Polishing the console reveals a coffee ring and a handwritten note: 'Check P03 temps — Vasquez.'",
+          "Engine Core": "Under the soot, scratch marks around the access panel. Someone pried it open without tools.",
+          "Med Bay": "Cleaning the counter uncovers a patient log. Last entry: three names, two crossed out.",
+          "Life Support": "Wiping the intake filter reveals it was deliberately clogged. Insulation foam, not dust.",
+          "Observation Deck": "The viewport glass is smudged with palm prints. Someone stood here a long time, watching.",
+          "Cargo Hold": "Beneath a cargo label: a smaller label underneath. Different manifest number. Different destination.",
+          "Maintenance Corridor": "The soot pattern tells a story — handprints at shoulder height, running east. Then nothing.",
+          "Auxiliary Power": "Cleaning the generator housing reveals a tamper seal. It's been broken and reattached.",
+          "Emergency Shelter": "The floor is scuffed near the door. Someone tried to get in. Or was dragged out.",
         };
         if (cleanRoom && roomCleaningDiscoveries[cleanRoom]) {
-          // Only show once per room — use deterministic check
-          const roomHash = (px * 7 + py * 13 + next.turn) % 3;
-          if (roomHash === 0) {
+          // Show room discovery once (keyed by room name to avoid repeats)
+          const discoveryId = `clean_discovery_${cleanRoom}`;
+          if (!next.logs.some(l => l.id === discoveryId)) {
             cleanLogs.push({
-              id: `log_clean_room_${cleanRoom}_${next.turn}`,
+              id: discoveryId,
               timestamp: next.turn,
               source: "narrative",
               text: roomCleaningDiscoveries[cleanRoom],

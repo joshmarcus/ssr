@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 24 complete (Game Feel)
+- **Phase**: Sprint 25 complete (Atmosphere & Polish)
 - **Test status**: 280 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -65,6 +65,12 @@
 - No CI pipeline deployed
 - Seed 3 DEFEAT: bot times out at 500 turns on large maps (navigation efficiency)
 - Seed 5 DEFEAT: bot only solves 3/5 deductions (evidence-gathering heuristic too shallow)
+
+## Sprint 25 Changes
+
+### Atmosphere & Polish
+- **Generated room descriptions**: "Section N" rooms (procedurally generated) now get atmospheric descriptions from a pool of 6 generic room descriptions, selected deterministically by seed. Named rooms continue to use their specific authored descriptions.
+- **Cleaning phase discoveries**: 9 new room-specific cleaning discoveries (Bridge, Engine Core, Med Bay, Life Support, Observation Deck, Cargo Hold, Maintenance Corridor, Auxiliary Power, Emergency Shelter). Cleaning a room now always reveals its discovery text (with dedup) instead of random 1/3 chance. Each discovery is lore-consistent environmental storytelling.
 
 ## Sprint 24 Changes
 
@@ -147,6 +153,7 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ## Recent Changes (Git History)
 
 ```
+2026-02-19        feat: sprint 25 — atmosphere & polish (room descriptions, cleaning discoveries)
 2026-02-19        feat: sprint 24 — game feel (room entry, interaction preview)
 2026-02-19        feat: sprint 23 — traversal & tension (HP economy, auto-explore)
 2026-02-19        feat: sensor-gated evidence — scan reveals hidden traces
@@ -282,7 +289,7 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ### Key Sim Files
 | File                   | Last Modified       |
 |-----------------------|---------------------|
-| src/sim/step.ts        | 2026-02-17 22:49   |
+| src/sim/step.ts        | 2026-02-19          |
 | src/sim/procgen.ts     | 2026-02-17 22:22   |
 | src/sim/deduction.ts   | 2026-02-19          |
 | src/sim/whatWeKnow.ts  | 2026-02-18          |

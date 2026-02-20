@@ -70,3 +70,24 @@ export const ROOM_DESCRIPTIONS: Record<string, string> = {
   "Escape Pod Bay":
     "Twelve standard-issue crew evacuation pods in two neat rows. Status panels glow amber — unpowered, waiting. The deployment rail tracks are clean. Nobody made it this far.",
 };
+
+/** Pool of generic descriptions for unnamed rooms (Section N). */
+const GENERIC_ROOM_DESCRIPTIONS = [
+  "An unmarked compartment. Bare walls, standard ceiling grid. Whatever this room's purpose was, it's been stripped down to structural minimums.",
+  "A utility space between main sections. Cable runs overhead, junction boxes at regular intervals. Functional. Unremarkable.",
+  "Storage alcove. Empty shelving units and magnetic cargo clamps bolted to the floor. The manifest panel is dark.",
+  "A secondary workspace. Folding tables and wall-mounted tool racks. One chair, pushed back, still spinning slightly.",
+  "Environmental monitoring substation. Air quality readouts on a small panel, most in amber. The recycler hums at low power.",
+  "A narrow equipment bay. Replacement parts for station systems, neatly labeled. Someone kept this section organized until the end.",
+];
+
+/** Get a room description, with fallback for unnamed/generic rooms. */
+export function getRoomDescription(roomName: string, seed: number): string | null {
+  if (ROOM_DESCRIPTIONS[roomName]) return ROOM_DESCRIPTIONS[roomName];
+  // Generic descriptions for "Section N" rooms
+  if (roomName.startsWith("Section ")) {
+    const idx = (seed + roomName.length * 7) % GENERIC_ROOM_DESCRIPTIONS.length;
+    return GENERIC_ROOM_DESCRIPTIONS[idx];
+  }
+  return null;
+}

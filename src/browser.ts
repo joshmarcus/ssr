@@ -15,7 +15,7 @@ import {
   CLASSIFIED_DIRECTIVE_LOG_FRAGMENT, CLASSIFIED_DIRECTIVE_TEXT,
   getVictoryText,
 } from "./data/endgame.js";
-import { ROOM_DESCRIPTIONS } from "./data/roomDescriptions.js";
+import { getRoomDescription } from "./data/roomDescriptions.js";
 import {
   BOT_INTROSPECTIONS, DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
   AMBIENT_HEAT_MESSAGES, AMBIENT_HEAT_DEFAULT, CLEANING_MESSAGES, DIRT_TRAIL_HINTS,
@@ -372,7 +372,7 @@ function checkRoomEntry(): void {
       // Item 11: Environmental sound cues BEFORE room description
       emitRoomEntryCues(currentRoom);
 
-      const desc = ROOM_DESCRIPTIONS[currentRoom.name];
+      const desc = getRoomDescription(currentRoom.name, state.seed);
       if (desc) {
         display.addLog(desc, "narrative");
       }
