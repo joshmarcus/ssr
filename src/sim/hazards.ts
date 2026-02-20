@@ -235,6 +235,17 @@ export function tickHazards(state: GameState): GameState {
     }
   }
 
+  // Re-zero airlock tiles after bulkhead logic (open airlocks are always 0)
+  for (const [, entity] of state.entities) {
+    if (entity.type === EntityType.Airlock && entity.props["open"] === true) {
+      const ax = entity.pos.x;
+      const ay = entity.pos.y;
+      if (ay >= 0 && ay < state.height && ax >= 0 && ax < state.width) {
+        newTiles[ay][ax].pressure = 0;
+      }
+    }
+  }
+
   return { ...state, tiles: newTiles };
 }
 

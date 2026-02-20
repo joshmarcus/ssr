@@ -1347,13 +1347,28 @@ export class BrowserDisplay implements IGameDisplay {
     ];
     const activeLegend = allLegendItems.filter(l => visibleEntityTypes.has(l.key));
 
-    // Render legend beneath the map (larger, more central)
+    // Render legend beneath the map — dim exhausted entity types
     const mapLegendEl = document.getElementById("map-legend");
     if (mapLegendEl) {
       if (activeLegend.length > 0) {
-        mapLegendEl.innerHTML = activeLegend.map(l =>
-          `<span class="legend-item"><span class="legend-glyph" style="color:${l.color}">${this.escapeHtml(l.glyph)}</span><span class="legend-label">${l.label}</span></span>`
-        ).join("");
+        mapLegendEl.innerHTML = activeLegend.map(l => {
+          // Check if ALL entities of this type in the room are exhausted
+          const isSpecialKey = l.key.startsWith("_");
+          let allExhausted = false;
+          if (!isSpecialKey && currentRoom) {
+            const entitiesOfType: boolean[] = [];
+            for (const [, e] of state.entities) {
+              if (e.type !== l.key) continue;
+              if (e.pos.x < currentRoom.x || e.pos.x >= currentRoom.x + currentRoom.width) continue;
+              if (e.pos.y < currentRoom.y || e.pos.y >= currentRoom.y + currentRoom.height) continue;
+              entitiesOfType.push(isEntityExhausted(e));
+            }
+            allExhausted = entitiesOfType.length > 0 && entitiesOfType.every(x => x);
+          }
+          const color = allExhausted ? "#555" : l.color;
+          const labelStyle = allExhausted ? ' style="color:#555"' : "";
+          return `<span class="legend-item"><span class="legend-glyph" style="color:${color}">${this.escapeHtml(l.glyph)}</span><span class="legend-label"${labelStyle}>${l.label}</span></span>`;
+        }).join("");
       } else {
         mapLegendEl.innerHTML = `<span class="legend-label">No notable objects nearby.</span>`;
       }

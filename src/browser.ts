@@ -33,6 +33,7 @@ import { computeChoiceEndings } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence, getTagExplanation } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave, recordRun } from "./sim/saveLoad.js";
+import { isEntityExhausted } from "./shared/ui.js";
 import { generateWhatWeKnow, formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
 
 // ── Archetype display names ─────────────────────────────────────
@@ -530,6 +531,31 @@ function checkRoomEntry(): void {
       if (roomEntities.length > 0) {
         const unique = [...new Set(roomEntities)];
         display.addLog(`You detect: ${unique.join(", ")}`, "sensor");
+      }
+    }
+
+    // Room investigation progress — fires on every room change
+    {
+      let totalInteractable = 0;
+      let freshCount = 0;
+      for (const [id, ent] of state.entities) {
+        if (id === "player") continue;
+        if (ent.pos.x < currentRoom.x || ent.pos.x >= currentRoom.x + currentRoom.width) continue;
+        if (ent.pos.y < currentRoom.y || ent.pos.y >= currentRoom.y + currentRoom.height) continue;
+        // Skip non-interactable types (drones, repair bots, etc.)
+        if (ent.type === EntityType.PatrolDrone || ent.type === EntityType.Drone ||
+            ent.type === EntityType.RepairBot) continue;
+        // Skip hidden/evacuated/dead entities
+        if (ent.props["hidden"] === true || ent.props["evacuated"] === true ||
+            ent.props["dead"] === true) continue;
+        totalInteractable++;
+        if (!isEntityExhausted(ent)) freshCount++;
+      }
+      if (totalInteractable > 0 && freshCount === 0) {
+        display.addLog("Room fully investigated.", "system");
+      } else if (freshCount > 0 && visitedRoomIds.has(currentRoom.id)) {
+        // Only show count on revisits (first visit already shows entity list)
+        display.addLog(`${freshCount} object${freshCount === 1 ? "" : "s"} to investigate.`, "sensor");
       }
     }
 
