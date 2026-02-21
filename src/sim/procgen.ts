@@ -988,6 +988,61 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
     }
   }
 
+  // ── Thermal chokepoints (corridor heat sources linked to relay prerequisites) ──
+  // Place 2 persistent heat sources in corridor tiles near mid/late relay rooms.
+  // These are relay entities with locked=true (non-interactable) and overheating=true.
+  // When the prerequisite relay is activated, these chokepoints are deactivated.
+  const chokeRelayPairs = [
+    { prereq: relayDefs[0].id, relayIdx: relay1Idx },
+    { prereq: relayDefs[1].id, relayIdx: relay2Idx },
+  ];
+  let chokepointCount = 0;
+  for (const pair of chokeRelayPairs) {
+    if (chokepointCount >= 2) break;
+    const relayRoom = rooms[pair.relayIdx];
+    const relayCenter = getRoomCenter(relayRoom);
+    // Find a corridor tile 3-6 tiles from the relay room
+    for (let dist = 3; dist <= 6 && chokepointCount < 2; dist++) {
+      for (const d of [{ x: dist, y: 0 }, { x: -dist, y: 0 }, { x: 0, y: dist }, { x: 0, y: -dist }]) {
+        const cx = relayCenter.x + d.x;
+        const cy = relayCenter.y + d.y;
+        if (cx < 1 || cx >= state.width - 1 || cy < 1 || cy >= state.height - 1) continue;
+        const tile = state.tiles[cy][cx];
+        if (!tile.walkable) continue;
+        // Must be a corridor tile (not in a room)
+        let inARoom = false;
+        for (const room of rooms) {
+          if (cx >= room.getLeft() && cx <= room.getRight() && cy >= room.getTop() && cy <= room.getBottom()) {
+            inARoom = true;
+            break;
+          }
+        }
+        if (inARoom) continue;
+        // Place chokepoint heat source
+        const chokeId = `chokepoint_${chokepointCount}`;
+        state.entities.set(chokeId, {
+          id: chokeId,
+          type: EntityType.Relay,
+          pos: { x: cx, y: cy },
+          props: { overheating: true, locked: true, prerequisiteRelay: pair.prereq, activated: false },
+        });
+        // Seed high heat on and around the chokepoint
+        state.tiles[cy][cx].heat = 55;
+        state.tiles[cy][cx].smoke = 8;
+        for (const adj of [{ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 }]) {
+          const ax = cx + adj.x;
+          const ay = cy + adj.y;
+          if (ax >= 0 && ax < state.width && ay >= 0 && ay < state.height && state.tiles[ay][ax].walkable) {
+            state.tiles[ay][ax].heat = Math.max(state.tiles[ay][ax].heat, 40);
+            state.tiles[ay][ax].smoke = Math.max(state.tiles[ay][ax].smoke, 5);
+          }
+        }
+        chokepointCount++;
+        break;
+      }
+    }
+  }
+
   // ── Closed shortcut doors (Item 7: routing decisions) ──────
   // Place 2 closed doors as shortcuts between rooms that would otherwise require going through heat
   const closedDoorCandidates: { x: number; y: number }[] = [];
@@ -1115,6 +1170,9 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
   if (puzzleRng >= powerCellFloor) {
     placePowerCellPuzzle(state, rooms, n, reservedRooms);
   }
+
+  // Puzzle C: Multi-step coolant loop re-routing (always present)
+  placeCoolantLoopPuzzle(state, rooms, n, reservedRooms);
 
   // ── Hostile patrol drones (1-3, seed+archetype-varied placement) ──
   const droneCountRng = ((state.seed * 48271) >>> 0) % 100;
@@ -1565,6 +1623,42 @@ function placePowerCellPuzzle(
     }
   });
 
+  // Third fuse box: independent system — station smoke ventilation
+  // Placed in a late-game room, competes with fuse group for the scarce 2nd power cell
+  const smokeVentRoomNames = ["Auxiliary Power", "Server Annex", "Signal Room"];
+  let smokeVentPlaced = false;
+  for (const name of smokeVentRoomNames) {
+    const idx = state.rooms.findIndex(r => r.name === name);
+    if (idx >= 0 && !reservedRooms.has(idx) && !fuseRooms.includes(idx)) {
+      const room = rooms[idx];
+      const pos = getRoomPos(room, 0, 1);
+      state.entities.set("fuse_box_vent", {
+        id: "fuse_box_vent",
+        type: EntityType.FuseBox,
+        pos,
+        props: { powered: false, group: "smoke_vent" },
+      });
+      if (pos.y >= 0 && pos.y < state.height && pos.x >= 0 && pos.x < state.width) {
+        state.tiles[pos.y][pos.x].smoke = Math.max(state.tiles[pos.y][pos.x].smoke, 30);
+      }
+      smokeVentPlaced = true;
+      break;
+    }
+  }
+  if (!smokeVentPlaced) {
+    const fallbackIdx = Math.min(n - 2, Math.floor(n * 0.7));
+    if (!fuseRooms.includes(fallbackIdx)) {
+      const room = rooms[fallbackIdx];
+      const pos = getRoomPos(room, 0, 1);
+      state.entities.set("fuse_box_vent", {
+        id: "fuse_box_vent",
+        type: EntityType.FuseBox,
+        pos,
+        props: { powered: false, group: "smoke_vent" },
+      });
+    }
+  }
+
   // Place power cells in early-to-mid rooms (player finds them before fuse boxes)
   const cellRoomCandidates: number[] = [];
   for (let ri = 1; ri < Math.floor(n * 0.5); ri++) {
@@ -1582,6 +1676,72 @@ function placePowerCellPuzzle(
       props: { collected: false },
     });
   });
+}
+
+/**
+ * Place a 3-step coolant loop re-routing puzzle.
+ * Step 1: Close bypass valve (PressureValve in room A)
+ * Step 2: Vent blocked pipe (Console in room B) — requires step 1
+ * Step 3: Re-engage coolant relay (Console in room C) — requires step 2
+ * Completing all 3 steps reduces heat station-wide and grants a milestone log.
+ */
+function placeCoolantLoopPuzzle(
+  state: GameState,
+  rooms: DiggerRoom[],
+  n: number,
+  reservedRooms: Set<number>,
+): void {
+  if (n < 8) return;
+
+  // Pick 3 spread-out rooms for the puzzle steps
+  const candidates: number[] = [];
+  for (let ri = 1; ri < n - 1; ri++) {
+    if (!reservedRooms.has(ri)) candidates.push(ri);
+  }
+  if (candidates.length < 3) return;
+
+  // Spread across early, mid, and late station
+  const step1Idx = candidates[Math.floor(candidates.length * 0.2)];
+  const step2Idx = candidates[Math.floor(candidates.length * 0.5)];
+  const step3Idx = candidates[Math.floor(candidates.length * 0.8)];
+
+  // Step 1: Bypass valve — close it to redirect coolant flow
+  const room1 = rooms[step1Idx];
+  const pos1 = getRoomPos(room1, 1, 1);
+  state.entities.set("coolant_step_1", {
+    id: "coolant_step_1",
+    type: EntityType.PressureValve,
+    pos: pos1,
+    props: { coolantPuzzle: true, coolantStep: 1, activated: false },
+  });
+
+  // Step 2: Vent pipe console — clear pressure buildup
+  const room2 = rooms[step2Idx];
+  const pos2 = getRoomPos(room2, -1, 0);
+  state.entities.set("coolant_step_2", {
+    id: "coolant_step_2",
+    type: EntityType.Console,
+    pos: pos2,
+    props: { coolantPuzzle: true, coolantStep: 2, activated: false },
+  });
+  // Add smoke around the blocked pipe to signal the problem
+  if (pos2.y >= 0 && pos2.y < state.height && pos2.x >= 0 && pos2.x < state.width) {
+    state.tiles[pos2.y][pos2.x].smoke = Math.max(state.tiles[pos2.y][pos2.x].smoke, 20);
+  }
+
+  // Step 3: Coolant relay re-engagement console
+  const room3 = rooms[step3Idx];
+  const pos3 = getRoomPos(room3, 0, -1);
+  state.entities.set("coolant_step_3", {
+    id: "coolant_step_3",
+    type: EntityType.Console,
+    pos: pos3,
+    props: { coolantPuzzle: true, coolantStep: 3, activated: false },
+  });
+  // Add heat around the broken relay to show the consequence
+  if (pos3.y >= 0 && pos3.y < state.height && pos3.x >= 0 && pos3.x < state.width) {
+    state.tiles[pos3.y][pos3.x].heat = Math.max(state.tiles[pos3.y][pos3.x].heat, 35);
+  }
 }
 
 /**

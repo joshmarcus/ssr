@@ -116,12 +116,13 @@ function isEntityExhausted(entity: Entity, state: GameState): boolean {
     case EntityType.RepairBot:
       return true; // not interactable via auto-target
     case EntityType.PressureValve:
-      return entity.props["turned"] === true;
+      return entity.props["turned"] === true || entity.props["activated"] === true;
     case EntityType.FuseBox:
       return entity.props["powered"] === true;
     case EntityType.PowerCell:
       return entity.props["collected"] === true;
     case EntityType.ToolPickup:
+    case EntityType.UtilityPickup:
       return entity.props["collected"] === true;
     case EntityType.EvidenceTrace:
       return entity.props["discovered"] === true;
@@ -132,7 +133,7 @@ function isEntityExhausted(entity: Entity, state: GameState): boolean {
     case EntityType.RepairCradle:
       return false; // always interactable
     case EntityType.Console:
-      return entity.props["read"] === true;
+      return entity.props["read"] === true || entity.props["activated"] === true;
     default:
       return false;
   }
@@ -659,6 +660,13 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         ...target,
         props: { ...target.props, overheating: false, activated: true },
       });
+
+      // Deactivate thermal chokepoints linked to this relay
+      for (const [eid, entity] of newEntities) {
+        if (entity.type === EntityType.Relay && entity.props["prerequisiteRelay"] === targetId && entity.props["overheating"] === true) {
+          newEntities.set(eid, { ...entity, props: { ...entity.props, overheating: false } });
+        }
+      }
 
       // Special: cooling relay — reduce heat in the containing room
       if (target.props["coolsRoom"] === true) {
@@ -1696,6 +1704,22 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
     }
 
     case EntityType.PressureValve: {
+      // ── Coolant loop puzzle step (if coolantPuzzle prop) ──
+      if (target.props["coolantPuzzle"] === true) {
+        const step = target.props["coolantStep"] as number;
+        if (target.props["activated"] === true) {
+          next.logs = [...state.logs, { id: `log_coolant_done_${targetId}_${next.turn}`, timestamp: next.turn, source: "system", text: "Bypass valve already closed. Coolant flow redirected.", read: false }];
+        } else if (step === 1) {
+          const newEntities = new Map(state.entities);
+          newEntities.set(targetId, { ...target, props: { ...target.props, activated: true } });
+          const newMilestones = new Set(state.milestones);
+          newMilestones.add("coolant_step_1");
+          next.entities = newEntities;
+          next.milestones = newMilestones;
+          next.logs = [...state.logs, { id: `log_coolant_1_${next.turn}`, timestamp: next.turn, source: "system", text: "Bypass valve sealed. Coolant rerouted through primary loop. The pipe downstream should be safe to vent now.", read: false }];
+        }
+        break;
+      }
       // Pressure valve puzzle: turn valves to reroute airflow
       if (target.props["turned"] === true) {
         next.logs = [
@@ -1829,26 +1853,37 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         let logText: string;
 
         if (allPowered) {
-          // Unlock sealed doors in the group's target area
           const newTiles = state.tiles.map(row => row.map(t => ({ ...t })));
-          // Reduce heat around fuse boxes in the group
-          for (const [, e] of newEntities) {
-            if (e.type === EntityType.FuseBox && e.props["group"] === groupId) {
-              for (let dy = -4; dy <= 4; dy++) {
-                for (let dx = -4; dx <= 4; dx++) {
-                  const fx = e.pos.x + dx;
-                  const fy = e.pos.y + dy;
-                  if (fx >= 0 && fx < state.width && fy >= 0 && fy < state.height) {
-                    if (newTiles[fy][fx].walkable) {
-                      newTiles[fy][fx].heat = Math.max(0, newTiles[fy][fx].heat - 20);
+          if (groupId === "smoke_vent") {
+            // Smoke ventilation system: reduce smoke station-wide
+            for (let y2 = 0; y2 < state.height; y2++) {
+              for (let x2 = 0; x2 < state.width; x2++) {
+                if (newTiles[y2][x2].walkable && newTiles[y2][x2].smoke > 0) {
+                  newTiles[y2][x2].smoke = Math.max(0, newTiles[y2][x2].smoke - 25);
+                }
+              }
+            }
+            logText = `Power cell inserted. Ventilation system online — smoke extraction activated station-wide.`;
+          } else {
+            // Standard fuse group: reduce heat around fuse boxes
+            for (const [, e] of newEntities) {
+              if (e.type === EntityType.FuseBox && e.props["group"] === groupId) {
+                for (let dy = -4; dy <= 4; dy++) {
+                  for (let dx = -4; dx <= 4; dx++) {
+                    const fx = e.pos.x + dx;
+                    const fy = e.pos.y + dy;
+                    if (fx >= 0 && fx < state.width && fy >= 0 && fy < state.height) {
+                      if (newTiles[fy][fx].walkable) {
+                        newTiles[fy][fx].heat = Math.max(0, newTiles[fy][fx].heat - 20);
+                      }
                     }
                   }
                 }
               }
             }
+            logText = `Power cell inserted. All junctions in section restored. Emergency systems back online — heat venting activated.`;
           }
           next.tiles = newTiles;
-          logText = `Power cell inserted. All junctions in section restored. Emergency systems back online — heat venting activated.`;
         } else {
           const remaining = totalFuses - poweredFuses;
           logText = `Power cell inserted. Junction ${poweredFuses}/${totalFuses} online. ${remaining} more fuse box${remaining > 1 ? "es" : ""} need power cells.`;
@@ -2797,6 +2832,61 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
     }
 
     case EntityType.Console: {
+      // ── Coolant loop puzzle steps 2 & 3 ──
+      if (target.props["coolantPuzzle"] === true) {
+        const step = target.props["coolantStep"] as number;
+        if (target.props["activated"] === true) {
+          const doneMsg = step === 2 ? "Pipe already vented. Flow clear." : "Coolant relay already engaged. System operational.";
+          next.logs = [...state.logs, { id: `log_coolant_done_${targetId}_${next.turn}`, timestamp: next.turn, source: "system", text: doneMsg, read: false }];
+        } else if (step === 2) {
+          if (!state.milestones.has("coolant_step_1")) {
+            next.logs = [...state.logs, { id: `log_coolant_blocked_2_${next.turn}`, timestamp: next.turn, source: "system", text: "Pipe pressure too high to vent safely. The upstream bypass valve needs to be closed first.", read: false }];
+          } else {
+            const newEntities = new Map(state.entities);
+            newEntities.set(targetId, { ...target, props: { ...target.props, activated: true } });
+            // Clear smoke around the vent pipe
+            const newTiles = state.tiles.map(row => row.map(t => ({ ...t })));
+            for (let dy = -3; dy <= 3; dy++) {
+              for (let dx = -3; dx <= 3; dx++) {
+                const vx = target.pos.x + dx;
+                const vy = target.pos.y + dy;
+                if (vx >= 0 && vx < state.width && vy >= 0 && vy < state.height && newTiles[vy][vx].walkable) {
+                  newTiles[vy][vx].smoke = Math.max(0, newTiles[vy][vx].smoke - 15);
+                }
+              }
+            }
+            const newMilestones = new Set(state.milestones);
+            newMilestones.add("coolant_step_2");
+            next = { ...next, entities: newEntities, tiles: newTiles, milestones: newMilestones };
+            next.logs = [...state.logs, { id: `log_coolant_2_${next.turn}`, timestamp: next.turn, source: "system", text: "Pipe vented. Pressure normalized — blocked coolant evacuated. The relay downstream can be re-engaged now.", read: false }];
+          }
+        } else if (step === 3) {
+          if (!state.milestones.has("coolant_step_2")) {
+            const hint = state.milestones.has("coolant_step_1")
+              ? "Relay cannot engage — coolant pipe still blocked. Vent the pipe first."
+              : "Relay cannot engage — coolant loop is backed up. Close the upstream bypass valve first.";
+            next.logs = [...state.logs, { id: `log_coolant_blocked_3_${next.turn}`, timestamp: next.turn, source: "system", text: hint, read: false }];
+          } else {
+            const newEntities = new Map(state.entities);
+            newEntities.set(targetId, { ...target, props: { ...target.props, activated: true } });
+            // Completing all 3 steps: reduce heat station-wide
+            const newTiles = state.tiles.map(row => row.map(t => ({ ...t })));
+            for (let y2 = 0; y2 < state.height; y2++) {
+              for (let x2 = 0; x2 < state.width; x2++) {
+                if (newTiles[y2][x2].walkable && newTiles[y2][x2].heat > 0) {
+                  newTiles[y2][x2].heat = Math.max(0, newTiles[y2][x2].heat - 15);
+                }
+              }
+            }
+            const newMilestones = new Set(state.milestones);
+            newMilestones.add("coolant_step_3");
+            next = { ...next, entities: newEntities, tiles: newTiles, milestones: newMilestones };
+            next.logs = [...state.logs, { id: `log_coolant_3_${next.turn}`, timestamp: next.turn, source: "system", text: "Coolant relay re-engaged. Primary loop restored — station thermal readings dropping. Well done.", read: false }];
+          }
+        }
+        break;
+      }
+
       const consoleName = (target.props["name"] as string) || "Console";
       const consoleText = (target.props["text"] as string) || "The console is offline.";
       const alreadyRead = target.props["read"] === true;
