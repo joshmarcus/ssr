@@ -102,7 +102,7 @@ const COLORS_3D = {
   wall: 0x99aabb,
   door: 0xdd8844,
   lockedDoor: 0xff4444,
-  corridor: 0x606060,
+  corridor: 0x6a6a6a,
   background: 0x0a0a12,
   player: 0x00ff00,
   fogFull: 0x000000,
@@ -405,6 +405,10 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Floating room name labels
   private roomLabels3D: Map<string, THREE.Sprite> = new Map();
+
+  // Entity name labels (shown when player is nearby)
+  private entityLabels: Map<string, THREE.Sprite> = new Map();
+  private entityLabelCanvas: Map<string, HTMLCanvasElement> = new Map();
 
   // Player movement trail
   private trailPoints: THREE.Points | null = null;
@@ -890,6 +894,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
     this.updateRoomLabels(state);
+    this.updateEntityLabels(state);
     this.renderMinimap(state);
   }
 
@@ -2134,7 +2139,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Only every 3rd tile (checkerboard-ish pattern for performance)
         if ((x + y) % 3 !== 0) continue;
         this.corridorLitTiles.add(key);
-        const corridorLight = new THREE.PointLight(0x445566, 0.3, 3);
+        const corridorLight = new THREE.PointLight(0x5577aa, 0.5, 4);
         corridorLight.position.set(x, 1.5, y);
         this.scene.add(corridorLight);
       }
@@ -2335,6 +2340,66 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.scene.add(sprite);
       this.roomLabels3D.set(room.id, sprite);
     }
+  }
+
+  private updateEntityLabels(state: GameState): void {
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+    const labelRange = 4; // show labels within this distance
+
+    // Hide all existing labels first
+    for (const [, sprite] of this.entityLabels) {
+      sprite.visible = false;
+    }
+
+    for (const [id, entity] of state.entities) {
+      if (id === "player") continue;
+      const dist = Math.max(Math.abs(entity.pos.x - px), Math.abs(entity.pos.y - py));
+      if (dist > labelRange) continue;
+
+      const tile = state.tiles[entity.pos.y]?.[entity.pos.x];
+      if (!tile?.visible) continue;
+
+      // Get or create label sprite
+      let sprite = this.entityLabels.get(id);
+      if (!sprite) {
+        const name = entityDisplayName(entity);
+        const color = ENTITY_COLORS_CSS[entity.type] ?? "#aaaaaa";
+        sprite = this.createTextSprite(name, color);
+        this.entityLabels.set(id, sprite);
+        this.scene.add(sprite);
+      }
+
+      sprite.visible = true;
+      sprite.position.set(entity.pos.x, 1.6, entity.pos.y);
+      // Fade based on distance (closer = more opaque)
+      const opacity = dist <= 1 ? 0.9 : 0.5 - (dist - 2) * 0.1;
+      (sprite.material as THREE.SpriteMaterial).opacity = Math.max(0.2, opacity);
+    }
+  }
+
+  private createTextSprite(text: string, color: string): THREE.Sprite {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 48;
+    const ctx = canvas.getContext("2d")!;
+
+    // Background
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, 8, 256, 32);
+
+    // Text
+    ctx.fillStyle = color;
+    ctx.font = "bold 18px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 128, 24);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.8, depthWrite: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(1.5, 0.3, 1);
+    return sprite;
   }
 
   private createHazardSprite(color: number, size: number, opacity: number): THREE.Sprite {
