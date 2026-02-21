@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 61 complete (Contradiction Events, Crew Fate Reveals, ReactorScram Dwell Penalty)
+- **Phase**: Sprint 62 complete (Discovery Cascade, Archetype Mechanics, Hub Polish)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -81,6 +81,26 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 62 Changes
+
+### First Discovery Cascade (Early-Game Atmosphere)
+- **3-beat early-game hook**: Fires on rooms 2, 3, and 4 — structural observation, timeline clue, personal crew artifact
+- **15 authored strings** (3 per archetype) using actual crew data for the personal beat
+- **Addresses quiet first 5 minutes**: The station immediately feels like a crime scene, not just a broken building
+
+### Archetype-Specific Mid-Game Mechanics (All 5)
+- **CoolantCascade — Thermal Cascade Timer**: Every 50 turns (after turn 50), +15 heat injected into 3 random unexplored walkable tiles. The cascade is still spreading — explore before it reaches you.
+- **HullBreach — Evidence Degradation**: Every 80 turns, the furthest unread terminal from the player gets corrupted (truncated to 40% + "[DATA CORRUPTED — moisture damage]"). The decompression event is physically destroying evidence.
+- **Sabotage — Organism Movement**: Every 60 turns, a patrol drone is relocated to a random room away from the player. The entity is alive and moving — you can't predict where the threat is.
+- **SignalAnomaly — Signal Pulse Interference**: Every 40 turns, sensor overlay is forcibly toggled off for 2 turns + screen flash. The array is still active and interfering.
+- **ReactorScram — Dwell Penalty**: (Sprint 61) Data core monitors stationary turns, adds heat at thresholds.
+- **Distinct mid-game feel**: Each archetype now plays differently mechanically, not just narratively.
+
+### Investigation Hub Visual Polish
+- **Linked evidence green prefix**: In CONNECTIONS evidence list, linked entries show `[+]` in green instead of `[x]`, with dim green text for unselected linked entries
+- **EVIDENCE tab "+N new" badge**: When journal has grown since last viewing the evidence tab, shows "+N new" in green on the tab label
+- **Clearer deduction workflow**: Players can see at a glance which evidence is linked and when new evidence arrives
 
 ## Sprint 61 Changes
 
