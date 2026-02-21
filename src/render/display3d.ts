@@ -189,6 +189,7 @@ const ENTITY_COLORS_CSS: Record<string, string> = {
 const WALL_MODEL_PATH = "models/synty-space-gltf/SM_Bld_Wall_01.glb";
 const WALL_CORNER_MODEL_PATH = "models/synty-space-gltf/SM_Bld_Wall_03.glb";
 const FLOOR_MODEL_PATH = "models/synty-space-gltf/SM_Bld_Floor_Small_01.glb";
+const DOOR_MODEL_PATH = "models/synty-space-gltf/SM_Bld_Wall_Doorframe_01.glb";
 
 const MODEL_PATHS: Partial<Record<string, string>> = {
   // Player bot (Sweepo cleaning robot)
@@ -259,7 +260,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private wallCornerModelMat: THREE.Material | null = null;
   private floorModelGeo: THREE.BufferGeometry | null = null;
   private floorModelMat: THREE.Material | null = null;
-
+  private doorModelGeo: THREE.BufferGeometry | null = null;
+  private doorModelMat: THREE.Material | null = null;
 
   // Animation
   private animFrameId: number = 0;
@@ -1009,7 +1011,39 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Gentle float
         const ud = mesh.userData as { baseY?: number };
         mesh.position.y = (ud.baseY ?? 0.1) + Math.sin(elapsed * 2.5 + mesh.position.z) * 0.06;
+      } else if (userData.entityType === EntityType.SensorPickup) {
+        // Hover and slow spin
+        const ud = mesh.userData as { baseY?: number };
+        mesh.position.y = (ud.baseY ?? 0.3) + Math.sin(elapsed * 1.8 + mesh.position.x * 3) * 0.05;
+        mesh.rotation.y = elapsed * 0.3;
+      } else if (userData.entityType === EntityType.ToolPickup) {
+        // Gentle bob
+        const ud = mesh.userData as { baseY?: number };
+        mesh.position.y = (ud.baseY ?? 0.1) + Math.sin(elapsed * 2.0 + mesh.position.z * 2) * 0.04;
+      } else if (userData.entityType === EntityType.MedKit) {
+        // Pulse scale
+        const s = 1 + Math.sin(elapsed * 2.5) * 0.03;
+        mesh.scale.set(s, s, s);
+      } else if (userData.entityType === EntityType.LogTerminal || userData.entityType === EntityType.SecurityTerminal) {
+        // Subtle screen glow flicker via emissive
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.emissiveIntensity = 0.15 + Math.sin(elapsed * 4 + mesh.position.x * 2) * 0.1;
+          }
+        });
+      } else if (userData.entityType === EntityType.PowerCell || userData.entityType === EntityType.FuseBox) {
+        // Subtle electrical flicker
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.emissiveIntensity = 0.1 + Math.sin(elapsed * 6 + mesh.position.z) * 0.08;
+          }
+        });
       }
+    }
+
+    // Player light subtle breathing pulse
+    if (this.playerLight) {
+      this.playerLight.intensity = 2.5 + Math.sin(elapsed * 1.5) * 0.3;
     }
 
     // Particle animations
@@ -1077,8 +1111,18 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
           const doorColor = tile.type === TileType.LockedDoor ? COLORS_3D.lockedDoor : COLORS_3D.door;
-          this.dummy.position.set(x, 0.5, y);
+          this.dummy.position.set(x, 0, y);
           this.dummy.scale.set(1, 1, 1);
+
+          // Orient door to face corridor direction (check horizontal vs vertical)
+          const openE = x < state.width - 1 && state.tiles[y][x + 1].walkable;
+          const openW = x > 0 && state.tiles[y][x - 1].walkable;
+          if (openE || openW) {
+            this.dummy.rotation.set(0, Math.PI / 2, 0);
+          } else {
+            this.dummy.rotation.set(0, 0, 0);
+          }
+
           this.dummy.updateMatrix();
           if (doorIdx < 200) {
             this.doorMesh.setMatrixAt(doorIdx, this.dummy.matrix);
@@ -1933,6 +1977,20 @@ export class BrowserDisplay3D implements IGameDisplay {
         console.warn("Failed to load floor model:", e);
       }
     }, undefined, () => {});
+
+    // Load door model
+    this.gltfLoader.load(base + DOOR_MODEL_PATH, (gltf) => {
+      try {
+        const { geometry, material } = this.extractFirstMeshGeo(gltf.scene, 1.0);
+        if (geometry) {
+          this.doorModelGeo = geometry;
+          this.doorModelMat = material;
+          this.rebuildDoorMesh();
+        }
+      } catch (e) {
+        console.warn("Failed to load door model:", e);
+      }
+    }, undefined, () => {});
   }
 
   /** Extract the first mesh's geometry from a GLTF scene, normalized to fit in a 1x1 tile */
@@ -2029,6 +2087,21 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.floorMesh.frustumCulled = false;
     this.floorMesh.count = 0;
     this.scene.add(this.floorMesh);
+  }
+
+  /** Rebuild door instanced mesh with loaded model geometry */
+  private rebuildDoorMesh(): void {
+    if (!this.doorModelGeo) return;
+    this.scene.remove(this.doorMesh);
+    this.doorMesh.dispose();
+
+    const mat = this.doorModelMat ?? makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
+
+    this.doorMesh = new THREE.InstancedMesh(this.doorModelGeo, mat, 200);
+    this.doorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.doorMesh.frustumCulled = false;
+    this.doorMesh.count = 0;
+    this.scene.add(this.doorMesh);
   }
 
   /** Post-process a loaded model: normalize scale, center, apply toon materials */
