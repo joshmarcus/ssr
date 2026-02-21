@@ -564,6 +564,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Ceiling beam structure (cross-beams spanning rooms)
   private ceilingGroup: THREE.Group = new THREE.Group();
   private ceilingRooms: Set<string> = new Set();
+  // Room atmospheric haze (colored fog planes per room)
+  private hazeRooms: Set<string> = new Set();
   // Corridor arch supports
   private corridorArchTiles: Set<string> = new Set();
   // Shared ceiling geometries
@@ -1090,6 +1092,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeRoomDecorations(state);
     this.placeRoomTrim(state);
     this.placeRoomCeiling(state);
+    this.placeRoomHaze(state);
     this.placeCautionMarkings(state);
     this.placeCorridorPipes(state);
     this.placeCorridorArches(state);
@@ -2647,6 +2650,40 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
   }
 
+  /** Place a subtle colored haze plane per room for atmospheric depth */
+  private placeRoomHaze(state: GameState): void {
+    for (const room of state.rooms) {
+      if (this.hazeRooms.has(room.id)) continue;
+
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
+      if (!state.tiles[cy][cx].explored) continue;
+      this.hazeRooms.add(room.id);
+
+      const tint = ROOM_WALL_TINTS_3D[room.name] ?? COLORS_3D.wall;
+      const hazeColor = tint;
+
+      // Semi-transparent plane at knee height covering the room
+      const hazeGeo = new THREE.PlaneGeometry(room.width * 0.9, room.height * 0.9);
+      hazeGeo.rotateX(-Math.PI / 2);
+      const hazeMat = new THREE.MeshBasicMaterial({
+        color: hazeColor,
+        transparent: true,
+        opacity: 0.04, // very subtle
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const haze = new THREE.Mesh(hazeGeo, hazeMat);
+      haze.position.set(
+        room.x + room.width / 2 - 0.5,
+        0.3,
+        room.y + room.height / 2 - 0.5
+      );
+      this.ceilingGroup.add(haze); // reuse ceiling group for room overlays
+    }
+  }
+
   private placeCautionMarkings(state: GameState): void {
     // Place yellow/black caution stripes on floor tiles adjacent to dangerous entities
     const dangerTypes = new Set([
@@ -3459,6 +3496,16 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // Ground ring — glowing circle on the floor beneath the entity
+      const ringColor = ENTITY_COLORS_3D[entity.type] ?? 0xffffff;
+      const groundRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.28, 0.38, 20),
+        new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })
+      );
+      groundRing.rotation.x = -Math.PI / 2;
+      groundRing.position.y = -baseY + 0.02; // sit at floor level
+      group.add(groundRing);
+
       return group;
     }
 
@@ -3780,12 +3827,21 @@ export class BrowserDisplay3D implements IGameDisplay {
     group.position.set(entity.pos.x, baseY, entity.pos.y);
 
     // Add glow light for emphasis entities (fallback geometry)
-    const glowDef = BrowserDisplay3D.ENTITY_GLOW_LIGHTS[entity.type];
-    if (glowDef) {
-      const glow = new THREE.PointLight(glowDef.color, glowDef.intensity, glowDef.distance);
+    const glowDefFb = BrowserDisplay3D.ENTITY_GLOW_LIGHTS[entity.type];
+    if (glowDefFb) {
+      const glow = new THREE.PointLight(glowDefFb.color, glowDefFb.intensity, glowDefFb.distance);
       glow.position.set(0, 0.5, 0);
       group.add(glow);
     }
+
+    // Ground ring — glowing circle on the floor beneath the entity
+    const groundRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.28, 0.38, 20),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })
+    );
+    groundRing.rotation.x = -Math.PI / 2;
+    groundRing.position.y = -baseY + 0.02; // sit at floor level
+    group.add(groundRing);
 
     return group;
   }
