@@ -435,6 +435,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   private orthoCamera: THREE.OrthographicCamera;
   private chaseCamera: THREE.PerspectiveCamera;
   private chaseCamActive: boolean = false;
+  private chaseCamPosX: number = 0;
+  private chaseCamPosY: number = 1.8;
+  private chaseCamPosZ: number = 0;
+  private chaseCamLookX: number = 0;
+  private chaseCamLookZ: number = 0;
   private mapWidth: number;
   private mapHeight: number;
 
@@ -808,7 +813,16 @@ export class BrowserDisplay3D implements IGameDisplay {
         e.preventDefault();
         this.chaseCamActive = !this.chaseCamActive;
         this.camera = this.chaseCamActive ? this.chaseCamera : this.orthoCamera;
-        this.handleResize(); // update aspect ratio for the active camera
+        if (this.chaseCamActive) {
+          // Initialize chase cam position to current player position to avoid snap
+          const facing = this.playerFacing;
+          this.chaseCamPosX = this.playerCurrentX - Math.sin(facing) * 2.5;
+          this.chaseCamPosZ = this.playerCurrentZ - Math.cos(facing) * 2.5;
+          this.chaseCamPosY = 1.8;
+          this.chaseCamLookX = this.playerCurrentX + Math.sin(facing) * 2.0;
+          this.chaseCamLookZ = this.playerCurrentZ + Math.cos(facing) * 2.0;
+        }
+        this.handleResize();
       }
     };
     window.addEventListener("keydown", this.boundKeyHandler);
@@ -1471,19 +1485,32 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
 
       if (this.chaseCamActive) {
-        // 3rd-person chase cam: behind and above Sweepo, looking forward
+        // 3rd-person chase cam: behind and above Sweepo, smoothly following
         const facing = this.playerMesh.rotation.y;
-        // Camera sits behind the player relative to facing direction
-        const chaseDist = 2.5;  // distance behind
-        const chaseHeight = 1.8; // height above ground
-        const camX = this.playerCurrentX - Math.sin(facing) * chaseDist + shakeX;
-        const camZ = this.playerCurrentZ - Math.cos(facing) * chaseDist + shakeZ;
-        this.chaseCamera.position.set(camX, chaseHeight, camZ);
-        // Look ahead of the player
+        const chaseDist = 2.5;
+        const chaseHeight = 1.8;
         const lookDist = 2.0;
-        const lookX = this.playerCurrentX + Math.sin(facing) * lookDist;
-        const lookZ = this.playerCurrentZ + Math.cos(facing) * lookDist;
-        this.chaseCamera.lookAt(lookX, 0.6, lookZ);
+
+        // Target positions
+        const targetCamX = this.playerCurrentX - Math.sin(facing) * chaseDist;
+        const targetCamZ = this.playerCurrentZ - Math.cos(facing) * chaseDist;
+        const targetLookX = this.playerCurrentX + Math.sin(facing) * lookDist;
+        const targetLookZ = this.playerCurrentZ + Math.cos(facing) * lookDist;
+
+        // Smooth interpolation (slower than player movement for cinematic lag)
+        const camLerp = Math.min(1, 5 * delta);
+        this.chaseCamPosX += (targetCamX - this.chaseCamPosX) * camLerp;
+        this.chaseCamPosZ += (targetCamZ - this.chaseCamPosZ) * camLerp;
+        this.chaseCamPosY += (chaseHeight - this.chaseCamPosY) * camLerp;
+        this.chaseCamLookX += (targetLookX - this.chaseCamLookX) * camLerp;
+        this.chaseCamLookZ += (targetLookZ - this.chaseCamLookZ) * camLerp;
+
+        this.chaseCamera.position.set(
+          this.chaseCamPosX + shakeX,
+          this.chaseCamPosY,
+          this.chaseCamPosZ + shakeZ
+        );
+        this.chaseCamera.lookAt(this.chaseCamLookX, 0.6, this.chaseCamLookZ);
       } else {
         // Orthographic top-down/isometric camera
         const camY = 4 + (1 - this.cameraElevation) * 12; // 4-16 range
@@ -5066,7 +5093,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   // ── Ambient dust particles ───────────────────────────────────
 
   private createDustParticles(): void {
-    const dustCount = 80;
+    const dustCount = 120;
     const positions = new Float32Array(dustCount * 3);
 
     for (let i = 0; i < dustCount; i++) {
