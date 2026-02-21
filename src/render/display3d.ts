@@ -1505,9 +1505,14 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.chaseCamLookX += (targetLookX - this.chaseCamLookX) * camLerp;
         this.chaseCamLookZ += (targetLookZ - this.chaseCamLookZ) * camLerp;
 
+        // Subtle head-bob when moving (based on player velocity)
+        const moveSpeed = Math.abs(this.playerTargetX - this.playerCurrentX) +
+                          Math.abs(this.playerTargetZ - this.playerCurrentZ);
+        const headBob = moveSpeed > 0.01 ? Math.sin(elapsed * 8) * 0.03 : 0;
+
         this.chaseCamera.position.set(
           this.chaseCamPosX + shakeX,
-          this.chaseCamPosY,
+          this.chaseCamPosY + headBob,
           this.chaseCamPosZ + shakeZ
         );
         this.chaseCamera.lookAt(this.chaseCamLookX, 0.6, this.chaseCamLookZ);
