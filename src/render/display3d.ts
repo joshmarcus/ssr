@@ -383,6 +383,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Room lights (colored point lights at room centers)
   private roomLights: Map<string, THREE.PointLight> = new Map();
+  private corridorLitTiles: Set<string> = new Set();
 
   // Synty texture atlas (loaded at startup, applied to models that lack embedded textures)
   private syntyAtlas: THREE.Texture | null = null;
@@ -1381,7 +1382,26 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Floor/corridor
         if (tile.walkable) {
           if (tile.type === TileType.Corridor) {
+            // Corridor tiles: darker than rooms with subtle blue-green tint
             baseColor = COLORS_3D.corridor;
+            // Check if corridor borders a room — blend tint from nearest room
+            for (const room of state.rooms) {
+              const dist = Math.max(
+                Math.max(room.x - x, x - (room.x + room.width - 1), 0),
+                Math.max(room.y - y, y - (room.y + room.height - 1), 0)
+              );
+              if (dist <= 2) {
+                const tint = ROOM_WALL_TINTS_3D[room.name];
+                if (tint) {
+                  // Light blend from nearby room (15%)
+                  const cr = ((COLORS_3D.corridor >> 16) & 0xff) * 0.85 + ((tint >> 16) & 0xff) * 0.15;
+                  const cg = ((COLORS_3D.corridor >> 8) & 0xff) * 0.85 + ((tint >> 8) & 0xff) * 0.15;
+                  const cb = (COLORS_3D.corridor & 0xff) * 0.85 + (tint & 0xff) * 0.15;
+                  baseColor = (Math.round(cr) << 16) | (Math.round(cg) << 8) | Math.round(cb);
+                }
+                break;
+              }
+            }
           } else {
             // Room floors: subtle tint from room wall color
             baseColor = COLORS_3D.floor;
@@ -1990,6 +2010,22 @@ export class BrowserDisplay3D implements IGameDisplay {
         light.position.set(centerX, 2.5, centerY);
         this.scene.add(light);
         this.roomLights.set(room.id, light);
+      }
+    }
+
+    // Corridor lights: dim point lights every 3 tiles along explored corridors
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const key = `${x},${y}`;
+        if (this.corridorLitTiles.has(key)) continue;
+        const tile = state.tiles[y][x];
+        if (tile.type !== TileType.Corridor || !tile.explored) continue;
+        // Only every 3rd tile (checkerboard-ish pattern for performance)
+        if ((x + y) % 3 !== 0) continue;
+        this.corridorLitTiles.add(key);
+        const corridorLight = new THREE.PointLight(0x445566, 0.3, 3);
+        corridorLight.position.set(x, 1.5, y);
+        this.scene.add(corridorLight);
       }
     }
   }
