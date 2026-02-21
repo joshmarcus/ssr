@@ -395,6 +395,13 @@ export class BrowserDisplay3D implements IGameDisplay {
   private dustParticles: THREE.Points | null = null;
   private starfieldPoints: THREE.Points | null = null;
 
+  // Hazard visual effects (sprites at hazardous tile positions)
+  private hazardSprites: THREE.Group = new THREE.Group();
+  private hazardSpriteKeys: Set<string> = new Set();
+
+  // Door frame accent lights
+  private doorLights: Map<string, THREE.PointLight> = new Map();
+
   // Player movement trail
   private trailPoints: THREE.Points | null = null;
   private trailPositions: Float32Array = new Float32Array(0);
@@ -553,6 +560,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Decoration group (room props) ──
     this.scene.add(this.decorationGroup);
+
+    // ── Hazard visual effects group ──
+    this.scene.add(this.hazardSprites);
 
     // ── Starfield background (distant stars visible through station gaps) ──
     this.createStarfield();
@@ -870,6 +880,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateFog(state);
     this.updateRoomLights(state);
     this.placeRoomDecorations(state);
+    this.updateHazardVisuals(state);
+    this.updateDoorLights(state);
     this.renderMinimap(state);
   }
 
@@ -1306,6 +1318,40 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else if (c === 0xff8800) {
         // Amber warning — slower gentle pulse
         light.intensity = 0.5 + Math.sin(elapsed * 2) * 0.4;
+      }
+    }
+
+    // Hazard sprite animations
+    for (const child of this.hazardSprites.children) {
+      if (!(child instanceof THREE.Sprite)) continue;
+      const ud = child.userData as { hazardType?: string; baseY?: number };
+      if (ud.hazardType === "smoke") {
+        // Drift upward and fade
+        child.position.y += delta * 0.15;
+        const mat = child.material as THREE.SpriteMaterial;
+        mat.opacity = Math.max(0, mat.opacity - delta * 0.08);
+        if (child.position.y > (ud.baseY ?? 0.5) + 1.5 || mat.opacity <= 0) {
+          // Reset to base position
+          child.position.y = ud.baseY ?? 0.3;
+          mat.opacity = 0.4;
+        }
+      } else if (ud.hazardType === "heat") {
+        // Pulsing glow
+        const mat = child.material as THREE.SpriteMaterial;
+        mat.opacity = 0.2 + Math.sin(elapsed * 3 + child.position.x * 2) * 0.2;
+        const s = 0.25 + Math.sin(elapsed * 2 + child.position.z) * 0.08;
+        child.scale.set(s, s, 1);
+      } else if (ud.hazardType === "vacuum") {
+        // Gentle sparkle/flutter
+        const mat = child.material as THREE.SpriteMaterial;
+        mat.opacity = 0.15 + Math.sin(elapsed * 5 + child.position.x * 3 + child.position.z * 7) * 0.15;
+      }
+    }
+
+    // Door light animations: locked doors pulse red
+    for (const [, light] of this.doorLights) {
+      if (light.color.getHex() === 0xff3333) {
+        light.intensity = 0.3 + Math.sin(elapsed * 2) * 0.3;
       }
     }
 
@@ -2154,6 +2200,81 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
     }
+  }
+
+  // ── Private: hazard visual effects ─────────────────────────────
+
+  private updateHazardVisuals(state: GameState): void {
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+    const viewRange = 8; // only show hazard sprites near the player
+
+    for (let y = Math.max(0, py - viewRange); y < Math.min(state.height, py + viewRange); y++) {
+      for (let x = Math.max(0, px - viewRange); x < Math.min(state.width, px + viewRange); x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.visible || !tile.walkable) continue;
+
+        const key = `${x},${y}`;
+
+        // Smoke wisps at smoky tiles
+        if (tile.smoke > 30 && !this.hazardSpriteKeys.has(`smoke_${key}`)) {
+          this.hazardSpriteKeys.add(`smoke_${key}`);
+          const smokeSprite = this.createHazardSprite(0x888888, 0.4, Math.min(0.6, tile.smoke / 100));
+          smokeSprite.position.set(x, 0.3 + Math.random() * 0.4, y);
+          smokeSprite.userData = { hazardType: "smoke", baseY: smokeSprite.position.y };
+          this.hazardSprites.add(smokeSprite);
+        }
+
+        // Heat glow at hot tiles
+        if (tile.heat > HEAT_PAIN_THRESHOLD && !this.hazardSpriteKeys.has(`heat_${key}`)) {
+          this.hazardSpriteKeys.add(`heat_${key}`);
+          const heatSprite = this.createHazardSprite(0xff4400, 0.3, Math.min(0.5, tile.heat / 120));
+          heatSprite.position.set(x, 0.05, y);
+          heatSprite.userData = { hazardType: "heat", baseY: 0.05 };
+          this.hazardSprites.add(heatSprite);
+        }
+
+        // Vacuum frost at depressurized tiles
+        if (tile.pressure < 40 && !this.hazardSpriteKeys.has(`vacuum_${key}`)) {
+          this.hazardSpriteKeys.add(`vacuum_${key}`);
+          const frostSprite = this.createHazardSprite(0x4488ff, 0.35, 0.3);
+          frostSprite.position.set(x + (Math.random() - 0.5) * 0.3, 0.1, y + (Math.random() - 0.5) * 0.3);
+          frostSprite.userData = { hazardType: "vacuum", baseY: 0.1 };
+          this.hazardSprites.add(frostSprite);
+        }
+      }
+    }
+  }
+
+  private updateDoorLights(state: GameState): void {
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if ((tile.type !== TileType.Door && tile.type !== TileType.LockedDoor) || !tile.explored) continue;
+        const key = `door_${x},${y}`;
+        if (this.doorLights.has(key)) continue;
+
+        const isLocked = tile.type === TileType.LockedDoor;
+        const lightColor = isLocked ? 0xff3333 : 0x44cc66;
+        const light = new THREE.PointLight(lightColor, isLocked ? 0.6 : 0.4, 3);
+        light.position.set(x, 1.2, y);
+        this.scene.add(light);
+        this.doorLights.set(key, light);
+      }
+    }
+  }
+
+  private createHazardSprite(color: number, size: number, opacity: number): THREE.Sprite {
+    const mat = new THREE.SpriteMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(size, size, 1);
+    return sprite;
   }
 
   // ── Private: entity mesh management ─────────────────────────────
