@@ -2106,10 +2106,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       const dx = px - this.lastPlayerX;
       const dy = py - this.lastPlayerY;
       if (dx !== 0 || dy !== 0) {
-        // atan2 gives angle from +Z axis: dx=0,dy=-1 (up/north)=0, dx=1,dy=0 (right/east)=π/2
-        // In our coordinate system: +x = east, +y(z) = south
-        // We want facing direction: Math.atan2(dx, -dy) gives angle from north
-        this.playerFacing = Math.atan2(dx, -dy);
+        // GLTF models face -Z by default. In our coordinate system:
+        // +x = east, +z (mapped from y) = south. We add π to flip 180°
+        // so the model faces the movement direction, not away from it.
+        this.playerFacing = Math.atan2(dx, -dy) + Math.PI;
       }
     }
     this.lastPlayerX = px;

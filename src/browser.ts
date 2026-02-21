@@ -1195,6 +1195,12 @@ function handleAction(action: Action): void {
     display.triggerTrail();
   }
 
+  // Space bar sends Interact — fall back to Wait if nothing is nearby
+  let resolvedAction: Action = action;
+  if (action.type === ActionType.Interact && !action.targetId && !hasAdjacentInteractable()) {
+    resolvedAction = { type: ActionType.Wait };
+  }
+
   const prevTurn = state.turn;
   const prevLogs = state.logs.length;
   const prevHp = state.player.hp;
@@ -1203,7 +1209,7 @@ function handleAction(action: Action): void {
   const ppy = state.player.entity.pos.y;
   const prevDirt = state.tiles[ppy]?.[ppx]?.dirt ?? 0;
   const hadEvacFarewell = state.milestones.has("corvus_evac_farewell");
-  state = step(state, action);
+  state = step(state, resolvedAction);
 
   // Start background music on first player interaction
   audio.startBgMusic();
@@ -1258,7 +1264,7 @@ function handleAction(action: Action): void {
     }
     if (hasPA) audio.playPA();
     // Interaction produced logs -- play interact sound + colored tile flash
-    if (action.type === ActionType.Interact) {
+    if (resolvedAction.type === ActionType.Interact) {
       audio.playInteract();
       // Entity-type-specific flash colors
       const getFlashColor = (ent: { type: string }): string => {
@@ -1272,8 +1278,8 @@ function handleAction(action: Action): void {
           default: return "#fff"; // white default
         }
       };
-      if (action.targetId) {
-        const target = state.entities.get(action.targetId);
+      if (resolvedAction.targetId) {
+        const target = state.entities.get(resolvedAction.targetId);
         if (target) {
           display.flashTile(target.pos.x, target.pos.y, getFlashColor(target));
         }
@@ -1290,12 +1296,12 @@ function handleAction(action: Action): void {
           }
         }
       }
-    } else if (action.type === ActionType.Move) {
+    } else if (resolvedAction.type === ActionType.Move) {
       audio.playMove();
     }
   } else if (state.turn !== prevTurn) {
     // Fallback messages for actions without sim logs
-    switch (action.type) {
+    switch (resolvedAction.type) {
       case ActionType.Move: {
         audio.playMove();
         // Contextual feedback based on tile conditions
@@ -1639,7 +1645,7 @@ function handleAction(action: Action): void {
   // ── Track progress for pacing nudges ──
   if (state.turn !== prevTurn) {
     // Count interaction or new room entry as progress
-    if (action.type === ActionType.Interact || action.type === ActionType.Scan) {
+    if (resolvedAction.type === ActionType.Interact || resolvedAction.type === ActionType.Scan) {
       lastProgressTurn = state.turn;
     }
     // New room entry counts as progress
@@ -2291,13 +2297,14 @@ function showHelp(): void {
 
         <div>
           <div style="color:#4af;font-weight:bold;margin-bottom:6px">── Actions ──</div>
-          <div><span style="color:#fff">[i]</span>  Interact with adjacent objects</div>
+          <div><span style="color:#fff">[i] [Space]</span>  Interact with adjacent objects</div>
           <div style="color:#888;margin-left:20px">Terminals, doors, airlocks, relays,</div>
           <div style="color:#888;margin-left:20px">repair cradles, crew NPCs, escape pods</div>
+          <div style="color:#888;margin-left:20px">(Space waits if nothing nearby)</div>
           <div><span style="color:#fff">[c]</span>  Clean current tile</div>
           <div><span style="color:#fff">[t] / [q]</span>  Cycle sensor overlay</div>
           <div><span style="color:#fff">[x]</span>  Look (examine surroundings)</div>
-          <div><span style="color:#fff">[.] [Space] [5]</span>  Wait one turn</div>
+          <div><span style="color:#fff">[.] [5]</span>  Wait one turn</div>
           <div><span style="color:#fff">[Tab]</span>  Auto-explore (any key to stop)</div>
         </div>
 

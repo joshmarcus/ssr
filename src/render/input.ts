@@ -110,9 +110,9 @@ export class InputHandler {
       case ".":
       case "5":
         return { type: ActionType.Wait };
-      // Wait
+      // Space: contextual — interact if possible, else wait (resolved in handleAction)
       case " ":
-        return { type: ActionType.Wait };
+        return { type: ActionType.Interact };
       // Journal / notes
       case ";":
         return { type: ActionType.Journal };
