@@ -2922,6 +2922,25 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.camera.position.set(px, 8, py + 12);
       this.camera.lookAt(px, 0, py);
     }
+
+    // Tint player light to current room's zone color (subtle blend)
+    const room = this.getPlayerRoom(state);
+    if (room) {
+      const roomLight = ROOM_LIGHT_COLORS[room.name];
+      if (roomLight) {
+        // Blend 70% green base + 30% room tint
+        const gr = 0x44, gg = 0xff, gb = 0x66; // base green
+        const rr = (roomLight >> 16) & 0xff;
+        const rg = (roomLight >> 8) & 0xff;
+        const rb = roomLight & 0xff;
+        const fr = Math.round(gr * 0.7 + rr * 0.3);
+        const fg = Math.round(gg * 0.7 + rg * 0.3);
+        const fb = Math.round(gb * 0.7 + rb * 0.3);
+        this.playerLight.color.setHex((fr << 16) | (fg << 8) | fb);
+      } else {
+        this.playerLight.color.setHex(0x44ff66); // default green
+      }
+    }
   }
 
   // ── Private: resize handling ────────────────────────────────────
@@ -3132,9 +3151,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Synty models are huge (~100 units); normalize to fit in ~0.7 unit box
     // Player gets slightly larger, small pickups get smaller
     const ENTITY_SCALE: Partial<Record<string, number>> = {
-      player: 0.9,
-      [EntityType.Relay]: 0.85,
-      [EntityType.DataCore]: 0.95,
+      player: 0.95,                          // Sweepo — prominent on screen
+      [EntityType.Relay]: 0.9,               // important system
+      [EntityType.DataCore]: 1.0,            // primary objective — largest
       [EntityType.LogTerminal]: 0.9,
       [EntityType.SecurityTerminal]: 0.9,
       [EntityType.Console]: 0.85,
@@ -3142,19 +3161,21 @@ export class BrowserDisplay3D implements IGameDisplay {
       [EntityType.ServiceBot]: 0.75,
       [EntityType.RepairBot]: 0.75,
       [EntityType.Drone]: 0.7,
-      [EntityType.PatrolDrone]: 0.7,
-      [EntityType.ToolPickup]: 0.6,
-      [EntityType.UtilityPickup]: 0.6,
-      [EntityType.SensorPickup]: 0.7,
-      [EntityType.MedKit]: 0.6,
-      [EntityType.PowerCell]: 0.6,
-      [EntityType.EvidenceTrace]: 0.5,
-      [EntityType.EscapePod]: 1.0,
-      [EntityType.CrewNPC]: 0.9,
-      [EntityType.Breach]: 0.8,
+      [EntityType.PatrolDrone]: 0.75,
+      [EntityType.ToolPickup]: 0.7,          // bigger so pickups visible
+      [EntityType.UtilityPickup]: 0.7,
+      [EntityType.SensorPickup]: 0.75,
+      [EntityType.MedKit]: 0.65,
+      [EntityType.PowerCell]: 0.65,
+      [EntityType.FuseBox]: 0.75,
+      [EntityType.PressureValve]: 0.75,
+      [EntityType.EvidenceTrace]: 0.55,
+      [EntityType.EscapePod]: 1.05,          // large escape capsule
+      [EntityType.CrewNPC]: 0.95,            // important NPC
+      [EntityType.Breach]: 0.85,
       [EntityType.ClosedDoor]: 0.9,
-      [EntityType.Airlock]: 0.9,
-      [EntityType.CrewItem]: 0.55,
+      [EntityType.Airlock]: 0.95,
+      [EntityType.CrewItem]: 0.6,
     };
     const targetSize = ENTITY_SCALE[key] ?? 0.8;
 
