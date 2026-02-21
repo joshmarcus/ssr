@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 62 complete (Discovery Cascade, Archetype Mechanics, Hub Polish)
+- **Phase**: Sprint 63 complete (Content Quality Pass, Security Terminal Puzzle, Utility Items)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -25,7 +25,7 @@
 - Fire system with slow spread and low-pressure suppression
 - Airlock system: toggleable entities that vent atmosphere
 - Procedural crew generation (8-12 crew, relationships, secrets, fates)
-- 175+ narrative elements (63 log templates, 16 authored logs, 16 crew items)
+- 183+ narrative elements (63 log templates, 16 authored logs, 16 crew items, 8 new corridors)
 - Ship computer PA announcements (periodic atmospheric messages)
 - **5 incident archetypes** with distinct human stories and 5-phase timelines:
   - CoolantCascade — "The Whistleblower" (B-)
@@ -73,6 +73,7 @@
 - Station reactions: correct deductions reduce heat/smoke station-wide
 - Deduction retrospective on game-over: shows each deduction's correct answer and player accuracy
 - Pry Bar tool-slot attachment: first Tool slot item, can force open clearance doors
+- Utility-slot attachments: Atmospheric Scrubber (passive smoke reduction), Emergency Beacon (room hazard suppression)
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
@@ -81,6 +82,24 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 63 Changes
+
+### Content Quality Pass
+- **Corridor ambient cooldown**: 20-turn minimum between corridor atmosphere lines (prevents spam on consecutive corridor tiles)
+- **Corridor pool expanded**: 12 → 20 atmospheric corridor descriptions — greater variety per run
+- **Contradiction refutation timing**: Delayed from 1st to 2nd correct deduction — gives players time to form their own theory before CORVUS-7 challenges the false lead
+
+### Security Terminal Access Puzzle
+- **Security access log evidence**: SecurityTerminal interaction now generates a multi-line crew movement log from timeline data
+- **Archetype-specific suspicious entries**: Each archetype appends unique anomalous access records (e.g., CoolantCascade shows "UNAUTHORIZED — Maintenance Override", HullBreach shows "airlock cycling without authorization")
+- **Journal integration**: Access log is added as a journal entry for deduction linking
+
+### Utility-Slot Attachments (All 3 Slots Now Populated)
+- **Atmospheric Scrubber** (Life Support / Engineering Storage): Passive — reduces smoke on player's tile by 10 every 3 turns. Lets the bot operate in smoky areas longer without taking damage.
+- **Emergency Beacon** (Emergency Shelter / Cargo Hold): Activated on pickup — deploys in current room, suppresses hazard spread (-5 heat, -3 smoke per turn) in that room for 15 turns. Creates a temporary safe zone.
+- **26 entity types**: UtilityPickup added with distinct glyph (⬢), teal color, legend entry
+- **All 3 attachment slots active**: Tool (Pry Bar), Sensor (Thermal/Atmospheric), Utility (Scrubber/Beacon)
 
 ## Sprint 62 Changes
 
