@@ -446,6 +446,8 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Caution stripe floor markings near hazardous entities
   private cautionMarkedTiles: Set<string> = new Set();
+  private trimGroup: THREE.Group = new THREE.Group();
+  private trimmedRooms: Set<string> = new Set();
   private cautionStripeGroup: THREE.Group = new THREE.Group();
 
   // Corridor overhead pipe runs
@@ -616,6 +618,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Decoration group (room props) ──
     this.scene.add(this.decorationGroup);
+
+    // ── Architectural trim group (baseboards, door frames) ──
+    this.scene.add(this.trimGroup);
 
     // ── Hazard visual effects group ──
     this.scene.add(this.hazardSprites);
@@ -948,6 +953,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateFog(state);
     this.updateRoomLights(state);
     this.placeRoomDecorations(state);
+    this.placeRoomTrim(state);
     this.placeCautionMarkings(state);
     this.placeCorridorPipes(state);
     this.placeCorridorWallProps(state);
@@ -1548,10 +1554,10 @@ export class BrowserDisplay3D implements IGameDisplay {
               if (dist <= 2) {
                 const tint = ROOM_WALL_TINTS_3D[room.name];
                 if (tint) {
-                  // Light blend from nearby room (15%)
-                  const cr = ((COLORS_3D.corridor >> 16) & 0xff) * 0.85 + ((tint >> 16) & 0xff) * 0.15;
-                  const cg = ((COLORS_3D.corridor >> 8) & 0xff) * 0.85 + ((tint >> 8) & 0xff) * 0.15;
-                  const cb = (COLORS_3D.corridor & 0xff) * 0.85 + (tint & 0xff) * 0.15;
+                  // Blend from nearby room color (25%)
+                  const cr = ((COLORS_3D.corridor >> 16) & 0xff) * 0.75 + ((tint >> 16) & 0xff) * 0.25;
+                  const cg = ((COLORS_3D.corridor >> 8) & 0xff) * 0.75 + ((tint >> 8) & 0xff) * 0.25;
+                  const cb = (COLORS_3D.corridor & 0xff) * 0.75 + (tint & 0xff) * 0.25;
                   baseColor = (Math.round(cr) << 16) | (Math.round(cg) << 8) | Math.round(cb);
                 }
                 break;
@@ -1565,10 +1571,10 @@ export class BrowserDisplay3D implements IGameDisplay {
                   y >= room.y && y < room.y + room.height) {
                 const tint = ROOM_WALL_TINTS_3D[room.name];
                 if (tint) {
-                  // Blend floor color with room tint (35% tint for distinct zone identity)
-                  const r = ((COLORS_3D.floor >> 16) & 0xff) * 0.65 + ((tint >> 16) & 0xff) * 0.35;
-                  const g = ((COLORS_3D.floor >> 8) & 0xff) * 0.65 + ((tint >> 8) & 0xff) * 0.35;
-                  const b = (COLORS_3D.floor & 0xff) * 0.65 + (tint & 0xff) * 0.35;
+                  // Blend floor color with room tint (45% tint for strong zone identity)
+                  const r = ((COLORS_3D.floor >> 16) & 0xff) * 0.55 + ((tint >> 16) & 0xff) * 0.45;
+                  const g = ((COLORS_3D.floor >> 8) & 0xff) * 0.55 + ((tint >> 8) & 0xff) * 0.45;
+                  const b = (COLORS_3D.floor & 0xff) * 0.55 + (tint & 0xff) * 0.45;
                   baseColor = (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
                 }
                 break;
@@ -2210,6 +2216,118 @@ export class BrowserDisplay3D implements IGameDisplay {
   // ── Private: caution stripe floor markings ─────────────────────
 
   private cautionStripeTex: THREE.CanvasTexture | null = null;
+
+  /** Place architectural trim: baseboards along room walls, door frame pillars */
+  private placeRoomTrim(state: GameState): void {
+    for (const room of state.rooms) {
+      if (this.trimmedRooms.has(room.id)) continue;
+      // Check if room is explored
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
+      if (!state.tiles[cy][cx].explored) continue;
+      this.trimmedRooms.add(room.id);
+
+      const tint = ROOM_WALL_TINTS_3D[room.name] ?? COLORS_3D.wall;
+      // Brighter accent color for trim
+      const tr = Math.min(255, ((tint >> 16) & 0xff) + 40);
+      const tg = Math.min(255, ((tint >> 8) & 0xff) + 40);
+      const tb = Math.min(255, (tint & 0xff) + 40);
+      const trimColor = (tr << 16) | (tg << 8) | tb;
+      const trimMat = makeToonMaterial({
+        color: trimColor,
+        gradientMap: this.toonGradient,
+        emissive: trimColor,
+        emissiveIntensity: 0.15,
+      });
+
+      // Scan room perimeter for wall tiles adjacent to floor
+      for (let y = room.y - 1; y <= room.y + room.height; y++) {
+        for (let x = room.x - 1; x <= room.x + room.width; x++) {
+          if (y < 0 || y >= state.height || x < 0 || x >= state.width) continue;
+          const tile = state.tiles[y][x];
+          if (tile.type !== TileType.Wall) continue;
+
+          // Check which direction(s) face into the room
+          const inN = y > 0 && state.tiles[y - 1][x].type === TileType.Floor;
+          const inS = y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Floor;
+          const inE = x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Floor;
+          const inW = x > 0 && state.tiles[y][x - 1].type === TileType.Floor;
+          if (!inN && !inS && !inE && !inW) continue;
+
+          // Baseboard: thin strip at base of wall, facing into room
+          const bbGeo = new THREE.BoxGeometry(1.02, 0.06, 0.08);
+          const bb = new THREE.Mesh(bbGeo, trimMat);
+
+          if (inN) {
+            bb.position.set(x, 0.03, y - 0.47);
+          } else if (inS) {
+            bb.position.set(x, 0.03, y + 0.47);
+          } else if (inE) {
+            bb.rotation.y = Math.PI / 2;
+            bb.position.set(x + 0.47, 0.03, y);
+          } else if (inW) {
+            bb.rotation.y = Math.PI / 2;
+            bb.position.set(x - 0.47, 0.03, y);
+          }
+          this.trimGroup.add(bb);
+
+          // Top rail: thin strip at top of wall
+          const railGeo = new THREE.BoxGeometry(1.02, 0.04, 0.06);
+          const rail = new THREE.Mesh(railGeo, trimMat);
+          rail.position.copy(bb.position);
+          rail.position.y = 1.98;
+          rail.rotation.copy(bb.rotation);
+          this.trimGroup.add(rail);
+        }
+      }
+
+      // Door frames: vertical pillars on each side of door tiles in this room
+      for (let y = room.y - 1; y <= room.y + room.height; y++) {
+        for (let x = room.x - 1; x <= room.x + room.width; x++) {
+          if (y < 0 || y >= state.height || x < 0 || x >= state.width) continue;
+          const tile = state.tiles[y][x];
+          if (tile.type !== TileType.Door && tile.type !== TileType.LockedDoor) continue;
+
+          const frameMat = makeToonMaterial({
+            color: tile.type === TileType.LockedDoor ? 0xff6666 : 0xeedd88,
+            gradientMap: this.toonGradient,
+            emissive: tile.type === TileType.LockedDoor ? 0xff2222 : 0xccaa44,
+            emissiveIntensity: 0.2,
+          });
+
+          // Determine door orientation (horizontal or vertical)
+          const openE = x < state.width - 1 && state.tiles[y][x + 1].walkable;
+          const openW = x > 0 && state.tiles[y][x - 1].walkable;
+          const isHorizontal = openE || openW;
+
+          // Two pillars on each side of the door
+          const pillarGeo = new THREE.BoxGeometry(0.08, 2.1, 0.08);
+          const pillar1 = new THREE.Mesh(pillarGeo, frameMat);
+          const pillar2 = new THREE.Mesh(pillarGeo, frameMat);
+
+          if (isHorizontal) {
+            pillar1.position.set(x, 1.05, y - 0.46);
+            pillar2.position.set(x, 1.05, y + 0.46);
+          } else {
+            pillar1.position.set(x - 0.46, 1.05, y);
+            pillar2.position.set(x + 0.46, 1.05, y);
+          }
+          this.trimGroup.add(pillar1, pillar2);
+
+          // Top lintel across the door
+          const lintelGeo = new THREE.BoxGeometry(
+            isHorizontal ? 0.12 : 1.0,
+            0.1,
+            isHorizontal ? 1.0 : 0.12
+          );
+          const lintel = new THREE.Mesh(lintelGeo, frameMat);
+          lintel.position.set(x, 2.05, y);
+          this.trimGroup.add(lintel);
+        }
+      }
+    }
+  }
 
   private placeCautionMarkings(state: GameState): void {
     // Place yellow/black caution stripes on floor tiles adjacent to dangerous entities
