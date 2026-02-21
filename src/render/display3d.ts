@@ -377,7 +377,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.lastRoomId = roomId;
   }
 
-  flashTile(_x: number, _y: number): void {
+  flashTile(_x: number, _y: number, _color?: string): void {
     // No-op in 3D mode — tile flash is a 2D-only effect
   }
 

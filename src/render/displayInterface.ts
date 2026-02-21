@@ -22,7 +22,7 @@ export interface IGameDisplay {
   readonly activeSensorMode: SensorType | null;
   getLogHistory(): DisplayLogEntry[];
   triggerScreenFlash(type: "damage" | "milestone" | "stun"): void;
-  flashTile(x: number, y: number): void;
+  flashTile(x: number, y: number, color?: string): void;
   showGameOverOverlay(state: GameState): void;
   copyRunSummary(): Promise<boolean>;
   destroy(): void;

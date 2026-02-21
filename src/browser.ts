@@ -27,7 +27,8 @@ import {
   TUTORIAL_HINT_INVESTIGATION, TUTORIAL_HINT_FIRST_INTERACT, TUTORIAL_HINT_FIRST_SCAN,
   TUTORIAL_HINT_FIRST_CLEAN, PRESSURE_ZONE_HINTS,
   CREW_DISTRESS_HINT, BREACH_PROXIMITY_HINT,
-  ROOM_AMBIENT_EVENTS, ROOM_AMBIENT_DEFAULT, CORRIDOR_AMBIENT,
+  ROOM_AMBIENT_EVENTS, ROOM_AMBIENT_DEFAULT, CORRIDOR_AMBIENT, CORRIDOR_AMBIENT_MOOD, MOOD_FLAVOR,
+  type StationMood,
   CREW_ESCORT_ARC,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
@@ -64,6 +65,9 @@ function getNextSeed(): number {
 let seed = params.has("seed")
   ? parseInt(params.get("seed")!, 10)
   : getNextSeed();
+// Derive station mood from seed (3 variants: cold/hot/silent)
+const MOOD_TYPES: StationMood[] = ["cold", "hot", "silent"];
+let stationMood: StationMood = MOOD_TYPES[seed % 3];
 const difficultyParam = params.get("difficulty") || "normal";
 const difficulty: Difficulty = difficultyParam === "easy" ? Difficulty.Easy
   : difficultyParam === "hard" ? Difficulty.Hard
@@ -731,7 +735,7 @@ function initGame(): void {
 
   // ── Dramatic link establishment sequence (compact) ──────────────
   display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. Rover A3 online.", "milestone");
-  display.addLog("The station is quiet. What happened here?", "narrative");
+  display.addLog(MOOD_FLAVOR[stationMood], "narrative");
   display.addLog("Use arrow keys or h/j/k/l to move. Approach objects and press [i] to interact.", "system");
   lastObjectivePhase = ObjectivePhase.Clean;
 
@@ -923,6 +927,7 @@ function renderAll(): void {
 function resetGameState(newSeed: number): void {
   deleteSave();
   seed = newSeed;
+  stationMood = MOOD_TYPES[seed % 3];
   // Persist seed so next "New Game" increments from here
   try { localStorage.setItem(LAST_SEED_KEY, String(seed)); } catch { /* ignore */ }
   state = generate(seed, difficulty);
@@ -1154,17 +1159,27 @@ function handleAction(action: Action): void {
       audio.speak(simLog.text);
     }
     if (hasPA) audio.playPA();
-    // Interaction produced logs -- play interact sound + tile flash
+    // Interaction produced logs -- play interact sound + colored tile flash
     if (action.type === ActionType.Interact) {
       audio.playInteract();
-      // Flash the interacted entity's tile for visual feedback
+      // Entity-type-specific flash colors
+      const getFlashColor = (ent: { type: string }): string => {
+        switch (ent.type) {
+          case EntityType.Relay: return "#fa0"; // amber for relay activation
+          case EntityType.EvidenceTrace: return "#fc0"; // gold for evidence
+          case EntityType.LogTerminal: return "#6cf"; // cyan for terminals
+          case EntityType.CrewNPC: return "#fff"; // white for crew
+          case EntityType.SensorPickup: return "#0f0"; // green for sensor upgrade
+          case EntityType.DataCore: return "#f0f"; // magenta for data core
+          default: return "#fff"; // white default
+        }
+      };
       if (action.targetId) {
         const target = state.entities.get(action.targetId);
         if (target) {
-          display.flashTile(target.pos.x, target.pos.y);
+          display.flashTile(target.pos.x, target.pos.y, getFlashColor(target));
         }
       } else {
-        // No specific target — flash adjacent interactable entities
         const px = state.player.entity.pos.x;
         const py = state.player.entity.pos.y;
         const deltas = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 0 }];
@@ -1172,7 +1187,7 @@ function handleAction(action: Action): void {
           for (const [id, ent] of state.entities) {
             if (id === "player") continue;
             if (ent.pos.x === px + d.x && ent.pos.y === py + d.y) {
-              display.flashTile(ent.pos.x, ent.pos.y);
+              display.flashTile(ent.pos.x, ent.pos.y, getFlashColor(ent));
             }
           }
         }
@@ -1353,8 +1368,11 @@ function handleAction(action: Action): void {
       const segKey = `${Math.floor(px / 4)}_${Math.floor(py / 4)}`;
       if (!corridorAmbientFired.has(segKey)) {
         corridorAmbientFired.add(segKey);
-        const idx = (px * 7 + py * 13) % CORRIDOR_AMBIENT.length;
-        display.addLog(CORRIDOR_AMBIENT[idx], "narrative");
+        // Alternate between default and mood-specific corridor pools
+        const useMood = (px + py) % 3 === 0;
+        const pool = useMood ? CORRIDOR_AMBIENT_MOOD[stationMood] : CORRIDOR_AMBIENT;
+        const idx = (px * 7 + py * 13) % pool.length;
+        display.addLog(pool[idx], "narrative");
       }
     }
   }

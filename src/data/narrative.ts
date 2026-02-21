@@ -344,6 +344,40 @@ export const ROOM_AMBIENT_EVENTS: Record<string, string[]> = {
   ],
 };
 
+// ── Station mood variants ─────────────────────────────────────
+// Three mood flavors derived from seed % 3, each giving a different texture
+// to the same station. The mood affects which ambient pool is selected.
+export type StationMood = "cold" | "hot" | "silent";
+
+// Mood-specific corridor ambient pools (supplement the default pool)
+export const CORRIDOR_AMBIENT_MOOD: Record<StationMood, string[]> = {
+  cold: [
+    "A clipboard is clipped to the wall. The inspection checklist is half-filled. Everything was routine.",
+    "The corridor is immaculate. Regulation-clean. The crew kept things tidy right until they couldn't.",
+    "A memo stuck to the wall: 'QUARTERLY REVIEW NEXT CYCLE. All departments prepare metrics.' It never happened.",
+    "The environmental controls hum steadily. The systems didn't break — the people did.",
+  ],
+  hot: [
+    "Sparks arc from a blown junction box. The air smells like burning plastic and desperation.",
+    "The deck plating is buckled here. Something hit this corridor hard. Recently.",
+    "Emergency lighting strobes in the smoke. Red-amber-dark-red-amber-dark.",
+    "A fire suppression nozzle is deployed, empty. It ran out hours ago.",
+  ],
+  silent: [
+    "The silence here has weight. Like the station is holding its breath.",
+    "A mug sits on a railing. Still half-full. Whoever set it down expected to come back.",
+    "The ventilation is almost silent. Just enough air moving to know the station is alive.",
+    "Footsteps. Your footsteps. The only sound for 847 days.",
+  ],
+};
+
+// Mood-specific boot flavor text (shown alongside the default boot)
+export const MOOD_FLAVOR: Record<StationMood, string> = {
+  cold: "Station operating within parameters. All deviations classified as routine maintenance.",
+  hot: "Multiple system alerts. Emergency protocols active. Station condition: critical.",
+  silent: "No crew contact in 847 days. Life support nominal. The station waits.",
+};
+
 // Corridor transit ambient text — fires once per corridor segment
 export const CORRIDOR_AMBIENT: string[] = [
   "The corridor smells of ozone and old coolant. Something overloaded here.",

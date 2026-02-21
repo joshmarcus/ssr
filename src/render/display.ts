@@ -300,7 +300,7 @@ export class BrowserDisplay implements IGameDisplay {
   private showTrail = false;
 
   // Flash tile mechanism for interaction feedback
-  private flashTiles: Set<string> = new Set();
+  private flashTiles: Map<string, string> = new Map(); // posKey -> flash color
 
   // Run summary for clipboard sharing
   _runSummary = "";
@@ -632,9 +632,9 @@ export class BrowserDisplay implements IGameDisplay {
     this.showTrail = true;
   }
 
-  /** Flash a tile white for 1 render frame (interaction feedback). */
-  flashTile(x: number, y: number): void {
-    this.flashTiles.add(`${x},${y}`);
+  /** Flash a tile for 1 render frame (interaction feedback). Color defaults to white. */
+  flashTile(x: number, y: number, color?: string): void {
+    this.flashTiles.set(`${x},${y}`, color ?? "#fff");
   }
 
   // ── Find interactable entities within 3 tiles of player ────────
@@ -970,9 +970,10 @@ export class BrowserDisplay implements IGameDisplay {
           fg = "#0a4a0a"; // dim green ghost
         }
 
-        // Flash tile: white flash for 1 render cycle (interaction feedback)
-        if (this.flashTiles.has(posKey)) {
-          bg = "#fff";
+        // Flash tile: colored flash for 1 render cycle (interaction feedback)
+        const flashColor = this.flashTiles.get(posKey);
+        if (flashColor) {
+          bg = flashColor;
           fg = "#000";
         }
 
@@ -1504,6 +1505,13 @@ export class BrowserDisplay implements IGameDisplay {
           pinnedHtml = `<div style="color:#f44;background:#1a0500;padding:2px 6px;border-bottom:1px solid #433;font-size:12px">[${phaseLabel}] Gather evidence and solve deductions to unlock the Data Core</div>`;
         }
       }
+      // Show journal progress when no other notification is pinned
+      if (!pinnedHtml && state.mystery.journal.length > 0) {
+        const journalCount = state.mystery.journal.length;
+        const solvedCount = state.mystery.deductions.filter(d => d.solved).length;
+        const totalDeds = state.mystery.deductions.length;
+        pinnedHtml = `<div style="color:#6a8;background:#0a1508;padding:2px 6px;border-bottom:1px solid #243;font-size:11px">[${phaseLabel}] Journal: ${journalCount} entries · Deductions: ${solvedCount}/${totalDeds}</div>`;
+      }
     }
 
     // ── Log panel (color-coded by type) ─────────────────────────
@@ -1540,8 +1548,15 @@ export class BrowserDisplay implements IGameDisplay {
       actions.push({ key: "t", label: sensorLabel, active: sensorNames.length > 0 });
       // Look
       actions.push({ key: "l", label: "Look", active: true });
-      // Journal/Investigation Hub
-      actions.push({ key: "v", label: "Evidence Hub", active: true });
+      // Journal/Investigation Hub with deduction progress
+      if (state.mystery) {
+        const solved = state.mystery.deductions.filter(d => d.solved).length;
+        const total = state.mystery.deductions.length;
+        const label = solved > 0 ? `Evidence Hub (${solved}/${total})` : "Evidence Hub";
+        actions.push({ key: "v", label, active: true });
+      } else {
+        actions.push({ key: "v", label: "Evidence Hub", active: true });
+      }
 
       actionBarHtml = `<div style="padding:2px 0;border-bottom:1px solid #222;font-size:11px;color:#888">` +
         actions.map(a => {
