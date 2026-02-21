@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 59 complete (Interaction Flash, Station Mood, UI Progress)
+- **Phase**: Sprint 60 complete (Crew Manifest, Replay Hooks, CORVUS-7 Personality)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -13,7 +13,7 @@
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 1300, Normal: 1000, Hard: 700) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 42 (189T) VICTORY on normal, all deductions correct
+- **Playtest results**: 5 seeds all VICTORY — 42(189T), 99(184T), 184201(272T), 7777(182T), 12345(225T)
 
 ## What Works
 
@@ -56,7 +56,7 @@
 - Heuristic playtest bot (playtest_bot.ts)
 - Mystery choices: 3 narrative decisions with spoiler protection
 - Procedural sound effects: 12 Web Audio SFX + 5 archetype ambient soundscapes
-- Game-over overlay: performance rating (S/A/B/C/D), stats summary, mystery choices recap, incident timeline reconstruction
+- Game-over overlay: performance rating (S/A/B/C/D), stats summary, mystery choices recap, incident timeline reconstruction, crew manifest, replay hints
 - Difficulty system: Easy/Normal/Hard with URL param, adjusting HP, turn limit, damage, deterioration
 - New Game [N] / Replay [R]: random seed generation for replayability, game-over shows both options
 - Objective compass: sensor-gated directional hints (Thermal → relays, Atmospheric → crew/breaches)
@@ -81,6 +81,31 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 60 Changes
+
+### Crew Manifest on Game-Over
+- **Full crew listing**: Game-over screen now shows a CREW MANIFEST section with every crew member's name, role, and fate
+- **Color-coded fates**: EVACUATED (green), DECEASED (red), REMAINS ABOARD (amber), NEVER LOCATED (dim grey), DECEASED pre-incident (dark red)
+- **Emotional weight**: Players see the human cost of their performance — who they saved, who they missed, who was already gone
+
+### Replay Hooks: "What Remains Unknown"
+- **Unsolved deduction hints**: When deductions go unsolved, game-over shows vague directional hints ("A pattern in the station logs might have revealed...")
+- **15 authored hint lines** across 5 deduction categories (what/hero/responsibility/why/agenda), 3 variants each
+- **Seed-variant selection**: Different seeds show different hints for the same unsolved deduction
+- **Encourages replay**: Players get a sense of *where* to look next run without spoiling *what* they'll find
+
+### Seed-Variant Victory Epilogue Details
+- **15 new closing detail lines** (3 per archetype) selected by seed % 3
+- **Narrative texture**: Same archetype, different closing beat — e.g., CoolantCascade might end with "The UN-ORC review board convenes" vs "Station thermal readings normalizing" vs "Three maintenance requests. Enough."
+- **Additive**: Appears as a subdued line beneath the main epilogue, not replacing it
+
+### CORVUS-7 Personality System
+- **3 communication styles**: Analytical (systematic, data-focused), Empathetic (warm, humanizing), Cryptic (philosophical, enigmatic)
+- **Seed-derived**: `(seed >> 2) % 3` — orthogonal to station mood, so a run can be cold+empathetic or hot+cryptic
+- **Personality-specific greeting**: Each personality gets a unique first-contact line after boot sequence
+- **Variant milestone reactions**: Key exploration milestones (first_terminal, first_crew_found, 50%, 100%) use personality-specific text when available
+- **Run identity**: Combined with station mood, creates 9 possible atmospheric combinations per archetype
 
 ## Sprint 59 Changes
 
