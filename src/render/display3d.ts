@@ -1012,6 +1012,15 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.playerMesh.position.z = this.playerCurrentZ;
       this.playerMesh.position.y = 0.4 + Math.sin(elapsed * 2) * 0.05;
 
+      // Smooth rotation towards facing direction
+      let targetRot = this.playerFacing;
+      let currentRot = this.playerMesh.rotation.y;
+      // Shortest path rotation
+      let diff = targetRot - currentRot;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      this.playerMesh.rotation.y += diff * Math.min(1, 10 * delta);
+
       // Smoothly move camera and light to follow
       this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
       this.cameraPosZ += (this.cameraTargetZ - this.cameraPosZ) * lerpFactor;
@@ -1255,6 +1264,25 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (tile.heat > 15) {
         return 0x221108;
       }
+    }
+
+    // Ambient smoke visibility (darker tiles in smoky areas)
+    if (tile.walkable && tile.smoke > 20) {
+      const smokeFactor = Math.min(1, tile.smoke / 80);
+      const r = ((baseColor >> 16) & 0xff);
+      const g = ((baseColor >> 8) & 0xff);
+      const b = (baseColor & 0xff);
+      const dr = Math.round(r * (1 - smokeFactor * 0.5));
+      const dg = Math.round(g * (1 - smokeFactor * 0.6));
+      const db = Math.round(b * (1 - smokeFactor * 0.4));
+      return (dr << 16) | (dg << 8) | db;
+    }
+
+    // Ambient low-pressure visibility (subtle blue tint)
+    if (this.sensorMode !== SensorType.Atmospheric && tile.walkable && tile.pressure < 60) {
+      const pressFactor = Math.max(0, 1 - tile.pressure / 60);
+      const blue = Math.round(0x30 + pressFactor * 0x30);
+      return (0x10 << 16) | (0x15 << 8) | blue;
     }
 
     return baseColor;
@@ -1929,11 +1957,24 @@ export class BrowserDisplay3D implements IGameDisplay {
     antenna.position.y = 0.55;
     group.add(antenna);
 
-    // Small tip sphere
+    // Small tip sphere (antenna tip)
     const tipGeo = new THREE.SphereGeometry(0.04, 6, 4);
     const tip = new THREE.Mesh(tipGeo, makeToonMaterial({ color: 0x00ff44, gradientMap: this.toonGradient }));
     tip.position.y = 0.67;
     group.add(tip);
+
+    // Ground glow circle under Sweepo
+    const glowGeo = new THREE.CircleGeometry(0.5, 16);
+    glowGeo.rotateX(-Math.PI / 2);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0x22ff66,
+      transparent: true,
+      opacity: 0.15,
+      depthWrite: false,
+    });
+    const glowCircle = new THREE.Mesh(glowGeo, glowMat);
+    glowCircle.position.y = -0.38; // just above floor
+    group.add(glowCircle);
 
     return group;
   }
@@ -1961,7 +2002,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.playerTargetZ = py;
     this.cameraTargetX = px;
     this.cameraTargetZ = py;
-    this.playerMesh.rotation.y = this.playerFacing;
+    // Rotation is smoothly interpolated in the animate loop
 
     // On first render, snap immediately (no lerp from origin)
     if (this.lastPlayerX === -1) {
