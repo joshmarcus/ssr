@@ -1513,6 +1513,19 @@ export class BrowserDisplay3D implements IGameDisplay {
             }
           }
 
+          // Structural damage: per-tile breach cracking pattern (always visible)
+          if (tile.pressure < 30) {
+            // Depressurized tiles: dark crack pattern using position hash
+            const crackHash = ((x * 13 + y * 37) & 0x7);
+            const darkFactor = crackHash < 3 ? 0.5 : 0.7; // uneven darkening
+            const r = ((baseColor >> 16) & 0xff);
+            const g = ((baseColor >> 8) & 0xff);
+            const b = (baseColor & 0xff);
+            baseColor = (Math.round(r * darkFactor) << 16) |
+                        (Math.round(g * darkFactor) << 8) |
+                        Math.round(b * darkFactor);
+          }
+
           // Ambient hazard floor tinting (always visible, subtle)
           if (tile.visible && this.sensorMode === SensorType.Cleanliness) {
             // Without a sensor overlay, show subtle hazard hints
@@ -1899,6 +1912,60 @@ export class BrowserDisplay3D implements IGameDisplay {
     ],
   };
 
+  private placeDebris(state: GameState, room: Room, hasBreach: boolean): void {
+    // Find empty floor tiles in the room
+    const entityPositions = new Set<string>();
+    for (const [, e] of state.entities) {
+      entityPositions.add(`${e.pos.x},${e.pos.y}`);
+    }
+    entityPositions.add(`${state.player.entity.pos.x},${state.player.entity.pos.y}`);
+
+    const emptyFloors: { x: number; y: number }[] = [];
+    for (let y = room.y; y < room.y + room.height; y++) {
+      for (let x = room.x; x < room.x + room.width; x++) {
+        if (y < 0 || y >= state.height || x < 0 || x >= state.width) continue;
+        if (state.tiles[y][x].type !== TileType.Floor) continue;
+        if (entityPositions.has(`${x},${y}`)) continue;
+        emptyFloors.push({ x, y });
+      }
+    }
+
+    // Deterministic shuffle
+    const seed = room.x * 41 + room.y * 29;
+    emptyFloors.sort((a, b) => ((a.x * 17 + a.y * 11 + seed) & 0xff) - ((b.x * 17 + b.y * 11 + seed) & 0xff));
+
+    // Simple seeded PRNG for deterministic debris placement
+    let rng = seed * 16807 + 1;
+    const nextRng = () => { rng = (rng * 16807 + 1) & 0x7fffffff; return (rng & 0xffff) / 0xffff; };
+
+    // Place 2-4 debris pieces
+    const debrisCount = Math.min(hasBreach ? 4 : 2, emptyFloors.length);
+    for (let i = 0; i < debrisCount; i++) {
+      const pos = emptyFloors[i];
+      // Procedural debris: small dark boxes at deterministic angles
+      const debrisGeo = new THREE.BoxGeometry(
+        0.15 + nextRng() * 0.15,
+        0.08 + nextRng() * 0.08,
+        0.15 + nextRng() * 0.15
+      );
+      const debrisMat = makeToonMaterial({
+        color: hasBreach ? 0x443333 : 0x444433,
+        gradientMap: this.toonGradient,
+        emissive: hasBreach ? 0x220000 : 0x000000,
+        emissiveIntensity: hasBreach ? 0.2 : 0,
+      });
+      const debris = new THREE.Mesh(debrisGeo, debrisMat);
+      debris.position.set(
+        pos.x + (nextRng() - 0.5) * 0.5,
+        0.04,
+        pos.y + (nextRng() - 0.5) * 0.5
+      );
+      debris.rotation.y = nextRng() * Math.PI * 2;
+      debris.rotation.z = (nextRng() - 0.5) * 0.3;
+      this.decorationGroup.add(debris);
+    }
+  }
+
   private placeRoomDecorations(state: GameState): void {
     for (const room of state.rooms) {
       if (this.decoratedRooms.has(room.id)) continue;
@@ -2126,6 +2193,11 @@ export class BrowserDisplay3D implements IGameDisplay {
         light.position.set(centerX, 2.5, centerY);
         this.scene.add(light);
         this.roomLights.set(room.id, light);
+
+        // Place debris in hazardous rooms
+        if (hasBreach || maxHeat > 40 || maxSmoke > 50) {
+          this.placeDebris(state, room, hasBreach);
+        }
       }
     }
 
@@ -3406,8 +3478,50 @@ export class BrowserDisplay3D implements IGameDisplay {
     for (const room of state.rooms) {
       if (x >= room.x - 1 && x <= room.x + room.width &&
           y >= room.y - 1 && y <= room.y + room.height) {
-        const tint = ROOM_WALL_TINTS_3D[room.name];
-        if (tint) return tint;
+        let color = ROOM_WALL_TINTS_3D[room.name] ?? COLORS_3D.wall;
+
+        // Damage tinting: darken and red-shift walls in hazardous rooms
+        let maxHeat = 0, maxSmoke = 0, hasBreach = false;
+        for (let ry = room.y; ry < room.y + room.height; ry++) {
+          for (let rx = room.x; rx < room.x + room.width; rx++) {
+            if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
+            const t = state.tiles[ry][rx];
+            if (t.heat > maxHeat) maxHeat = t.heat;
+            if (t.smoke > maxSmoke) maxSmoke = t.smoke;
+            if (t.pressure < 30) hasBreach = true;
+          }
+        }
+
+        if (hasBreach) {
+          // Severe: dark with red burn marks
+          const r = ((color >> 16) & 0xff);
+          const g = ((color >> 8) & 0xff);
+          const b = (color & 0xff);
+          color = (Math.min(255, Math.round(r * 0.5 + 40)) << 16) |
+                  (Math.round(g * 0.35) << 8) |
+                  Math.round(b * 0.35);
+        } else if (maxHeat > 40) {
+          // Heat damage: warm orange-brown tint
+          const hf = Math.min(1, (maxHeat - 40) / 60);
+          const r = ((color >> 16) & 0xff);
+          const g = ((color >> 8) & 0xff);
+          const b = (color & 0xff);
+          color = (Math.min(255, Math.round(r + hf * 30)) << 16) |
+                  (Math.max(0, Math.round(g * (1 - hf * 0.3))) << 8) |
+                  Math.max(0, Math.round(b * (1 - hf * 0.5)));
+        } else if (maxSmoke > 30) {
+          // Smoke staining: desaturate toward grey
+          const sf = Math.min(1, (maxSmoke - 30) / 70);
+          const r = ((color >> 16) & 0xff);
+          const g = ((color >> 8) & 0xff);
+          const b = (color & 0xff);
+          const grey = Math.round(r * 0.3 + g * 0.59 + b * 0.11);
+          color = (Math.round(r + (grey - r) * sf * 0.5) << 16) |
+                  (Math.round(g + (grey - g) * sf * 0.5) << 8) |
+                  Math.round(b + (grey - b) * sf * 0.5);
+        }
+
+        return color;
       }
     }
     const hash = ((x * 3) + (y * 7)) & 0xf;
