@@ -39,9 +39,9 @@ describe("evidence system", () => {
         }
       }
     }
-    // Room-based evidence traces: 3-5
+    // Room-based evidence traces: 3-7 (includes sensor-gated traces)
     expect(roomTraces.length).toBeGreaterThanOrEqual(3);
-    expect(roomTraces.length).toBeLessThanOrEqual(5);
+    expect(roomTraces.length).toBeLessThanOrEqual(7);
     // Corridor evidence traces: 6-8 from placeCorridorClues + crew path breadcrumbs
     expect(corridorTraces.length).toBeGreaterThanOrEqual(6);
     expect(corridorTraces.length).toBeLessThanOrEqual(40);
@@ -137,6 +137,10 @@ describe("evidence system", () => {
     // Game starts in Clean phase; fast-forward to Investigate for this test
     state = { ...state, mystery: { ...state.mystery!, objectivePhase: ObjectivePhase.Investigate } };
     expect(state.mystery!.objectivePhase).toBe(ObjectivePhase.Investigate);
+
+    // Grant relay milestones so puzzle-gated terminals are accessible
+    state.milestones.add("first_relay");
+    state.milestones.add("all_relays");
 
     // Read enough log terminals to reach threshold
     const threshold = state.mystery!.evidenceThreshold;

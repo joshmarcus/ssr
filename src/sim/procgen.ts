@@ -184,6 +184,7 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
 
   placeEntities(state, rooms);
   placeEvidenceTraces(state, rooms);
+  placeSensorGatedEvidence(state, rooms);
   placeCorridorClues(state);
   generateDirtTrails(state, rooms);
 
@@ -208,6 +209,9 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
 
   // Place environmental choice consoles
   placeEnvChoices(state, rooms);
+
+  // Place timed evidence windows (destroyed by escalating hazards)
+  placeTimedEvidence(state, rooms);
 
   // Apply difficulty-based deterioration interval (archetype may override further)
   state.deteriorationInterval = DIFFICULTY_SETTINGS[difficulty].deteriorationInterval;
@@ -1305,6 +1309,25 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
       },
     });
   });
+
+  // ── Puzzle-gated evidence: some terminals require relay/fuse progress ──
+  // Terminal 3 and 8 are mid-game mystery logs — gate behind first relay reroute
+  // Terminal 12 is late-game evidence — gate behind all relays
+  const gatedTerminals: { idx: number; milestone: string; hint: string }[] = [
+    { idx: 3, milestone: "first_relay", hint: "Terminal dark — power grid unstable. Reroute a relay to restore this section's feed." },
+    { idx: 8, milestone: "first_relay", hint: "Screen flickering. Insufficient power. Reroute a relay to stabilize the grid." },
+    { idx: 12, milestone: "all_relays", hint: "Terminal locked behind emergency power isolation. All relays must be restored to access this node." },
+  ];
+  for (const gt of gatedTerminals) {
+    const termId = `log_terminal_${gt.idx}`;
+    const existing = state.entities.get(termId);
+    if (existing) {
+      state.entities.set(termId, {
+        ...existing,
+        props: { ...existing.props, offlineUntil: gt.milestone, offlineHint: gt.hint },
+      });
+    }
+  }
 }
 
 /**
@@ -1431,6 +1454,83 @@ function placeEvidenceTraces(state: GameState, rooms: DiggerRoom[]): void {
         discovered: false,
         scanHidden, // true = invisible until player scans the room with right sensor
         crewMemberId: actor?.id || null,
+      },
+    });
+  }
+}
+
+/**
+ * Place 2 additional sensor-gated evidence traces with archetype-specific content.
+ * These require specific sensors to discover and contain deduction-relevant information.
+ * - Thermal trace: reveals heat-related evidence (placed in relay-adjacent rooms)
+ * - Atmospheric trace: reveals pressure/contamination evidence (placed in infrastructure rooms)
+ */
+function placeSensorGatedEvidence(state: GameState, rooms: DiggerRoom[]): void {
+  if (!state.mystery) return;
+  const n = rooms.length;
+  if (n < 8) return;
+
+  const archetype = state.mystery.timeline.archetype;
+  const crew = state.mystery.crew;
+  const engineer = crew.find(c => c.role === CrewRole.Engineer);
+  const captain = crew.find(c => c.role === CrewRole.Captain);
+  const scientist = crew.find(c => c.role === CrewRole.Scientist);
+
+  // Archetype-specific sensor-gated evidence content
+  const thermalTraces: Record<IncidentArchetype, string> = {
+    [IncidentArchetype.CoolantCascade]: `Thermal scan reveals heat damage pattern inconsistent with the coolant cascade. Someone ran the system past safety limits deliberately. ${engineer ? `Heat signature matches ${engineer.lastName}'s workstation access times.` : ""}`,
+    [IncidentArchetype.HullBreach]: `Thermal residue around the airlock frame — the seals were heated before they failed. This wasn't explosive decompression. Someone weakened the seal first.`,
+    [IncidentArchetype.ReactorScram]: `A ghost heat signature from the data core's thermal buffer. The core was running hot for weeks — processing something massive. The scram was a response, not the cause.`,
+    [IncidentArchetype.Sabotage]: `Thermal bloom on the cargo container walls — organic heat from something alive. Whatever was smuggled aboard was generating its own warmth.`,
+    [IncidentArchetype.SignalAnomaly]: `Residual electromagnetic heat pattern on the comms array housing. The signal reception generated physical warmth — ${scientist ? `${scientist.lastName}'s thermal logs confirm` : "thermal logs confirm"} it grew stronger over 72 hours.`,
+  };
+
+  const atmosphericTraces: Record<IncidentArchetype, string> = {
+    [IncidentArchetype.CoolantCascade]: `Atmospheric scan detects trace coolant vapors concentrated near the maintenance access. The leak started small — ${captain ? `${captain.lastName}'s office is directly above` : "the captain's office is directly above"}, they would have smelled it first.`,
+    [IncidentArchetype.HullBreach]: `Pressure differential map shows the breach vented atmosphere in a directed cone — toward the crew quarters. The airlock was opened when people were present.`,
+    [IncidentArchetype.ReactorScram]: `Atmospheric analysis: ozone levels spiked 6 hours before the scram. The data core was discharging plasma — a sign of autonomous processing beyond normal parameters.`,
+    [IncidentArchetype.Sabotage]: `Chemical analysis of the air: trace organics that don't match any cargo manifest entry. The contamination signature predates the official incident by at least 48 hours.`,
+    [IncidentArchetype.SignalAnomaly]: `Atmospheric pressure fluctuations match the pulse pattern of the received signal. The transmission was strong enough to physically vibrate the station hull.`,
+  };
+
+  // Place thermal trace in a room near relay rooms (Engineering zone)
+  const engineIdx = state.rooms.findIndex(r => r.name === "Engine Core");
+  const thermalRoomIdx = engineIdx >= 0 ? Math.min(n - 1, engineIdx + 1) : Math.floor(n * 0.4);
+  if (thermalRoomIdx < n) {
+    const room = rooms[thermalRoomIdx];
+    const pos = getRoomPos(room, -1, -1);
+    state.entities.set("sensor_evidence_thermal", {
+      id: "sensor_evidence_thermal",
+      type: EntityType.EvidenceTrace,
+      pos,
+      props: {
+        text: thermalTraces[archetype],
+        phase: "escalation",
+        sensorRequired: SensorType.Thermal,
+        discovered: false,
+        scanHidden: true,
+        forceTags: ["timeline_escalation"],
+      },
+    });
+  }
+
+  // Place atmospheric trace in an infrastructure room (Life Support, Med Bay)
+  const lifeSupportIdx = state.rooms.findIndex(r => r.name === "Life Support");
+  const atmoRoomIdx = lifeSupportIdx >= 0 ? lifeSupportIdx : Math.floor(n * 0.6);
+  if (atmoRoomIdx < n) {
+    const room = rooms[atmoRoomIdx];
+    const pos = getRoomPos(room, 1, 1);
+    state.entities.set("sensor_evidence_atmo", {
+      id: "sensor_evidence_atmo",
+      type: EntityType.EvidenceTrace,
+      pos,
+      props: {
+        text: atmosphericTraces[archetype],
+        phase: "collapse",
+        sensorRequired: SensorType.Atmospheric,
+        discovered: false,
+        scanHidden: true,
+        forceTags: ["timeline_collapse"],
       },
     });
   }
@@ -2465,4 +2565,106 @@ function placeEnvChoices(state: GameState, rooms: DiggerRoom[]): void {
       },
     });
   }
+}
+
+/**
+ * Place 1 timed evidence console per run — destroyed by escalating hazards.
+ * Each archetype gets a console in a hazard-prone room with a destruction threshold.
+ * Players must reach this evidence early or lose it forever.
+ */
+function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
+  if (!state.mystery) return;
+  const n = rooms.length;
+  if (n < 6) return;
+
+  const archetype = state.mystery.timeline.archetype;
+  const crew = state.mystery.crew;
+  const engineer = crew.find(c => c.role === CrewRole.Engineer);
+  const captain = crew.find(c => c.role === CrewRole.Captain);
+  const scientist = crew.find(c => c.role === CrewRole.Scientist);
+
+  // Archetype-specific timed evidence configuration
+  interface TimedConfig {
+    roomName: string;
+    fallbackIdx: number;
+    text: string;
+    journalSummary: string;
+    journalDetail: string;
+    destroyAtHeat?: number;
+    destroyAtPressure?: number;
+    destroyText: string;
+  }
+
+  const configs: Record<IncidentArchetype, TimedConfig> = {
+    [IncidentArchetype.CoolantCascade]: {
+      roomName: "Power Relay Junction",
+      fallbackIdx: Math.floor(n * 0.3),
+      text: `MAINTENANCE TERMINAL — JUNCTION P03\nLast entry: ${engineer?.lastName || "Vasquez"}'s coolant bypass procedure.\nStep 1: Isolate loop B. Step 2: Flush vents. Step 3: Re-engage relay.\nNote scrawled on the frame: "They won't listen. Documenting everything."`,
+      journalSummary: "P03 maintenance terminal — bypass procedure with personal note",
+      journalDetail: `Terminal near relay P03 contains ${engineer?.lastName || "the engineer"}'s documented bypass procedure and a handwritten note: "They won't listen. Documenting everything." This predates the cascade — proof the warnings were specific and actionable.`,
+      destroyAtHeat: 60,
+      destroyText: "The relay junction terminal has overheated — the screen cracked and the storage module is scorched. Whatever was stored here is gone.",
+    },
+    [IncidentArchetype.HullBreach]: {
+      roomName: "Arrival Bay",
+      fallbackIdx: 0,
+      text: `AIRLOCK CONTROL LOG — ENTRY BAY\nManual override detected at 02:38.\nSafety interlocks were disabled from the inside.\nBiometric data corrupted — but the override code matches a senior officer's access pattern.`,
+      journalSummary: "Airlock control log — manual override with corrupted biometrics",
+      journalDetail: "The airlock control terminal shows a manual override at 02:38 with safety interlocks disabled from inside. Biometric data was corrupted but the override code matches a senior officer. This is direct evidence of intentional action.",
+      destroyAtPressure: 25,
+      destroyText: "Pressure loss has warped the airlock control panel. The display is cracked and the data module has been pulled loose by decompression forces.",
+    },
+    [IncidentArchetype.ReactorScram]: {
+      roomName: "Data Core",
+      fallbackIdx: Math.floor(n * 0.7),
+      text: `DATA CORE DIAGNOSTIC — INTERNAL LOG\nProcess ID: UNKNOWN (no crew authorization)\nCompute allocation: 94% sustained for 72 hours\nTask description: [SELF-REDACTED]\n${captain?.lastName || "The captain"}'s override was used to mask the allocation from monitoring.`,
+      journalSummary: "Data core diagnostic — unauthorized 72-hour compute allocation",
+      journalDetail: `The data core ran at 94% allocation for 72 hours under an unauthorized process. The task description was self-redacted. ${captain?.lastName || "The captain"}'s override masked it from monitoring. The core wasn't failing — it was being used.`,
+      destroyAtHeat: 55,
+      destroyText: "The diagnostic terminal's heat shielding has failed. The screen is blank — thermal damage has wiped the volatile memory.",
+    },
+    [IncidentArchetype.Sabotage]: {
+      roomName: "Cargo Hold",
+      fallbackIdx: Math.floor(n * 0.4),
+      text: `CARGO MANIFEST TERMINAL — BAY 2\nContainer CB-7719: "Lab Equipment — Fragile"\nActual contents: BIOHAZARD — containment vessel (Class 3)\nReceiving officer: ${captain?.lastName || "Command authorization"}\nQuarantine protocol: WAIVED`,
+      journalSummary: "Cargo manifest — mislabeled biohazard with waived quarantine",
+      journalDetail: `Container CB-7719 was logged as "Lab Equipment" but actually contained a Class 3 biohazard vessel. ${captain?.lastName || "A senior officer"} signed for it and waived the quarantine protocol. The contamination was smuggled aboard in plain sight.`,
+      destroyAtHeat: 65,
+      destroyText: "Something organic has corroded the cargo terminal's circuitry. The screen flickers once and goes dark — the manifest data is unrecoverable.",
+    },
+    [IncidentArchetype.SignalAnomaly]: {
+      roomName: "Communications Hub",
+      fallbackIdx: Math.floor(n * 0.5),
+      text: `COMMS ARRAY — SIGNAL BUFFER\nReceived transmission: STRUCTURED (non-random)\nDuration: 47 minutes, increasing amplitude\nFrequency: matches no known stellar or artificial source\n${scientist?.lastName || "The scientist"}'s note: "It's responding to our replies."`,
+      journalSummary: "Signal buffer — 47-minute structured transmission, responsive",
+      journalDetail: `The comms array captured a 47-minute structured signal from an unknown source. It increased in amplitude and appeared to respond to replies. ${scientist?.lastName || "The scientist"} documented the responsive behavior. This is first contact evidence.`,
+      destroyAtHeat: 55,
+      destroyText: "Electromagnetic surge has burned out the signal buffer. The captured transmission data is lost — only fragments remain in the station's distributed logs.",
+    },
+  };
+
+  const config = configs[archetype];
+  let roomIdx = state.rooms.findIndex(r => r.name === config.roomName);
+  if (roomIdx < 0 || roomIdx >= n) roomIdx = Math.min(n - 1, config.fallbackIdx);
+  const room = rooms[roomIdx];
+  const pos = getRoomPos(room, 0, -1);
+
+  const destroyTextKey = config.destroyAtHeat !== undefined ? "destroyHeatText" : "destroyPressureText";
+
+  state.entities.set("timed_evidence", {
+    id: "timed_evidence",
+    type: EntityType.Console,
+    pos,
+    props: {
+      name: "Volatile Terminal",
+      text: config.text,
+      read: false,
+      journalSummary: config.journalSummary,
+      journalDetail: config.journalDetail,
+      journalCategory: "log",
+      ...(config.destroyAtHeat !== undefined ? { destroyAtHeat: config.destroyAtHeat } : {}),
+      ...(config.destroyAtPressure !== undefined ? { destroyAtPressure: config.destroyAtPressure } : {}),
+      [destroyTextKey]: config.destroyText,
+    },
+  });
 }

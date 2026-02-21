@@ -888,6 +888,39 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
     }
 
     case EntityType.LogTerminal: {
+      // Check timed destruction: terminal destroyed by hazard
+      if (target.props["timedDestroyed"] === true) {
+        const destroyedText = (target.props["destroyHeatText"] as string) || (target.props["destroyPressureText"] as string) || "Terminal damaged beyond recovery. The data is lost.";
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_terminal_destroyed_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: destroyedText,
+            read: false,
+          },
+        ];
+        break;
+      }
+
+      // Check puzzle-gate: terminal offline until milestone is met
+      const offlineUntil = target.props["offlineUntil"] as string | undefined;
+      if (offlineUntil && !state.milestones.has(offlineUntil)) {
+        const offlineHint = (target.props["offlineHint"] as string) || "Terminal offline. Power systems must be restored.";
+        next.logs = [
+          ...state.logs,
+          {
+            id: `log_terminal_offline_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: offlineHint,
+            read: false,
+          },
+        ];
+        break;
+      }
+
       // Read a log terminal - add its log entries to the player's log
       const terminalText = (target.props["text"] as string) || "Terminal offline. No data available.";
       const alreadyRead = state.logs.find((l) => l.id === `log_terminal_${targetId}`);
@@ -4238,6 +4271,64 @@ function applyChoiceConsequence(state: GameState, consequence: string, answerKey
 }
 
 /**
+ * Timed evidence destruction: evidence entities with destroyAtHeat/destroyAtPressure
+ * are destroyed (made unreadable) when their tile's hazard exceeds the threshold.
+ * Creates urgency — players must reach certain evidence before hazards escalate.
+ */
+function tickTimedEvidence(state: GameState): GameState {
+  let changed = false;
+  let newEntities: Map<string, Entity> | null = null;
+  const logs: typeof state.logs extends (infer T)[] ? T[] : never[] = [];
+
+  for (const [id, entity] of state.entities) {
+    if (entity.props["timedDestroyed"] === true) continue; // already destroyed
+    const destroyAtHeat = entity.props["destroyAtHeat"] as number | undefined;
+    const destroyAtPressure = entity.props["destroyAtPressure"] as number | undefined;
+    if (destroyAtHeat === undefined && destroyAtPressure === undefined) continue;
+
+    const tile = state.tiles[entity.pos.y]?.[entity.pos.x];
+    if (!tile) continue;
+
+    let shouldDestroy = false;
+    let destroyReason = "";
+
+    if (destroyAtHeat !== undefined && tile.heat >= destroyAtHeat) {
+      shouldDestroy = true;
+      destroyReason = (entity.props["destroyHeatText"] as string) ||
+        "Heat damage has corrupted the data. The terminal's display has gone dark.";
+    }
+    if (destroyAtPressure !== undefined && tile.pressure <= destroyAtPressure) {
+      shouldDestroy = true;
+      destroyReason = (entity.props["destroyPressureText"] as string) ||
+        "Pressure loss has physically warped the storage medium. The data is unrecoverable.";
+    }
+
+    if (shouldDestroy) {
+      if (!newEntities) newEntities = new Map(state.entities);
+      newEntities.set(id, {
+        ...entity,
+        props: { ...entity.props, timedDestroyed: true, read: true }, // mark as exhausted
+      });
+      logs.push({
+        id: `log_evidence_destroyed_${id}_${state.turn}`,
+        timestamp: state.turn,
+        source: "system",
+        text: destroyReason,
+        read: false,
+      });
+      changed = true;
+    }
+  }
+
+  if (!changed) return state;
+  return {
+    ...state,
+    entities: newEntities ?? state.entities,
+    logs: [...state.logs, ...logs],
+  };
+}
+
+/**
  * Pure function: apply one action to produce the next game state.
  * Returns a new state (immutable style for replay determinism).
  */
@@ -4965,6 +5056,9 @@ export function step(state: GameState, action: Action): GameState {
 
   // Station deterioration: periodic escalation
   next = tickDeterioration(next);
+
+  // Timed evidence destruction: evidence nodes destroyed by escalating hazards
+  next = tickTimedEvidence(next);
 
   // Ship computer PA announcements
   next = tickPA(next);
