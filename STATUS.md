@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 63 complete (Content Quality Pass, Security Terminal Puzzle, Utility Items)
+- **Phase**: Sprint 64 complete (Coolant Loop Puzzle, Power Cell Scarcity, Thermal Chokepoints)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -74,6 +74,9 @@
 - Deduction retrospective on game-over: shows each deduction's correct answer and player accuracy
 - Pry Bar tool-slot attachment: first Tool slot item, can force open clearance doors
 - Utility-slot attachments: Atmospheric Scrubber (passive smoke reduction), Emergency Beacon (room hazard suppression)
+- Multi-step coolant loop puzzle (3 ordered steps across rooms with prerequisite checks)
+- Power cell scarcity economy (2 cells, 3 endpoints — forced resource choice)
+- Thermal chokepoint corridors (relay-prerequisite heat gates)
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
@@ -82,6 +85,29 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 64 Changes
+
+### Multi-Step Coolant Loop Puzzle
+- **3 ordered steps across 3 rooms**: (1) Close bypass valve (PressureValve), (2) Vent blocked pipe (Console), (3) Re-engage coolant relay (Console)
+- **Prerequisite enforcement**: Step 2 blocked until step 1 complete, step 3 blocked until step 2 complete — contextual error messages guide the player
+- **Environmental feedback**: Step 2 clears smoke in 3-tile radius, step 3 reduces heat station-wide by 15
+- **Milestone tracking**: Uses existing `milestones` Set (`coolant_step_1/2/3`)
+- **Placed across station**: Early, mid, and late rooms to force traversal through hazard zones
+
+### Power Cell Scarcity Economy
+- **2 power cells, 3 fuse boxes**: Forces a genuine resource allocation choice every run
+- **Standard fuse group (2 boxes)**: Powering both activates heat venting around those junctions
+- **Smoke ventilation fuse box**: Independent system in late-game room (Auxiliary Power/Server Annex) — powering it reduces smoke station-wide by 25
+- **Escape pod also accepts cells**: Creates a 3-way dilemma — heat reduction vs smoke reduction vs pod power
+- **Design philosophy**: Same item, different endpoints, durable consequences
+
+### Thermal Chokepoint Corridors
+- **2 persistent heat sources in corridor tiles**: High heat (55) + smoke (8) blocking passage
+- **Relay-linked prerequisites**: Each chokepoint has a `prerequisiteRelay` prop — when that relay is activated, the chokepoint's heat source is deactivated
+- **Player options per chokepoint**: (a) Solve prerequisite relay (correct puzzle solution), (b) Use Emergency Beacon to suppress temporarily, (c) Tank the damage
+- **Attachment loadout matters**: Thermal sensor shows intensity before committing, Beacon creates an alternate solution, Scrubber helps survive the passage
+- **Integrated system payoff**: Heat, relays, sensors, and utility items now work together as connected decisions
 
 ## Sprint 63 Changes
 
