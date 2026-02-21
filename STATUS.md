@@ -93,7 +93,7 @@
 - Signal interference: first 3 turns suppress scan on SignalAnomaly with static-burst opening
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
-- **3D mode** (default, toggle F3): Full Three.js renderer with Synty POLYGON Sci-Fi Space models, room decorations, entity animations, atmospheric particles, room lighting, movement trail, nebula backdrop
+- **3D mode** (default, toggle F3): Full Three.js renderer with Synty POLYGON Sci-Fi Space + synty-gltf + kenney-space + Characters + Items + quaternius models, room decorations, entity animations, atmospheric particles, room lighting, movement trail, nebula backdrop, chase cam (F2)
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
 - **Spatial investigation**: Evidence access requires puzzle solving, sensors, and urgency:
   - Puzzle-gated terminals: 3 log terminals offline until relay milestones (first_relay, all_relays)
@@ -125,7 +125,7 @@
 - **Atmospheric fog**: Subtle edge fade (14-28 range) for depth
 - **Starfield background**: 400 star points in a dome below the station
 - **Nebula shader backdrop**: Dark blue-purple gradient plane with animated swirl
-- **Ambient dust particles**: 80 floating motes near the camera with drift animation
+- **Ambient dust particles**: 120 floating motes near the camera with drift animation
 - **Player movement trail**: 12 fading green dots behind Sweepo during movement
 - **Player ground glow**: Green glow disc under Sweepo for visibility
 - **Entity glow lights**: Colored point lights on DataCore, Relay, Breach, SensorPickup, EscapePod, MedKit
@@ -169,6 +169,23 @@
 - **Mouse wheel zoom**: Scroll to zoom in/out (frustum range 3-12), default 3.5
 - **Shift+scroll camera angle**: Adjustable elevation (top-down ↔ side-on)
 - **Cel-shaded brightness**: Floor 0xbbbbbb, wall 0xccddee, corridor 0xaaaaaa, vibrant room tints, ambient light 2.8, floor texture base #dddddd
+
+### Visual Sprints (V14-V18)
+- **Sprint V14 — Performance + scale**: Reduced corridor lights (every 5th tile), pipes (every 4th), wall props (~12%), entity glow lights (15→5 key types). Entity scales normalized to realistic proportions (Sweepo 0.45, DataCore 0.7, etc.)
+- **Sprint V15 — Atmospheric lighting**: Procedural starfield background texture, hemisphere light for natural fill, ambient 3.2, key 2.8, fill 1.6, rim 1.0. Navy fog (#0a0a1a) instead of pure black. 8 entity types get emissive glow. Camera frustum default 3.0
+- **Sprint V16 — Room architecture**: Baseboard trim strips along room walls, top rails at ceiling height, door frame pillars with emissive lintels (red=locked, gold=unlocked). Floor tint 45%, corridor blend 25%
+- **Sprint V17 — Surface detail**: Procedural wall panel texture (grooves, rivets, vent slits, horizontal seam). Separate corridor floor mesh with metal grate texture. Toon gradient shadows raised (60/150/220/255)
+- **Sprint V18 — Decorations + depth**: Large decorations (1.15x) in bigger rooms spanning ~1.5 tiles. Corridor floors recessed 0.06 units below room floors for depth contrast. Shared trim geometry for GC optimization. **Decoration model preloading** eliminates frame hitches on room entry. Room labels redesigned: clean warm-white map-style text without background boxes
+
+### Visual Sprints (V19-V26)
+- **Sprint V19 — Ceiling beams + AO**: Ceiling beam structure (horizontal beams, vertical cross-braces), overhead light fixtures, simulated ambient occlusion (wall-adjacent floor darkening 12-28%), stronger room point lights
+- **Sprint V20 — Darker beams + arches**: Darker metallic grey ceiling beams (capped at 0x80), reduced beam density (every 3 tiles), corridor arch supports (vertical posts + crossbar)
+- **Sprint V21 — Edge glow + thresholds**: Sci-fi wall edge glow strips (emissive 0.6, room-tinted), door threshold glow strips (emissive 0.7, amber/red for locked)
+- **Sprint V22 — Ground rings + haze**: Colored translucent ring beneath each entity, room atmospheric haze (subtle fog plane at knee height, 0.04 opacity)
+- **Sprint V23 — Corridor strip lights**: Emissive cyan floor strips along corridor walls, alternating bright/dim pattern
+- **Sprint V24 — Model library integration**: Massively expanded decorations with synty-gltf models (200+ industrial props), expanded wall props per room type (cameras, valves, lockers, ventilation), expanded corridor wall models. Console entity uses Bridge Console model at 1.8x scale (spans ~2-3 cells). **3rd-person chase cam** (F2 toggle). Closer zoom (frustum min 1.5). Sweepo flipped 180°. Ceiling lights removed
+- **Sprint V25 — Entity model upgrades**: PatrolDrone=Enemy_Flying, CrewNPC=Astronaut, Airlock=kenney gate-door, ToolPickup=Pickup_Crate, UtilityPickup=Pickup_Thunder, MedKit=Pickup_Health, RepairBot=quaternius Robot. Checkerboard floor pattern
+- **Sprint V26 — Chase cam polish**: Smooth cinematic chase cam with lerped position/look-at, position initialization on toggle. Dust particles increased to 120
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
