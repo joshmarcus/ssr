@@ -22,17 +22,17 @@ function createFloorGridTexture(): THREE.CanvasTexture {
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
 
-  // Light base — instance color multiplies through this, so lighter = brighter floors
-  ctx.fillStyle = "#dddddd";
+  // Bright base — instance color multiplies through this, so lighter = brighter floors
+  ctx.fillStyle = "#eeeeee";
   ctx.fillRect(0, 0, size, size);
 
-  // Outer panel edge — bright highlight
-  ctx.strokeStyle = "#eeeeee";
+  // Outer panel edge — white highlight
+  ctx.strokeStyle = "#f4f4f4";
   ctx.lineWidth = 1;
   ctx.strokeRect(1, 1, size - 2, size - 2);
 
-  // Corner accents — blue-ish highlight
-  ctx.strokeStyle = "#ccddee";
+  // Corner accents — subtle blue highlight
+  ctx.strokeStyle = "#ddeeff";
   ctx.lineWidth = 2;
   const c = 8;
   ctx.beginPath();
@@ -43,7 +43,7 @@ function createFloorGridTexture(): THREE.CanvasTexture {
   ctx.stroke();
 
   // Subtle inner seam
-  ctx.strokeStyle = "#bbbbbb";
+  ctx.strokeStyle = "#cccccc";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(size / 2, 3);
@@ -86,9 +86,9 @@ function createCautionStripeTexture(): THREE.CanvasTexture {
 
 function createToonGradient(): THREE.DataTexture {
   const colors = new Uint8Array([
-    40,   // very dark (deep shadow)
-    120,  // mid shadow
-    200,  // lit
+    60,   // shadow (brighter for cel-shaded look)
+    150,  // mid shadow
+    220,  // lit
     255,  // highlight
   ]);
   const tex = new THREE.DataTexture(colors, colors.length, 1, THREE.RedFormat);
@@ -126,21 +126,21 @@ function makeToonMaterial(opts: {
 
 // ── Color constants ──────────────────────────────────────────────
 const COLORS_3D = {
-  floor: 0xbbbbbb,     // bright cel-shaded floor
-  wall: 0xccddee,      // bright walls
+  floor: 0xcccccc,     // bright cel-shaded floor
+  wall: 0xddeeee,      // bright walls
   door: 0xeeaa55,
   lockedDoor: 0xff5555,
-  corridor: 0xaaaaaa,   // bright corridors
-  background: 0x080814,
+  corridor: 0xbbbbbb,   // bright corridors
+  background: 0x060610,
   player: 0x00ff00,
-  fogFull: 0x000000,
-  fogMemory: 0x222233,
+  fogFull: 0x0a0a1a,    // dark navy instead of pure black
+  fogMemory: 0x2a2a44,  // visible blue-grey memory tint
 } as const;
 
 // How many world-units tall the visible area is (zoom level)
-const CAMERA_FRUSTUM_SIZE_DEFAULT = 3.5; // start zoomed all the way in
-const CAMERA_FRUSTUM_SIZE_MIN = 3;     // max zoom in
-const CAMERA_FRUSTUM_SIZE_MAX = 12;    // max zoom out
+const CAMERA_FRUSTUM_SIZE_DEFAULT = 3.0; // start zoomed in close for detail
+const CAMERA_FRUSTUM_SIZE_MIN = 2.5;    // max zoom in
+const CAMERA_FRUSTUM_SIZE_MAX = 12;     // max zoom out
 
 const ENTITY_COLORS_3D: Record<string, number> = {
   [EntityType.Relay]: 0xffcc00,
@@ -168,30 +168,30 @@ const ENTITY_COLORS_3D: Record<string, number> = {
   [EntityType.RepairCradle]: 0xaaff66,
 };
 
-// Room wall tints — vibrant cel-shaded color identity per zone
+// Room wall tints — vibrant cel-shaded color identity per zone (bright!)
 const ROOM_WALL_TINTS_3D: Record<string, number> = {
-  "Engineering Storage": 0xddbb77,   // warm industrial amber
-  "Power Relay Junction": 0xeedd66,  // electric yellow
-  "Engine Core": 0xee9944,           // hot orange
-  "Life Support": 0x77ccee,          // cool medical blue
-  "Vent Control Room": 0x88bbdd,     // duct steel blue
-  "Communications Hub": 0x7799ee,    // comm blue
-  "Research Lab": 0x77dd99,          // lab green
-  "Med Bay": 0xee88aa,              // medical pink-red
-  "Data Core": 0xcc77ee,            // data purple
-  "Robotics Bay": 0xaabbbb,         // metallic grey-teal
-  "Bridge": 0x99aadd,              // command blue-grey
-  "Observation Deck": 0x88bbcc,     // sky viewport blue
-  "Escape Pod Bay": 0x77eeaa,       // emergency green
-  "Auxiliary Power": 0xddcc66,       // power amber
-  "Signal Room": 0x7788ee,          // signal deep blue
-  "Server Annex": 0xbb77dd,         // server violet
-  "Armory": 0xee7777,              // danger red
-  "Emergency Shelter": 0x88dd99,    // safe green
-  "Cargo Hold": 0xddaa66,          // cargo warm brown
-  "Crew Quarters": 0xddcc88,        // residential warm gold
-  "Arrival Bay": 0x88ccaa,          // teal arrival
-  "Maintenance Corridor": 0xaabbaa, // utility grey-green
+  "Engineering Storage": 0xeedd99,   // warm industrial amber
+  "Power Relay Junction": 0xffee88,  // electric yellow
+  "Engine Core": 0xffbb66,           // hot orange
+  "Life Support": 0x99ddff,          // cool medical blue
+  "Vent Control Room": 0xaaccee,     // duct steel blue
+  "Communications Hub": 0x99bbff,    // comm blue
+  "Research Lab": 0x99eebb,          // lab green
+  "Med Bay": 0xffaacc,              // medical pink-red
+  "Data Core": 0xdd99ff,            // data purple
+  "Robotics Bay": 0xccdddd,         // metallic grey-teal
+  "Bridge": 0xbbccee,              // command blue-grey
+  "Observation Deck": 0xaaddee,     // sky viewport blue
+  "Escape Pod Bay": 0x99ffcc,       // emergency green
+  "Auxiliary Power": 0xeedd88,       // power amber
+  "Signal Room": 0x99aaff,          // signal deep blue
+  "Server Annex": 0xdd99ff,         // server violet
+  "Armory": 0xff9999,              // danger red
+  "Emergency Shelter": 0xaaeebb,    // safe green
+  "Cargo Hold": 0xeecc88,          // cargo warm brown
+  "Crew Quarters": 0xeeddaa,        // residential warm gold
+  "Arrival Bay": 0xaaddcc,          // teal arrival
+  "Maintenance Corridor": 0xccddcc, // utility grey-green
 };
 
 // Room ambient light colors — warm/cool per room function
@@ -478,9 +478,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Scene ──
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(COLORS_3D.background);
+    this.scene.background = this.createStarfieldTexture();
     // Atmospheric fog — subtle fade at the far edges only
-    this.scene.fog = new THREE.Fog(COLORS_3D.background, 18, 35);
+    this.scene.fog = new THREE.Fog(COLORS_3D.background, 20, 40);
 
     // ── Camera (orthographic, zoomed-in, follows player) ──
     const aspect = this.getAspect();
@@ -504,26 +504,30 @@ export class BrowserDisplay3D implements IGameDisplay {
       defaultAlpha: 0.8,
     });
 
-    // ── Lights (cel-shaded bright — push for vibrant toon look) ──
-    const ambient = new THREE.AmbientLight(0xbbccee, 2.8);
+    // ── Lights (cel-shaded bright — vibrant toon look, well-lit scene) ──
+    const ambient = new THREE.AmbientLight(0xccddff, 3.2);
     this.scene.add(ambient);
 
     // Strong key light — warm directional from upper-left
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 2.2);
+    const dirLight = new THREE.DirectionalLight(0xffeedd, 2.8);
     dirLight.position.set(-8, 15, -5);
     this.scene.add(dirLight);
 
     // Cool fill light from opposite side
-    const fillLight = new THREE.DirectionalLight(0x6688cc, 1.2);
+    const fillLight = new THREE.DirectionalLight(0x88aadd, 1.6);
     fillLight.position.set(8, 10, 5);
     this.scene.add(fillLight);
 
-    // Rim light from behind for depth — brighter for cel-shaded pop
-    const rimLight = new THREE.DirectionalLight(0xaaaaff, 0.8);
+    // Rim light from behind for depth — strong cel-shaded pop
+    const rimLight = new THREE.DirectionalLight(0xbbbbff, 1.0);
     rimLight.position.set(0, 5, 15);
     this.scene.add(rimLight);
 
-    this.playerLight = new THREE.PointLight(0x44ff66, 2.5, 16);
+    // Hemisphere light for natural sky/ground fill
+    const hemiLight = new THREE.HemisphereLight(0xccddff, 0x446688, 0.6);
+    this.scene.add(hemiLight);
+
+    this.playerLight = new THREE.PointLight(0x44ff66, 3.0, 18);
     this.playerLight.position.set(0, 3, 0);
     this.scene.add(this.playerLight);
 
@@ -565,11 +569,13 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.doorMesh.count = 0;
     this.scene.add(this.doorMesh);
 
-    // Fog-of-war overlays
+    // Fog-of-war overlays — dark navy with slight translucency
     const fogGeo = new THREE.PlaneGeometry(1, 1);
     fogGeo.rotateX(-Math.PI / 2);
     const fogFullMat = new THREE.MeshBasicMaterial({
       color: COLORS_3D.fogFull,
+      transparent: true,
+      opacity: 0.92,
     });
     this.fogFullMesh = new THREE.InstancedMesh(fogGeo, fogFullMat, this.maxTiles);
     this.fogFullMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -580,9 +586,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     const fogMemGeo = new THREE.PlaneGeometry(1, 1);
     fogMemGeo.rotateX(-Math.PI / 2);
     const fogMemMat = new THREE.MeshBasicMaterial({
-      color: 0x000000,
+      color: COLORS_3D.fogMemory,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.45,
     });
     this.fogMemoryMesh = new THREE.InstancedMesh(fogMemGeo, fogMemMat, this.maxTiles);
     this.fogMemoryMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -2530,7 +2536,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Only every 3rd tile (checkerboard-ish pattern for performance)
         if ((x + y) % 5 !== 0) continue; // every 5th tile for performance
         this.corridorLitTiles.add(key);
-        const corridorLight = new THREE.PointLight(0x88aadd, 0.8, 5);
+        const corridorLight = new THREE.PointLight(0xaaccee, 1.2, 6);
         corridorLight.position.set(x, 1.5, y);
         this.scene.add(corridorLight);
       }
@@ -2916,13 +2922,16 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   // Entity types that get a small colored point light for visual emphasis
-  // Only key entities get glow lights (5 max for performance)
+  // Key entities only (max ~8 lights active at a time for performance)
   private static readonly ENTITY_GLOW_LIGHTS: Partial<Record<string, { color: number; intensity: number; distance: number }>> = {
-    [EntityType.DataCore]: { color: 0xff44ff, intensity: 2.0, distance: 8 },
-    [EntityType.Breach]: { color: 0xff2200, intensity: 1.5, distance: 6 },
-    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 1.2, distance: 6 },
-    [EntityType.EvidenceTrace]: { color: 0xffaa00, intensity: 1.2, distance: 5 },
-    [EntityType.Relay]: { color: 0xffcc00, intensity: 1.2, distance: 5 },
+    [EntityType.DataCore]: { color: 0xff44ff, intensity: 2.5, distance: 8 },
+    [EntityType.Breach]: { color: 0xff2200, intensity: 2.0, distance: 7 },
+    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 1.5, distance: 6 },
+    [EntityType.EvidenceTrace]: { color: 0xffaa00, intensity: 1.5, distance: 5 },
+    [EntityType.Relay]: { color: 0xffcc00, intensity: 1.5, distance: 6 },
+    [EntityType.SensorPickup]: { color: 0x00ffee, intensity: 1.2, distance: 5 },
+    [EntityType.CrewNPC]: { color: 0xffcc88, intensity: 1.0, distance: 5 },
+    [EntityType.LogTerminal]: { color: 0x66ccff, intensity: 0.8, distance: 4 },
   };
 
   private createEntityMesh(entity: Entity): THREE.Object3D {
@@ -2947,9 +2956,20 @@ export class BrowserDisplay3D implements IGameDisplay {
         clone.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
             child.material.emissive = new THREE.Color(glowDef.color);
-            child.material.emissiveIntensity = 0.15;
+            child.material.emissiveIntensity = 0.3;
           }
         });
+      } else {
+        // Non-glow entities still get a subtle emissive tint from their entity color
+        const entityColor = ENTITY_COLORS_3D[entity.type];
+        if (entityColor) {
+          clone.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.emissive = new THREE.Color(entityColor);
+              child.material.emissiveIntensity = 0.08;
+            }
+          });
+        }
       }
 
       return group;
@@ -3390,6 +3410,64 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   // ── Private: resize handling ────────────────────────────────────
+
+  /** Create a procedural starfield background texture for the scene */
+  private createStarfieldTexture(): THREE.CanvasTexture {
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+
+    // Deep space gradient background
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size * 0.7);
+    grad.addColorStop(0, "#0c0c1a");
+    grad.addColorStop(0.5, "#080814");
+    grad.addColorStop(1, "#04040c");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    // Scatter stars — use seeded positions
+    let rng = 42;
+    const nextRng = () => { rng = (rng * 16807 + 1) & 0x7fffffff; return (rng & 0xffff) / 0xffff; };
+    for (let i = 0; i < 200; i++) {
+      const x = nextRng() * size;
+      const y = nextRng() * size;
+      const brightness = 0.3 + nextRng() * 0.7;
+      const radius = 0.3 + nextRng() * 1.2;
+      const r = Math.floor(200 + nextRng() * 55);
+      const g = Math.floor(200 + nextRng() * 55);
+      const b = Math.floor(220 + nextRng() * 35);
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r},${g},${b},${brightness})`;
+      ctx.fill();
+    }
+
+    // A few brighter prominent stars
+    for (let i = 0; i < 15; i++) {
+      const x = nextRng() * size;
+      const y = nextRng() * size;
+      const r = 1 + nextRng() * 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,240,${0.6 + nextRng() * 0.4})`;
+      ctx.fill();
+      // Glow halo
+      const haloGrad = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+      haloGrad.addColorStop(0, "rgba(200,220,255,0.15)");
+      haloGrad.addColorStop(1, "rgba(200,220,255,0)");
+      ctx.beginPath();
+      ctx.arc(x, y, r * 3, 0, Math.PI * 2);
+      ctx.fillStyle = haloGrad;
+      ctx.fill();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    return tex;
+  }
 
   private getAspect(): number {
     const sidebarWidth = 340;
