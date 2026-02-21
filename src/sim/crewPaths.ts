@@ -78,6 +78,13 @@ const HIDING_DIALOGUE: Record<string, Record<string, (name: string) => string>> 
     [PersonalityTrait.Secretive]: (name) => `${name} stares at nothing for a moment. "We got a response. Before the systems fried. Something answered the signal. I don't know what that means yet."`,
     [PersonalityTrait.Pragmatic]: (name) => `${name} stands up, brushing debris off. "Electromagnetic overload from the comms array. Unauthorized transmission. Half the station is dark. Pod bay — which direction?"`,
   },
+  [IncidentArchetype.Mutiny]: {
+    [PersonalityTrait.Cautious]: (name) => `${name} is wedged behind a sealed bulkhead. "They're fighting. Both sides. I don't know who's right anymore. I just want to go home."`,
+    [PersonalityTrait.Ambitious]: (name) => `${name} grabs your arm. "There's a scuttle order. From Command. The security chief was going to destroy everything. The science team tried to stop it."`,
+    [PersonalityTrait.Loyal]: (name) => `${name} looks torn. "I know people on both sides. They're all good people. They just... disagree about what matters more — orders or the work."`,
+    [PersonalityTrait.Secretive]: (name) => `${name} lowers their voice. "The captain knew about the scuttle order for three days before telling anyone. Check the bridge logs. Time-stamped."`,
+    [PersonalityTrait.Pragmatic]: (name) => `${name} is already on their feet. "Factional conflict. Life support disabled in research wing. Bulkheads sealed. We need atmosphere restored before anything else."`,
+  },
 };
 
 // Fallback for any missing combination

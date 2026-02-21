@@ -78,6 +78,14 @@ export const STORY_ROLES: Record<IncidentArchetype, StoryRoles> = {
     heroHint: "Find emergency action logs — who physically disconnected the array during the electromagnetic storm?",
     villainHint: "Check array modification logs and unauthorized transmission records — who sent the response?",
   },
+  [IncidentArchetype.Mutiny]: {
+    hero: CrewRole.Medic,
+    villain: CrewRole.Security,
+    heroQuestion: "Who crossed the line to keep both sides alive?",
+    villainQuestion: "Who was following the scuttle order?",
+    heroHint: "Look for triage records and medical logs from both factions — who treated injuries on both sides of the barricade?",
+    villainHint: "Check classified transmissions and duty rosters — who received orders from UN-ORC Command to destroy the station?",
+  },
 };
 
 /**
@@ -95,6 +103,8 @@ export function getArchetypeTags(archetype: IncidentArchetype): string[] {
       return ["electrical", "biological"];
     case IncidentArchetype.SignalAnomaly:
       return ["signal", "transmission"];
+    case IncidentArchetype.Mutiny:
+      return ["faction", "lockdown", "atmospheric"];
   }
 }
 
@@ -229,6 +239,13 @@ function generateSequenceDeduction(
         "The Data Core overloaded and caused a chain reaction",
       ];
       break;
+    case IncidentArchetype.Mutiny:
+      wrongOptions = [
+        "A reactor failure forced emergency evacuation procedures",
+        "An external threat required the crew to secure the station",
+        "A software malfunction disabled critical life support systems",
+      ];
+      break;
     default:
       wrongOptions = [
         "The Data Core overloaded and caused a chain reaction",
@@ -327,6 +344,16 @@ function generateWhyDeduction(
         "Natural electromagnetic interference from a nearby pulsar disrupted electronics",
       ];
       break;
+    case IncidentArchetype.Mutiny:
+      correctLabel = "A classified scuttle order from UN-ORC Command split the crew into opposing factions";
+      correctKey = "scuttle_order";
+      crewTagMember = undefined;  // P0: don't name villain at Tier 3
+      wrongAnswers = [
+        "A leadership dispute over evacuation priority escalated into crew-wide conflict",
+        "A saboteur deliberately disabled life support to force an evacuation",
+        "Contaminated air recyclers caused paranoia and aggression across the crew",
+      ];
+      break;
     default:
       correctLabel = "System failure compounded by human error";
       correctKey = "compound_failure";
@@ -359,6 +386,8 @@ function generateWhyDeduction(
     requiredTags = ["electrical", "biological"];
   } else if (archetype === IncidentArchetype.SignalAnomaly) {
     requiredTags = ["signal", "transmission"];
+  } else if (archetype === IncidentArchetype.Mutiny) {
+    requiredTags = ["faction", "lockdown"];
   } else {
     requiredTags = [archTags[0], crewTag];
   }
@@ -477,6 +506,8 @@ function getVillainDescription(archetype: IncidentArchetype): string {
       return "approved the flagged cargo transfer despite biological hazard warnings";
     case IncidentArchetype.SignalAnomaly:
       return "secretly modified the array and transmitted without authorization";
+    case IncidentArchetype.Mutiny:
+      return "received the scuttle order and chose to follow it, tearing the crew apart";
     default:
       return "had the authority to prevent this and chose not to act";
   }
@@ -550,6 +581,8 @@ function getIncidentDescription(archetype: IncidentArchetype): string {
       return "Station systems were deliberately sabotaged by someone aboard";
     case IncidentArchetype.SignalAnomaly:
       return "An anomalous external signal caused widespread system interference";
+    case IncidentArchetype.Mutiny:
+      return "The crew split into factions and disabled life support in contested sections";
   }
 }
 
@@ -560,6 +593,7 @@ function getWrongIncidentDescriptions(archetype: IncidentArchetype): string[] {
     "The reactor underwent emergency shutdown after containment failure",
     "Station systems were deliberately sabotaged by someone aboard",
     "An anomalous external signal caused widespread system interference",
+    "The crew split into factions and disabled life support in contested sections",
   ];
   const correct = getIncidentDescription(archetype);
   const wrong = all.filter(d => d !== correct);
@@ -684,6 +718,8 @@ function getWhatHintText(archetype: IncidentArchetype): string {
       return "Look for the pattern of system failures — is the sequence consistent with human sabotage?";
     case IncidentArchetype.SignalAnomaly:
       return "Search for signal processing logs and electronic interference records.";
+    case IncidentArchetype.Mutiny:
+      return "Look for sealed bulkheads, disabled life support zones, and factional barricades.";
   }
 }
 
@@ -699,6 +735,8 @@ function getWhyHintText(archetype: IncidentArchetype): string {
       return "Analyze the failure pattern and residue at junction points — is this really human sabotage?";
     case IncidentArchetype.SignalAnomaly:
       return "Check array power logs — was the station receiving, or was it transmitting?";
+    case IncidentArchetype.Mutiny:
+      return "Find the classified transmission — what orders did UN-ORC send, and who received them?";
   }
 }
 
@@ -729,6 +767,11 @@ export function getTagExplanation(tag: string, archetype?: IncidentArchetype): s
         if (tag === "signal") return "Evidence of the anomalous signal event";
         if (tag === "transmission") return "Evidence of outbound array transmission activity";
         break;
+      case IncidentArchetype.Mutiny:
+        if (tag === "faction") return "Evidence of factional division among the crew";
+        if (tag === "lockdown") return "Evidence of deliberate life support shutdowns in contested sections";
+        if (tag === "atmospheric") return "Evidence of atmospheric manipulation during the crew conflict";
+        break;
     }
   }
 
@@ -749,6 +792,8 @@ export function getTagExplanation(tag: string, archetype?: IncidentArchetype): s
     classified: "Classified or restricted-access information",
     cargo: "Evidence from cargo manifests or shipping records",
     transmission: "Evidence of array transmission activity",
+    faction: "Evidence of crew division into opposing groups",
+    lockdown: "Evidence of deliberate section lockdowns",
     medical: "Medical logs or diagnostic evidence",
   };
   if (systemExplanations[tag]) return systemExplanations[tag];
@@ -858,6 +903,14 @@ export function generateEvidenceTags(
     "diagnosis": "medical",
     "contaminant": "medical",
     "exposure": "medical",
+    "faction": "faction",
+    "mutiny": "faction",
+    "split": "faction",
+    "barricade": "faction",
+    "lockdown": "lockdown",
+    "sealed bulkhead": "lockdown",
+    "disabled life support": "lockdown",
+    "scuttle": "lockdown",
   };
   for (const [keyword, tag] of Object.entries(systemKeywords)) {
     if (lowerDetail.includes(keyword)) {

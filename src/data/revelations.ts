@@ -427,6 +427,84 @@ const REVELATIONS: RevelationMap = {
     },
   },
 
+  // ══════════════════════════════════════════════════════════════════
+  // MUTINY — "The Divide"
+  //
+  // Hero: Medic (crossed factional lines to treat both sides)
+  // Villain: Security officer (followed classified scuttle order from Command)
+  // Twist: UN-ORC sent a scuttle order. Security tried to carry it out.
+  //        The scientist defied Command to protect the research.
+  //        The captain froze. The medic kept people alive on both sides.
+  // ══════════════════════════════════════════════════════════════════
+  [IncidentArchetype.Mutiny]: {
+    deduction_what: {
+      tagRevelations: [
+        {
+          tag: "faction",
+          text: "Barricades on both sides of corridor C-4 — improvised seals, welded shut from within. The crew organized into two opposing groups. This wasn't panic. It was deliberate.",
+        },
+      ],
+      synthesisText: "The crew split into opposing factions, sealed bulkheads between them, and disabled life support in contested sections. Not a system failure — a civil war inside the station.",
+      conclusionText: "CONFIRMED: Crew mutiny — factional conflict with deliberate life support disruption. What caused the split?",
+    },
+    deduction_sequence: {
+      tagRevelations: [
+        {
+          tag: "lockdown",
+          text: "Life support was disabled in the research wing first — a surgical strike. The air recyclers were shut down from a security terminal, not engineering. Someone used military-grade access codes.",
+        },
+        {
+          tag: "timeline_trigger",
+          text: "The factional split happened within 90 minutes of a classified transmission from UN-ORC Command. Before the transmission, the crew was unified. After it, bulkheads started sealing.",
+        },
+      ],
+      synthesisText: "A classified transmission from UN-ORC Command preceded the split by 90 minutes. Life support was disabled using security codes, targeting the research wing specifically. The order came from outside the station.",
+      conclusionText: "CONFIRMED: External order triggered the split. Life support disabled with military codes. But what was the order?",
+    },
+    deduction_why: {
+      tagRevelations: [
+        {
+          tag: "faction",
+          text: "Two factions: one following a classified scuttle order from UN-ORC Command to destroy the station's research, and one defying it to preserve nine months of scientific work.",
+        },
+        {
+          tag: "lockdown",
+          text: "The scuttle order specified data core destruction and evidence disposal. Security received it directly. The science team learned of it through an intercepted relay — and refused to comply.",
+        },
+      ],
+      synthesisText: "UN-ORC Command ordered the station scuttled — research destroyed, evidence disposed. Security moved to carry it out. The science team intercepted the order and refused. The crew fractured along the line between duty and conviction.",
+      conclusionText: "CONFIRMED: A scuttle order from Command split the crew. Who crossed the line to keep both sides alive?",
+    },
+    deduction_hero: {
+      tagRevelations: [
+        {
+          tag: "medic",
+          text: "{medic}'s triage logs show patients from both factions — security personnel and science staff, treated side by side. {medic_last} crossed the barricade line three times, unarmed, carrying medical supplies.",
+        },
+        {
+          tag: "timeline_response",
+          text: "When both factions sealed their sections, {medic_last} refused to choose a side. Medical neutrality. {medic}'s badge was found clipped to a portable medkit in the corridor between the barricades — the no-man's-land.",
+        },
+      ],
+      synthesisText: "{medic} refused to take a side. While both factions sealed their sections and disabled systems, {medic_last} crossed the barricade line repeatedly, treating injuries on both sides. The only person who moved freely between the two camps — because both sides needed a doctor.",
+      conclusionText: "CONFIRMED: {medic} kept both factions alive by refusing to choose between them. Who was following the scuttle order?",
+    },
+    deduction_responsibility: {
+      tagRevelations: [
+        {
+          tag: "{security_last}",
+          text: "{security} received the classified transmission directly from UN-ORC Command. The scuttle order was unambiguous: destroy the research, disable the data core, prepare the station for decommissioning. {security_last} followed orders.",
+        },
+        {
+          tag: "timeline_aftermath",
+          text: "{security_last}'s personal log: 'I took an oath. The order was lawful. The research is classified beyond my clearance. I don't have the right to decide what deserves to survive. That's above my pay grade.' Duty, not malice — but the crew paid the price.",
+        },
+      ],
+      synthesisText: "{security} followed a lawful order from UN-ORC Command to scuttle the station and destroy the research. Not malice — duty. But the cost was a fractured crew, disabled life support, and a station tearing itself apart over whether orders outweigh conviction.",
+      conclusionText: "CONFIRMED: {security} followed the scuttle order. The research survived because one faction refused. Whether any of them were right — that question outlasts the station.",
+    },
+  },
+
 };
 
 /**

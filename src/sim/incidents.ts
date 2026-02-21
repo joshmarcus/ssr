@@ -111,6 +111,24 @@ export const INCIDENT_TEMPLATES: Record<IncidentArchetype, IncidentTemplate> = {
     logCategories: ["technical", "comms", "personal", "warning", "aftermath"],
   },
 
+  [IncidentArchetype.Mutiny]: {
+    archetype: IncidentArchetype.Mutiny,
+    name: "Mutiny",
+    primaryHazard: "atmospheric",
+    sensorBias: SensorType.Atmospheric,
+    storyHook: "The crew split in two — one faction to destroy the station, another to save it",
+    centralRoles: [CrewRole.Security, CrewRole.Scientist, CrewRole.Captain],
+    possibleSecrets: ["sabotage", "whistleblower"],
+    beats: {
+      [TimelinePhase.NormalOps]: "{security} receives classified orders from UN-ORC Command: scuttle the station and destroy all research before resupply. {security} begins preparations in secret. {scientist} notices supply requisitions that don't match any active project.",
+      [TimelinePhase.Trigger]: "{scientist} discovers the scuttle order on {security}'s terminal. Confronts {captain}, who admits awareness but claims it's for the greater good — the research is too dangerous. {scientist} rallies sympathetic crew to resist.",
+      [TimelinePhase.Escalation]: "{scientist}'s faction disables life support as a lockdown — forces everyone to the emergency shelter, buying time. {security}'s faction retaliates by sealing bulkheads and venting atmosphere from research sections. The station splits into two zones of control.",
+      [TimelinePhase.Collapse]: "Smoke fills the corridors between factions. Pressure drops in contested sections. {medic} crosses the line to treat injuries on both sides. {captain} locks themselves in the bridge, refusing to act. The station tears itself apart from within.",
+      [TimelinePhase.Aftermath]: "Both factions exhausted, station crippled. Research intact but inaccessible. Crew scattered in sealed compartments. {medic}'s triage notes are the only complete record of what happened — both sides told their version to {medic}.",
+    },
+    logCategories: ["security", "personal", "emergency", "warning", "aftermath"],
+  },
+
 };
 
 /**

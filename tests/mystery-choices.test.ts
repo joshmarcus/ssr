@@ -63,7 +63,7 @@ describe("mystery choices", () => {
   });
 
   it("non-sabotage/signal archetypes generate rescue priority choice", () => {
-    for (const archetype of [IncidentArchetype.CoolantCascade, IncidentArchetype.HullBreach, IncidentArchetype.ReactorScram]) {
+    for (const archetype of [IncidentArchetype.CoolantCascade, IncidentArchetype.HullBreach, IncidentArchetype.ReactorScram, IncidentArchetype.Mutiny]) {
       ROT.RNG.setSeed(42);
       const crew = generateCrew(10, 42, ROOM_NAMES);
       const timeline = generateTimeline(crew, archetype, ROOM_NAMES);

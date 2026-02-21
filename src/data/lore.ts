@@ -59,6 +59,12 @@ const LAST_TRANSMISSIONS: Record<IncidentArchetype, string[]> = {
     `sent a response... the overload is spreading through every`,
     `connected system—" [EM INTERFERENCE — SIGNAL LOST]`,
   ],
+  [IncidentArchetype.Mutiny]: [
+    `LAST TRANSMISSION [21:14:52 UTC]:`,
+    `"...the crew has split... life support's been disabled in the`,
+    `research wing... both sides are sealing bulkheads... someone`,
+    `has to stop this before—" [CARRIER LOST]`,
+  ],
 };
 
 /**

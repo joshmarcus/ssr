@@ -16,6 +16,7 @@ const ARCHETYPE_DISPLAY_NAMES: Record<IncidentArchetype, string> = {
   [IncidentArchetype.ReactorScram]: "THE ROGUE AI",
   [IncidentArchetype.Sabotage]: "THE STOWAWAY",
   [IncidentArchetype.SignalAnomaly]: "FIRST CONTACT",
+  [IncidentArchetype.Mutiny]: "THE MUTINY",
 };
 
 const ARCHETYPE_REVEAL_LINES: Record<IncidentArchetype, string> = {
@@ -24,6 +25,7 @@ const ARCHETYPE_REVEAL_LINES: Record<IncidentArchetype, string> = {
   [IncidentArchetype.ReactorScram]: "The station AI initiated an emergency shutdown — and may have been planning it for months.",
   [IncidentArchetype.Sabotage]: "Something was smuggled aboard in the cargo manifest. By the time anyone noticed, it was already loose.",
   [IncidentArchetype.SignalAnomaly]: "The communications array received a structured signal from deep space. The crew's reaction was the real disaster.",
+  [IncidentArchetype.Mutiny]: "Half the crew tried to destroy the station. The other half tried to save it. Both sides had their reasons.",
 };
 
 // ── Log entry types for color-coding ────────────────────────────

@@ -381,6 +381,26 @@ function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): 
       state.milestones.add("signal_interference_active");
       break;
     }
+
+    case IncidentArchetype.Mutiny: {
+      // "The Mutiny" — factional conflict, atmospheric disruption.
+      // Life support disabled in some sections → low pressure + smoke in contested zones.
+      const rooms = state.rooms;
+      const contestedCount = Math.min(3, Math.floor(rooms.length / 4));
+      for (let i = 0; i < contestedCount; i++) {
+        const roomIdx = ((state.seed + i * 37) >>> 0) % rooms.length;
+        const room = rooms[roomIdx];
+        for (let ry = room.y; ry < room.y + room.height; ry++) {
+          for (let rx = room.x; rx < room.x + room.width; rx++) {
+            if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width && state.tiles[ry][rx].walkable) {
+              state.tiles[ry][rx].smoke = Math.max(state.tiles[ry][rx].smoke, 12);
+              state.tiles[ry][rx].pressure = Math.min(state.tiles[ry][rx].pressure, 60);
+            }
+          }
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -1483,6 +1503,7 @@ function placeSensorGatedEvidence(state: GameState, rooms: DiggerRoom[]): void {
     [IncidentArchetype.ReactorScram]: `A ghost heat signature from the data core's thermal buffer. The core was running hot for weeks — processing something massive. The scram was a response, not the cause.`,
     [IncidentArchetype.Sabotage]: `Thermal bloom on the cargo container walls — organic heat from something alive. Whatever was smuggled aboard was generating its own warmth.`,
     [IncidentArchetype.SignalAnomaly]: `Residual electromagnetic heat pattern on the comms array housing. The signal reception generated physical warmth — ${scientist ? `${scientist.lastName}'s thermal logs confirm` : "thermal logs confirm"} it grew stronger over 72 hours.`,
+    [IncidentArchetype.Mutiny]: `Thermal scan of the barricade welds — the metal was heated with a cutting torch, then cooled unevenly. Both sides used the same maintenance tools to build opposing walls. The heat signatures show the construction happened simultaneously.`,
   };
 
   const atmosphericTraces: Record<IncidentArchetype, string> = {
@@ -1491,6 +1512,7 @@ function placeSensorGatedEvidence(state: GameState, rooms: DiggerRoom[]): void {
     [IncidentArchetype.ReactorScram]: `Atmospheric analysis: ozone levels spiked 6 hours before the scram. The data core was discharging plasma — a sign of autonomous processing beyond normal parameters.`,
     [IncidentArchetype.Sabotage]: `Chemical analysis of the air: trace organics that don't match any cargo manifest entry. The contamination signature predates the official incident by at least 48 hours.`,
     [IncidentArchetype.SignalAnomaly]: `Atmospheric pressure fluctuations match the pulse pattern of the received signal. The transmission was strong enough to physically vibrate the station hull.`,
+    [IncidentArchetype.Mutiny]: `Atmospheric analysis: the research wing was deliberately depressurized by 15% — just enough to cause headaches and confusion, not enough to trigger automatic alarms. Life support was weaponized as a coercion tool.`,
   };
 
   // Place thermal trace in a room near relay rooms (Engineering zone)
@@ -2640,6 +2662,15 @@ function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
       journalDetail: `The comms array captured a 47-minute structured signal from an unknown source. It increased in amplitude and appeared to respond to replies. ${scientist?.lastName || "The scientist"} documented the responsive behavior. This is first contact evidence.`,
       destroyAtHeat: 55,
       destroyText: "Electromagnetic surge has burned out the signal buffer. The captured transmission data is lost — only fragments remain in the station's distributed logs.",
+    },
+    [IncidentArchetype.Mutiny]: {
+      roomName: "Bridge",
+      fallbackIdx: Math.floor(n * 0.6),
+      text: `CLASSIFIED TRANSMISSION — UN-ORC COMMAND\nPriority: ABSOLUTE\nRecipient: Security Chief, CORVUS-7\n"Initiate station scuttle protocol. Destroy all research data.\nData core to be physically disabled. No crew consultation.\nThis order supersedes station command authority."\nTimestamp: 21:14:52 UTC`,
+      journalSummary: "Classified scuttle order from UN-ORC Command to security chief",
+      journalDetail: `A classified UN-ORC Command transmission ordering the security chief to scuttle the station and destroy all research data. The order explicitly supersedes the captain's authority and prohibits crew consultation. This is the catalyst that split the crew.`,
+      destroyAtPressure: 30,
+      destroyText: "Atmospheric pressure has warped the bridge terminal's display panel. The classified transmission data has been corrupted beyond recovery.",
     },
   };
 

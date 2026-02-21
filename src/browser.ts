@@ -59,6 +59,7 @@ const ARCHETYPE_DISPLAY_NAMES: Record<IncidentArchetype, string> = {
   [IncidentArchetype.ReactorScram]: "THE ROGUE AI",
   [IncidentArchetype.Sabotage]: "THE STOWAWAY",
   [IncidentArchetype.SignalAnomaly]: "FIRST CONTACT",
+  [IncidentArchetype.Mutiny]: "THE MUTINY",
 };
 
 // ── Parse seed and difficulty from URL params ───────────────────

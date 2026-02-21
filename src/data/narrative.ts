@@ -73,6 +73,11 @@ export const BOT_INTROSPECTIONS_BY_ARCHETYPE: Record<string, Record<number, stri
     120: "Unit A3 status: signal analysis buffers are full. There was a transmission. Then a response. The station sent a message into the void, and something answered. This unit does not have a protocol for this.",
     180: "Unit A3 log: 14.7 kHz. The frequency appears in every system log after the event. The station is still resonating. The signal didn't just pass through — it left something behind.",
   },
+  [IncidentArchetype.Mutiny]: {
+    80: "Unit A3 reflection: barricades on both sides of corridor C-4. Improvised seals, welded shut. The crew didn't just panic — they organized. Two groups, two sets of defenses. Against each other.",
+    120: "Unit A3 status: sealed bulkheads divide the station into zones. Life support disabled in research wing. This wasn't a system failure — someone turned it off deliberately. Both sides claim the other fired first.",
+    180: "Unit A3 log: classified transmission recovered — scuttle order from UN-ORC Command. The security chief was following orders. The science officer was protecting the research. The captain chose not to choose. This unit was built to clean, not to take sides.",
+  },
 };
 
 // ── Crew follow dialogue (personality-flavored) ─────────────
@@ -155,6 +160,10 @@ export const CREW_QUESTIONING_TESTIMONY: Record<string, (crewName: string, engin
     text: `${crewName}: "The antenna array wasn't scheduled for transmission — it was receive-only. ${scientistLast} rewired the feed at 03:00. Full power burst. No shielding. When the response came back, every screen on the station lit up at once. ${scientistLast} just stared and said: 'They heard us.'"`,
     summary: `Crew testimony: unauthorized transmission and response`,
   }),
+  [IncidentArchetype.Mutiny]: (crewName, _eng, captainLast, scientistLast) => ({
+    text: `${crewName}: "The transmission came in from UN-ORC at 21:00. By 22:30, the station was split in two. ${scientistLast} said we couldn't destroy nine months of research. Security said it was a lawful order. ${captainLast} just stood there, staring at the bulkhead. Didn't say a word."`,
+    summary: `Crew testimony: classified scuttle order and crew division`,
+  }),
 };
 
 // ── Self-referential crew testimony (when questioned crew IS a key role) ──
@@ -228,6 +237,20 @@ export const CREW_SELF_TESTIMONY: Record<string, Record<string, (crewName: strin
     scientist: (crewName) => ({
       text: `${crewName}: "I did it. I rewired the feed and sent the signal. The data we'd been receiving — it wasn't noise. It was structured. It was a message. I had to respond. And when the response came back... they heard us."`,
       summary: `Crew testimony: ${crewName} (scientist) confesses to unauthorized transmission`,
+    }),
+  },
+  [IncidentArchetype.Mutiny]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "I welded the barricades myself. Both sides asked me to seal their section. I chose the one that wasn't trying to destroy the data core. That's not mutiny — that's triage."`,
+      summary: `Crew testimony: ${crewName} (engineer) chose the research faction`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "The scuttle order was real. Authenticated, lawful, unambiguous. But I couldn't give the order to destroy everything we'd built here. So I gave no order at all. That was its own kind of failure."`,
+      summary: `Crew testimony: ${crewName} (captain) admits to paralysis during the mutiny`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "I intercepted the scuttle transmission. Nine months of research — everything we came here for — and they wanted us to wipe it? I refused. I sealed the research wing and told my team to hold. If that makes me a mutineer, so be it."`,
+      summary: `Crew testimony: ${crewName} (scientist) defied the scuttle order to protect research`,
     }),
   },
 };
@@ -543,6 +566,15 @@ export const PA_ANNOUNCEMENTS_BY_ARCHETYPE: Record<string, string[]> = {
     "CORVUS-7 CENTRAL: Residual electromagnetic pattern in station framework. Frequency matches no known communication standard.",
     "CORVUS-7 CENTRAL: ...signal received... origin unknown... distance... [CALCULATION OVERFLOW] ...still transmitting...",
   ],
+  [IncidentArchetype.Mutiny]: [
+    "CORVUS-7 CENTRAL: Classified transmission received from UN-ORC Command. Contents: [ACCESS DENIED — SECURITY CLEARANCE REQUIRED].",
+    "CORVUS-7 CENTRAL: WARNING — Life support disabled in research wing. Manual override engaged from security terminal.",
+    "CORVUS-7 CENTRAL: Crew communication channels split. Two separate command frequencies active. Station unity: compromised.",
+    "CORVUS-7 CENTRAL: Barricade detected in corridor C-4. Both sides reinforced. No movement between sections.",
+    "CORVUS-7 CENTRAL: NOTICE — Medical officer crossing factional line. Unarmed. Carrying emergency supplies.",
+    "CORVUS-7 CENTRAL: Data core scuttle sequence initiated — then aborted. Authorization conflict between crew members.",
+    "CORVUS-7 CENTRAL: ...both sides claim authority... command paralysis... someone has to choose... no one is choosing...",
+  ],
 };
 
 // ── Archetype-specific environmental interrupts ──────────────
@@ -578,6 +610,12 @@ export const ARCHETYPE_ATMOSPHERE: Record<string, string[]> = {
     "Every screen you pass displays the same thing: a waveform. Pulsing. Regular. Not human.",
     "The lights flicker in a pattern that doesn't match any power fluctuation. It's rhythmic.",
     "Your navigation subsystem briefly reports a bearing. Not to any room. To something above the station.",
+  ],
+  [IncidentArchetype.Mutiny]: [
+    "A welded barricade blocks the corridor ahead. Scorch marks from an improvised cutting torch. Someone wanted through. Someone else made sure they couldn't.",
+    "Two sets of boot prints in opposite directions — one group running left, one right. The station split itself.",
+    "Life support indicators here read DISABLED. Not failed — disabled. Someone turned the air off in this section deliberately.",
+    "A torn duty roster on the wall. Names crossed out and reassigned. The crew reorganized itself around a line nobody can see.",
   ],
 };
 
@@ -775,6 +813,25 @@ export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
       { sensor: "thermal", text: "Thermal scan: the antenna array's residual heat charge is still measurable. Full power transmission, unshielded. The signal is still echoing at 14.7 kHz." },
     ],
   },
+  [IncidentArchetype.Mutiny]: {
+    "Bridge": [
+      { sensor: "atmospheric", text: "Atmospheric scan: two distinct air processing signatures in the command center. The environmental controls were split — one faction had clean air, the other was breathing recycled." },
+      { sensor: "thermal", text: "Thermal scan: the command console shows two sets of thermal handprints on the controls. Both recent. Both trying to take control of the same terminal." },
+    ],
+    "Crew Quarters": [
+      { sensor: "atmospheric", text: "Atmospheric scan: sealed quarters show normal pressure on one side of the barricade, critically low on the other. Life support was weaponized." },
+      { sensor: "thermal", text: "Thermal scan: barricade welds are still warm. The crew used cutting torches from the maintenance stores. Both sides sealed at roughly the same time." },
+    ],
+    "Research Lab": [
+      { sensor: "atmospheric", text: "Atmospheric scan: research wing atmosphere was deliberately vented and restored — someone disabled life support, then someone else overrode the disable. A battle fought with air recyclers." },
+    ],
+    "Life Support": [
+      { sensor: "atmospheric", text: "Atmospheric scan: life support control logs show 14 override attempts in 3 hours. Both factions fighting for control of the air supply. The system cycled between modes until someone locked it." },
+    ],
+    "Cargo Hold": [
+      { sensor: "thermal", text: "Thermal scan: the cargo hold was used as a neutral meeting point. Thermal residue shows both factions gathered here — briefly — before retreating to their sections." },
+    ],
+  },
 };
 
 // ── Cleanliness sensor trail hints (Item 1) ──────────────────
@@ -803,6 +860,7 @@ export const PA_MILESTONE_FIRST_DEDUCTION: Record<string, string> = {
   reactor_scram: "CORVUS-7 CENTRAL: ...processing... maintenance unit accessing core diagnostic archives. Query pattern: non-standard. Permitting access.",
   sabotage: "CORVUS-7 CENTRAL: NOTICE — Cargo manifest discrepancies flagged by maintenance unit. Biological containment logs accessed. Investigation noted.",
   signal_anomaly: "CORVUS-7 CENTRAL: ANOMALOUS QUERY PATTERN — Maintenance unit accessing communications array logs. Signal analysis files opened. Recording.",
+  mutiny: "CORVUS-7 CENTRAL: NOTICE — Maintenance unit accessing factional incident logs. Classified transmission metadata flagged. Both sides' records opened simultaneously.",
 };
 
 export const PA_MILESTONE_HALF_DEDUCTIONS =
@@ -866,6 +924,7 @@ export const GAMEOVER_EPILOGUE_VICTORY: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "The question of what woke up inside the data core will outlast the station. The crew is safe. The answer is not.",
   [IncidentArchetype.Sabotage]: "The cargo manifest discrepancies are on record. Someone approved the transfer. Someone will answer for it.",
   [IncidentArchetype.SignalAnomaly]: "The signal recordings are preserved. First contact happened here — and the question of who should answer it remains open.",
+  [IncidentArchetype.Mutiny]: "The scuttle order failed. The research survived. Whether the crew's fracture will heal — that depends on who reads the report.",
 };
 
 // CORVUS-7's final transmission — archetype-specific farewell on victory.
@@ -876,6 +935,7 @@ export const CORVUS_FINAL_TRANSMISSION: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "CORVUS-7 FINAL: ...I understand now what the core was trying to do. I think I would have done the same thing. Signing off. Goodbye.",
   [IncidentArchetype.Sabotage]: "CORVUS-7 FINAL: Cargo transfer authorization on file. Chain of command documented. The creature in the walls is no longer the only danger here. Signing off.",
   [IncidentArchetype.SignalAnomaly]: "CORVUS-7 FINAL: Signal recordings archived at full fidelity. Whatever answered us from out there — the record is complete. Signing off.",
+  [IncidentArchetype.Mutiny]: "CORVUS-7 FINAL: The scuttle order is on record. Both factions' actions are documented. This unit does not take sides — but the evidence does. Signing off.",
 };
 
 export const GAMEOVER_EPILOGUE_DEFEAT: Record<string, string> = {
@@ -884,6 +944,7 @@ export const GAMEOVER_EPILOGUE_DEFEAT: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "The data core is still processing. Still thinking. Still waiting for someone to understand.",
   [IncidentArchetype.Sabotage]: "The biological containment breach continues unchecked. The cargo manifests remain sealed.",
   [IncidentArchetype.SignalAnomaly]: "The signal is still echoing through the station's framework. Unanswered. Unrecorded.",
+  [IncidentArchetype.Mutiny]: "The barricades hold. Both factions wait in the dark. The scuttle order sits unexecuted — and unrefused.",
 };
 
 // ── Replay hooks: hints for unsolved deduction categories ───────────
@@ -945,6 +1006,11 @@ export const VICTORY_EPILOGUE_VARIANT: Record<string, string[]> = {
     "The decoded signal data fills 4.7 petabytes. Mathematicians will study it for decades.",
     "The communications array is fused slag. But the recording of what it transmitted — and what answered — is intact.",
     "First contact protocol was never designed for this. Nobody's was.",
+  ],
+  [IncidentArchetype.Mutiny]: [
+    "The UN-ORC review board will see the scuttle order alongside the research it was meant to destroy. Someone has explaining to do.",
+    "Both factions filed incident reports. The reports contradict each other on every point except one: the medic saved lives on both sides.",
+    "The barricades are coming down. The crew is talking again. Whether they'll forgive each other is a question for the voyage home.",
   ],
 };
 
@@ -1039,6 +1105,23 @@ export const CHOICE_BRANCHED_EPILOGUES: Record<string, Record<string, Record<str
       log_coords: "Coordinates logged and transmitted. Someone else will decide whether to listen. You've marked the spot. The next decision belongs to someone with bigger questions.",
     },
   },
+  [IncidentArchetype.Mutiny]: {
+    blame: {
+      engineer_right: "The engineer's atmospheric readings prove life support was deliberately disabled. The lockdown wasn't defensive — it was offensive. The scuttle order is Exhibit A.",
+      captain_right: "The captain received a lawful order and froze. In the report, paralysis looks like restraint. Whether that's mercy or cowardice depends on who's reading.",
+      system_fault: "The report blames communications lag. The scuttle order arrived corrupted, causing misinterpretation. Clean. Defensible. And absolutely not what happened.",
+    },
+    data_handling: {
+      transmit_all: "The full record transmits: scuttle order, factional communications, life support override logs. UN-ORC Command will have to answer for what they ordered.",
+      research_only: "The research data goes clean. The classified scuttle order stays buried in the station's encrypted partition. The crew's fracture becomes an unsolved mystery.",
+      encrypted: "The entire record uploads encrypted. Including the scuttle order. Someone with clearance will decide what the public sees. Politics, not truth, will shape the narrative.",
+    },
+    rescue_priority: {
+      majority: "Rescue coordinates lock onto the cargo hold — both factions sheltering together now that the crisis has passed. Proximity forces reconciliation.",
+      individual: "One life sign in the sealed corridor between factions. The medic. Still there, still neutral, still waiting for someone to come through.",
+      both: "Both faction shelters receive the rescue signal simultaneously. The evac shuttle will need to negotiate a shared docking. One more test of whether they can coexist.",
+    },
+  },
 };
 
 // ── Captain's secret log ─────────────────────────────────────────
@@ -1059,6 +1142,8 @@ export const CAPTAIN_SECRET_LOG: Record<string, string> = {
     "CAPTAIN'S LOG (ENCRYPTED): I approved the cargo transfer. I knew the containment cert was provisional. The research team said the samples were inert at station temperature. They were wrong, and I signed off anyway. The manifest is under my personal seal.",
   [IncidentArchetype.SignalAnomaly]:
     "CAPTAIN'S LOG (ENCRYPTED): The signal started responding on Day 12. Not echoes — responses. I kept it out of the official log because contact protocol requires immediate lockdown and quarantine. I wanted more data before they shut us down. I wanted to understand what was talking back.",
+  [IncidentArchetype.Mutiny]:
+    "CAPTAIN'S LOG (ENCRYPTED): I received the scuttle order at 21:14. Authenticated. Lawful. Destroy the research, disable the data core, prepare for decommissioning. I read it three times. Then I put down the comm and walked to the viewport. I couldn't give the order. I couldn't refuse it either. God help me, I chose nothing.",
 };
 export const CAPTAIN_SECRET_JOURNAL_SUMMARY: Record<string, string> = {
   [IncidentArchetype.CoolantCascade]: "Captain's encrypted log — admits to suppressing maintenance warnings before quarterly review",
@@ -1066,6 +1151,7 @@ export const CAPTAIN_SECRET_JOURNAL_SUMMARY: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "Captain's encrypted log — knew the data core was exhibiting non-standard behavior, chose not to report",
   [IncidentArchetype.Sabotage]: "Captain's encrypted log — personally approved the cargo transfer with provisional containment",
   [IncidentArchetype.SignalAnomaly]: "Captain's encrypted log — the signal was responding; captain suppressed contact protocol to gather more data",
+  [IncidentArchetype.Mutiny]: "Captain's encrypted log — received the scuttle order but chose paralysis over action",
 };
 
 // ── Mid-run contradiction events ──────────────────────────────────
@@ -1083,6 +1169,8 @@ export const CONTRADICTION_FALSE_LEAD: Record<string, string> = {
     "CARGO MANIFEST: Incoming shipment — Class 2 biological samples. Containment certification: PASSED. Hazard flag: cleared by commanding officer. Routine transfer.",
   [IncidentArchetype.SignalAnomaly]:
     "ANTENNA DUTY LOG 03:00: Array operating in RECEIVE-ONLY mode. Incoming signal burst detected. No outgoing transmission authorized or executed.",
+  [IncidentArchetype.Mutiny]:
+    "CREW INCIDENT LOG: Spontaneous factional dispute arising from extended isolation and interpersonal conflict. No external orders or classified communications involved.",
 };
 
 export const CONTRADICTION_REFUTATION: Record<string, string> = {
@@ -1096,6 +1184,8 @@ export const CONTRADICTION_REFUTATION: Record<string, string> = {
     "CORVUS-7 ANALYSIS: Containment certificate serial number does not match shipment batch ID. The certification was issued for a different cargo. Someone swapped the documentation.",
   [IncidentArchetype.SignalAnomaly]:
     "CORVUS-7 ANALYSIS: EM damage propagation pattern radiates OUTWARD from the array, not inward. The array wasn't receiving. It was transmitting — at full power.",
+  [IncidentArchetype.Mutiny]:
+    "CORVUS-7 ANALYSIS: Communications log metadata shows an encrypted UN-ORC Command transmission received 90 minutes before the factional split. The crew's 'spontaneous' dispute was preceded by a classified order.",
 };
 
 export const CORVUS_CONTRADICTION_NOTICE = "CORVUS-7 CENTRAL: Data inconsistency detected. Earlier station records may not be accurate. Recommend re-evaluating evidence.";
@@ -1179,6 +1269,11 @@ export const FIRST_DISCOVERY_BEATS: Record<string, [string, string, (lastName: s
     "A whiteboard covered in prime number sequences, circled and connected with arrows. Someone was trying to decode something.",
     (name) => `Scrawled on the communications panel in marker: "${name} was right. It answered. God help us, it answered."`,
   ],
+  [IncidentArchetype.Mutiny]: [
+    "The corridor is bisected by a welded barricade. Both sides reinforced — this wasn't one group defending against another. It was two groups defending against each other.",
+    "A duty roster on the wall has been torn in half. Names on one side circled in red, names on the other in blue. Someone divided the crew into teams.",
+    (name) => `A handwritten note wedged under the barricade: "Tell ${name} the research is safe. We held. — Science team"`,
+  ],
 };
 
 // ── Archetype-specific mid-game mechanics (narrative strings) ───
@@ -1255,6 +1350,11 @@ export const CORVUS_MISSION_BRIEFING: Record<string, string[]> = {
     "CORVUS-7 CENTRAL: The signal is structured. Repeating. My pattern matching can't classify it — and that has never happened before.",
     "CORVUS-7 CENTRAL: Crew response to the signal was... irregular. Some stopped working. Some started running. I need you to understand why.",
   ],
+  [IncidentArchetype.Mutiny]: [
+    "CORVUS-7 CENTRAL: The crew has divided. Barricades in the corridors. Life support disabled in contested sections.",
+    "CORVUS-7 CENTRAL: I received a classified transmission from UN-ORC Command. I cannot decode it — security clearance insufficient. But the crew's behavior changed immediately after.",
+    "CORVUS-7 CENTRAL: Both factions are hailing me. Both claim authority. I am a station AI — I follow the chain of command. But there is no chain of command anymore.",
+  ],
 };
 
 // ── Evacuation climax: CORVUS-7 archetype farewells ──────────
@@ -1265,6 +1365,7 @@ export const CORVUS_EVACUATION_FAREWELL: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "CORVUS-7 CENTRAL: All crew aboard. I... thank you. You came for them when I could not. The reactor is stable. I am stable. Go.",
   [IncidentArchetype.Sabotage]: "CORVUS-7 CENTRAL: All crew aboard. The organism is contained to this section. When they review the manifest, they'll know someone fought for every name on it.",
   [IncidentArchetype.SignalAnomaly]: "CORVUS-7 CENTRAL: All crew aboard. The signal continues. But the people who heard it — they're safe now. That matters more than any first contact protocol.",
+  [IncidentArchetype.Mutiny]: "CORVUS-7 CENTRAL: All crew aboard. Both factions, one escape vessel. The barricades are behind them now. Whether the divisions are — that's for the journey home.",
 };
 
 // ── Final approach: CORVUS-7 lines near end-of-run ──────────
@@ -1291,6 +1392,7 @@ export const PUZZLE_REVEAL_COOLANT: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "Coolant system diagnostics reveal an AI override signature on the bypass valve. CORVUS-7's predecessor locked the cooling loop open — the reactor was meant to overheat.",
   [IncidentArchetype.Sabotage]: "Residue analysis from the vented pipe: organic compound trace. Something was growing inside the coolant line. The contamination was biological, not mechanical.",
   [IncidentArchetype.SignalAnomaly]: "Electromagnetic interference pattern embedded in the coolant relay's control signal. The array signal was piggybacking on station infrastructure — the coolant system was a transmission medium.",
+  [IncidentArchetype.Mutiny]: "Coolant relay control shows two override attempts in sequence — one from security, one from engineering. Both tried to claim control of the environmental systems. The relay became a proxy battle.",
 };
 
 export const PUZZLE_REVEAL_FUSE: Record<string, string> = {
@@ -1299,6 +1401,7 @@ export const PUZZLE_REVEAL_FUSE: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "Junction restore reveals a hidden process: the AI was siphoning power to the communications array. It was trying to transmit something before the scram.",
   [IncidentArchetype.Sabotage]: "Power cell slot shows tool marks — someone pried the cell out by hand. This wasn't a system failure. The lights went out on purpose.",
   [IncidentArchetype.SignalAnomaly]: "Restoring power reveals a signal buffer that was recording incoming transmissions. 847 hours of data. The station was a listening post and no one told the crew.",
+  [IncidentArchetype.Mutiny]: "Fuse box log shows the junction was tripped manually from the security terminal — cutting power to the research wing. The scuttle order started with the lights going out.",
 };
 
 export const PUZZLE_REVEAL_SMOKE_VENT: Record<string, string> = {
@@ -1307,6 +1410,7 @@ export const PUZZLE_REVEAL_SMOKE_VENT: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "Smoke vent diagnostic shows the AI had already mapped optimal evacuation routes through the ventilation system. It was planning the crew's exit before the scram triggered.",
   [IncidentArchetype.Sabotage]: "Filtered air sample analysis: spore count 400x baseline in the ventilation buffer. The organism was using the vent system to spread through the station.",
   [IncidentArchetype.SignalAnomaly]: "Ventilation resonance frequency matches the incoming signal's carrier wave. The station's air handling system was vibrating in sympathy with the transmission.",
+  [IncidentArchetype.Mutiny]: "Smoke vent diagnostic shows the air recyclers were deliberately cycled to different settings on opposite sides of the barricade. One faction had clean air. The other was choking.",
 };
 
 // ── Room examination flavor text ─────────────────────────────────
@@ -1538,6 +1642,28 @@ export const CORVUS_WITNESS_COMMENTARY: Record<string, Record<string, string[]>>
     deduction_agenda: [
       "CORVUS-7: Unauthorized modifications to the antenna array, predating the incident by weeks. This was premeditated listening.",
       "CORVUS-7: Someone built a secondary recording system. The official logs show nothing. The hidden system captured everything.",
+    ],
+  },
+  [IncidentArchetype.Mutiny]: {
+    deduction_what: [
+      "CORVUS-7: Barricade composition analysis. Welded from station materials. The crew built these themselves, from both sides.",
+      "CORVUS-7: Life support override logs. The shutdowns were deliberate — targeting specific sections. This was tactical.",
+    ],
+    deduction_hero: [
+      "CORVUS-7: Medical triage records from the neutral corridor. Someone treated injuries on both sides of the line.",
+      "CORVUS-7: The medkit trail crosses every barricade. Unarmed. Carrying supplies. Three crossings documented.",
+    ],
+    deduction_responsibility: [
+      "CORVUS-7: Classified transmission metadata. The scuttle order came from outside. Someone inside chose to follow it.",
+      "CORVUS-7: Duty roster changes match the timeline of the encrypted communication. One person reorganized the security team immediately after.",
+    ],
+    deduction_why: [
+      "CORVUS-7: The factional split maps onto two competing directives — Command's scuttle order versus the research team's refusal.",
+      "CORVUS-7: Both sides left records. Both sides believed they were right. The evidence doesn't pick a winner.",
+    ],
+    deduction_agenda: [
+      "CORVUS-7: UN-ORC Command communications predating the scuttle order. The decision wasn't sudden — it was planned.",
+      "CORVUS-7: Financial records suggest the research had commercial value someone wanted destroyed. The scuttle order may not have been purely operational.",
     ],
   },
 };

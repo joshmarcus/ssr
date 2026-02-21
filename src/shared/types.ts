@@ -242,6 +242,7 @@ export enum IncidentArchetype {
   ReactorScram = "reactor_scram",
   Sabotage = "sabotage",
   SignalAnomaly = "signal_anomaly",
+  Mutiny = "mutiny",
 }
 
 export enum TimelinePhase {

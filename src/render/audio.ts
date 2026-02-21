@@ -213,6 +213,9 @@ export class AudioManager {
       case IncidentArchetype.SignalAnomaly:
         this.ambientSignal(ctx, ambientGain);
         break;
+      case IncidentArchetype.Mutiny:
+        this.ambientMutiny(ctx, ambientGain);
+        break;
     }
   }
 
@@ -437,6 +440,48 @@ export class AudioManager {
     signal.start();
     signalLfo.start();
     this.ambientNodes.push(signal, signalLfo);
+  }
+
+  /** Mutiny: Tense low drone + irregular percussive ticks (bulkheads sealing). */
+  private ambientMutiny(ctx: AudioContext, dest: AudioNode): void {
+    // Tense low drone (minor second: A2 + Bb2)
+    const osc1 = ctx.createOscillator();
+    osc1.type = "sawtooth";
+    osc1.frequency.value = 55;
+    const osc2 = ctx.createOscillator();
+    osc2.type = "sawtooth";
+    osc2.frequency.value = 58.3; // Bb2 — dissonant minor second
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 120;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.5;
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(gain);
+    gain.connect(dest);
+    osc1.start();
+    osc2.start();
+    this.ambientNodes.push(osc1, osc2);
+
+    // Irregular tick (bulkhead seals — fast LFO modulated noise burst)
+    const tick = ctx.createOscillator();
+    tick.type = "square";
+    tick.frequency.value = 800;
+    const tickGain = ctx.createGain();
+    tickGain.gain.value = 0.0;
+    const tickLfo = ctx.createOscillator();
+    tickLfo.type = "sine";
+    tickLfo.frequency.value = 0.4; // irregular-feeling 2.5s period
+    const tickLfoGain = ctx.createGain();
+    tickLfoGain.gain.value = 0.04;
+    tickLfo.connect(tickLfoGain);
+    tickLfoGain.connect(tickGain.gain);
+    tick.connect(tickGain);
+    tickGain.connect(dest);
+    tick.start();
+    tickLfo.start();
+    this.ambientNodes.push(tick, tickLfo);
   }
 
   // ── Background music ──────────────────────────────────────

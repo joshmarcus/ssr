@@ -103,6 +103,22 @@ export function getVictoryText(mystery?: MysteryState): string[] {
         `have been allowed to answer it.`,
       ];
 
+    case IncidentArchetype.Mutiny:
+      return [
+        `The data core hums to life. Nine months of research — the work both`,
+        `factions were fighting over — streams through the low-band uplink.`,
+        `Preserved. Transmitted. The scuttle order failed.`,
+        ``,
+        `${security} followed orders from Command. ${scientist} defied them to`,
+        `protect the research. ${captain} knew about the scuttle order for`,
+        `days and chose paralysis. ${medic} crossed the factional line to`,
+        `keep people alive on both sides.`,
+        ``,
+        `The crew of CORVUS-7 will see home again. They'll carry the`,
+        `research, the scars, and the question of whether any of them were`,
+        `wrong — or whether they all were.`,
+      ];
+
     default:
       return [
         `The data core hums to life. The station's research data streams`,

@@ -56,6 +56,13 @@ export function generateThreads(
         entries: [],
       });
       break;
+    case IncidentArchetype.Mutiny:
+      threads.push({
+        name: "The Divide",
+        description: "Evidence of the factional split — barricades, sealed sections, disabled life support. Two sides, one station.",
+        entries: [],
+      });
+      break;
   }
 
   return threads;
