@@ -4,16 +4,16 @@
 
 ## Current State
 
-- **Phase**: Sprint 70 complete (Spatial Investigation — puzzle-gated, sensor-gated, timed evidence)
+- **Phase**: Sprint 71 complete (Sixth Archetype: The Mutiny + bot fix)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
-- **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
-- **Archetypes**: 5 active (ContainmentBreach removed — rated C+ by all reviewers)
-- **Save key**: v7
+- **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
+- **Archetypes**: 6 active (Mutiny added — "The Divide")
+- **Save key**: v8
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 1300, Normal: 1000, Hard: 700) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 4/5 VICTORY — 42, 99, 7777, 12345; 184201 DEFEAT (bot heuristic loop, not gameplay bug)
+- **Playtest results**: 12/12 VICTORY across seeds 1-12 (all 6 archetypes including Mutiny at seeds 5, 11)
 
 ## What Works
 
@@ -27,12 +27,13 @@
 - Procedural crew generation (8-12 crew, relationships, secrets, fates)
 - 183+ narrative elements (63 log templates, 16 authored logs, 16 crew items, 8 new corridors)
 - Ship computer PA announcements (periodic atmospheric messages)
-- **5 incident archetypes** with distinct human stories and 5-phase timelines:
+- **6 incident archetypes** with distinct human stories and 5-phase timelines:
   - CoolantCascade — "The Whistleblower" (B-)
   - HullBreach — "The Murder" (A-)
   - ReactorScram — "The Rogue AI" (A)
   - Sabotage — "The Stowaway" (B+)
   - SignalAnomaly — "First Contact" (A)
+  - Mutiny — "The Divide" (NEW)
 - 5-6 chained deductions with evidence linking, per-deduction hint text, and revelation cascade
 - **Revelation system**: linking evidence yields narrative sentences explaining HOW clues illuminate questions
   - Tag-specific revelations appear in a Revelation Board as evidence is linked
@@ -55,7 +56,7 @@
 - Harness CLI for AI playtesting (with deduction support)
 - Heuristic playtest bot (playtest_bot.ts)
 - Mystery choices: 3 narrative decisions with spoiler protection
-- Procedural sound effects: 12 Web Audio SFX + 5 archetype ambient soundscapes
+- Procedural sound effects: 12 Web Audio SFX + 6 archetype ambient soundscapes
 - Game-over overlay: performance rating (S/A/B/C/D), stats summary, mystery choices recap, incident timeline reconstruction, crew manifest, replay hints
 - Difficulty system: Easy/Normal/Hard with URL param, adjusting HP, turn limit, damage, deterioration
 - New Game [N] / Replay [R]: random seed generation for replayability, game-over shows both options
@@ -83,12 +84,12 @@
 - CORVUS-7 opening mission briefing (3 archetype-specific lines per run)
 - Pacing nudges: objective-aware CORVUS hints after idle turns
 - Game-over archetype reveal with story summary + reordered sections
-- Choice-branching epilogues: 45 archetype×consequence×option ending paragraphs in game-over overlay
-- Captain's secret log: two-step hidden discovery (Crew Quarters override key → Bridge encrypted log) with 5 archetype-specific revelations
+- Choice-branching epilogues: 54 archetype×consequence×option ending paragraphs in game-over overlay
+- Captain's secret log: two-step hidden discovery (Crew Quarters override key → Bridge encrypted log) with 6 archetype-specific revelations
 - Room examination flavor text: 16 rooms × 3 variants of atmospheric prose on Look action
 - Archetype-keyed starting conditions: distinct opening hazard states per archetype (hot corridors, depressurized rooms, EM damage, organic contamination)
 - Environmental interaction choices: 4 binary decision consoles in themed rooms with immediate physical consequences
-- CORVUS-7 witness commentary: 50 investigation-reactive lines fired during evidence linking
+- CORVUS-7 witness commentary: 60 investigation-reactive lines fired during evidence linking
 - Signal interference: first 3 turns suppress scan on SignalAnomaly with static-burst opening
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
@@ -103,6 +104,28 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 71 Changes
+
+### Playtest Bot Fix
+- **Crew rescue loop**: Bot no longer gets stuck interacting with crew in hazardous rooms (4-attempt max)
+- **Emergency data core override**: At 90% maxTurns, data core allows transmission even with living crew
+- **All seeds VICTORY**: Seeds 1-12 all win, including golden seed 184201
+
+### Sixth Archetype: The Mutiny ("The Divide")
+- **Full archetype implementation**: Enum member, incident template, 5-phase timeline
+- **Story**: UN-ORC Command sends classified scuttle order → security follows it → scientist defies it → captain freezes → medic crosses factional lines to save both sides
+- **Hero/Villain**: Medic (hero, crossed the barricade line unarmed) / Security (villain, followed lawful but devastating order)
+- **5-tier deduction chain**: faction → lockdown + trigger → faction + lockdown → medic + response → security + aftermath
+- **Revelation content**: ~60 lines of authored narrative across 5 deduction tiers with template placeholders
+- **30+ narrative Records updated**: PA announcements, atmosphere text, sensor clues, victory/defeat text, captain's secret log, contradiction events, first discovery beats, mission briefing, evacuation farewell, puzzle reveals, witness commentary, choice-branched epilogues
+- **Ambient audio**: Tense dissonant drone (minor second A2/Bb2) + irregular percussive ticks (bulkhead seals)
+- **Archetype profile**: Contested rooms with smoke and low pressure (atmospheric disruption)
+- **Thread generation**: "The Divide" (evidence of factional split, sealed sections)
+- **Timed evidence**: Classified scuttle order on Bridge terminal (destroyAtPressure: 30)
+- **Sensor-gated evidence**: Barricade weld thermal scan + atmospheric weaponization trace
+- **Save key bumped**: v7 → v8 (archetype distribution change)
+- **Tests updated**: evidence-linking (6 archetypes), mystery-choices (Mutiny generates rescue_priority)
 
 ## Sprint 70 Changes
 
