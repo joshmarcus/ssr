@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 65 complete (Cross-System Reveals, Attachment UI, Evacuation Climax)
+- **Phase**: Sprint 66 complete (Opening Transmission, Pacing Nudges, Game-Over Polish)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -80,6 +80,9 @@
 - Cross-system reveals: puzzle completion generates archetype-specific narrative evidence
 - Full attachment loadout display in sidebar (TOOL/SENSOR/UTILITY)
 - Climactic evacuation: escalating boarding urgency + CORVUS farewell + final approach beat
+- CORVUS-7 opening mission briefing (3 archetype-specific lines per run)
+- Pacing nudges: objective-aware CORVUS hints after idle turns
+- Game-over archetype reveal with story summary + reordered sections
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
@@ -88,6 +91,25 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 66 Changes
+
+### CORVUS-7 Opening Mission Briefing
+- **3-line archetype-specific transmission** at game start, before first input
+- **Sets the stakes**: CoolantCascade warns of thermal failure, HullBreach notes crew were running, ReactorScram admits AI discontinuity, Sabotage detects unauthorized biology, SignalAnomaly reveals the array is receiving
+- **Emotional hook**: Player understands what happened and why they're here before touching anything
+
+### Pacing Nudges (Objective-Aware Idle Detection)
+- **8-turn idle threshold**: If player hasn't entered a new room or interacted in 8 turns, CORVUS-7 fires a directional hint
+- **4 objective-phase pools**: Clean (3 lines), Investigate (4), Recover (3), Evacuate (3)
+- **12-turn cooldown**: Prevents nudge spam, fires max once per 12 turns
+- **Never lost**: Player always has a sense of what to do next
+
+### Game-Over Screen Polish
+- **Archetype reveal section**: Gold-bordered panel with archetype name ("THE WHISTLEBLOWER") and one-line story summary
+- **Reordered sections**: Archetype reveal → Rating → Deduction retrospective → Crew manifest → Stats → Timeline → Epilogue
+- **Enhanced footer**: Seed + archetype + rating + turns in a single scannable line
+- **5 authored reveal descriptions**: Each archetype gets a one-sentence "what happened" for the ending screen
 
 ## Sprint 65 Changes
 
