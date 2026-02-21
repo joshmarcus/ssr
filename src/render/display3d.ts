@@ -64,7 +64,7 @@ const COLORS_3D = {
 } as const;
 
 // How many world-units tall the visible area is (zoom level)
-const CAMERA_FRUSTUM_SIZE = 8; // zoomed in for better detail
+const CAMERA_FRUSTUM_SIZE = 10; // balanced zoom — close enough for detail, wide enough for context
 
 const ENTITY_COLORS_3D: Record<string, number> = {
   [EntityType.Relay]: 0xffcc00,
@@ -103,6 +103,21 @@ const ROOM_WALL_TINTS_3D: Record<string, number> = {
   "Med Bay": 0x907080,
   "Data Core": 0x906898,
   "Robotics Bay": 0x888888,
+};
+
+// Room ambient light colors — warm/cool per room function
+const ROOM_LIGHT_COLORS: Record<string, number> = {
+  "Engineering Storage": 0xffaa44,    // warm amber
+  "Power Relay Junction": 0xffcc66,   // warm yellow
+  "Life Support": 0x44aaff,           // cool blue
+  "Vent Control Room": 0x6688cc,      // steel blue
+  "Communications Hub": 0x4488ff,     // bright blue
+  "Research Lab": 0x44ff88,           // green
+  "Med Bay": 0xff6688,               // pink-red
+  "Data Core": 0xaa44ff,             // purple
+  "Robotics Bay": 0x88aacc,          // neutral blue
+  "Arrival Bay": 0x88ccaa,           // teal
+  "Corridor": 0x667788,              // dim grey-blue
 };
 
 // ── UI rendering helpers (shared with 2D — duplicated for independence) ──
@@ -316,8 +331,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Scene ──
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(COLORS_3D.background);
-    // Atmospheric fog — fades distant tiles into darkness
-    this.scene.fog = new THREE.Fog(COLORS_3D.background, 8, 20);
+    // Atmospheric fog — subtle fade at the edges of visible area
+    this.scene.fog = new THREE.Fog(COLORS_3D.background, 14, 28);
 
     // ── Camera (orthographic, zoomed-in, follows player) ──
     const aspect = this.getAspect();
@@ -342,7 +357,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     });
 
     // ── Lights (warmer, more dramatic for cel-shaded look) ──
-    const ambient = new THREE.AmbientLight(0x667788, 0.8);
+    const ambient = new THREE.AmbientLight(0x778899, 1.0);
     this.scene.add(ambient);
 
     // Strong key light — warm directional from upper-left
@@ -634,6 +649,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateEntities(state);
     this.updatePlayer(state);
     this.updateFog(state);
+    this.updateRoomLights(state);
   }
 
   // ── Render sidebar UI (same HTML as 2D) ─────────────────────────
@@ -1167,6 +1183,27 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     this.fogFullMesh.instanceMatrix.needsUpdate = true;
     this.fogMemoryMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // ── Private: room ambient lights ────────────────────────────────
+
+  private updateRoomLights(state: GameState): void {
+    for (const room of state.rooms) {
+      if (this.roomLights.has(room.id)) continue; // already placed
+
+      // Check if any tile in the room is explored
+      const centerX = room.x + Math.floor(room.width / 2);
+      const centerY = room.y + Math.floor(room.height / 2);
+      if (centerY < 0 || centerY >= state.height || centerX < 0 || centerX >= state.width) continue;
+      if (!state.tiles[centerY][centerX].explored) continue;
+
+      // Place a colored point light at the room center
+      const lightColor = ROOM_LIGHT_COLORS[room.name] ?? 0x667788;
+      const light = new THREE.PointLight(lightColor, 0.6, room.width + room.height + 4);
+      light.position.set(centerX, 2.5, centerY);
+      this.scene.add(light);
+      this.roomLights.set(room.id, light);
+    }
   }
 
   // ── Private: entity mesh management ─────────────────────────────
