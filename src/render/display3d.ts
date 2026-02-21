@@ -365,6 +365,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private roomFlashTimer: ReturnType<typeof setTimeout> | null = null;
   private lastRoomId = "";
   private showTrail = false;
+  private cameraZoomPulse: number = 0; // >0 = zooming out briefly on room transition
 
   // Room decoration props (placed once per room when explored)
   private decoratedRooms: Set<string> = new Set();
@@ -401,6 +402,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Door frame accent lights
   private doorLights: Map<string, THREE.PointLight> = new Map();
+
+  // Floating room name labels
+  private roomLabels3D: Map<string, THREE.Sprite> = new Map();
 
   // Player movement trail
   private trailPoints: THREE.Points | null = null;
@@ -674,6 +678,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.roomFlashMessage = room!.name;
       if (this.roomFlashTimer) clearTimeout(this.roomFlashTimer);
 
+      // Trigger camera zoom pulse for room transition
+      this.cameraZoomPulse = 1.0;
+
       // Show room name banner on the 3D viewport
       const banner = document.getElementById("room-banner");
       if (banner) {
@@ -882,6 +889,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeRoomDecorations(state);
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
+    this.updateRoomLabels(state);
     this.renderMinimap(state);
   }
 
@@ -1205,7 +1213,23 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.cameraShakeIntensity *= Math.max(0, 1 - this.cameraShakeDecay * delta);
       }
 
-      this.camera.position.set(this.cameraPosX + shakeX, 8, this.cameraPosZ + 12 + shakeZ);
+      // Camera zoom pulse on room transition (subtle pull-back and zoom-in)
+      let zoomOffset = 0;
+      if (this.cameraZoomPulse > 0) {
+        // Smooth ease-out bump: brief zoom-out then return
+        zoomOffset = Math.sin(this.cameraZoomPulse * Math.PI) * 1.5;
+        this.cameraZoomPulse = Math.max(0, this.cameraZoomPulse - delta * 2.0);
+        // Update orthographic camera frustum
+        const aspect = this.container.clientWidth / this.container.clientHeight;
+        const baseSize = CAMERA_FRUSTUM_SIZE + zoomOffset;
+        this.camera.left = -baseSize * aspect;
+        this.camera.right = baseSize * aspect;
+        this.camera.top = baseSize;
+        this.camera.bottom = -baseSize;
+        this.camera.updateProjectionMatrix();
+      }
+
+      this.camera.position.set(this.cameraPosX + shakeX, 8 + zoomOffset * 0.5, this.cameraPosZ + 12 + shakeZ);
       this.camera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
 
@@ -2261,6 +2285,55 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.scene.add(light);
         this.doorLights.set(key, light);
       }
+    }
+  }
+
+  private updateRoomLabels(state: GameState): void {
+    for (const room of state.rooms) {
+      if (this.roomLabels3D.has(room.id)) continue;
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
+      if (!state.tiles[cy][cx].explored) continue;
+
+      // Create canvas-based text sprite for the room name
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 64;
+      const ctx = canvas.getContext("2d")!;
+
+      // Room zone color
+      const tint = ROOM_WALL_TINTS_3D[room.name] ?? 0x778899;
+      const r = (tint >> 16) & 0xff;
+      const g = (tint >> 8) & 0xff;
+      const b = tint & 0xff;
+
+      // Semi-transparent background bar
+      ctx.fillStyle = `rgba(${Math.round(r * 0.3)}, ${Math.round(g * 0.3)}, ${Math.round(b * 0.3)}, 0.5)`;
+      ctx.fillRect(0, 10, 256, 44);
+
+      // Text
+      ctx.fillStyle = `rgb(${Math.min(255, r + 80)}, ${Math.min(255, g + 80)}, ${Math.min(255, b + 80)})`;
+      ctx.font = "bold 22px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(room.name.toUpperCase(), 128, 32);
+
+      // Accent line at bottom
+      ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(20, 52);
+      ctx.lineTo(236, 52);
+      ctx.stroke();
+
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.7, depthWrite: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(room.width * 0.8, room.width * 0.2, 1);
+      sprite.position.set(cx, 2.5, cy);
+      this.scene.add(sprite);
+      this.roomLabels3D.set(room.id, sprite);
     }
   }
 
