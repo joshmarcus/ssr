@@ -2312,8 +2312,8 @@ export class BrowserDisplay3D implements IGameDisplay {
         const key = `${x},${y}`;
         if (this.corridorPipeTiles.has(key)) continue;
 
-        // Only place pipes every 2nd tile for performance
-        if ((x + y) % 2 !== 0) continue;
+        // Only place pipes every 4th tile for performance
+        if ((x + y) % 4 !== 0) continue;
         this.corridorPipeTiles.add(key);
 
         // Determine corridor direction (horizontal or vertical)
@@ -2400,9 +2400,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         const adjW = x > 0 && state.tiles[y][x - 1].type === TileType.Corridor;
         if (!adjN && !adjS && !adjE && !adjW) continue;
 
-        // Place prop every ~4th qualifying wall (deterministic by position)
+        // Place prop every ~8th qualifying wall (deterministic by position)
         const hash = (x * 23 + y * 47) & 0xff;
-        if (hash > 64) continue; // ~25% chance
+        if (hash > 32) continue; // ~12% chance — sparse for perf
         this.corridorWallPropTiles.add(key);
 
         // Pick model deterministically
@@ -2528,7 +2528,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         const tile = state.tiles[y][x];
         if (tile.type !== TileType.Corridor || !tile.explored) continue;
         // Only every 3rd tile (checkerboard-ish pattern for performance)
-        if ((x + y) % 3 !== 0) continue;
+        if ((x + y) % 5 !== 0) continue; // every 5th tile for performance
         this.corridorLitTiles.add(key);
         const corridorLight = new THREE.PointLight(0x88aadd, 0.8, 5);
         corridorLight.position.set(x, 1.5, y);
@@ -2916,22 +2916,13 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   // Entity types that get a small colored point light for visual emphasis
+  // Only key entities get glow lights (5 max for performance)
   private static readonly ENTITY_GLOW_LIGHTS: Partial<Record<string, { color: number; intensity: number; distance: number }>> = {
     [EntityType.DataCore]: { color: 0xff44ff, intensity: 2.0, distance: 8 },
-    [EntityType.Relay]: { color: 0xffcc00, intensity: 1.4, distance: 6 },
     [EntityType.Breach]: { color: 0xff2200, intensity: 1.5, distance: 6 },
-    [EntityType.SensorPickup]: { color: 0x00ffee, intensity: 1.0, distance: 5 },
-    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 1.0, distance: 6 },
-    [EntityType.MedKit]: { color: 0xff4444, intensity: 0.7, distance: 4 },
+    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 1.2, distance: 6 },
     [EntityType.EvidenceTrace]: { color: 0xffaa00, intensity: 1.2, distance: 5 },
-    [EntityType.CrewNPC]: { color: 0xffcc88, intensity: 0.8, distance: 5 },
-    [EntityType.LogTerminal]: { color: 0x66ccff, intensity: 0.7, distance: 4 },
-    [EntityType.SecurityTerminal]: { color: 0x44aaff, intensity: 0.7, distance: 4 },
-    [EntityType.Console]: { color: 0x66aaff, intensity: 0.6, distance: 4 },
-    [EntityType.PowerCell]: { color: 0xffdd44, intensity: 0.7, distance: 4 },
-    [EntityType.FuseBox]: { color: 0xdd8800, intensity: 0.6, distance: 3 },
-    [EntityType.PressureValve]: { color: 0x44bbaa, intensity: 0.5, distance: 3 },
-    [EntityType.RepairCradle]: { color: 0xaaff66, intensity: 0.5, distance: 4 },
+    [EntityType.Relay]: { color: 0xffcc00, intensity: 1.2, distance: 5 },
   };
 
   private createEntityMesh(entity: Entity): THREE.Object3D {
@@ -3632,35 +3623,35 @@ export class BrowserDisplay3D implements IGameDisplay {
     const model = scene;
 
     // Synty models are huge (~100 units); normalize to fit in ~0.7 unit box
-    // Player gets slightly larger, small pickups get smaller
+    // Realistic proportions: Sweepo is a small cleaning bot, furniture is larger
     const ENTITY_SCALE: Partial<Record<string, number>> = {
-      player: 0.95,                          // Sweepo — prominent on screen
-      [EntityType.Relay]: 0.9,               // important system
-      [EntityType.DataCore]: 1.0,            // primary objective — largest
-      [EntityType.LogTerminal]: 0.9,
-      [EntityType.SecurityTerminal]: 0.9,
-      [EntityType.Console]: 0.85,
-      [EntityType.RepairCradle]: 0.85,
-      [EntityType.ServiceBot]: 0.75,
-      [EntityType.RepairBot]: 0.75,
-      [EntityType.Drone]: 0.7,
-      [EntityType.PatrolDrone]: 0.75,
-      [EntityType.ToolPickup]: 0.7,          // bigger so pickups visible
-      [EntityType.UtilityPickup]: 0.7,
-      [EntityType.SensorPickup]: 0.75,
-      [EntityType.MedKit]: 0.65,
-      [EntityType.PowerCell]: 0.65,
-      [EntityType.FuseBox]: 0.75,
-      [EntityType.PressureValve]: 0.75,
-      [EntityType.EvidenceTrace]: 0.55,
-      [EntityType.EscapePod]: 1.05,          // large escape capsule
-      [EntityType.CrewNPC]: 0.95,            // important NPC
-      [EntityType.Breach]: 0.85,
-      [EntityType.ClosedDoor]: 0.9,
-      [EntityType.Airlock]: 0.95,
-      [EntityType.CrewItem]: 0.6,
+      player: 0.45,                          // Sweepo — small cleaning robot
+      [EntityType.Relay]: 0.55,              // wall-mounted relay box
+      [EntityType.DataCore]: 0.7,            // large server rack
+      [EntityType.LogTerminal]: 0.55,        // desk terminal
+      [EntityType.SecurityTerminal]: 0.55,   // wall panel
+      [EntityType.Console]: 0.6,             // standing console
+      [EntityType.RepairCradle]: 0.65,       // work bench
+      [EntityType.ServiceBot]: 0.4,          // small bot
+      [EntityType.RepairBot]: 0.45,          // medium bot
+      [EntityType.Drone]: 0.3,              // small flying drone
+      [EntityType.PatrolDrone]: 0.35,        // slightly larger drone
+      [EntityType.ToolPickup]: 0.3,          // hand-held tool
+      [EntityType.UtilityPickup]: 0.3,       // hand-held item
+      [EntityType.SensorPickup]: 0.3,        // hand-held sensor
+      [EntityType.MedKit]: 0.25,             // small med pack
+      [EntityType.PowerCell]: 0.3,           // battery pack
+      [EntityType.FuseBox]: 0.45,            // wall junction box
+      [EntityType.PressureValve]: 0.45,      // pipe valve
+      [EntityType.EvidenceTrace]: 0.2,       // small clue marker
+      [EntityType.EscapePod]: 0.75,          // large escape capsule
+      [EntityType.CrewNPC]: 0.55,            // humanoid crew member
+      [EntityType.Breach]: 0.5,              // hull damage area
+      [EntityType.ClosedDoor]: 0.6,          // door panel
+      [EntityType.Airlock]: 0.65,            // large airlock
+      [EntityType.CrewItem]: 0.2,            // small personal item
     };
-    const targetSize = ENTITY_SCALE[key] ?? 0.8;
+    const targetSize = ENTITY_SCALE[key] ?? 0.4;
 
     const box = new THREE.Box3().setFromObject(model);
     const size = new THREE.Vector3();
