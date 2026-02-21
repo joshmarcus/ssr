@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 58 complete (Insight Notifications, Archetype Atmosphere, Deduction Consequences)
+- **Phase**: Sprint 59 complete (Interaction Flash, Station Mood, UI Progress)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -81,6 +81,24 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 59 Changes
+
+### Interaction-Specific Tile Flash Colors
+- **Entity-type visual feedback**: Each interaction category now flashes a distinct color on the ROT.js map
+  - Relay: amber (#fa0), Evidence: gold (#fc0), Terminal: cyan (#6cf), Crew: white, Sensor: green, Data Core: magenta
+- **Colored flash system**: `flashTile()` accepts optional color parameter, replacing uniform white flash
+
+### Station Mood Variants
+- **Three seed-derived moods** (`seed % 3`): COLD (bureaucratic/clinical), HOT (active disaster/panic), SILENT (aftermath/ghost ship)
+- **Mood-specific boot flavor**: Each mood gets a unique opening line setting the atmospheric tone
+- **Mood-blended corridor ambients**: 12 new corridor lines (4 per mood) alternate with default pool — COLD gets inspection checklists and immaculate corridors, HOT gets sparks and emergency lighting, SILENT gets silence and half-full mugs
+- **Replay texture**: Same archetype feels meaningfully different across seeds — a HOT CoolantCascade vs a COLD CoolantCascade
+
+### UI Progress Indicators
+- **Deduction progress in action bar**: Evidence Hub shows "(N/M)" solved deduction count — players always know investigation progress at a glance
+- **Persistent journal/deduction pinned line**: When no DEDUCTION READY or phase notification is active, shows "Journal: N entries · Deductions: N/M" in log panel header
+- **Always-visible progress**: Investigation state is visible without opening the hub
 
 ## Sprint 58 Changes
 
