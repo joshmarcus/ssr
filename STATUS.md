@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 60 complete (Crew Manifest, Replay Hooks, CORVUS-7 Personality)
+- **Phase**: Sprint 61 complete (Contradiction Events, Crew Fate Reveals, ReactorScram Dwell Penalty)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -81,6 +81,33 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 61 Changes
+
+### Mid-Run Contradiction Events
+- **False lead + refutation per archetype**: 10 authored log strings (5 misleading + 5 refuting)
+- **False lead fires after 3rd terminal read**: Presents a plausible-but-wrong conclusion (e.g., "inspection record PASSED — equipment fatigue")
+- **Refutation fires after first correct deduction**: CORVUS-7 flags data inconsistency, then reveals the truth (e.g., "inspection was backdated 6 hours after the cascade")
+- **Investigation depth**: The investigation now has a revision moment — players must re-evaluate evidence, not just accumulate it
+- **Archetype-specific**: Each archetype's false lead points in a different wrong direction — natural causes (CoolantCascade), meteorite (HullBreach), automatic safety (ReactorScram), routine cargo (Sabotage), incoming signal (SignalAnomaly)
+
+### Dynamic Crew Fate Reveals
+- **Fate-specific room entry text**: When entering a room where a crew member was last known, fires an individualized one-liner using actual crew data (name, role, fate)
+- **15 authored template functions** across 5 fate types (Dead, Missing, Escaped, InCryo, Survived)
+- **Dead**: Forensic traces — flatlined vital signs, cold chairs, name tags
+- **Missing**: Abandoned belongings — half-eaten meals, access badges still in readers, shift logs that end mid-sentence
+- **Escaped**: Empty lockers, countdown timers, orderly shutdown notes
+- **InCryo**: Cryo status readouts, amber pod lights, voluntary stasis documentation
+- **Survived**: Recent activity signs — warm terminals, jackets over chairs
+- **Replaces generic crew memory fragments** with data-driven individualized text
+
+### ReactorScram Dwell Penalty (Data Core Surveillance)
+- **Archetype-specific mechanic**: ReactorScram runs only — the sentient data core monitors the player
+- **12-turn threshold**: After lingering 12 turns in one room, fires a monitoring message and adds +5 heat to the room ("I am... aware of you now.")
+- **20-turn threshold**: Stronger response — +10 heat, screen flash, and threat ("20 cycles. You are testing my patience.")
+- **10 authored data core warning lines** (5 per threshold) with distinct personality — curious, clinical, annoyed
+- **Distinct mid-game feel**: ReactorScram now feels like being observed, not just threatened by physics
+- **Resets on room change**: Moving to a different room resets the counter — the mechanic encourages exploration
 
 ## Sprint 60 Changes
 
