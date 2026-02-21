@@ -570,15 +570,56 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.lastRoomId = roomId;
   }
 
-  flashTile(_x: number, _y: number, _color?: string): void {
-    // No-op in 3D mode — tile flash is a 2D-only effect
+  flashTile(x: number, y: number, _color?: string): void {
+    // 3D interaction flash: expanding glowing ring at the tile position
+    const ringGeo = new THREE.TorusGeometry(0.2, 0.03, 6, 16);
+    ringGeo.rotateX(Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x44ff88,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(x, 0.1, y);
+    this.scene.add(ring);
+
+    // Animate: expand and fade over 600ms
+    const startTime = this.clock.getElapsedTime();
+    const duration = 0.6;
+    const animateRing = () => {
+      const t = (this.clock.getElapsedTime() - startTime) / duration;
+      if (t >= 1) {
+        this.scene.remove(ring);
+        ringGeo.dispose();
+        ringMat.dispose();
+        return;
+      }
+      const scale = 1 + t * 3;
+      ring.scale.set(scale, 1, scale);
+      ringMat.opacity = 0.8 * (1 - t);
+      requestAnimationFrame(animateRing);
+    };
+    requestAnimationFrame(animateRing);
   }
+
+  // Camera shake state
+  private cameraShakeIntensity: number = 0;
+  private cameraShakeDecay: number = 0;
 
   triggerScreenFlash(type: "damage" | "milestone" | "stun"): void {
     const flash = document.getElementById("damage-flash");
     if (!flash) return;
     flash.className = `active ${type}`;
     setTimeout(() => { flash.className = ""; }, 200);
+
+    // 3D camera shake on damage/stun
+    if (type === "damage") {
+      this.cameraShakeIntensity = 0.15;
+      this.cameraShakeDecay = 3.0;
+    } else if (type === "stun") {
+      this.cameraShakeIntensity = 0.25;
+      this.cameraShakeDecay = 2.0;
+    }
   }
 
   showGameOverOverlay(state: GameState): void {
@@ -1027,7 +1068,15 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (Math.abs(this.cameraTargetX - this.cameraPosX) < 0.01) this.cameraPosX = this.cameraTargetX;
       if (Math.abs(this.cameraTargetZ - this.cameraPosZ) < 0.01) this.cameraPosZ = this.cameraTargetZ;
 
-      this.camera.position.set(this.cameraPosX, 12, this.cameraPosZ + 14);
+      // Camera shake
+      let shakeX = 0, shakeZ = 0;
+      if (this.cameraShakeIntensity > 0.001) {
+        shakeX = (Math.random() - 0.5) * 2 * this.cameraShakeIntensity;
+        shakeZ = (Math.random() - 0.5) * 2 * this.cameraShakeIntensity;
+        this.cameraShakeIntensity *= Math.max(0, 1 - this.cameraShakeDecay * delta);
+      }
+
+      this.camera.position.set(this.cameraPosX + shakeX, 12, this.cameraPosZ + 14 + shakeZ);
       this.camera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
 
