@@ -161,6 +161,15 @@
 - **Entity improvements**: Floating ? symbol for EvidenceTrace (procedural, no GLTF), procedural CrewItem mesh, entity glow lights expanded to 15 types (DataCore/Relay/Breach/SensorPickup/EscapePod/MedKit/EvidenceTrace/CrewNPC/LogTerminal/SecurityTerminal/Console/PowerCell/FuseBox/PressureValve/RepairCradle), animations for EvidenceTrace/CrewItem/bots/PatrolDrone, increased entity scales
 - **Minimap overhaul**: Hazard coloring (red heat, blue vacuum, murky smoke), pulsing red breach markers, size-scaled entity dots, larger player indicator, room boundary outlines
 
+### Visual Sprints (V11-V13 + User Fixes)
+- **Sprint V11 — Labels + corridors**: Entity name labels (floating text sprites with distance-based opacity 0.2-0.9 within 4 tiles), brighter corridor lighting (0x88aadd, 0.8 intensity, range 5)
+- **Sprint V12 — Environmental damage**: Procedural debris in hazardous rooms (2-4 dark boxes per room with seeded PRNG), wall damage tinting (breach=red-shift, heat=orange, smoke=desaturation), floor crack patterns on depressurized tiles
+- **Sprint V13 — Infrastructure detail**: Yellow/black caution stripe floor markings near breaches/airlocks/escape pods, corridor overhead pipe runs (dual pipes with position-based color variation), corridor wall-mounted GLTF props (~25% of qualifying walls)
+- **Sweepo facing fix**: Corrected rotation formula for +X-facing Synty vehicle models (-atan2(dy,dx))
+- **Mouse wheel zoom**: Scroll to zoom in/out (frustum range 3-12), default 3.5
+- **Shift+scroll camera angle**: Adjustable elevation (top-down ↔ side-on)
+- **Cel-shaded brightness**: Floor 0xbbbbbb, wall 0xccddee, corridor 0xaaaaaa, vibrant room tints, ambient light 2.8, floor texture base #dddddd
+
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
 
