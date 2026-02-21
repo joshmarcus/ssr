@@ -126,19 +126,19 @@ function makeToonMaterial(opts: {
 
 // ── Color constants ──────────────────────────────────────────────
 const COLORS_3D = {
-  floor: 0x999999,     // brighter floor for better visibility
-  wall: 0xaabbcc,
-  door: 0xdd8844,
-  lockedDoor: 0xff4444,
-  corridor: 0x888888,  // brighter corridors
-  background: 0x0a0a12,
+  floor: 0xbbbbbb,     // bright cel-shaded floor
+  wall: 0xccddee,      // bright walls
+  door: 0xeeaa55,
+  lockedDoor: 0xff5555,
+  corridor: 0xaaaaaa,   // bright corridors
+  background: 0x080814,
   player: 0x00ff00,
   fogFull: 0x000000,
-  fogMemory: 0x111111,
+  fogMemory: 0x222233,
 } as const;
 
 // How many world-units tall the visible area is (zoom level)
-const CAMERA_FRUSTUM_SIZE_DEFAULT = 5; // start zoomed in for detail visibility
+const CAMERA_FRUSTUM_SIZE_DEFAULT = 3.5; // start zoomed all the way in
 const CAMERA_FRUSTUM_SIZE_MIN = 3;     // max zoom in
 const CAMERA_FRUSTUM_SIZE_MAX = 12;    // max zoom out
 
@@ -168,30 +168,30 @@ const ENTITY_COLORS_3D: Record<string, number> = {
   [EntityType.RepairCradle]: 0xaaff66,
 };
 
-// Room wall tints — stronger color identity per zone
+// Room wall tints — vibrant cel-shaded color identity per zone
 const ROOM_WALL_TINTS_3D: Record<string, number> = {
-  "Engineering Storage": 0xbb9955,   // warm industrial amber
-  "Power Relay Junction": 0xccaa44,  // electric yellow
-  "Engine Core": 0xcc7733,           // hot orange
-  "Life Support": 0x55aacc,          // cool medical blue
-  "Vent Control Room": 0x6699bb,     // duct steel blue
-  "Communications Hub": 0x5577cc,    // comm blue
-  "Research Lab": 0x55bb77,          // lab green
-  "Med Bay": 0xcc6688,              // medical pink-red
-  "Data Core": 0xaa55cc,            // data purple
-  "Robotics Bay": 0x889999,         // metallic grey-teal
-  "Bridge": 0x7788bb,              // command blue-grey
-  "Observation Deck": 0x6699aa,     // sky viewport blue
-  "Escape Pod Bay": 0x55cc88,       // emergency green
-  "Auxiliary Power": 0xbbaa44,       // power amber
-  "Signal Room": 0x5566cc,          // signal deep blue
-  "Server Annex": 0x9955bb,         // server violet
-  "Armory": 0xcc5555,              // danger red
-  "Emergency Shelter": 0x66bb77,    // safe green
-  "Cargo Hold": 0xbb8844,          // cargo warm brown
-  "Crew Quarters": 0xbbaa66,        // residential warm gold
-  "Arrival Bay": 0x66aa88,          // teal arrival
-  "Maintenance Corridor": 0x889988, // utility grey-green
+  "Engineering Storage": 0xddbb77,   // warm industrial amber
+  "Power Relay Junction": 0xeedd66,  // electric yellow
+  "Engine Core": 0xee9944,           // hot orange
+  "Life Support": 0x77ccee,          // cool medical blue
+  "Vent Control Room": 0x88bbdd,     // duct steel blue
+  "Communications Hub": 0x7799ee,    // comm blue
+  "Research Lab": 0x77dd99,          // lab green
+  "Med Bay": 0xee88aa,              // medical pink-red
+  "Data Core": 0xcc77ee,            // data purple
+  "Robotics Bay": 0xaabbbb,         // metallic grey-teal
+  "Bridge": 0x99aadd,              // command blue-grey
+  "Observation Deck": 0x88bbcc,     // sky viewport blue
+  "Escape Pod Bay": 0x77eeaa,       // emergency green
+  "Auxiliary Power": 0xddcc66,       // power amber
+  "Signal Room": 0x7788ee,          // signal deep blue
+  "Server Annex": 0xbb77dd,         // server violet
+  "Armory": 0xee7777,              // danger red
+  "Emergency Shelter": 0x88dd99,    // safe green
+  "Cargo Hold": 0xddaa66,          // cargo warm brown
+  "Crew Quarters": 0xddcc88,        // residential warm gold
+  "Arrival Bay": 0x88ccaa,          // teal arrival
+  "Maintenance Corridor": 0xaabbaa, // utility grey-green
 };
 
 // Room ambient light colors — warm/cool per room function
@@ -504,22 +504,22 @@ export class BrowserDisplay3D implements IGameDisplay {
       defaultAlpha: 0.8,
     });
 
-    // ── Lights (brighter for visibility, still atmospheric) ──
-    const ambient = new THREE.AmbientLight(0x99aacc, 2.0);
+    // ── Lights (cel-shaded bright — push for vibrant toon look) ──
+    const ambient = new THREE.AmbientLight(0xbbccee, 2.8);
     this.scene.add(ambient);
 
     // Strong key light — warm directional from upper-left
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 1.8);
+    const dirLight = new THREE.DirectionalLight(0xffeedd, 2.2);
     dirLight.position.set(-8, 15, -5);
     this.scene.add(dirLight);
 
     // Cool fill light from opposite side
-    const fillLight = new THREE.DirectionalLight(0x4466aa, 0.8);
+    const fillLight = new THREE.DirectionalLight(0x6688cc, 1.2);
     fillLight.position.set(8, 10, 5);
     this.scene.add(fillLight);
 
-    // Subtle rim light from behind for depth
-    const rimLight = new THREE.DirectionalLight(0x8888ff, 0.4);
+    // Rim light from behind for depth — brighter for cel-shaded pop
+    const rimLight = new THREE.DirectionalLight(0xaaaaff, 0.8);
     rimLight.position.set(0, 5, 15);
     this.scene.add(rimLight);
 
@@ -944,6 +944,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeRoomDecorations(state);
     this.placeCautionMarkings(state);
     this.placeCorridorPipes(state);
+    this.placeCorridorWallProps(state);
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
     this.updateRoomLabels(state);
@@ -2323,7 +2324,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         // Pipe color varies with position hash
         const pipeHash = ((x * 7 + y * 13) & 0xf);
-        const pipeColor = pipeHash < 5 ? 0x556677 : pipeHash < 10 ? 0x667788 : 0x778899;
+        const pipeColor = pipeHash < 5 ? 0x7788aa : pipeHash < 10 ? 0x8899bb : 0x99aacc;
 
         // Main overhead pipe (thin cylinder running along corridor axis)
         const pipeGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.0, 6);
@@ -2364,6 +2365,99 @@ export class BrowserDisplay3D implements IGameDisplay {
             pipe2.position.z = y - 0.2;
           }
           this.pipeGroup.add(pipe2);
+        }
+      }
+    }
+  }
+
+  // ── Private: corridor wall-mounted GLTF props ──────────────────
+
+  private corridorWallPropTiles: Set<string> = new Set();
+
+  // Models placed against corridor walls for variety
+  private static readonly CORRIDOR_WALL_MODELS = [
+    "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+    "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+    "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+    "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
+    "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+    "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
+  ];
+
+  private placeCorridorWallProps(state: GameState): void {
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (tile.type !== TileType.Wall || !tile.explored) continue;
+
+        const key = `cw_${x},${y}`;
+        if (this.corridorWallPropTiles.has(key)) continue;
+
+        // Only walls adjacent to corridor tiles get props
+        const adjN = y > 0 && state.tiles[y - 1][x].type === TileType.Corridor;
+        const adjS = y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Corridor;
+        const adjE = x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Corridor;
+        const adjW = x > 0 && state.tiles[y][x - 1].type === TileType.Corridor;
+        if (!adjN && !adjS && !adjE && !adjW) continue;
+
+        // Place prop every ~4th qualifying wall (deterministic by position)
+        const hash = (x * 23 + y * 47) & 0xff;
+        if (hash > 64) continue; // ~25% chance
+        this.corridorWallPropTiles.add(key);
+
+        // Pick model deterministically
+        const modelIdx = hash % BrowserDisplay3D.CORRIDOR_WALL_MODELS.length;
+        const modelPath = BrowserDisplay3D.CORRIDOR_WALL_MODELS[modelIdx];
+
+        // Determine facing direction (toward corridor)
+        let rot = 0;
+        if (adjN) rot = Math.PI;       // face south toward corridor
+        else if (adjS) rot = 0;        // face north
+        else if (adjE) rot = Math.PI / 2;  // face west
+        else if (adjW) rot = -Math.PI / 2; // face east
+
+        const placeModel = (model: THREE.Object3D) => {
+          const clone = model.clone();
+          const box = new THREE.Box3().setFromObject(clone);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          const maxDim = Math.max(size.x, size.y, size.z);
+          if (maxDim > 0) clone.scale.multiplyScalar(0.45 / maxDim);
+
+          // Position against wall, slightly elevated
+          clone.position.set(x, 0.6, y);
+          clone.rotation.y = rot;
+          this.decorationGroup.add(clone);
+        };
+
+        const cached = this.gltfCache.get(modelPath);
+        if (cached) {
+          placeModel(cached);
+        } else {
+          const url = import.meta.env.BASE_URL + modelPath;
+          this.gltfLoader.load(url, (gltf) => {
+            try {
+              const model = gltf.scene.clone();
+              model.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  const oldMat = mats[0] as THREE.MeshStandardMaterial;
+                  const hasUVs = !!(child.geometry?.attributes?.uv);
+                  let tex = hasUVs && oldMat?.map ? oldMat.map : null;
+                  if (!tex && hasUVs && this.syntyAtlas) tex = this.syntyAtlas;
+                  child.material = makeToonMaterial({
+                    color: tex ? 0xffffff : (oldMat?.color?.getHex() ?? 0x999999),
+                    gradientMap: this.toonGradient,
+                    map: tex,
+                  });
+                }
+              });
+              this.gltfCache.set(modelPath, model);
+              placeModel(model);
+            } catch (e) {
+              console.warn(`Failed to load corridor wall prop ${modelPath}:`, e);
+            }
+          }, undefined, () => {});
         }
       }
     }
@@ -2436,7 +2530,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Only every 3rd tile (checkerboard-ish pattern for performance)
         if ((x + y) % 3 !== 0) continue;
         this.corridorLitTiles.add(key);
-        const corridorLight = new THREE.PointLight(0x5577aa, 0.5, 4);
+        const corridorLight = new THREE.PointLight(0x88aadd, 0.8, 5);
         corridorLight.position.set(x, 1.5, y);
         this.scene.add(corridorLight);
       }
@@ -2614,8 +2708,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       ctx.fillStyle = `rgba(${Math.round(r * 0.3)}, ${Math.round(g * 0.3)}, ${Math.round(b * 0.3)}, 0.5)`;
       ctx.fillRect(0, 10, 256, 44);
 
-      // Text
-      ctx.fillStyle = `rgb(${Math.min(255, r + 80)}, ${Math.min(255, g + 80)}, ${Math.min(255, b + 80)})`;
+      // Bright text
+      ctx.fillStyle = `rgb(${Math.min(255, r + 100)}, ${Math.min(255, g + 100)}, ${Math.min(255, b + 100)})`;
       ctx.font = "bold 22px 'Courier New', monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -3256,10 +3350,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       const dx = px - this.lastPlayerX;
       const dy = py - this.lastPlayerY;
       if (dx !== 0 || dy !== 0) {
-        // Synty GLTF models face +Z by default. In our coordinate system:
+        // Synty vehicle models face +X. In our coordinate system:
         // game +x = 3D +x (east), game +y = 3D +z (south).
-        // atan2(-dx, dy) gives the correct Y rotation for +Z-facing models.
-        this.playerFacing = Math.atan2(-dx, dy);
+        // -atan2(dy, dx) rotates the +X-facing model toward movement direction.
+        this.playerFacing = -Math.atan2(dy, dx);
       }
     }
     this.lastPlayerX = px;
@@ -3578,7 +3672,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       model.scale.multiplyScalar(s);
     }
 
-    // Rotate to face camera (GLTF models typically face -Z)
+    // Reset rotation — facing direction is handled at runtime by playerFacing
     model.rotation.y = 0;
 
     // Re-measure after scaling, center horizontally, sit on floor
