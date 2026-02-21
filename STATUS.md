@@ -118,21 +118,29 @@
 
 ### 3D Visual Polish
 - **Smooth movement**: Lerp interpolation (speed=12) for player, camera, and light
+- **Smooth rotation**: Sweepo turns gradually when changing direction (shortest-path interpolation)
 - **Room-specific lighting**: Colored PointLights at room centers for all 21 room types
 - **Room wall tints**: Every room has a distinct wall color for visual identity
+- **Room floor tints**: 25% room color blended into floor tiles for spatial awareness
 - **Atmospheric fog**: Subtle edge fade (14-28 range) for depth
 - **Starfield background**: 400 star points in a dome below the station
 - **Nebula shader backdrop**: Dark blue-purple gradient plane with animated swirl
 - **Ambient dust particles**: 80 floating motes near the camera with drift animation
 - **Player movement trail**: 12 fading green dots behind Sweepo during movement
+- **Player ground glow**: Green glow disc under Sweepo for visibility
 - **Entity glow lights**: Colored point lights on DataCore, Relay, Breach, SensorPickup, EscapePod, MedKit
 - **Entity animations**: Relay spin, DataCore orbit, Breach pulse, drone hover, terminal screen flicker, sensor pickup hover/spin, tool bob, medkit pulse, power cell flicker
 - **Room decorations**: Thematic prop placement for all 21 room types (medical beds, barrels, screens, etc.)
-- **Door orientation**: Doorframe models face corridor direction
+- **Door models**: Synty doorframe models, properly oriented to face corridor direction
 - **Room name banner**: Floating HUD banner with zone tag on room entry (fade in/out)
 - **3D UI styling**: Semi-transparent panel with green glow accents, backdrop blur
 - **Viewport vignette**: CSS radial gradient for cinematic framing
 - **Outline effect**: Dark mesh outlines via Three.js OutlineEffect
+- **Interaction flash rings**: Expanding glowing ring effect when interacting with tiles
+- **Camera shake**: Damage (0.15) and stun (0.25) intensity with natural decay
+- **Sensor scan wave**: Expanding color-coded ring on sensor activation
+- **3D minimap**: Canvas overlay showing explored tiles, entities, player position
+- **Ambient hazard visualization**: Smoke darkens tiles, low pressure adds blue tint (no sensor needed)
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
