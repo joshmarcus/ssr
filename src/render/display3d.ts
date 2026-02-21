@@ -3002,17 +3002,22 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // ── Private: corridor arch supports ────────────────────────────
 
+  private static readonly CORRIDOR_ARCH_MODEL = "models/synty-space-gltf/SM_Bld_Corridor_Single_Arch_01.glb";
+
   private placeCorridorArches(state: GameState): void {
-    // Create shared geometry once
+    // Create shared fallback geometry once
     if (!BrowserDisplay3D._archPostGeo) {
-      BrowserDisplay3D._archPostGeo = new THREE.BoxGeometry(0.06, 1.6, 0.06); // vertical post
-      BrowserDisplay3D._archSpanGeo = new THREE.BoxGeometry(1.1, 0.06, 0.06);  // horizontal span
+      BrowserDisplay3D._archPostGeo = new THREE.BoxGeometry(0.06, 1.6, 0.06);
+      BrowserDisplay3D._archSpanGeo = new THREE.BoxGeometry(1.1, 0.06, 0.06);
     }
 
     const archMat = makeToonMaterial({
       color: 0x667788,
       gradientMap: this.toonGradient,
     });
+
+    // Try to use the Synty arch model if loaded
+    const archModel = this.gltfCache.get(BrowserDisplay3D.CORRIDOR_ARCH_MODEL);
 
     for (let y = 0; y < state.height; y++) {
       for (let x = 0; x < state.width; x++) {
@@ -3034,28 +3039,36 @@ export class BrowserDisplay3D implements IGameDisplay {
         const isHorizontal = (hasE || hasW) && !hasN && !hasS;
         const isVertical = (hasN || hasS) && !hasE && !hasW;
 
-        if (!isHorizontal && !isVertical) continue; // skip junctions
+        if (!isHorizontal && !isVertical) continue;
 
-        // Two posts on each side + a crossbar on top
-        const post1 = new THREE.Mesh(BrowserDisplay3D._archPostGeo!, archMat);
-        const post2 = new THREE.Mesh(BrowserDisplay3D._archPostGeo!, archMat);
-        const span = new THREE.Mesh(BrowserDisplay3D._archSpanGeo!, archMat);
-
-        if (isHorizontal) {
-          // Posts on north/south sides
-          post1.position.set(x, 0.8, y - 0.47);
-          post2.position.set(x, 0.8, y + 0.47);
-          span.position.set(x, 1.62, y);
-          span.rotation.y = Math.PI / 2; // rotate span to run N-S
-          span.scale.x = 0.86; // slightly narrower to fit between posts
+        if (archModel) {
+          // Use Synty arch GLTF model
+          const clone = archModel.clone();
+          clone.position.set(x, 0, y);
+          if (isHorizontal) {
+            clone.rotation.y = Math.PI / 2;
+          }
+          this.ceilingGroup.add(clone);
         } else {
-          // Posts on east/west sides
-          post1.position.set(x - 0.47, 0.8, y);
-          post2.position.set(x + 0.47, 0.8, y);
-          span.position.set(x, 1.62, y);
-        }
+          // Fallback: procedural posts + span
+          const post1 = new THREE.Mesh(BrowserDisplay3D._archPostGeo!, archMat);
+          const post2 = new THREE.Mesh(BrowserDisplay3D._archPostGeo!, archMat);
+          const span = new THREE.Mesh(BrowserDisplay3D._archSpanGeo!, archMat);
 
-        this.ceilingGroup.add(post1, post2, span);
+          if (isHorizontal) {
+            post1.position.set(x, 0.8, y - 0.47);
+            post2.position.set(x, 0.8, y + 0.47);
+            span.position.set(x, 1.62, y);
+            span.rotation.y = Math.PI / 2;
+            span.scale.x = 0.86;
+          } else {
+            post1.position.set(x - 0.47, 0.8, y);
+            post2.position.set(x + 0.47, 0.8, y);
+            span.position.set(x, 1.62, y);
+          }
+
+          this.ceilingGroup.add(post1, post2, span);
+        }
       }
     }
   }
@@ -3148,6 +3161,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     "models/synty-gltf/SM_Detector.glb",
     "models/synty-gltf/SM_Lantern_1.glb",
     "models/synty-gltf/SM_Wall_remote_control.glb",
+    "models/kenney-space/cables.glb",
   ];
 
   private placeCorridorWallProps(state: GameState): void {
@@ -4657,6 +4671,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     for (const p of BrowserDisplay3D.CORRIDOR_WALL_MODELS) {
       allPaths.add(p);
     }
+    allPaths.add(BrowserDisplay3D.CORRIDOR_ARCH_MODEL);
 
     // Filter out already-cached models
     const toLoad = [...allPaths].filter(p => !this.gltfCache.has(p));
