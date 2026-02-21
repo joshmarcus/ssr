@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 64 complete (Coolant Loop Puzzle, Power Cell Scarcity, Thermal Chokepoints)
+- **Phase**: Sprint 65 complete (Cross-System Reveals, Attachment UI, Evacuation Climax)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -77,6 +77,9 @@
 - Multi-step coolant loop puzzle (3 ordered steps across rooms with prerequisite checks)
 - Power cell scarcity economy (2 cells, 3 endpoints — forced resource choice)
 - Thermal chokepoint corridors (relay-prerequisite heat gates)
+- Cross-system reveals: puzzle completion generates archetype-specific narrative evidence
+- Full attachment loadout display in sidebar (TOOL/SENSOR/UTILITY)
+- Climactic evacuation: escalating boarding urgency + CORVUS farewell + final approach beat
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
@@ -85,6 +88,26 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 65 Changes
+
+### Cross-System Reveal Moments
+- **Puzzle completion → narrative evidence**: Completing the coolant loop, fuse box group, or smoke ventilation system generates an archetype-specific journal entry connecting the physical puzzle to the story
+- **15 authored reveal strings** (5 archetypes × 3 puzzle types): Each reveal makes an explicit narrative connection (e.g., "the bypass valve was sealed manually — the thermal cascade was engineered")
+- **Auto-tagged for deductions**: Journal entries include system keywords that generate evidence tags matching active deductions
+- **"Aha" moments**: The investigation and mechanical systems now speak to each other — puzzle solving IS evidence gathering
+
+### Attachment Slot Sidebar Display
+- **All 3 slots visible**: TOOL (Pry Bar, amber), SENSOR (name, teal), UTILITY (name + active state, cyan)
+- **Active effect indicators**: Beacon shows remaining turns "(15T)", Scrubber shows "(active)"
+- **One-time activation hints**: First scrubber cycle and beacon deploy fire explanatory messages
+- **Build legibility**: Players can always see their loadout and understand what their equipment is doing
+
+### Climactic Evacuation Pacing
+- **Escalating boarding urgency**: Per-crew messages shift tone — "N safe, M still need rescue" → "One soul still aboard. Find them." → "That's everyone."
+- **CORVUS-7 archetype farewell**: When all crew board, fires a unique farewell per archetype + milestone screen flash
+- **Final approach beat**: At 80% turn limit post-evacuation, CORVUS-7 fires a reflective line acknowledging the run is ending
+- **5 authored farewell strings + 5 final approach lines**: Each archetype gets a distinct emotional closing beat
 
 ## Sprint 64 Changes
 
