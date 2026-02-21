@@ -2947,42 +2947,38 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
       if (!state.tiles[cy][cx].explored) continue;
 
-      // Create canvas-based text sprite for the room name
+      // Clean map-style label — no background box, just text with drop shadow
       const canvas = document.createElement("canvas");
-      canvas.width = 256;
+      canvas.width = 512;
       canvas.height = 64;
       const ctx = canvas.getContext("2d")!;
 
-      // Room zone color
-      const tint = ROOM_WALL_TINTS_3D[room.name] ?? 0x778899;
-      const r = (tint >> 16) & 0xff;
-      const g = (tint >> 8) & 0xff;
-      const b = tint & 0xff;
+      // Room zone color for text
+      const tint = ROOM_WALL_TINTS_3D[room.name] ?? 0xcccccc;
+      const r = Math.min(255, ((tint >> 16) & 0xff) + 60);
+      const g = Math.min(255, ((tint >> 8) & 0xff) + 60);
+      const b = Math.min(255, (tint & 0xff) + 60);
 
-      // Semi-transparent background bar
-      ctx.fillStyle = `rgba(${Math.round(r * 0.3)}, ${Math.round(g * 0.3)}, ${Math.round(b * 0.3)}, 0.5)`;
-      ctx.fillRect(0, 10, 256, 44);
-
-      // Bright text
-      ctx.fillStyle = `rgb(${Math.min(255, r + 100)}, ${Math.min(255, g + 100)}, ${Math.min(255, b + 100)})`;
-      ctx.font = "bold 22px 'Courier New', monospace";
+      const label = room.name.toUpperCase();
+      ctx.font = "bold 28px 'Courier New', monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(room.name.toUpperCase(), 128, 32);
 
-      // Accent line at bottom
-      ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(20, 52);
-      ctx.lineTo(236, 52);
-      ctx.stroke();
+      // Drop shadow for readability
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillText(label, 257, 34);
+
+      // Main text — bright room-tinted color
+      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      ctx.fillText(label, 256, 32);
 
       const tex = new THREE.CanvasTexture(canvas);
-      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.7, depthWrite: false });
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.85, depthWrite: false });
       const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(room.width * 0.8, room.width * 0.2, 1);
-      sprite.position.set(cx, 2.5, cy);
+      // Scale proportional to room width but with wider canvas
+      const labelWidth = Math.max(room.width * 0.7, 2.5);
+      sprite.scale.set(labelWidth, labelWidth * (64 / 512), 1);
+      sprite.position.set(cx, 2.3, cy);
       this.scene.add(sprite);
       this.roomLabels3D.set(room.id, sprite);
     }
@@ -4064,6 +4060,8 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.addLog(`Loaded ${this.gltfCache.size}/${entries.length} 3D models.`, "system");
         this.swapPlayerModel();
         this.rebuildEntityMeshes();
+        // Preload decoration models in the background to prevent frame hitches
+        this.preloadDecorationModels();
       }
     };
 
@@ -4087,6 +4085,73 @@ export class BrowserDisplay3D implements IGameDisplay {
           console.warn(`Failed to load model ${path}:`, error);
           onDone();
         }
+      );
+    }
+  }
+
+  /** Preload all decoration/prop models so they're cached before rooms are explored.
+   *  This prevents frame hitches when entering new rooms. */
+  private preloadDecorationModels(): void {
+    // Collect all unique decoration model paths
+    const allPaths = new Set<string>();
+    for (const paths of Object.values(BrowserDisplay3D.ROOM_DECORATIONS)) {
+      for (const p of paths) allPaths.add(p);
+    }
+    for (const paths of Object.values(BrowserDisplay3D.WALL_PROPS)) {
+      for (const p of paths) allPaths.add(p);
+    }
+    for (const p of BrowserDisplay3D.CORRIDOR_WALL_MODELS) {
+      allPaths.add(p);
+    }
+
+    // Filter out already-cached models
+    const toLoad = [...allPaths].filter(p => !this.gltfCache.has(p));
+    if (toLoad.length === 0) return;
+
+    let loaded = 0;
+    const base = import.meta.env.BASE_URL;
+
+    for (const modelPath of toLoad) {
+      const url = base + modelPath;
+      this.gltfLoader.load(
+        url,
+        (gltf) => {
+          try {
+            const model = gltf.scene.clone();
+            // Normalize to decoration scale
+            const box = new THREE.Box3().setFromObject(model);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0) model.scale.multiplyScalar(0.65 / maxDim);
+
+            // Apply toon materials with Synty atlas
+            model.traverse((child) => {
+              if (child instanceof THREE.Mesh) {
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                const oldMat = mats[0] as THREE.MeshStandardMaterial;
+                const hasUVs = !!(child.geometry?.attributes?.uv);
+                let tex = hasUVs && oldMat?.map ? oldMat.map : null;
+                if (!tex && hasUVs && this.syntyAtlas) tex = this.syntyAtlas;
+                child.material = makeToonMaterial({
+                  color: tex ? 0xffffff : (oldMat?.color?.getHex() ?? 0x888888),
+                  gradientMap: this.toonGradient,
+                  map: tex,
+                });
+              }
+            });
+
+            this.gltfCache.set(modelPath, model);
+          } catch (e) {
+            // Silently skip failed decoration models
+          }
+          loaded++;
+          if (loaded >= toLoad.length) {
+            console.log(`Preloaded ${loaded} decoration models.`);
+          }
+        },
+        undefined,
+        () => { loaded++; } // skip failed loads
       );
     }
   }

@@ -164,50 +164,45 @@ async function main(): Promise<void> {
       // First move once to clear any pending state
       await page.keyboard.press(".");
       await page.waitForTimeout(200);
-      // Try multiple dispatch methods to trigger F3
-      // Method 1: Playwright keyboard press
-      await page.keyboard.press("F3");
-      await page.waitForTimeout(3000);
-      // Check for mode-3d class or WebGL canvas
-      let has3d = await page.evaluate(() => {
-        return document.querySelector('.mode-3d') !== null ||
-               document.querySelectorAll('canvas').length > 1;
-      });
-      console.log(`[screenshot] 3D active after keyboard F3: ${has3d}`);
-      if (!has3d) {
-        // Method 2: dispatch on document.body (may propagate to window)
-        console.log("[screenshot] Retrying: dispatch on document...");
-        await page.evaluate(() => {
-          const ev = new KeyboardEvent("keydown", { key: "F3", code: "F3", bubbles: true, cancelable: true });
-          document.dispatchEvent(ev);
-          document.body.dispatchEvent(ev);
-        });
-        await page.waitForTimeout(3000);
-        has3d = await page.evaluate(() => {
-          return document.querySelector('.mode-3d') !== null ||
-                 document.querySelectorAll('canvas').length > 1;
-        });
-        console.log(`[screenshot] 3D active after document dispatch: ${has3d}`);
-      }
-      if (!has3d) {
-        // Method 3: Try clicking the game container first to focus, then F3
-        console.log("[screenshot] Retrying: click container + F3...");
-        await page.click("#game-container");
-        await page.waitForTimeout(200);
+      // Try multiple dispatch methods to trigger F3 (wrapped in try/catch for crash resilience)
+      let has3d = false;
+      try {
+        // Method 1: Click container to focus, then F3 (most reliable)
+        await page.click("#game-container").catch(() => {});
+        await page.waitForTimeout(300);
         await page.keyboard.press("F3");
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(4000);
         has3d = await page.evaluate(() => {
           return document.querySelector('.mode-3d') !== null ||
                  document.querySelectorAll('canvas').length > 1;
         });
         console.log(`[screenshot] 3D active after click+F3: ${has3d}`);
-      }
-      if (has3d) {
-        // Wait for Three.js scene to initialize and models to load
-        console.log("[screenshot] 3D mode activated! Waiting for scene to load...");
-        await page.waitForTimeout(10000);
-      } else {
-        console.log("[screenshot] WARNING: Could not activate 3D mode");
+
+        if (!has3d) {
+          // Method 2: synthetic keydown dispatch
+          console.log("[screenshot] Retrying: synthetic dispatch...");
+          await page.evaluate(() => {
+            const ev = new KeyboardEvent("keydown", { key: "F3", code: "F3", bubbles: true, cancelable: true });
+            window.dispatchEvent(ev);
+          });
+          await page.waitForTimeout(4000);
+          has3d = await page.evaluate(() => {
+            return document.querySelector('.mode-3d') !== null ||
+                   document.querySelectorAll('canvas').length > 1;
+          });
+          console.log(`[screenshot] 3D active after dispatch: ${has3d}`);
+        }
+
+        if (has3d) {
+          console.log("[screenshot] 3D mode activated! Waiting for scene to load...");
+          // Wait for models to load, but not too long to avoid crashes
+          await page.waitForTimeout(12000);
+        } else {
+          console.log("[screenshot] WARNING: Could not activate 3D mode");
+        }
+      } catch (e) {
+        console.log(`[screenshot] 3D toggle error (page may have crashed): ${e}`);
+        console.log("[screenshot] Continuing with 2D screenshot...");
       }
     }
 
