@@ -566,6 +566,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private ceilingRooms: Set<string> = new Set();
   // Room atmospheric haze (colored fog planes per room)
   private hazeRooms: Set<string> = new Set();
+  // Corridor floor strip lights
+  private corridorStripTiles: Set<string> = new Set();
+  private static _stripLightGeo: THREE.BoxGeometry | null = null;
   // Corridor arch supports
   private corridorArchTiles: Set<string> = new Set();
   // Shared ceiling geometries
@@ -1096,6 +1099,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeCautionMarkings(state);
     this.placeCorridorPipes(state);
     this.placeCorridorArches(state);
+    this.placeCorridorStripLights(state);
     this.placeCorridorWallProps(state);
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
@@ -2905,6 +2909,76 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
 
         this.ceilingGroup.add(post1, post2, span);
+      }
+    }
+  }
+
+  // ── Private: corridor floor strip lights ───────────────────────
+
+  private placeCorridorStripLights(state: GameState): void {
+    if (!BrowserDisplay3D._stripLightGeo) {
+      BrowserDisplay3D._stripLightGeo = new THREE.BoxGeometry(0.8, 0.01, 0.04); // thin floor strip
+    }
+
+    const stripMat = makeToonMaterial({
+      color: 0x44ddff,
+      gradientMap: this.toonGradient,
+      emissive: 0x44ddff,
+      emissiveIntensity: 0.5,
+    });
+
+    // Dimmer variant for alternating pattern
+    const stripMatDim = makeToonMaterial({
+      color: 0x225588,
+      gradientMap: this.toonGradient,
+      emissive: 0x225588,
+      emissiveIntensity: 0.3,
+    });
+
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored || tile.type !== TileType.Corridor) continue;
+
+        const key = `strip_${x},${y}`;
+        if (this.corridorStripTiles.has(key)) continue;
+
+        // Place every 2nd corridor tile for density
+        if ((x + y) % 2 !== 0) continue;
+        this.corridorStripTiles.add(key);
+
+        // Find which side has a wall to place the strip against
+        const wallN = y > 0 && state.tiles[y - 1][x].type === TileType.Wall;
+        const wallS = y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Wall;
+        const wallE = x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Wall;
+        const wallW = x > 0 && state.tiles[y][x - 1].type === TileType.Wall;
+
+        // Alternate bright/dim based on position hash
+        const isBright = ((x * 3 + y * 7) & 0x3) < 2;
+        const mat = isBright ? stripMat : stripMatDim;
+
+        if (wallN) {
+          const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
+          strip.position.set(x, -0.05, y - 0.46);
+          this.ceilingGroup.add(strip);
+        }
+        if (wallS) {
+          const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
+          strip.position.set(x, -0.05, y + 0.46);
+          this.ceilingGroup.add(strip);
+        }
+        if (wallE) {
+          const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
+          strip.rotation.y = Math.PI / 2;
+          strip.position.set(x + 0.46, -0.05, y);
+          this.ceilingGroup.add(strip);
+        }
+        if (wallW) {
+          const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
+          strip.rotation.y = Math.PI / 2;
+          strip.position.set(x - 0.46, -0.05, y);
+          this.ceilingGroup.add(strip);
+        }
       }
     }
   }
