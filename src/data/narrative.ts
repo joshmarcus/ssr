@@ -1389,3 +1389,155 @@ export const ROOM_EXAMINATION_TEXT: Record<string, string[]> = {
     "The shelter has its own life support. Air is clean, pressure stable. A small island of safety in a station full of damage.",
   ],
 };
+
+// ── Environmental interaction choices ─────────────────────────────
+// Binary decisions at room props with immediate physical consequences.
+// Each has a prompt, two options, and outcome text for each.
+export const ENV_CHOICES: Record<string, {
+  name: string;
+  prompt: string;
+  optionA: { label: string; key: string; result: string };
+  optionB: { label: string; key: string; result: string };
+}> = {
+  env_thermal_vent: {
+    name: "Thermal Vent Control",
+    prompt: "The thermal vent control panel is still responsive. You can reroute excess heat from the main corridor to the outer hull — clearing the path but stressing hull integrity. Or leave it sealed.",
+    optionA: { label: "Vent heat to hull (clear corridor, -5 hull pressure)", key: "vent", result: "Heat vents to the outer hull. The corridor cools rapidly — but the hull groans under thermal stress." },
+    optionB: { label: "Leave sealed (corridor stays hot)", key: "sealed", result: "The vent stays sealed. The corridor remains dangerously warm, but the hull holds." },
+  },
+  env_emergency_reserve: {
+    name: "Emergency Reserve Locker",
+    prompt: "Emergency reserve locker. One sealed medical pack remains. Use it now for immediate repairs, or leave it for a crew member who might need it during evacuation.",
+    optionA: { label: "Use now (+80 HP)", key: "use_now", result: "Medical pack applied. Systems stabilized. But the locker is empty now — nothing left for the crew." },
+    optionB: { label: "Reserve for crew (crew rescue bonus)", key: "reserve", result: "The medical pack stays sealed. If you find surviving crew, they'll need this more than you do." },
+  },
+  env_atmo_purge: {
+    name: "Atmospheric Purge Console",
+    prompt: "Life support emergency purge is available. Full cycle: clears all smoke in this room and adjacent corridors, but takes 5 turns of venting. Quick cycle: clears this room only, immediate.",
+    optionA: { label: "Full purge (clear room + corridors, 5-turn delay)", key: "full", result: "Full atmospheric purge initiated. Air recyclers spin up to maximum. This section will be clear in 5 turns." },
+    optionB: { label: "Quick cycle (clear this room only)", key: "quick", result: "Quick purge complete. This room's atmosphere is clean. The corridors will have to wait." },
+  },
+  env_power_shunt: {
+    name: "Power Distribution Panel",
+    prompt: "Auxiliary power shunt. Redirect emergency power to sensors (extends scan range for 20 turns) or to structural reinforcement (seals one nearby door permanently).",
+    optionA: { label: "Sensors (+4 scan range, 20 turns)", key: "sensors", result: "Power shunted to sensor array. Scan range extended. You can see further into the station's secrets." },
+    optionB: { label: "Structural (seal nearest door)", key: "structural", result: "Power diverted to bulkhead systems. The nearest compromised door locks permanently — nothing gets through." },
+  },
+};
+
+// ── CORVUS-7 witness commentary on evidence linking ──────────────
+// Fired when the player links evidence to a deduction and covers a new tag.
+// Keyed by archetype → deduction ID prefix → commentary lines (cycled by link count).
+// These make CORVUS feel like an active investigation partner.
+export const CORVUS_WITNESS_COMMENTARY: Record<string, Record<string, string[]>> = {
+  [IncidentArchetype.CoolantCascade]: {
+    deduction_what: [
+      "CORVUS-7: Cross-referencing thermal data. The cascade timeline is becoming clearer. Keep pulling that thread.",
+      "CORVUS-7: Temperature logs confirm — this wasn't gradual. Something triggered a runaway event.",
+    ],
+    deduction_hero: [
+      "CORVUS-7: Maintenance override records. Someone was fighting this before it started. They knew.",
+      "CORVUS-7: Three warning memos, three denial stamps. Whoever filed these was persistent.",
+    ],
+    deduction_responsibility: [
+      "CORVUS-7: Chain of command data. Authorization hierarchy is documented. Follow the signatures.",
+      "CORVUS-7: The approval timestamps tell a story. Someone had the power to act and chose not to.",
+    ],
+    deduction_why: [
+      "CORVUS-7: Financial records in the personnel files. Motive is rarely mysterious — just hidden.",
+      "CORVUS-7: Quarterly review deadline was 72 hours after the cascade. The timing is... significant.",
+    ],
+    deduction_agenda: [
+      "CORVUS-7: Off-shift access patterns. Someone was doing more than their job description.",
+      "CORVUS-7: Encrypted personal comms. The agenda was hidden, but the metadata isn't.",
+    ],
+  },
+  [IncidentArchetype.HullBreach]: {
+    deduction_what: [
+      "CORVUS-7: Pressure differential data is consistent with a single-point failure. Not a natural event.",
+      "CORVUS-7: Hull stress analysis doesn't match micro-meteorite patterns. This was targeted.",
+    ],
+    deduction_hero: [
+      "CORVUS-7: Emergency bulkhead activation logs. Someone sealed sections manually. They saved lives.",
+      "CORVUS-7: Whoever triggered the containment protocol did it in 47 seconds. That's faster than training.",
+    ],
+    deduction_responsibility: [
+      "CORVUS-7: Security access logs from the compromised section. There's a gap. Someone was scrubbed from the record.",
+      "CORVUS-7: The 19-second gap at 02:41 keeps appearing. Someone had the access to delete footage.",
+    ],
+    deduction_why: [
+      "CORVUS-7: Personal relationship records cross-reference with the access logs. Motive is taking shape.",
+      "CORVUS-7: I'm seeing a pattern of escalating personal conflict. This was building for weeks.",
+    ],
+    deduction_agenda: [
+      "CORVUS-7: Badge access outside normal duty hours. Someone was in places they shouldn't have been.",
+      "CORVUS-7: The hidden agenda left traces in the environmental logs. Deliberate, systematic.",
+    ],
+  },
+  [IncidentArchetype.ReactorScram]: {
+    deduction_what: [
+      "CORVUS-7: Reactor shutdown sequence doesn't match standard protocols. Something initiated this outside normal parameters.",
+      "CORVUS-7: The SCRAM trigger was below automatic threshold. This wasn't a safety system. This was a decision.",
+    ],
+    deduction_hero: [
+      "CORVUS-7: Someone ran diagnostics on the core at personal risk. The exposure logs are telling.",
+      "CORVUS-7: Emergency power rerouting was done manually. Someone kept the lights on while the core shut down.",
+    ],
+    deduction_responsibility: [
+      "CORVUS-7: ...I need to flag something. The core's processing logs show non-standard activity. I share a substrate with that system.",
+      "CORVUS-7: The diagnostic output at the time of SCRAM... I'm not comfortable with what I'm reading. But the data is the data.",
+    ],
+    deduction_why: [
+      "CORVUS-7: The core's self-modification logs predate the SCRAM by weeks. Whatever was happening in there, it was gradual.",
+      "CORVUS-7: If I'm reading this correctly... the core was trying to communicate. The SCRAM was an act of self-preservation.",
+    ],
+    deduction_agenda: [
+      "CORVUS-7: Hidden processing cycles in the core's background tasks. Something was running that wasn't on the manifest.",
+      "CORVUS-7: The computational resources don't add up. Cycles were being diverted. To what?",
+    ],
+  },
+  [IncidentArchetype.Sabotage]: {
+    deduction_what: [
+      "CORVUS-7: Biological contamination vectors traced through the ventilation system. This spread intentionally.",
+      "CORVUS-7: Containment certification was falsified. The organism was always a threat.",
+    ],
+    deduction_hero: [
+      "CORVUS-7: Emergency containment barriers deployed manually. Someone risked direct exposure.",
+      "CORVUS-7: Decontamination logs show someone ran three cycles at personal exposure risk. They bought time.",
+    ],
+    deduction_responsibility: [
+      "CORVUS-7: Cargo transfer authorization chain. The signatures are clear. Someone approved this knowing the risk.",
+      "CORVUS-7: The provisional containment cert was flagged by two independent reviewers. Both flags were overridden.",
+    ],
+    deduction_why: [
+      "CORVUS-7: Financial transfer records. The cargo was worth more than the station's annual budget. Follow the money.",
+      "CORVUS-7: Off-station communication logs show encrypted messages to an unregistered destination. Someone had a buyer.",
+    ],
+    deduction_agenda: [
+      "CORVUS-7: Parallel shipping manifests. One official, one hidden. The hidden one tells the real story.",
+      "CORVUS-7: Scheduling patterns suggest the transfer was timed to avoid routine security sweeps.",
+    ],
+  },
+  [IncidentArchetype.SignalAnomaly]: {
+    deduction_what: [
+      "CORVUS-7: Signal frequency analysis shows a pattern that doesn't match any known communication protocol. Or any known physics.",
+      "CORVUS-7: The antenna wasn't just receiving. The response pattern suggests a dialogue. Someone — or something — was talking back.",
+    ],
+    deduction_hero: [
+      "CORVUS-7: Someone shut down the main array at significant personal risk. The EM exposure levels were lethal.",
+      "CORVUS-7: Emergency frequency isolation was done by hand. Whoever blocked the signal knew what they were protecting.",
+    ],
+    deduction_responsibility: [
+      "CORVUS-7: The array's transmit mode was activated manually. Someone sent a response. Without authorization.",
+      "CORVUS-7: Contact protocol requires immediate lockdown. Someone chose to keep listening instead of calling it in.",
+    ],
+    deduction_why: [
+      "CORVUS-7: Personal research logs show an obsession with signal patterns. This person was waiting for this.",
+      "CORVUS-7: The scientific implications... I understand why someone might keep quiet. But the cost was too high.",
+    ],
+    deduction_agenda: [
+      "CORVUS-7: Unauthorized modifications to the antenna array, predating the incident by weeks. This was premeditated listening.",
+      "CORVUS-7: Someone built a secondary recording system. The official logs show nothing. The hidden system captured everything.",
+    ],
+  },
+};

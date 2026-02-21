@@ -206,6 +206,9 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
   // Place captain's secret log (hidden multi-step discovery)
   placeCaptainSecretLog(state, rooms);
 
+  // Place environmental choice consoles
+  placeEnvChoices(state, rooms);
+
   // Apply difficulty-based deterioration interval (archetype may override further)
   state.deteriorationInterval = DIFFICULTY_SETTINGS[difficulty].deteriorationInterval;
 
@@ -226,7 +229,8 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
 function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): void {
   switch (archetype) {
     case IncidentArchetype.CoolantCascade: {
-      // "The Whistleblower" — cascading thermal failure. Slightly more heat.
+      // "The Whistleblower" — cascading thermal failure.
+      // Existing: boost heat on hot tiles. NEW: two early corridors at 45 heat.
       for (let y = 0; y < state.height; y++) {
         for (let x = 0; x < state.width; x++) {
           const tile = state.tiles[y][x];
@@ -236,11 +240,27 @@ function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): 
           }
         }
       }
+      // Plant two early "cascade already in progress" heat corridors
+      let hotCorridorsPlaced = 0;
+      for (let y = 0; y < state.height && hotCorridorsPlaced < 2; y++) {
+        for (let x = 0; x < state.width && hotCorridorsPlaced < 2; x++) {
+          const tile = state.tiles[y][x];
+          if (tile.type === TileType.Corridor && tile.walkable && tile.heat === 0) {
+            const rng = ((state.seed + y * 53 + x * 29) >>> 0) % 12;
+            if (rng === 0) {
+              tile.heat = 45;
+              tile.smoke = 15;
+              hotCorridorsPlaced++;
+            }
+          }
+        }
+      }
       break;
     }
 
     case IncidentArchetype.HullBreach: {
-      // "The Murder" — structural failure. Slightly more pressure loss around breaches.
+      // "The Murder" — structural failure. Existing: deepen pressure loss.
+      // NEW: one mid-station room at critically low pressure (fragile sealed breach).
       for (let y = 0; y < state.height; y++) {
         for (let x = 0; x < state.width; x++) {
           const tile = state.tiles[y][x];
@@ -249,21 +269,44 @@ function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): 
           }
         }
       }
+      // Depressurize one mid-station room to show the breach was recent
+      const midRoomIdx = Math.floor(state.rooms.length * 0.35);
+      const depressRoom = state.rooms[midRoomIdx];
+      if (depressRoom) {
+        for (let ry = depressRoom.y; ry < depressRoom.y + depressRoom.height; ry++) {
+          for (let rx = depressRoom.x; rx < depressRoom.x + depressRoom.width; rx++) {
+            if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width && state.tiles[ry][rx].walkable) {
+              state.tiles[ry][rx].pressure = Math.min(state.tiles[ry][rx].pressure, 35);
+            }
+          }
+        }
+      }
       break;
     }
 
     case IncidentArchetype.ReactorScram: {
       // "The Rogue AI" — reactor emergency. Faster deterioration.
-      // Store a faster deterioration interval on the state (checked in hazards.ts)
       state.deteriorationInterval = (state.deteriorationInterval ?? DETERIORATION_INTERVAL) - 5;
-      // Add extra smoke in corridors (reactor venting)
+      // Existing: smoke in corridors. NEW: data core room gets elevated heat.
       for (let y = 0; y < state.height; y++) {
         for (let x = 0; x < state.width; x++) {
           const tile = state.tiles[y][x];
           if (tile.type === TileType.Corridor && tile.walkable) {
             const smokeRng = ((state.seed + y * 37 + x * 13) >>> 0) % 10;
-            if (smokeRng < 3) { // 30% of corridor tiles
+            if (smokeRng < 3) {
               tile.smoke = Math.min(100, tile.smoke + 12);
+            }
+          }
+        }
+      }
+      // Elevate temperature in the data core room (the reactor was running hot)
+      const dataCoreRoom = state.rooms.find(r => r.name === "Data Core");
+      if (dataCoreRoom) {
+        for (let ry = dataCoreRoom.y; ry < dataCoreRoom.y + dataCoreRoom.height; ry++) {
+          for (let rx = dataCoreRoom.x; rx < dataCoreRoom.x + dataCoreRoom.width; rx++) {
+            if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width && state.tiles[ry][rx].walkable) {
+              state.tiles[ry][rx].heat = Math.max(state.tiles[ry][rx].heat, 30);
+              state.tiles[ry][rx].smoke = Math.max(state.tiles[ry][rx].smoke, 8);
             }
           }
         }
@@ -272,8 +315,8 @@ function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): 
     }
 
     case IncidentArchetype.Sabotage: {
-      // "The Stowaway" — sabotage scenario. Add one extra hostile patrol drone.
-      // Existing drones keep their normal behaviour (become hostile later via deterioration).
+      // "The Stowaway" — sabotage scenario. Add extra hostile patrol drone.
+      // NEW: also add a light organic contamination (smoke) in cargo-adjacent rooms.
       const rooms = state.rooms;
       const extraDroneRoomIdx = Math.min(rooms.length - 1, Math.floor(rooms.length * 0.4));
       const room = rooms[extraDroneRoomIdx];
@@ -286,25 +329,52 @@ function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): 
           props: { hostile: true },
         });
       }
+      // Organic contamination: light smoke in cargo-area rooms
+      const contamRooms = ["Cargo Hold", "Engineering Storage", "Maintenance Corridor"];
+      for (const rName of contamRooms) {
+        const cRoom = state.rooms.find(r => r.name === rName);
+        if (cRoom) {
+          for (let ry = cRoom.y; ry < cRoom.y + cRoom.height; ry++) {
+            for (let rx = cRoom.x; rx < cRoom.x + cRoom.width; rx++) {
+              if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width && state.tiles[ry][rx].walkable) {
+                state.tiles[ry][rx].smoke = Math.max(state.tiles[ry][rx].smoke, 12);
+              }
+            }
+          }
+        }
+      }
       break;
     }
 
     case IncidentArchetype.SignalAnomaly: {
-      // "First Contact" — alien signal overloaded systems. Standard hazards,
-      // but add electromagnetic interference: random heat pockets in corridors
-      // (representing fried electrical systems from the signal overload)
+      // "First Contact" — alien signal overloaded systems.
+      // Existing: EM heat pockets. NEW: comms hub heavily damaged + signal interference flag.
       for (let y = 0; y < state.height; y++) {
         for (let x = 0; x < state.width; x++) {
           const tile = state.tiles[y][x];
           if (tile.type === TileType.Corridor && tile.walkable && tile.heat === 0) {
             const emRng = ((state.seed + y * 71 + x * 23) >>> 0) % 20;
-            if (emRng < 2) { // 10% of corridor tiles get fried-circuit heat pockets
+            if (emRng < 2) {
               tile.heat = 25 + (emRng * 8);
               tile.smoke = 5;
             }
           }
         }
       }
+      // Communications Hub shows heavy electromagnetic damage
+      const commsRoom = state.rooms.find(r => r.name === "Communications Hub");
+      if (commsRoom) {
+        for (let ry = commsRoom.y; ry < commsRoom.y + commsRoom.height; ry++) {
+          for (let rx = commsRoom.x; rx < commsRoom.x + commsRoom.width; rx++) {
+            if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width && state.tiles[ry][rx].walkable) {
+              state.tiles[ry][rx].heat = Math.max(state.tiles[ry][rx].heat, 35);
+              state.tiles[ry][rx].smoke = Math.max(state.tiles[ry][rx].smoke, 10);
+            }
+          }
+        }
+      }
+      // Set signal interference flag for first 3 turns (checked in step.ts)
+      state.milestones.add("signal_interference_active");
       break;
     }
   }
@@ -2344,6 +2414,54 @@ function placeCaptainSecretLog(state: GameState, rooms: DiggerRoom[]): void {
         text: "",  // Overridden by step.ts handler
         read: false,
         captainSecretLog: true,
+      },
+    });
+  }
+}
+
+/**
+ * Place environmental interaction choice consoles in specific rooms.
+ * Each offers a binary decision with immediate physical consequences.
+ */
+function placeEnvChoices(state: GameState, rooms: DiggerRoom[]): void {
+  const n = rooms.length;
+  if (n < 6) return;
+
+  // Map env choice IDs to target rooms
+  const placements: { choiceId: string; roomName: string; offset: [number, number] }[] = [
+    { choiceId: "env_thermal_vent", roomName: "Power Relay Junction", offset: [0, -1] },
+    { choiceId: "env_emergency_reserve", roomName: "Med Bay", offset: [1, 0] },
+    { choiceId: "env_atmo_purge", roomName: "Life Support", offset: [0, 1] },
+    { choiceId: "env_power_shunt", roomName: "Auxiliary Power", offset: [-1, 0] },
+  ];
+
+  for (const pl of placements) {
+    const roomIdx = state.rooms.findIndex(r => r.name === pl.roomName);
+    if (roomIdx < 0 || roomIdx >= n) continue;
+
+    const room = rooms[roomIdx];
+    const pos = getRoomPos(room, pl.offset[0], pl.offset[1]);
+
+    // Don't place on existing entity
+    let occupied = false;
+    for (const [, entity] of state.entities) {
+      if (entity.pos.x === pos.x && entity.pos.y === pos.y) {
+        occupied = true;
+        break;
+      }
+    }
+    if (occupied) continue;
+
+    state.entities.set(pl.choiceId, {
+      id: pl.choiceId,
+      type: EntityType.Console,
+      pos,
+      props: {
+        name: pl.choiceId,  // Resolved by step.ts using ENV_CHOICES lookup
+        text: "",
+        read: false,
+        envChoice: true,
+        envChoiceId: pl.choiceId,
       },
     });
   }

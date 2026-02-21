@@ -41,6 +41,7 @@ import {
   CORVUS_FINAL_APPROACH,
   CORVUS_MISSION_BRIEFING,
   PACING_NUDGE_CLEAN, PACING_NUDGE_INVESTIGATE, PACING_NUDGE_RECOVER, PACING_NUDGE_EVACUATE,
+  CORVUS_WITNESS_COMMENTARY,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
@@ -771,6 +772,12 @@ function initGame(): void {
     for (const line of CORVUS_MISSION_BRIEFING[briefingArchetype]) {
       display.addLog(line, "narrative");
     }
+  }
+
+  // Signal interference static burst (SignalAnomaly opening)
+  if (state.milestones.has("signal_interference_active")) {
+    display.addLog("▓▓▓ ELECTROMAGNETIC INTERFERENCE DETECTED ▓▓▓", "critical");
+    display.addLog("Station communications array is broadcasting at high power. Sensor systems degraded. Expect instrument disruption.", "system");
   }
 
   display.addLog("Use arrow keys or h/j/k/l to move. Approach objects and press [i] to interact.", "system");
@@ -3515,6 +3522,18 @@ function handleHubConnectionsInput(e: KeyboardEvent): void {
                 hubLinkFeedback = "";
               }
               audio.playDeductionReady();
+
+              // CORVUS-7 witness commentary on evidence linking
+              const witnessArchetype = state.mystery?.timeline?.archetype;
+              if (witnessArchetype) {
+                const deductionPrefix = deduction.id.replace(/_[0-9]+$/, ""); // e.g. "deduction_what"
+                const pool = CORVUS_WITNESS_COMMENTARY[witnessArchetype]?.[deductionPrefix];
+                if (pool && pool.length > 0) {
+                  const linkedCount = hubLinkedEvidence.length;
+                  const line = pool[(linkedCount - 1) % pool.length];
+                  display.addLog(line, "narrative");
+                }
+              }
             } else {
               hubLinkFeedback = "This evidence doesn't add new insight to this question.";
             }

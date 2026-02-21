@@ -1,4 +1,4 @@
-import type { Action, GameState, Entity, LogEntry, Attachment, JournalEntry, Room, EvacuationState } from "../shared/types.js";
+import type { Action, GameState, Entity, LogEntry, Attachment, JournalEntry, Room, EvacuationState, MysteryChoice } from "../shared/types.js";
 import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType, CrewRole, CrewFate, IncidentArchetype } from "../shared/types.js";
 import {
   GLYPHS, PATROL_DRONE_DAMAGE, PATROL_DRONE_STUN_TURNS, PATROL_DRONE_SPEED,
@@ -21,6 +21,7 @@ import {
   CAPTAIN_SECRET_LOG_HINT, CAPTAIN_OVERRIDE_FOUND,
   CAPTAIN_SECRET_LOG, CAPTAIN_SECRET_JOURNAL_SUMMARY,
   ROOM_EXAMINATION_TEXT,
+  ENV_CHOICES,
 } from "../data/narrative.js";
 
 /**
@@ -2983,6 +2984,65 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         break;
       }
 
+      // ── Environmental interaction choices ──
+      if (target.props["envChoice"] === true) {
+        const choiceId = target.props["envChoiceId"] as string;
+        const choiceDef = ENV_CHOICES[choiceId];
+        if (!choiceDef) break;
+
+        if (target.props["envChoiceResult"]) {
+          // Already resolved
+          next.logs = [...state.logs, { id: `log_env_done_${targetId}_${next.turn}`, timestamp: next.turn, source: "system", text: `${choiceDef.name}: Decision already made.`, read: false }];
+          break;
+        }
+
+        if (target.props["envChoicePresented"] === true) {
+          // Second interaction: player chose option A (interact again = confirm first option)
+          // We use a toggle: first interact shows prompt, second interact picks A,
+          // third (if somehow possible) would be B. But for simplicity: interact = A, wait+interact = B
+          // Actually, let's do it via the pending choice system instead.
+          // For now: first interact = show prompt + pick A automatically after next interact
+          // Let's handle this differently: use milestone to track which option
+          // Simplest approach: present two options as [1] and [2] in the prompt,
+          // and the answerKey from action determines which
+        }
+
+        // Present the choice — mark as presented
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, { ...target, props: { ...target.props, envChoicePresented: true } });
+        next = { ...next, entities: newEntities };
+
+        // Create a pending mystery choice for this environmental decision
+        if (next.mystery) {
+          const envChoice: MysteryChoice = {
+            id: choiceId,
+            prompt: choiceDef.prompt,
+            options: [
+              { label: choiceDef.optionA.label, key: choiceDef.optionA.key },
+              { label: choiceDef.optionB.label, key: choiceDef.optionB.key },
+            ],
+            turnPresented: next.turn,
+            consequence: `env_${choiceId}`,
+          };
+          // Add to choices list if not already there
+          if (!next.mystery.choices.some(c => c.id === choiceId)) {
+            next.mystery = {
+              ...next.mystery,
+              choices: [...next.mystery.choices, envChoice],
+              pendingChoice: envChoice,
+            };
+          } else {
+            next.mystery = { ...next.mystery, pendingChoice: envChoice };
+          }
+        }
+
+        next.logs = [
+          ...state.logs,
+          { id: `log_env_prompt_${targetId}_${next.turn}`, timestamp: next.turn, source: "narrative", text: `[${choiceDef.name}] ${choiceDef.prompt}`, read: false },
+        ];
+        break;
+      }
+
       const consoleName = (target.props["name"] as string) || "Console";
       const consoleText = (target.props["text"] as string) || "The console is offline.";
       const alreadyRead = target.props["read"] === true;
@@ -3048,6 +3108,20 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
  * Always provides a basic scan; additional sensors reveal more data.
  */
 function handleScan(state: GameState): GameState {
+  // Signal interference (SignalAnomaly, first 3 turns): scan returns static
+  if (state.milestones.has("signal_interference_active") && state.turn <= 3) {
+    return {
+      ...state,
+      logs: [...state.logs, {
+        id: `log_scan_interference_${state.turn}`,
+        timestamp: state.turn,
+        source: "system",
+        text: "SENSOR INTERFERENCE — Electromagnetic noise from the communications array is overwhelming sensor inputs. Instruments recalibrating...",
+        read: false,
+      }],
+    };
+  }
+
   const sensors = state.player.sensors ?? [];
   const px = state.player.entity.pos.x;
   const py = state.player.entity.pos.y;
@@ -4031,6 +4105,131 @@ function applyChoiceConsequence(state: GameState, consequence: string, answerKey
             read: false,
           }];
         }
+      }
+      break;
+    }
+
+    // ── Environmental interaction choice consequences ──
+    case "env_env_thermal_vent": {
+      const choiceDef = ENV_CHOICES["env_thermal_vent"];
+      if (answerKey === "vent") {
+        // Clear heat in nearby corridors, reduce pressure slightly
+        const newTiles = next.tiles.map(row => row.map(t => ({ ...t })));
+        for (let dy = -4; dy <= 4; dy++) {
+          for (let dx = -4; dx <= 4; dx++) {
+            const vx = px + dx; const vy = py + dy;
+            if (vx >= 0 && vx < next.width && vy >= 0 && vy < next.height && newTiles[vy][vx].walkable) {
+              newTiles[vy][vx].heat = Math.max(0, newTiles[vy][vx].heat - 20);
+              newTiles[vy][vx].pressure = Math.max(20, newTiles[vy][vx].pressure - 5);
+            }
+          }
+        }
+        next.tiles = newTiles;
+        next.logs = [...next.logs, { id: `log_env_fx_vent_${next.turn}`, timestamp: next.turn, source: "system", text: choiceDef.optionA.result, read: false }];
+      } else {
+        next.logs = [...next.logs, { id: `log_env_fx_vent_${next.turn}`, timestamp: next.turn, source: "system", text: choiceDef.optionB.result, read: false }];
+      }
+      // Mark console as resolved
+      const ventEntity = [...next.entities].find(([, e]) => e.props["envChoiceId"] === "env_thermal_vent");
+      if (ventEntity) {
+        const newEntities = new Map(next.entities);
+        newEntities.set(ventEntity[0], { ...ventEntity[1], props: { ...ventEntity[1].props, envChoiceResult: answerKey, read: true } });
+        next.entities = newEntities;
+      }
+      break;
+    }
+    case "env_env_emergency_reserve": {
+      const choiceDef = ENV_CHOICES["env_emergency_reserve"];
+      if (answerKey === "use_now") {
+        next.player = { ...next.player, hp: Math.min(next.player.maxHp, next.player.hp + 80) };
+        next.logs = [...next.logs, { id: `log_env_fx_reserve_${next.turn}`, timestamp: next.turn, source: "system", text: choiceDef.optionA.result + " (+80 HP)", read: false }];
+      } else {
+        // Reserve for crew: add milestone that boosts crew HP when found
+        const newMilestones = new Set(next.milestones);
+        newMilestones.add("env_reserve_for_crew");
+        next = { ...next, milestones: newMilestones };
+        next.logs = [...next.logs, { id: `log_env_fx_reserve_${next.turn}`, timestamp: next.turn, source: "system", text: choiceDef.optionB.result, read: false }];
+      }
+      const resEntity = [...next.entities].find(([, e]) => e.props["envChoiceId"] === "env_emergency_reserve");
+      if (resEntity) {
+        const newEntities = new Map(next.entities);
+        newEntities.set(resEntity[0], { ...resEntity[1], props: { ...resEntity[1].props, envChoiceResult: answerKey, read: true } });
+        next.entities = newEntities;
+      }
+      break;
+    }
+    case "env_env_atmo_purge": {
+      const choiceDef = ENV_CHOICES["env_atmo_purge"];
+      const room = next.rooms.find(r =>
+        px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height);
+      if (answerKey === "full") {
+        // Clear smoke in current room + all adjacent tiles in a wider radius
+        const newTiles = next.tiles.map(row => row.map(t => ({ ...t })));
+        for (let dy = -6; dy <= 6; dy++) {
+          for (let dx = -6; dx <= 6; dx++) {
+            const vx = px + dx; const vy = py + dy;
+            if (vx >= 0 && vx < next.width && vy >= 0 && vy < next.height && newTiles[vy][vx].walkable) {
+              newTiles[vy][vx].smoke = 0;
+            }
+          }
+        }
+        next.tiles = newTiles;
+        next.logs = [...next.logs, { id: `log_env_fx_purge_${next.turn}`, timestamp: next.turn, source: "system", text: choiceDef.optionA.result, read: false }];
+      } else {
+        // Quick cycle: clear smoke in current room only
+        if (room) {
+          const newTiles = next.tiles.map(row => row.map(t => ({ ...t })));
+          for (let ry = room.y; ry < room.y + room.height; ry++) {
+            for (let rx = room.x; rx < room.x + room.width; rx++) {
+              if (ry >= 0 && ry < next.height && rx >= 0 && rx < next.width) {
+                newTiles[ry][rx].smoke = 0;
+              }
+            }
+          }
+          next.tiles = newTiles;
+        }
+        next.logs = [...next.logs, { id: `log_env_fx_purge_${next.turn}`, timestamp: next.turn, source: "system", text: choiceDef.optionB.result, read: false }];
+      }
+      const purgeEntity = [...next.entities].find(([, e]) => e.props["envChoiceId"] === "env_atmo_purge");
+      if (purgeEntity) {
+        const newEntities = new Map(next.entities);
+        newEntities.set(purgeEntity[0], { ...purgeEntity[1], props: { ...purgeEntity[1].props, envChoiceResult: answerKey, read: true } });
+        next.entities = newEntities;
+      }
+      break;
+    }
+    case "env_env_power_shunt": {
+      const choiceDef = ENV_CHOICES["env_power_shunt"];
+      if (answerKey === "sensors") {
+        // Extend scan range for 20 turns via milestone
+        const newMilestones = new Set(next.milestones);
+        newMilestones.add("env_sensor_boost");
+        next = { ...next, milestones: newMilestones };
+        // Store the turn so it expires after 20 turns
+        next.player = { ...next.player, entity: { ...next.player.entity, props: { ...next.player.entity.props, sensorBoostTurn: next.turn } } };
+        next.logs = [...next.logs, { id: `log_env_fx_shunt_${next.turn}`, timestamp: next.turn, source: "system", text: choiceDef.optionA.result, read: false }];
+      } else {
+        // Seal nearest open door
+        const newEntities = new Map(next.entities);
+        let sealed = false;
+        for (const [eid, e] of newEntities) {
+          if (e.type !== EntityType.ClosedDoor) continue;
+          if (e.props["locked"] === true) continue;
+          const dist = Math.abs(e.pos.x - px) + Math.abs(e.pos.y - py);
+          if (dist < 15) {
+            newEntities.set(eid, { ...e, props: { ...e.props, locked: true, reinforced: true } });
+            next.entities = newEntities;
+            sealed = true;
+            break;
+          }
+        }
+        next.logs = [...next.logs, { id: `log_env_fx_shunt_${next.turn}`, timestamp: next.turn, source: "system", text: choiceDef.optionB.result + (sealed ? "" : " (No compromised door nearby.)"), read: false }];
+      }
+      const shuntEntity = [...next.entities].find(([, e]) => e.props["envChoiceId"] === "env_power_shunt");
+      if (shuntEntity) {
+        const newEntities = new Map(next.entities);
+        newEntities.set(shuntEntity[0], { ...shuntEntity[1], props: { ...shuntEntity[1].props, envChoiceResult: answerKey, read: true } });
+        next.entities = newEntities;
       }
       break;
     }
