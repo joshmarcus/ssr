@@ -1,10 +1,10 @@
 # SSR — Project Status
 
-*Last updated: 2026-02-20*
+*Last updated: 2026-02-21*
 
 ## Current State
 
-- **Phase**: Sprint 72 complete (Clue Clarity Rework + Atmospheric Active Scan)
+- **Phase**: Sprint 73 in progress (3D Visual Mode Restoration + Enhancement)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -93,6 +93,7 @@
 - Signal interference: first 3 turns suppress scan on SignalAnomaly with static-burst opening
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
+- **3D mode** (default, toggle F3): Full Three.js renderer with Synty POLYGON Sci-Fi Space models, room decorations, entity animations, atmospheric particles, room lighting, movement trail, nebula backdrop
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
 - **Spatial investigation**: Evidence access requires puzzle solving, sensors, and urgency:
   - Puzzle-gated terminals: 3 log terminals offline until relay milestones (first_relay, all_relays)
@@ -104,6 +105,37 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 73 Changes (In Progress)
+
+### 3D Mode Restoration — Synty POLYGON Sci-Fi Space Pack
+- **Default to 3D mode**: Game now launches in 3D (toggle with F3)
+- **Synty model pipeline**: FBX→GLB conversion via `convert-space-models.ts` (65 models)
+- **Texture atlas loading**: Runtime atlas application for models without embedded textures
+- **All 25 entity types mapped** to Synty Space GLB models with per-type scaling
+- **Tile models**: Synty wall, floor, corner wall, and doorframe building pieces
+- **MeshStandardMaterial**: Proper textured rendering with roughness/metalness
+
+### 3D Visual Polish
+- **Smooth movement**: Lerp interpolation (speed=12) for player, camera, and light
+- **Room-specific lighting**: Colored PointLights at room centers for all 21 room types
+- **Room wall tints**: Every room has a distinct wall color for visual identity
+- **Atmospheric fog**: Subtle edge fade (14-28 range) for depth
+- **Starfield background**: 400 star points in a dome below the station
+- **Nebula shader backdrop**: Dark blue-purple gradient plane with animated swirl
+- **Ambient dust particles**: 80 floating motes near the camera with drift animation
+- **Player movement trail**: 12 fading green dots behind Sweepo during movement
+- **Entity glow lights**: Colored point lights on DataCore, Relay, Breach, SensorPickup, EscapePod, MedKit
+- **Entity animations**: Relay spin, DataCore orbit, Breach pulse, drone hover, terminal screen flicker, sensor pickup hover/spin, tool bob, medkit pulse, power cell flicker
+- **Room decorations**: Thematic prop placement for all 21 room types (medical beds, barrels, screens, etc.)
+- **Door orientation**: Doorframe models face corridor direction
+- **Room name banner**: Floating HUD banner with zone tag on room entry (fade in/out)
+- **3D UI styling**: Semi-transparent panel with green glow accents, backdrop blur
+- **Viewport vignette**: CSS radial gradient for cinematic framing
+- **Outline effect**: Dark mesh outlines via Three.js OutlineEffect
+
+### Branding
+- **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
 
 ## Sprint 72 Changes
 
