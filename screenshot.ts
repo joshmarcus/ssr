@@ -31,6 +31,7 @@ function parseArgs(): {
   width: number;
   height: number;
   difficulty: string;
+  mode3d: boolean;
 } {
   const args = process.argv.slice(2);
   const opts = {
@@ -41,6 +42,7 @@ function parseArgs(): {
     width: 1280,
     height: 800,
     difficulty: "normal",
+    mode3d: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -52,6 +54,7 @@ function parseArgs(): {
       case "--width": opts.width = parseInt(args[++i], 10); break;
       case "--height": opts.height = parseInt(args[++i], 10); break;
       case "--difficulty": opts.difficulty = args[++i]; break;
+      case "--3d": opts.mode3d = true; break;
     }
   }
   return opts;
@@ -113,11 +116,21 @@ async function main(): Promise<void> {
 
   try {
     // Launch browser
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({
+      headless: true,
+      args: ['--enable-webgl', '--use-gl=swiftshader'],
+    });
     const context = await browser.newContext({
       viewport: { width: opts.width, height: opts.height },
     });
     const page = await context.newPage();
+
+    // Capture console errors/warnings from the browser
+    page.on("console", (msg) => {
+      if (msg.type() === "error" || msg.type() === "warning") {
+        console.log(`[browser ${msg.type()}] ${msg.text()}`);
+      }
+    });
 
     // Navigate to game with seed (Vite base is /ssr/, root is src/)
     // Ensure trailing slash on base URL so query params work
@@ -144,6 +157,37 @@ async function main(): Promise<void> {
 
     // Wait for ROT.js canvas to render
     await page.waitForTimeout(300);
+
+    // Toggle 3D mode if requested
+    if (opts.mode3d) {
+      console.log("[screenshot] Switching to 3D mode (F3)...");
+      // First move once to clear any pending state
+      await page.keyboard.press(".");
+      await page.waitForTimeout(200);
+      // Dispatch F3 via page.evaluate to ensure it reaches the handler
+      await page.evaluate(() => {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "F3", code: "F3", bubbles: true }));
+      });
+      // Wait for Three.js scene to initialize and models to load
+      await page.waitForTimeout(8000);
+      // Check if 3D mode is active
+      const logText = await page.evaluate(() => {
+        const logs = document.querySelectorAll('.log');
+        const arr: string[] = [];
+        logs.forEach(l => arr.push(l.textContent || ''));
+        return arr.join('\n');
+      });
+      const is3d = logText.includes('[3D MODE]');
+      console.log(`[screenshot] 3D mode active: ${is3d}`);
+      if (!is3d) {
+        // Try again
+        console.log("[screenshot] Retrying F3 toggle...");
+        await page.evaluate(() => {
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "F3", code: "F3", bubbles: true }));
+        });
+        await page.waitForTimeout(8000);
+      }
+    }
 
     // Auto-explore for N turns if requested
     if (opts.turns > 0) {

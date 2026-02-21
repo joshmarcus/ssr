@@ -82,16 +82,18 @@ function makeToonMaterial(opts: {
   opacity?: number;
   map?: THREE.Texture | null;
 }): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
+  const matOpts: THREE.MeshStandardMaterialParameters = {
     color: opts.color,
     emissive: opts.emissive ?? 0x000000,
     emissiveIntensity: opts.emissiveIntensity ?? 0,
     transparent: opts.transparent ?? false,
     opacity: opts.opacity ?? 1.0,
-    map: opts.map ?? undefined,
     roughness: 0.7,
     metalness: 0.1,
-  });
+  };
+  // Only set map if it's an actual texture (avoids THREE.Material "undefined" warning)
+  if (opts.map) matOpts.map = opts.map;
+  return new THREE.MeshStandardMaterial(matOpts);
 }
 
 // ── Color constants ──────────────────────────────────────────────
@@ -384,6 +386,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Room lights (colored point lights at room centers)
   private roomLights: Map<string, THREE.PointLight> = new Map();
   private corridorLitTiles: Set<string> = new Set();
+  private corridorDecorTiles: Set<string> = new Set();
 
   // Synty texture atlas (loaded at startup, applied to models that lack embedded textures)
   private syntyAtlas: THREE.Texture | null = null;
@@ -535,10 +538,17 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.add(this.entityGroup);
 
     // ── Interaction indicator (floating diamond above nearest interactable) ──
-    const indicatorGeo = new THREE.OctahedronGeometry(0.12, 0);
-    const indicatorMat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.8 });
+    const indicatorGeo = new THREE.OctahedronGeometry(0.18, 0);
+    const indicatorMat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.9 });
     this.interactionIndicator = new THREE.Mesh(indicatorGeo, indicatorMat);
     this.interactionIndicator.visible = false;
+    // Add glow ring beneath indicator
+    const ringGeo = new THREE.RingGeometry(0.25, 0.38, 24);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.y = -0.5; // below the diamond
+    this.interactionIndicator.add(ring);
     this.scene.add(this.interactionIndicator);
 
     // ── Decoration group (room props) ──
@@ -1274,10 +1284,17 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.playerLight.intensity = 2.5 + Math.sin(elapsed * 1.5) * 0.3;
     }
 
-    // Interaction indicator: bob and spin
+    // Interaction indicator: bob, spin, and ring pulse
     if (this.interactionIndicator && this.interactionIndicator.visible) {
-      this.interactionIndicator.position.y = 1.8 + Math.sin(elapsed * 3) * 0.1;
+      this.interactionIndicator.position.y = 1.8 + Math.sin(elapsed * 3) * 0.12;
       this.interactionIndicator.rotation.y = elapsed * 2;
+      // Pulse ring opacity
+      const ring = this.interactionIndicator.children[0];
+      if (ring instanceof THREE.Mesh) {
+        (ring.material as THREE.MeshBasicMaterial).opacity = 0.25 + Math.sin(elapsed * 4) * 0.2;
+        const s = 1 + Math.sin(elapsed * 3) * 0.15;
+        ring.scale.set(s, 1, s);
+      }
     }
 
     // Room lights: emergency flicker for red/amber lights
@@ -1418,6 +1435,30 @@ export class BrowserDisplay3D implements IGameDisplay {
                 }
                 break;
               }
+            }
+          }
+
+          // Ambient hazard floor tinting (always visible, subtle)
+          if (tile.visible && this.sensorMode === SensorType.Cleanliness) {
+            // Without a sensor overlay, show subtle hazard hints
+            if (tile.heat >= HEAT_PAIN_THRESHOLD) {
+              // Dangerous heat: warm red-orange tint
+              const hf = Math.min(1, tile.heat / 100);
+              const r = ((baseColor >> 16) & 0xff);
+              const g = ((baseColor >> 8) & 0xff);
+              const b = (baseColor & 0xff);
+              baseColor = (Math.min(255, Math.round(r + hf * 80)) << 16) |
+                          (Math.max(0, Math.round(g - hf * 20)) << 8) |
+                          Math.max(0, Math.round(b - hf * 40));
+            } else if (tile.pressure < 40) {
+              // Vacuum: subtle blue tint
+              const pf = Math.max(0, 1 - tile.pressure / 40);
+              const r = ((baseColor >> 16) & 0xff);
+              const g = ((baseColor >> 8) & 0xff);
+              const b = (baseColor & 0xff);
+              baseColor = (Math.max(0, Math.round(r - pf * 30)) << 16) |
+                          (Math.max(0, Math.round(g - pf * 10)) << 8) |
+                          Math.min(255, Math.round(b + pf * 50));
             }
           }
 
@@ -2028,6 +2069,91 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.scene.add(corridorLight);
       }
     }
+
+    // Corridor wall decorations: pipes/wires along corridor walls
+    const corridorPropModels = [
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+    ];
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const key = `${x},${y}`;
+        if (this.corridorDecorTiles.has(key)) continue;
+        const tile = state.tiles[y][x];
+        if (tile.type !== TileType.Wall || !tile.explored) continue;
+        // Only every 4th tile for performance
+        if ((x * 7 + y * 13) % 4 !== 0) continue;
+        // Must border a corridor tile
+        const hasCorridorN = y > 0 && state.tiles[y - 1][x].type === TileType.Corridor;
+        const hasCorridorS = y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Corridor;
+        const hasCorridorE = x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Corridor;
+        const hasCorridorW = x > 0 && state.tiles[y][x - 1].type === TileType.Corridor;
+        if (!hasCorridorN && !hasCorridorS && !hasCorridorE && !hasCorridorW) continue;
+        // Don't place near room walls (already have room wall props)
+        let nearRoom = false;
+        for (const room of state.rooms) {
+          if (x >= room.x - 1 && x <= room.x + room.width &&
+              y >= room.y - 1 && y <= room.y + room.height) {
+            nearRoom = true;
+            break;
+          }
+        }
+        if (nearRoom) continue;
+
+        this.corridorDecorTiles.add(key);
+        const modelPath = corridorPropModels[(x + y) % corridorPropModels.length];
+        let rot = 0;
+        if (hasCorridorN) rot = 0;
+        else if (hasCorridorS) rot = Math.PI;
+        else if (hasCorridorE) rot = -Math.PI / 2;
+        else if (hasCorridorW) rot = Math.PI / 2;
+
+        const cached = this.gltfCache.get(modelPath);
+        if (cached) {
+          const clone = cached.clone();
+          const box = new THREE.Box3().setFromObject(clone);
+          const sz = new THREE.Vector3();
+          box.getSize(sz);
+          const maxDim = Math.max(sz.x, sz.y, sz.z);
+          if (maxDim > 0) clone.scale.multiplyScalar(0.4 / maxDim);
+          clone.position.set(x, 0.8, y);
+          clone.rotation.y = rot;
+          this.decorationGroup.add(clone);
+        } else {
+          const capturedX = x, capturedY = y, capturedRot = rot;
+          const url = import.meta.env.BASE_URL + modelPath;
+          this.gltfLoader.load(url, (gltf) => {
+            try {
+              const model = gltf.scene.clone();
+              model.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  const oldMat = mats[0] as THREE.MeshStandardMaterial;
+                  const hasUVs = !!(child.geometry?.attributes?.uv);
+                  let tex = hasUVs && oldMat?.map ? oldMat.map : null;
+                  if (!tex && hasUVs && this.syntyAtlas) tex = this.syntyAtlas;
+                  child.material = makeToonMaterial({
+                    color: tex ? 0xffffff : (oldMat?.color?.getHex() ?? 0x666677),
+                    gradientMap: this.toonGradient,
+                    map: tex,
+                  });
+                }
+              });
+              this.gltfCache.set(modelPath, model);
+              const clone = model.clone();
+              const box = new THREE.Box3().setFromObject(clone);
+              const sz = new THREE.Vector3();
+              box.getSize(sz);
+              const maxDim = Math.max(sz.x, sz.y, sz.z);
+              if (maxDim > 0) clone.scale.multiplyScalar(0.4 / maxDim);
+              clone.position.set(capturedX, 0.8, capturedY);
+              clone.rotation.y = capturedRot;
+              this.decorationGroup.add(clone);
+            } catch (e) { /* ignore load failure */ }
+          }, undefined, () => {});
+        }
+      }
+    }
   }
 
   // ── Private: entity mesh management ─────────────────────────────
@@ -2141,18 +2267,21 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Entity types that get a small colored point light for visual emphasis
   private static readonly ENTITY_GLOW_LIGHTS: Partial<Record<string, { color: number; intensity: number; distance: number }>> = {
-    [EntityType.DataCore]: { color: 0xff44ff, intensity: 1.5, distance: 6 },
-    [EntityType.Relay]: { color: 0xffcc00, intensity: 1.0, distance: 5 },
-    [EntityType.Breach]: { color: 0xff2200, intensity: 1.2, distance: 5 },
-    [EntityType.SensorPickup]: { color: 0x00ffee, intensity: 0.7, distance: 4 },
-    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 0.8, distance: 5 },
-    [EntityType.MedKit]: { color: 0xff4444, intensity: 0.5, distance: 3 },
-    [EntityType.EvidenceTrace]: { color: 0xffaa00, intensity: 0.8, distance: 4 },
-    [EntityType.CrewNPC]: { color: 0xffcc88, intensity: 0.6, distance: 4 },
-    [EntityType.LogTerminal]: { color: 0x66ccff, intensity: 0.5, distance: 3 },
-    [EntityType.SecurityTerminal]: { color: 0x44aaff, intensity: 0.5, distance: 3 },
-    [EntityType.Console]: { color: 0x66aaff, intensity: 0.4, distance: 3 },
-    [EntityType.PowerCell]: { color: 0xffdd44, intensity: 0.5, distance: 3 },
+    [EntityType.DataCore]: { color: 0xff44ff, intensity: 2.0, distance: 8 },
+    [EntityType.Relay]: { color: 0xffcc00, intensity: 1.4, distance: 6 },
+    [EntityType.Breach]: { color: 0xff2200, intensity: 1.5, distance: 6 },
+    [EntityType.SensorPickup]: { color: 0x00ffee, intensity: 1.0, distance: 5 },
+    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 1.0, distance: 6 },
+    [EntityType.MedKit]: { color: 0xff4444, intensity: 0.7, distance: 4 },
+    [EntityType.EvidenceTrace]: { color: 0xffaa00, intensity: 1.2, distance: 5 },
+    [EntityType.CrewNPC]: { color: 0xffcc88, intensity: 0.8, distance: 5 },
+    [EntityType.LogTerminal]: { color: 0x66ccff, intensity: 0.7, distance: 4 },
+    [EntityType.SecurityTerminal]: { color: 0x44aaff, intensity: 0.7, distance: 4 },
+    [EntityType.Console]: { color: 0x66aaff, intensity: 0.6, distance: 4 },
+    [EntityType.PowerCell]: { color: 0xffdd44, intensity: 0.7, distance: 4 },
+    [EntityType.FuseBox]: { color: 0xdd8800, intensity: 0.6, distance: 3 },
+    [EntityType.PressureValve]: { color: 0x44bbaa, intensity: 0.5, distance: 3 },
+    [EntityType.RepairCradle]: { color: 0xaaff66, intensity: 0.5, distance: 4 },
   };
 
   private createEntityMesh(entity: Entity): THREE.Object3D {
@@ -2173,6 +2302,13 @@ export class BrowserDisplay3D implements IGameDisplay {
         const glow = new THREE.PointLight(glowDef.color, glowDef.intensity, glowDef.distance);
         glow.position.set(0, 0.5, 0);
         group.add(glow);
+        // Apply emissive to the model itself for self-illumination
+        clone.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.emissive = new THREE.Color(glowDef.color);
+            child.material.emissiveIntensity = 0.15;
+          }
+        });
       }
 
       return group;
@@ -3151,6 +3287,29 @@ export class BrowserDisplay3D implements IGameDisplay {
       const offset = Math.floor(dotSize / 2);
       ctx.fillStyle = color;
       ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
+    }
+
+    // Room boundary outlines for readability
+    for (const room of state.rooms) {
+      const rcx = room.x + Math.floor(room.width / 2);
+      const rcy = room.y + Math.floor(room.height / 2);
+      if (rcy >= 0 && rcy < state.height && rcx >= 0 && rcx < state.width && state.tiles[rcy][rcx].explored) {
+        const rx = Math.floor(room.x * scale);
+        const ry = Math.floor(room.y * scale);
+        const rw = Math.ceil(room.width * scale);
+        const rh = Math.ceil(room.height * scale);
+        const tint = ROOM_WALL_TINTS_3D[room.name];
+        if (tint) {
+          const tr = (tint >> 16) & 0xff;
+          const tg = (tint >> 8) & 0xff;
+          const tb = tint & 0xff;
+          ctx.strokeStyle = `rgba(${tr}, ${tg}, ${tb}, 0.6)`;
+        } else {
+          ctx.strokeStyle = "rgba(100, 120, 140, 0.4)";
+        }
+        ctx.lineWidth = 1;
+        ctx.strokeRect(rx, ry, rw, rh);
+      }
     }
 
     // Player: bright green dot with white border, larger
