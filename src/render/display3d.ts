@@ -343,6 +343,12 @@ export class BrowserDisplay3D implements IGameDisplay {
   private dustParticles: THREE.Points | null = null;
   private starfieldPoints: THREE.Points | null = null;
 
+  // Player movement trail
+  private trailPoints: THREE.Points | null = null;
+  private trailPositions: Float32Array = new Float32Array(0);
+  private trailOpacities: Float32Array = new Float32Array(0);
+  private static readonly TRAIL_LENGTH = 12;
+
   constructor(container: HTMLElement, mapWidth?: number, mapHeight?: number) {
     this.container = container;
     this.mapWidth = mapWidth ?? DEFAULT_MAP_WIDTH;
@@ -486,6 +492,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Ambient dust particles (floating motes near the camera) ──
     this.createDustParticles();
+
+    // ── Player movement trail ──
+    this.createMovementTrail();
 
     // ── Player mesh (green cylinder + antenna box) ──
     this.playerMesh = this.createPlayerMesh();
@@ -1001,6 +1010,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.camera.position.set(this.cameraPosX, 12, this.cameraPosZ + 14);
       this.camera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
+
+      // Update movement trail
+      this.updateTrail(this.playerCurrentX, this.playerCurrentZ, delta);
     }
 
     // Entity animations
@@ -2387,6 +2399,48 @@ export class BrowserDisplay3D implements IGameDisplay {
   // ── Starfield background ─────────────────────────────────────
 
   private createStarfield(): void {
+    // Nebula backdrop: a large gradient plane below the station
+    const nebulaGeo = new THREE.PlaneGeometry(120, 120);
+    nebulaGeo.rotateX(-Math.PI / 2);
+    const nebulaMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uTime;
+        void main() {
+          // Dark space gradient with subtle color variation
+          vec2 p = vUv - 0.5;
+          float dist = length(p);
+          // Deep blue to purple gradient
+          vec3 col = mix(
+            vec3(0.02, 0.03, 0.08),  // dark blue
+            vec3(0.06, 0.02, 0.10),  // dark purple
+            smoothstep(0.0, 0.7, dist)
+          );
+          // Subtle nebula swirl
+          float swirl = sin(p.x * 3.0 + p.y * 2.0 + uTime * 0.1) * 0.015;
+          col += vec3(swirl * 0.5, swirl * 0.3, swirl);
+          float alpha = smoothstep(0.7, 0.0, dist) * 0.4;
+          gl_FragColor = vec4(col, alpha);
+        }
+      `,
+    });
+    const nebulaMesh = new THREE.Mesh(nebulaGeo, nebulaMat);
+    nebulaMesh.position.y = -8;
+    nebulaMesh.renderOrder = -2;
+    this.scene.add(nebulaMesh);
+
     const starCount = 400;
     const positions = new Float32Array(starCount * 3);
     const colors = new Float32Array(starCount * 3);
@@ -2459,6 +2513,68 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     this.dustParticles = new THREE.Points(dustGeo, dustMat);
     this.scene.add(this.dustParticles);
+  }
+
+  // ── Player movement trail ──────────────────────────────────
+
+  private createMovementTrail(): void {
+    const count = BrowserDisplay3D.TRAIL_LENGTH;
+    this.trailPositions = new Float32Array(count * 3);
+    this.trailOpacities = new Float32Array(count);
+
+    const trailGeo = new THREE.BufferGeometry();
+    trailGeo.setAttribute("position", new THREE.BufferAttribute(this.trailPositions, 3));
+
+    const trailMat = new THREE.PointsMaterial({
+      size: 0.08,
+      color: 0x44ff88,
+      transparent: true,
+      opacity: 0.6,
+      sizeAttenuation: true,
+      depthWrite: false,
+    });
+
+    this.trailPoints = new THREE.Points(trailGeo, trailMat);
+    this.trailPoints.renderOrder = 1;
+    this.scene.add(this.trailPoints);
+  }
+
+  private lastTrailX: number = -999;
+  private lastTrailZ: number = -999;
+  private trailHead: number = 0;
+
+  private updateTrail(px: number, pz: number, delta: number): void {
+    if (!this.trailPoints) return;
+
+    // Record a new trail point when player moves enough
+    const dx = px - this.lastTrailX;
+    const dz = pz - this.lastTrailZ;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    if (dist > 0.3) {
+      this.lastTrailX = px;
+      this.lastTrailZ = pz;
+
+      const count = BrowserDisplay3D.TRAIL_LENGTH;
+      const idx = this.trailHead % count;
+      this.trailPositions[idx * 3] = px;
+      this.trailPositions[idx * 3 + 1] = 0.05;
+      this.trailPositions[idx * 3 + 2] = pz;
+      this.trailOpacities[idx] = 1.0;
+      this.trailHead++;
+    }
+
+    // Fade all trail points
+    const count = BrowserDisplay3D.TRAIL_LENGTH;
+    for (let i = 0; i < count; i++) {
+      this.trailOpacities[i] = Math.max(0, this.trailOpacities[i] - delta * 0.5);
+      // Move faded points below floor so they're invisible
+      if (this.trailOpacities[i] <= 0) {
+        this.trailPositions[i * 3 + 1] = -10;
+      }
+    }
+
+    this.trailPoints.geometry.attributes.position.needsUpdate = true;
   }
 
   // ── Animate particles ────────────────────────────────────────
