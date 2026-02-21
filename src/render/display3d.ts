@@ -268,6 +268,10 @@ export class BrowserDisplay3D implements IGameDisplay {
   private entityMeshes: Map<string, THREE.Object3D> = new Map();
   private entityGroup: THREE.Group;
 
+  // Interaction indicator — floating diamond above nearby interactable
+  private interactionIndicator: THREE.Mesh | null = null;
+  private interactionTargetId: string = "";
+
   // Player mesh
   private playerMesh: THREE.Group;
 
@@ -430,7 +434,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.floorMesh.count = 0;
     this.scene.add(this.floorMesh);
 
-    const wallGeo = new THREE.BoxGeometry(1, 1.5, 1);
+    const wallGeo = new THREE.BoxGeometry(1, 2.0, 1);
     const wallMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, this.maxTiles);
     this.wallMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -439,7 +443,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.add(this.wallMesh);
 
     // Corner walls (placeholder geo, replaced when model loads)
-    const cornerGeo = new THREE.BoxGeometry(1, 1.5, 1);
+    const cornerGeo = new THREE.BoxGeometry(1, 2.0, 1);
     const cornerMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.wallCornerMesh = new THREE.InstancedMesh(cornerGeo, cornerMat, this.maxTiles);
     this.wallCornerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -483,6 +487,13 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Entity group ──
     this.entityGroup = new THREE.Group();
     this.scene.add(this.entityGroup);
+
+    // ── Interaction indicator (floating diamond above nearest interactable) ──
+    const indicatorGeo = new THREE.OctahedronGeometry(0.12, 0);
+    const indicatorMat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.8 });
+    this.interactionIndicator = new THREE.Mesh(indicatorGeo, indicatorMat);
+    this.interactionIndicator.visible = false;
+    this.scene.add(this.interactionIndicator);
 
     // ── Decoration group (room props) ──
     this.scene.add(this.decorationGroup);
@@ -1217,6 +1228,24 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.playerLight.intensity = 2.5 + Math.sin(elapsed * 1.5) * 0.3;
     }
 
+    // Interaction indicator: bob and spin
+    if (this.interactionIndicator && this.interactionIndicator.visible) {
+      this.interactionIndicator.position.y = 1.8 + Math.sin(elapsed * 3) * 0.1;
+      this.interactionIndicator.rotation.y = elapsed * 2;
+    }
+
+    // Room lights: emergency flicker for red/amber lights
+    for (const [, light] of this.roomLights) {
+      const c = light.color.getHex();
+      if (c === 0xff2200) {
+        // Red emergency strobe — fast harsh pulse
+        light.intensity = 0.3 + Math.abs(Math.sin(elapsed * 4)) * 1.2;
+      } else if (c === 0xff8800) {
+        // Amber warning — slower gentle pulse
+        light.intensity = 0.5 + Math.sin(elapsed * 2) * 0.4;
+      }
+    }
+
     // Particle animations
     this.animateParticles(elapsed, delta);
 
@@ -1832,6 +1861,41 @@ export class BrowserDisplay3D implements IGameDisplay {
           mesh.geometry?.dispose();
         }
         this.entityMeshes.delete(id);
+      }
+    }
+
+    // Update interaction indicator — show above nearest interactable entity
+    if (this.interactionIndicator) {
+      const px = state.player.entity.pos.x;
+      const py = state.player.entity.pos.y;
+      let bestId = "";
+      let bestDist = Infinity;
+      for (const [id, entity] of state.entities) {
+        if (id === "player") continue;
+        const dx = Math.abs(entity.pos.x - px);
+        const dy = Math.abs(entity.pos.y - py);
+        if (dx > 1 || dy > 1 || dx + dy > 1) continue; // cardinal adjacency + same tile
+        const tile = state.tiles[entity.pos.y]?.[entity.pos.x];
+        if (!tile?.visible) continue;
+        const dist = dx + dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = id;
+        }
+      }
+      if (bestId) {
+        const mesh = this.entityMeshes.get(bestId);
+        if (mesh && mesh.visible) {
+          this.interactionIndicator.visible = true;
+          this.interactionIndicator.position.set(mesh.position.x, 1.8, mesh.position.z);
+          this.interactionTargetId = bestId;
+        } else {
+          this.interactionIndicator.visible = false;
+          this.interactionTargetId = "";
+        }
+      } else {
+        this.interactionIndicator.visible = false;
+        this.interactionTargetId = "";
       }
     }
   }
