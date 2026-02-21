@@ -219,6 +219,9 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
   // Apply archetype-specific hazard profile
   applyArchetypeProfile(state, archetype);
 
+  // Place archetype spatial signatures (distinctive navigation features)
+  placeArchetypeSignatures(state, rooms, archetype);
+
   // Guarantee all deduction tags are covered by placed evidence
   ensureTagCoverage(state);
 
@@ -398,6 +401,232 @@ function applyArchetypeProfile(state: GameState, archetype: IncidentArchetype): 
             }
           }
         }
+      }
+      break;
+    }
+  }
+}
+
+/**
+ * Place archetype-specific "spatial signatures" — distinctive entities and
+ * hazard features that make each archetype feel physically different to navigate.
+ * These are mandatory per-archetype elements, not random.
+ */
+function placeArchetypeSignatures(
+  state: GameState,
+  rooms: DiggerRoom[],
+  archetype: IncidentArchetype,
+): void {
+  const n = rooms.length;
+  if (n < 6) return;
+
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade: {
+      // "Thermal wall" — a mid-station corridor scorched by the cascade.
+      // Creates a heat gate requiring relay repair to cool down.
+      const relayRoom = state.rooms.find(r => r.name === "Power Relay Junction");
+      if (relayRoom) {
+        // Scorch the corridor tiles between relay and adjacent room
+        for (let y = relayRoom.y - 2; y <= relayRoom.y + relayRoom.height + 1; y++) {
+          for (let x = relayRoom.x - 2; x <= relayRoom.x + relayRoom.width + 1; x++) {
+            if (y >= 0 && y < state.height && x >= 0 && x < state.width) {
+              const tile = state.tiles[y][x];
+              if (tile.type === TileType.Corridor && tile.walkable) {
+                tile.heat = Math.max(tile.heat, 55);
+                tile.smoke = Math.max(tile.smoke, 20);
+              }
+            }
+          }
+        }
+      }
+      // Place a "cascade damage marker" console
+      const engineRoom = state.rooms.find(r => r.name === "Engine Core");
+      if (engineRoom) {
+        const pos = getRoomPos(rooms[state.rooms.indexOf(engineRoom)], 1, 0);
+        state.entities.set("sig_cascade_marker", {
+          id: "sig_cascade_marker",
+          type: EntityType.Console,
+          pos,
+          props: {
+            name: "Cascade Damage Report",
+            text: "THERMAL CASCADE STATUS: Relay Junction P03 → Engine Core.\nPropagation rate: 3 junctions per hour.\nCurrent spread: sections 2-5 affected.\nEstimated time to station-wide failure: 4 hours.\nRECOMMENDATION: Restore relay power to contain cascade.",
+            read: false,
+            journalSummary: "Cascade damage report — spreading from P03 junction at 3 junctions/hour",
+            journalDetail: "Engineering cascade status terminal shows thermal propagation from the P03 junction affecting sections 2-5. The cascade is still actively spreading. Relay restoration is the only containment strategy.",
+            journalCategory: "log" as const,
+          },
+        });
+      }
+      break;
+    }
+
+    case IncidentArchetype.HullBreach: {
+      // "Vacuum corridor" — a depressurized passage to crew quarters.
+      // Creates a navigation challenge requiring breach seal before safe passage.
+      const crewQuarters = state.rooms.find(r => r.name === "Crew Quarters");
+      if (crewQuarters) {
+        // Deep depressurize corridors around crew quarters (the breach zone)
+        for (let y = crewQuarters.y - 2; y <= crewQuarters.y + crewQuarters.height + 1; y++) {
+          for (let x = crewQuarters.x - 2; x <= crewQuarters.x + crewQuarters.width + 1; x++) {
+            if (y >= 0 && y < state.height && x >= 0 && x < state.width) {
+              const tile = state.tiles[y][x];
+              if (tile.type === TileType.Corridor && tile.walkable) {
+                tile.pressure = Math.min(tile.pressure, 20);
+              }
+            }
+          }
+        }
+      }
+      // Place forensic marker at breach site
+      const medBay = state.rooms.find(r => r.name === "Med Bay");
+      if (medBay) {
+        const pos = getRoomPos(rooms[state.rooms.indexOf(medBay)], -1, 0);
+        state.entities.set("sig_breach_forensics", {
+          id: "sig_breach_forensics",
+          type: EntityType.Console,
+          pos,
+          props: {
+            name: "Forensic Pressure Analysis",
+            text: "HULL BREACH ANALYSIS — MED BAY ADJACENT\nBreach geometry: directed cone, 47° arc\nTool marks detected on hull interior\nPressure loss rate: inconsistent with micro-meteorite\nCONCLUSION: Deliberate structural weakening from inside",
+            read: false,
+            journalSummary: "Forensic analysis — breach was deliberate, tool marks on interior hull",
+            journalDetail: "Pressure analysis at the breach site shows a directed cone pattern with tool marks on the interior hull. The geometry is inconsistent with micro-meteorite impact. This was deliberate structural sabotage.",
+            journalCategory: "log" as const,
+          },
+        });
+      }
+      break;
+    }
+
+    case IncidentArchetype.ReactorScram: {
+      // "Core approach" — elevated heat gradient approaching the Data Core.
+      // The AI is generating heat to discourage approach — thermal obstacle course.
+      const dataCoreIdx = state.rooms.findIndex(r => r.name === "Data Core");
+      if (dataCoreIdx >= 0) {
+        const dcRoom = state.rooms[dataCoreIdx];
+        // Heat gradient radiating outward from data core
+        for (let y = dcRoom.y - 3; y <= dcRoom.y + dcRoom.height + 2; y++) {
+          for (let x = dcRoom.x - 3; x <= dcRoom.x + dcRoom.width + 2; x++) {
+            if (y >= 0 && y < state.height && x >= 0 && x < state.width) {
+              const tile = state.tiles[y][x];
+              if (tile.walkable && tile.type === TileType.Corridor) {
+                const dist = Math.max(
+                  Math.max(dcRoom.y - y, y - (dcRoom.y + dcRoom.height - 1), 0),
+                  Math.max(dcRoom.x - x, x - (dcRoom.x + dcRoom.width - 1), 0),
+                );
+                const gradientHeat = Math.max(0, 45 - dist * 12);
+                tile.heat = Math.max(tile.heat, gradientHeat);
+              }
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    case IncidentArchetype.Sabotage: {
+      // "Contamination trail" — organic residue trail from cargo hold outward.
+      // Places trace entities showing the creature's path through the station.
+      const cargoIdx = state.rooms.findIndex(r => r.name === "Cargo Hold");
+      if (cargoIdx >= 0) {
+        const cargoRoom = state.rooms[cargoIdx];
+        // Escalating contamination smoke from cargo outward through corridors
+        for (let y = 0; y < state.height; y++) {
+          for (let x = 0; x < state.width; x++) {
+            const tile = state.tiles[y][x];
+            if (tile.type === TileType.Corridor && tile.walkable) {
+              const dist = Math.abs(y - (cargoRoom.y + Math.floor(cargoRoom.height / 2)))
+                + Math.abs(x - (cargoRoom.x + Math.floor(cargoRoom.width / 2)));
+              if (dist < 15) {
+                const contamLevel = Math.max(0, 25 - dist);
+                tile.smoke = Math.max(tile.smoke, contamLevel);
+              }
+            }
+          }
+        }
+      }
+      // Place organism trace console
+      const maintenanceRoom = state.rooms.find(r => r.name === "Maintenance Corridor");
+      if (maintenanceRoom) {
+        const pos = getRoomPos(rooms[state.rooms.indexOf(maintenanceRoom)], 0, 1);
+        state.entities.set("sig_organism_trace", {
+          id: "sig_organism_trace",
+          type: EntityType.Console,
+          pos,
+          props: {
+            name: "Bio-Contamination Scanner",
+            text: "BIO-SCAN RESULTS — MAINTENANCE CORRIDOR\nOrganic residue trail: continuous, Cargo Bay → corridor C-3 → ventilation access\nMovement pattern: systematic junction-to-junction progression\nResidual electrical disruption at each waypoint\nNOTE: Trail is still warm. Subject is active.",
+            read: false,
+            journalSummary: "Bio-scan — organism trail from cargo bay through maintenance corridors",
+            journalDetail: "The bio-contamination scanner shows a continuous organic trail from Cargo Bay through the maintenance corridors. The organism moved systematically between junctions, disrupting electrical systems at each waypoint. The trail is still warm — the creature is active.",
+            journalCategory: "log" as const,
+          },
+        });
+      }
+      break;
+    }
+
+    case IncidentArchetype.SignalAnomaly: {
+      // "EM dead zone" — electromagnetic damage corridor near comms hub.
+      // Heat + smoke corridor that feels like walking through the signal blast zone.
+      const commsIdx = state.rooms.findIndex(r => r.name === "Communications Hub");
+      if (commsIdx >= 0) {
+        const commsRoom = state.rooms[commsIdx];
+        // EM blast radius from comms hub
+        for (let y = commsRoom.y - 3; y <= commsRoom.y + commsRoom.height + 2; y++) {
+          for (let x = commsRoom.x - 3; x <= commsRoom.x + commsRoom.width + 2; x++) {
+            if (y >= 0 && y < state.height && x >= 0 && x < state.width) {
+              const tile = state.tiles[y][x];
+              if (tile.walkable && tile.type === TileType.Corridor) {
+                tile.heat = Math.max(tile.heat, 30);
+                tile.smoke = Math.max(tile.smoke, 10);
+              }
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    case IncidentArchetype.Mutiny: {
+      // "Barricade corridor" — a physical barrier between the two faction zones.
+      // Place barricade consoles in corridors between station halves.
+      const midIdx = Math.floor(n / 2);
+      // Place barricade consoles near the midpoint of the station
+      for (let barricadeI = 0; barricadeI < 2; barricadeI++) {
+        const roomIdx = midIdx + barricadeI;
+        if (roomIdx >= n) continue;
+        const room = rooms[roomIdx];
+        // Find corridor tiles adjacent to this room for barricade placement
+        for (let y = room.getTop() - 1; y <= room.getBottom() + 1; y++) {
+          for (let x = room.getLeft() - 1; x <= room.getRight() + 1; x++) {
+            if (y >= 0 && y < state.height && x >= 0 && x < state.width) {
+              const tile = state.tiles[y][x];
+              if (tile.type === TileType.Corridor && tile.walkable) {
+                tile.smoke = Math.max(tile.smoke, 15);
+                tile.pressure = Math.min(tile.pressure, 55);
+              }
+            }
+          }
+        }
+      }
+      // Place faction barricade console at station midpoint
+      const bridgeRoom = state.rooms.find(r => r.name === "Bridge");
+      if (bridgeRoom) {
+        const pos = getRoomPos(rooms[state.rooms.indexOf(bridgeRoom)], 0, 1);
+        state.entities.set("sig_barricade_log", {
+          id: "sig_barricade_log",
+          type: EntityType.Console,
+          pos,
+          props: {
+            name: "Faction Status Board",
+            text: "STATION DIVISION STATUS — BRIDGE TERMINAL\nSecurity faction: Bridge, Armory, Cargo Hold\nScience faction: Research Lab, Data Core, Server Annex\nContested: Life Support, Crew Quarters\nLife support status: DISABLED in research wing (security override)\nCaptain's response: [NO ENTRY LOGGED]",
+            read: false,
+            journalSummary: "Faction status board — station divided, life support disabled in research wing",
+            journalDetail: "The Bridge terminal shows the station divided into two faction zones: security controlling Bridge/Armory/Cargo, science holding Research/Data Core. Life support was disabled in the research wing via security override. The captain logged no response to the crisis.",
+            journalCategory: "log" as const,
+          },
+        });
       }
       break;
     }
