@@ -56,6 +56,112 @@ function createFloorGridTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+/** Create a wall panel texture — vertical panels with rivets and horizontal seam */
+function createWallPanelTexture(): THREE.CanvasTexture {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size * 2; // taller for walls (2:1 ratio)
+  const ctx = canvas.getContext("2d")!;
+
+  // Light base
+  ctx.fillStyle = "#e8e8e8";
+  ctx.fillRect(0, 0, size, size * 2);
+
+  // Vertical panel groove
+  ctx.strokeStyle = "#cccccc";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(size / 2, 2);
+  ctx.lineTo(size / 2, size * 2 - 2);
+  ctx.stroke();
+
+  // Horizontal seam at 1/3 height
+  ctx.strokeStyle = "#cccccc";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(2, Math.floor(size * 2 / 3));
+  ctx.lineTo(size - 2, Math.floor(size * 2 / 3));
+  ctx.stroke();
+
+  // Top/bottom border trim
+  ctx.strokeStyle = "#d0d8e0";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(0, 0, size, size * 2);
+
+  // Corner rivets
+  ctx.fillStyle = "#aabbcc";
+  const offsets = [[4, 4], [size - 5, 4], [4, size * 2 - 5], [size - 5, size * 2 - 5]];
+  for (const [rx, ry] of offsets) {
+    ctx.beginPath();
+    ctx.arc(rx, ry, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Subtle ventilation slits in upper panel
+  ctx.strokeStyle = "#bbbbbb";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    const sy = 12 + i * 8;
+    ctx.beginPath();
+    ctx.moveTo(size * 0.2, sy);
+    ctx.lineTo(size * 0.45, sy);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+/** Create a corridor grate texture — metal grid pattern distinct from room floors */
+function createCorridorGrateTexture(): THREE.CanvasTexture {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  // Slightly darker base for corridors
+  ctx.fillStyle = "#d8d8d8";
+  ctx.fillRect(0, 0, size, size);
+
+  // Grate cross pattern
+  ctx.strokeStyle = "#bbbbbb";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const y = 8 + i * 16;
+    ctx.beginPath();
+    ctx.moveTo(2, y);
+    ctx.lineTo(size - 2, y);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 4; i++) {
+    const x = 8 + i * 16;
+    ctx.beginPath();
+    ctx.moveTo(x, 2);
+    ctx.lineTo(x, size - 2);
+    ctx.stroke();
+  }
+
+  // Outer border
+  ctx.strokeStyle = "#c0c0c0";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, size, size);
+
+  // Center drain dot
+  ctx.fillStyle = "#999999";
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
 /** Create a yellow/black diagonal caution stripe texture for hazard floor markings. */
 function createCautionStripeTexture(): THREE.CanvasTexture {
   const size = 64;
@@ -333,7 +439,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private playerLight: THREE.PointLight;
 
   // Tile instanced meshes
-  private floorMesh: THREE.InstancedMesh;
+  private floorMesh: THREE.InstancedMesh;      // room floors
+  private corridorFloorMesh: THREE.InstancedMesh; // corridor floors (grate texture)
   private wallMesh: THREE.InstancedMesh;
   private wallCornerMesh: THREE.InstancedMesh;
   private doorMesh: THREE.InstancedMesh;
@@ -546,8 +653,20 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.floorMesh.count = 0;
     this.scene.add(this.floorMesh);
 
+    // Corridor floors: different grate texture for visual distinction
+    const corridorFloorGeo = new THREE.BoxGeometry(1, 0.08, 1);
+    corridorFloorGeo.translate(0, -0.04, 0);
+    const corridorGrateTex = createCorridorGrateTexture();
+    const corridorFloorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: corridorGrateTex });
+    this.corridorFloorMesh = new THREE.InstancedMesh(corridorFloorGeo, corridorFloorMat, this.maxTiles);
+    this.corridorFloorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.corridorFloorMesh.frustumCulled = false;
+    this.corridorFloorMesh.count = 0;
+    this.scene.add(this.corridorFloorMesh);
+
     const wallGeo = new THREE.BoxGeometry(1, 2.0, 1);
-    const wallMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
+    const wallPanelTex = createWallPanelTexture();
+    const wallMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: wallPanelTex });
     this.wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, this.maxTiles);
     this.wallMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.wallMesh.frustumCulled = false;
@@ -1464,6 +1583,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   private updateTiles(state: GameState): void {
     let floorIdx = 0;
+    let corridorIdx = 0;
     let wallIdx = 0;
     let doorIdx = 0;
 
@@ -1627,27 +1747,38 @@ export class BrowserDisplay3D implements IGameDisplay {
           this.dummy.position.set(x, 0, y);
           this.dummy.scale.set(1, 1, 1);
           this.dummy.updateMatrix();
-          this.floorMesh.setMatrixAt(floorIdx, this.dummy.matrix);
 
           tempColor.setHex(baseColor);
           if (!tile.visible) tempColor.multiplyScalar(brightness);
-          this.floorMesh.setColorAt(floorIdx, tempColor);
-          floorIdx++;
+
+          // Route to corridor or room floor mesh
+          if (tile.type === TileType.Corridor) {
+            this.corridorFloorMesh.setMatrixAt(corridorIdx, this.dummy.matrix);
+            this.corridorFloorMesh.setColorAt(corridorIdx, tempColor);
+            corridorIdx++;
+          } else {
+            this.floorMesh.setMatrixAt(floorIdx, this.dummy.matrix);
+            this.floorMesh.setColorAt(floorIdx, tempColor);
+            floorIdx++;
+          }
         }
       }
     }
 
     // Set instance count to only render used instances
     this.floorMesh.count = floorIdx;
+    this.corridorFloorMesh.count = corridorIdx;
     this.wallMesh.count = wallIdx;
     this.wallCornerMesh.count = 0;
     this.doorMesh.count = doorIdx;
 
     this.floorMesh.instanceMatrix.needsUpdate = true;
+    this.corridorFloorMesh.instanceMatrix.needsUpdate = true;
     this.wallMesh.instanceMatrix.needsUpdate = true;
     this.wallCornerMesh.instanceMatrix.needsUpdate = true;
     this.doorMesh.instanceMatrix.needsUpdate = true;
     if (this.floorMesh.instanceColor) this.floorMesh.instanceColor.needsUpdate = true;
+    if (this.corridorFloorMesh.instanceColor) this.corridorFloorMesh.instanceColor.needsUpdate = true;
     if (this.wallMesh.instanceColor) this.wallMesh.instanceColor.needsUpdate = true;
     if (this.wallCornerMesh.instanceColor) this.wallCornerMesh.instanceColor.needsUpdate = true;
     if (this.doorMesh.instanceColor) this.doorMesh.instanceColor.needsUpdate = true;
@@ -4356,10 +4487,10 @@ export class BrowserDisplay3D implements IGameDisplay {
     dustGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
     const dustMat = new THREE.PointsMaterial({
-      size: 0.04,
-      color: 0xaabbcc,
+      size: 0.06,
+      color: 0xccddee,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.45,
       sizeAttenuation: true,
       depthWrite: false,
     });
