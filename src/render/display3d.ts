@@ -561,6 +561,15 @@ export class BrowserDisplay3D implements IGameDisplay {
   private corridorPipeTiles: Set<string> = new Set();
   private pipeGroup: THREE.Group = new THREE.Group();
 
+  // Ceiling beam structure (cross-beams spanning rooms)
+  private ceilingGroup: THREE.Group = new THREE.Group();
+  private ceilingRooms: Set<string> = new Set();
+  // Shared ceiling geometries
+  private static _beamGeoH: THREE.BoxGeometry | null = null;
+  private static _beamGeoV: THREE.BoxGeometry | null = null;
+  private static _lightFixtureGeo: THREE.BoxGeometry | null = null;
+  private static _lightBulbGeo: THREE.SphereGeometry | null = null;
+
   // Player movement trail
   private trailPoints: THREE.Points | null = null;
   private trailPositions: Float32Array = new Float32Array(0);
@@ -747,6 +756,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Caution stripe markings and corridor pipes ──
     this.scene.add(this.cautionStripeGroup);
     this.scene.add(this.pipeGroup);
+
+    // ── Ceiling beam structure (cross-beams + light fixtures) ──
+    this.scene.add(this.ceilingGroup);
 
     // ── Starfield background (distant stars visible through station gaps) ──
     this.createStarfield();
@@ -1073,6 +1085,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateRoomLights(state);
     this.placeRoomDecorations(state);
     this.placeRoomTrim(state);
+    this.placeRoomCeiling(state);
     this.placeCautionMarkings(state);
     this.placeCorridorPipes(state);
     this.placeCorridorWallProps(state);
@@ -1742,6 +1755,23 @@ export class BrowserDisplay3D implements IGameDisplay {
           // Sensor overlays on floor tiles
           if (tile.visible) {
             baseColor = this.applyFloorSensorColor(tile, baseColor);
+          }
+
+          // Simulated ambient occlusion: darken floor tiles adjacent to walls
+          if (tile.visible) {
+            let wallAdj = 0;
+            if (y > 0 && state.tiles[y - 1][x].type === TileType.Wall) wallAdj++;
+            if (y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Wall) wallAdj++;
+            if (x > 0 && state.tiles[y][x - 1].type === TileType.Wall) wallAdj++;
+            if (x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Wall) wallAdj++;
+            if (wallAdj > 0) {
+              // Darken proportionally — 1 wall = 12%, 2 walls = 20%, 3+ = 28%
+              const aoFactor = wallAdj === 1 ? 0.88 : wallAdj === 2 ? 0.80 : 0.72;
+              const ar = Math.round(((baseColor >> 16) & 0xff) * aoFactor);
+              const ag = Math.round(((baseColor >> 8) & 0xff) * aoFactor);
+              const ab = Math.round((baseColor & 0xff) * aoFactor);
+              baseColor = (ar << 16) | (ag << 8) | ab;
+            }
           }
 
           // Room floors sit slightly higher, corridors lower — creates depth contrast
@@ -2476,6 +2506,106 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
   }
 
+  /** Place ceiling beams, cross-supports, and overhead light fixtures per room */
+  private placeRoomCeiling(state: GameState): void {
+    // Create shared geometries once
+    if (!BrowserDisplay3D._beamGeoH) {
+      BrowserDisplay3D._beamGeoH = new THREE.BoxGeometry(1.04, 0.08, 0.1); // horizontal beam (X-axis)
+      BrowserDisplay3D._beamGeoV = new THREE.BoxGeometry(0.1, 0.08, 1.04); // vertical beam (Z-axis)
+      BrowserDisplay3D._lightFixtureGeo = new THREE.BoxGeometry(0.3, 0.04, 0.3); // flat light housing
+      BrowserDisplay3D._lightBulbGeo = new THREE.SphereGeometry(0.08, 8, 6);
+    }
+
+    const ceilingY = 2.0; // ceiling height (matches wall top)
+    const beamY = ceilingY - 0.04; // beams hang just below ceiling
+
+    for (const room of state.rooms) {
+      if (this.ceilingRooms.has(room.id)) continue;
+
+      // Check if room is explored
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
+      if (!state.tiles[cy][cx].explored) continue;
+      this.ceilingRooms.add(room.id);
+
+      const tint = ROOM_WALL_TINTS_3D[room.name] ?? COLORS_3D.wall;
+      // Beams: slightly darker than walls for contrast
+      const br = Math.max(0, ((tint >> 16) & 0xff) - 30);
+      const bg = Math.max(0, ((tint >> 8) & 0xff) - 30);
+      const bb = Math.max(0, (tint & 0xff) - 30);
+      const beamColor = (br << 16) | (bg << 8) | bb;
+      const beamMat = makeToonMaterial({
+        color: beamColor,
+        gradientMap: this.toonGradient,
+      });
+
+      // Place horizontal beams (running east-west) every 2 tiles
+      for (let ry = room.y; ry < room.y + room.height; ry++) {
+        if ((ry - room.y) % 2 !== 0) continue; // every 2nd row
+        for (let rx = room.x; rx < room.x + room.width; rx++) {
+          if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
+          if (state.tiles[ry][rx].type !== TileType.Floor) continue;
+          const beam = new THREE.Mesh(BrowserDisplay3D._beamGeoH!, beamMat);
+          beam.position.set(rx, beamY, ry);
+          this.ceilingGroup.add(beam);
+        }
+      }
+
+      // Place vertical beams (running north-south) every 3 tiles for cross-bracing
+      for (let rx = room.x; rx < room.x + room.width; rx++) {
+        if ((rx - room.x) % 3 !== 0) continue; // every 3rd column
+        for (let ry = room.y; ry < room.y + room.height; ry++) {
+          if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
+          if (state.tiles[ry][rx].type !== TileType.Floor) continue;
+          const beam = new THREE.Mesh(BrowserDisplay3D._beamGeoV!, beamMat);
+          beam.position.set(rx, beamY - 0.04, ry); // slightly below H-beams
+          this.ceilingGroup.add(beam);
+        }
+      }
+
+      // Place overhead light fixtures — one per 4-6 floor tiles (deterministic)
+      const lightColor = ROOM_LIGHT_COLORS[room.name] ?? 0xccddff;
+      const fixtureMat = makeToonMaterial({
+        color: 0x888899,
+        gradientMap: this.toonGradient,
+      });
+      const bulbMat = makeToonMaterial({
+        color: lightColor,
+        gradientMap: this.toonGradient,
+        emissive: lightColor,
+        emissiveIntensity: 0.8,
+      });
+
+      let fixtureCount = 0;
+      const maxFixtures = Math.min(4, Math.floor(room.width * room.height / 6));
+      for (let ry = room.y + 1; ry < room.y + room.height - 1; ry++) {
+        for (let rx = room.x + 1; rx < room.x + room.width - 1; rx++) {
+          if (fixtureCount >= maxFixtures) break;
+          if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
+          if (state.tiles[ry][rx].type !== TileType.Floor) continue;
+
+          // Deterministic placement: use position hash
+          const hash = ((rx * 23 + ry * 41 + room.x * 7) & 0xff);
+          if (hash > 40) continue; // ~15% density
+
+          // Light housing (flat box on ceiling)
+          const fixture = new THREE.Mesh(BrowserDisplay3D._lightFixtureGeo!, fixtureMat);
+          fixture.position.set(rx, ceilingY - 0.02, ry);
+          this.ceilingGroup.add(fixture);
+
+          // Glowing bulb hanging slightly below
+          const bulb = new THREE.Mesh(BrowserDisplay3D._lightBulbGeo!, bulbMat);
+          bulb.position.set(rx, ceilingY - 0.12, ry);
+          this.ceilingGroup.add(bulb);
+
+          fixtureCount++;
+        }
+        if (fixtureCount >= maxFixtures) break;
+      }
+    }
+  }
+
   private placeCautionMarkings(state: GameState): void {
     // Place yellow/black caution stripes on floor tiles adjacent to dangerous entities
     const dangerTypes = new Set([
@@ -2766,20 +2896,20 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
 
-        // Distressed rooms get red/amber warning lights
+        // Distressed rooms get red/amber warning lights; others get atmospheric room color
         let lightColor: number;
-        let intensity = 0.8;
+        let intensity = 1.2;
         if (hasBreach || maxHeat > 40) {
           lightColor = 0xff2200; // red emergency
-          intensity = 1.0;
+          intensity = 1.5;
         } else if (maxHeat > 20 || maxSmoke > 30) {
           lightColor = 0xff8800; // amber warning
-          intensity = 0.9;
+          intensity = 1.3;
         } else {
           lightColor = ROOM_LIGHT_COLORS[room.name] ?? 0x667788;
         }
 
-        const light = new THREE.PointLight(lightColor, intensity, room.width + room.height + 4);
+        const light = new THREE.PointLight(lightColor, intensity, room.width + room.height + 6);
         light.position.set(centerX, 2.5, centerY);
         this.scene.add(light);
         this.roomLights.set(room.id, light);
