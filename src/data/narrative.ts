@@ -426,6 +426,14 @@ export const CORRIDOR_AMBIENT: string[] = [
   "A personal photo is taped to the wall — a reminder of somewhere else. The tape is giving way.",
   "Cable bundles dangle from an open ceiling panel. Someone was rerouting power by hand.",
   "The floor plating vibrates beneath your treads. The station's heartbeat, faint but present.",
+  "A handprint on the wall, smeared downward. Someone lost their footing here.",
+  "The corridor junction sign still glows: sections A through D. Section C has been crossed out in marker.",
+  "Static crackles from a wall-mounted speaker. The PA system is trying to say something, but the words are gone.",
+  "An emergency stretcher is folded against the wall. Never deployed. Whatever happened, nobody had time.",
+  "Magnetic safety seals along the floor. This corridor was designed to lock down, but the mechanism failed.",
+  "Air tastes metallic. Trace coolant in the ventilation, or maybe just old blood on old steel.",
+  "A junction panel displays SECTION OFFLINE in amber. The offline section is where you just came from.",
+  "Graffiti scratched into the wall plating: a tally. Forty-seven marks. Days? Shifts? The count stopped.",
 ];
 
 // Default ambient events for rooms without specific entries

@@ -859,6 +859,67 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
     });
   }
 
+  // ── Utility-slot items ──────────────────────────────────────
+  // Atmospheric Scrubber: passive smoke reduction while equipped
+  const scrubberRoomNames = ["Life Support", "Engineering Storage", "Maintenance Corridor"];
+  let scrubberPlaced = false;
+  for (const name of scrubberRoomNames) {
+    const idx = state.rooms.findIndex(r => r.name === name);
+    if (idx >= 0 && !reservedRooms.has(idx)) {
+      const room = rooms[idx];
+      const pos = getRoomPos(room, -1, 1);
+      state.entities.set("utility_scrubber", {
+        id: "utility_scrubber",
+        type: EntityType.UtilityPickup,
+        pos,
+        props: { utilityType: "atmospheric_scrubber" },
+      });
+      scrubberPlaced = true;
+      break;
+    }
+  }
+  if (!scrubberPlaced) {
+    const fallbackIdx = Math.max(2, Math.floor(n * 0.25));
+    const room = rooms[fallbackIdx];
+    const pos = getRoomPos(room, -1, 1);
+    state.entities.set("utility_scrubber", {
+      id: "utility_scrubber",
+      type: EntityType.UtilityPickup,
+      pos,
+      props: { utilityType: "atmospheric_scrubber" },
+    });
+  }
+
+  // Emergency Beacon: halts hazard spread in current room on activation
+  const beaconRoomNames = ["Emergency Shelter", "Cargo Hold", "Observation Deck"];
+  let beaconPlaced = false;
+  for (const name of beaconRoomNames) {
+    const idx = state.rooms.findIndex(r => r.name === name);
+    if (idx >= 0 && !reservedRooms.has(idx)) {
+      const room = rooms[idx];
+      const pos = getRoomPos(room, 1, -1);
+      state.entities.set("utility_beacon", {
+        id: "utility_beacon",
+        type: EntityType.UtilityPickup,
+        pos,
+        props: { utilityType: "emergency_beacon" },
+      });
+      beaconPlaced = true;
+      break;
+    }
+  }
+  if (!beaconPlaced) {
+    const fallbackIdx = Math.min(n - 2, Math.floor(n * 0.6));
+    const room = rooms[fallbackIdx];
+    const pos = getRoomPos(room, 1, -1);
+    state.entities.set("utility_beacon", {
+      id: "utility_beacon",
+      type: EntityType.UtilityPickup,
+      pos,
+      props: { utilityType: "emergency_beacon" },
+    });
+  }
+
   // ── Breach entities (2, placed in rooms between relays) ────
   const breachRoomCandidates: number[] = [];
   for (let ri = relay1Idx + 1; ri < relay3Idx; ri++) {

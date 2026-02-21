@@ -53,6 +53,7 @@ export enum EntityType {
   Console = "console",
   Airlock = "airlock",
   ToolPickup = "tool_pickup",
+  UtilityPickup = "utility_pickup",
 }
 
 export interface Entity {

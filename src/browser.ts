@@ -203,6 +203,7 @@ let currentRoomTurns = 0; // turns spent in current room (for ambient events)
 let lastRoomIdForAmbient = ""; // track room changes for ambient counter
 const escortArcSteps = new Map<string, number>(); // track escort dialogue arc step per crew NPC
 const corridorAmbientFired = new Set<string>(); // track corridor segments that have triggered ambient text
+let lastCorridorAmbientTurn = 0; // cooldown: don't fire corridor ambient more than once per 20 turns
 let lastJournalLength = 0; // track journal size for insight notifications
 let journalOpen = false;
 let journalTab: "evidence" | "deductions" = "evidence";
@@ -977,6 +978,7 @@ function resetGameState(newSeed: number): void {
   lastRoomIdForAmbient = "";
   escortArcSteps.clear();
   corridorAmbientFired.clear();
+  lastCorridorAmbientTurn = 0;
   lastJournalLength = 0;
   mapOpen = false;
   helpOpen = false;
@@ -1548,8 +1550,9 @@ function handleAction(action: Action): void {
     if (!playerRoom) {
       // Player is in a corridor — bucket by every 4 tiles
       const segKey = `${Math.floor(px / 4)}_${Math.floor(py / 4)}`;
-      if (!corridorAmbientFired.has(segKey)) {
+      if (!corridorAmbientFired.has(segKey) && (state.turn - lastCorridorAmbientTurn) >= 20) {
         corridorAmbientFired.add(segKey);
+        lastCorridorAmbientTurn = state.turn;
         // Alternate between default and mood-specific corridor pools
         const useMood = (px + py) % 3 === 0;
         const pool = useMood ? CORRIDOR_AMBIENT_MOOD[stationMood] : CORRIDOR_AMBIENT;
@@ -1716,8 +1719,8 @@ function handleAction(action: Action): void {
     }
     // Refutation: fire after the player solves their first deduction correctly
     if (contradictionFalseLeadFired && !contradictionRefutationFired && state.mystery?.timeline?.archetype) {
-      const hasCorrectDeduction = state.mystery.deductions.some(d => d.answeredCorrectly);
-      if (hasCorrectDeduction) {
+      const correctDeductionCount = state.mystery.deductions.filter(d => d.answeredCorrectly).length;
+      if (correctDeductionCount >= 2) {
         const arch = state.mystery.timeline.archetype as IncidentArchetype;
         const refutation = CONTRADICTION_REFUTATION[arch];
         if (refutation) {

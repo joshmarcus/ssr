@@ -5,7 +5,7 @@ import {
   PATROL_DRONE_ATTACK_COOLDOWN, SMOKE_SLOW_THRESHOLD,
 } from "../shared/constants.js";
 import { isValidAction, getDirectionDelta, hasUnlockedDoorAt, isAutoSealedBulkhead } from "./actions.js";
-import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex } from "./rooms.js";
+import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex, getRoomAt } from "./rooms.js";
 import { tickHazards, tickDeterioration, tickPA, applyHazardDamage, getDamageMultiplier } from "./hazards.js";
 import { checkWinCondition, checkLossCondition, checkTurnLimit } from "./objectives.js";
 import { updateVision } from "./vision.js";
@@ -1636,6 +1636,20 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             read: false,
           },
         ];
+
+        // Generate access log evidence from security terminal
+        const accessLogText = generateSecurityAccessLog(state);
+        if (accessLogText) {
+          next = addJournalEntry(
+            next,
+            `journal_secterm_${targetId}`,
+            "log",
+            "Security access log — crew movement records",
+            accessLogText,
+            getPlayerRoomName(state),
+            targetId,
+          );
+        }
       }
       break;
     }
@@ -1932,6 +1946,60 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           timestamp: next.turn,
           source: "system",
           text: "PRY BAR acquired. Heavy-duty hydraulic lever — can force open sealed bulkheads. [Tool slot equipped]",
+          read: false,
+        }];
+      }
+      break;
+    }
+
+    case EntityType.UtilityPickup: {
+      if (target.props["collected"] === true) {
+        next.logs = [...state.logs, {
+          id: `log_utility_empty_${targetId}_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Equipment rack empty. Already collected.",
+          read: false,
+        }];
+      } else {
+        const utilityType = target.props["utilityType"] as string;
+        const newEntities = new Map(state.entities);
+        newEntities.set(targetId, {
+          ...target,
+          props: { ...target.props, collected: true },
+        });
+        let utilityName = "Unknown Utility";
+        let logText = "";
+        if (utilityType === "atmospheric_scrubber") {
+          utilityName = "Atmospheric Scrubber";
+          logText = "ATMOSPHERIC SCRUBBER acquired. Micro-filtration unit — passively reduces smoke on your tile every 3 turns. [Utility slot equipped]";
+          const playerEntity = { ...state.player.entity, props: { ...state.player.entity.props, hasScrubber: true } };
+          newEntities.set("player", playerEntity);
+          next.player = {
+            ...state.player,
+            entity: playerEntity,
+            attachments: { ...state.player.attachments, [AttachmentSlot.Utility]: { slot: AttachmentSlot.Utility, name: utilityName } },
+          };
+        } else if (utilityType === "emergency_beacon") {
+          utilityName = "Emergency Beacon";
+          logText = "EMERGENCY BEACON acquired. Deployable stabilizer — activated automatically, halts hazard spread in this room for 15 turns. [Utility slot equipped]";
+          // Deploy beacon immediately on the current room
+          const px = state.player.entity.pos.x;
+          const py = state.player.entity.pos.y;
+          const playerEntity = { ...state.player.entity, props: { ...state.player.entity.props, hasBeacon: true, beaconRoomX: px, beaconRoomY: py, beaconTurnsLeft: 15 } };
+          newEntities.set("player", playerEntity);
+          next.player = {
+            ...state.player,
+            entity: playerEntity,
+            attachments: { ...state.player.attachments, [AttachmentSlot.Utility]: { slot: AttachmentSlot.Utility, name: utilityName } },
+          };
+        }
+        next.entities = newEntities;
+        next.logs = [...state.logs, {
+          id: `log_utility_${targetId}_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: logText,
           read: false,
         }];
       }
@@ -4441,6 +4509,52 @@ export function step(state: GameState, action: Action): GameState {
   // Hazard tick: heat/smoke spread each turn
   next = tickHazards(next);
 
+  // ── Utility item passive effects ──────────────────────────
+  // Atmospheric Scrubber: reduce smoke on player tile every 3 turns
+  if (next.player.entity.props["hasScrubber"] === true && next.turn % 3 === 0) {
+    const px = next.player.entity.pos.x;
+    const py = next.player.entity.pos.y;
+    if (py >= 0 && py < next.height && px >= 0 && px < next.width) {
+      const currentSmoke = next.tiles[py][px].smoke;
+      if (currentSmoke > 0) {
+        const newTiles = next.tiles.map(row => row.map(t => ({ ...t })));
+        newTiles[py][px].smoke = Math.max(0, currentSmoke - 10);
+        next = { ...next, tiles: newTiles };
+      }
+    }
+  }
+
+  // Emergency Beacon: suppress hazard spread in beacon room for N turns
+  const beaconTurns = next.player.entity.props["beaconTurnsLeft"] as number | undefined;
+  if (beaconTurns !== undefined && beaconTurns > 0) {
+    const bx = next.player.entity.props["beaconRoomX"] as number;
+    const by = next.player.entity.props["beaconRoomY"] as number;
+    const beaconRoom = getRoomAt(next, { x: bx, y: by });
+    if (beaconRoom) {
+      const newTiles = next.tiles.map(row => row.map(t => ({ ...t })));
+      // Clamp heat and smoke in beacon room — don't let them grow
+      for (let ry = beaconRoom.y; ry < beaconRoom.y + beaconRoom.height; ry++) {
+        for (let rx = beaconRoom.x; rx < beaconRoom.x + beaconRoom.width; rx++) {
+          if (ry >= 0 && ry < next.height && rx >= 0 && rx < next.width) {
+            if (newTiles[ry][rx].heat > 0) {
+              newTiles[ry][rx].heat = Math.max(0, newTiles[ry][rx].heat - 5);
+            }
+            if (newTiles[ry][rx].smoke > 0) {
+              newTiles[ry][rx].smoke = Math.max(0, newTiles[ry][rx].smoke - 3);
+            }
+          }
+        }
+      }
+      next = { ...next, tiles: newTiles };
+    }
+    // Decrement beacon timer
+    const newBeaconTurns = beaconTurns - 1;
+    const newEntities = new Map(next.entities);
+    const playerEntity = { ...next.player.entity, props: { ...next.player.entity.props, beaconTurnsLeft: newBeaconTurns } };
+    newEntities.set("player", playerEntity);
+    next = { ...next, entities: newEntities, player: { ...next.player, entity: playerEntity } };
+  }
+
   // Station deterioration: periodic escalation
   next = tickDeterioration(next);
 
@@ -4462,4 +4576,47 @@ export function step(state: GameState, action: Action): GameState {
   next = updateVision(next);
 
   return next;
+}
+
+/**
+ * Generate a security access log from the mystery's crew and timeline data.
+ * Produces a multi-line text showing crew movement patterns that feed deduction linking.
+ */
+function generateSecurityAccessLog(state: GameState): string | null {
+  const mystery = state.mystery;
+  if (!mystery) return null;
+
+  const crew = mystery.crew;
+  const timeline = mystery.timeline;
+  if (!crew.length || !timeline) return null;
+
+  const lines: string[] = ["SECURITY ACCESS LOG — LAST 72 HOURS\n"];
+
+  // Generate 4-6 access log entries from crew data
+  const events = timeline.events;
+  for (let i = 0; i < Math.min(5, events.length); i++) {
+    const evt = events[i];
+    const actor = crew.find(c => c.id === evt.actorId);
+    const name = actor ? `${actor.lastName}, ${actor.firstName}` : evt.actorId;
+    const badge = actor?.badgeId ?? "UNKNOWN";
+    lines.push(`${evt.timestamp} | ${badge} | ${name} | ${evt.location} | ${evt.phase.toUpperCase()}`);
+  }
+
+  // Add archetype-specific suspicious entry
+  const arch = timeline.archetype;
+  if (arch === IncidentArchetype.HullBreach) {
+    const villain = crew.find(c => c.role === CrewRole.Security);
+    if (villain) lines.push(`02:41:00 | ${villain.badgeId} | ${villain.lastName}, ${villain.firstName} | Hull Section 4 | [ACCESS LOGGED — THEN SCRUBBED]`);
+  } else if (arch === IncidentArchetype.CoolantCascade) {
+    const villain = crew.find(c => c.role === CrewRole.Captain);
+    if (villain) lines.push(`ADMIN OVERRIDE | ${villain.badgeId} | ${villain.lastName} | Incident Report Archive | RECORD MODIFICATION DETECTED`);
+  } else if (arch === IncidentArchetype.Sabotage) {
+    const villain = crew.find(c => c.role === CrewRole.Captain);
+    if (villain) lines.push(`CARGO BAY 2 | ${villain.badgeId} | ${villain.lastName} | Manifest Override | HAZARD FLAG CLEARED`);
+  } else if (arch === IncidentArchetype.SignalAnomaly) {
+    const villain = crew.find(c => c.role === CrewRole.Scientist);
+    if (villain) lines.push(`03:00:17 | ${villain.badgeId} | ${villain.lastName} | Comms Array | SAFETY INTERLOCK BYPASSED`);
+  }
+
+  return lines.join("\n");
 }

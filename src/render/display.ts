@@ -155,6 +155,7 @@ const ENTITY_COLORS: Record<string, string> = {
   [EntityType.Console]: "#66aacc",
   [EntityType.Airlock]: "#0ff",
   [EntityType.ToolPickup]: "#ffaa44",
+  [EntityType.UtilityPickup]: "#44ddaa",
 };
 
 // Blue background glow for interactable (non-exhausted) entities
@@ -184,7 +185,7 @@ const STATIC_ENTITY_TYPES = new Set<string>([
   EntityType.Breach, EntityType.ClosedDoor, EntityType.SecurityTerminal,
   EntityType.PressureValve, EntityType.FuseBox, EntityType.PowerCell,
   EntityType.EscapePod, EntityType.RepairCradle, EntityType.Airlock,
-  EntityType.EvidenceTrace, EntityType.Console, EntityType.ToolPickup,
+  EntityType.EvidenceTrace, EntityType.Console, EntityType.ToolPickup, EntityType.UtilityPickup,
 ]);
 
 // Entity background glow colors (subtle tint behind entities)
@@ -207,6 +208,7 @@ const ENTITY_BG_GLOW: Record<string, string> = {
   [EntityType.Console]: "#0a1520",
   [EntityType.Airlock]: "#001a1a",
   [EntityType.ToolPickup]: "#1a1200",
+  [EntityType.UtilityPickup]: "#081a12",
 };
 
 const ENTITY_GLYPHS: Record<string, string> = {
@@ -233,6 +235,7 @@ const ENTITY_GLYPHS: Record<string, string> = {
   [EntityType.Console]: "\ud83d\udcbb",  // 💻 (terminal)
   [EntityType.ToolPickup]: "\ud83d\udd27",  // 🔧
   [EntityType.Airlock]: "\u229f",        // ⊟
+  [EntityType.UtilityPickup]: "\u2b22",  // ⬢
 };
 
 // ── Thermal color interpolation ─────────────────────────────────
@@ -1425,6 +1428,7 @@ export class BrowserDisplay implements IGameDisplay {
       { key: EntityType.EvidenceTrace, glyph: ENTITY_GLYPHS[EntityType.EvidenceTrace] || "※", color: "#ca8", label: "Evidence" },
       { key: EntityType.Console, glyph: ENTITY_GLYPHS[EntityType.Console] || "💻", color: "#6ac", label: "Console" },
       { key: EntityType.ToolPickup, glyph: ENTITY_GLYPHS[EntityType.ToolPickup] || "🔧", color: "#fa4", label: "Tool" },
+      { key: EntityType.UtilityPickup, glyph: ENTITY_GLYPHS[EntityType.UtilityPickup] || "⬢", color: "#4da", label: "Utility" },
       { key: EntityType.Airlock, glyph: ENTITY_GLYPHS[EntityType.Airlock] || "⊟", color: "#0ff", label: "Airlock" },
       { key: "_heat", glyph: GLYPHS.heat, color: "#f42", label: "Heat" },
       { key: "_locked", glyph: GLYPHS.lockedDoor, color: "#f00", label: "Locked" },

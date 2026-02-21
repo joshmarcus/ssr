@@ -102,4 +102,5 @@ export const GLYPHS = {
   repairCradle: "⚕️",  // medical — bot repair station
   console: "▣",       // terminal — interactable console
   airlock: "⊟",       // airlock hatch
+  utilityPickup: "⬢", // filled hexagon — utility attachment
 } as const;
