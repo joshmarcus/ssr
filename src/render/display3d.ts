@@ -1,13 +1,51 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OutlineEffect } from "three/addons/effects/OutlineEffect.js";
 import type { GameState, Entity, Room } from "../shared/types.js";
 import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
 import type { IGameDisplay, LogType, DisplayLogEntry } from "./displayInterface.js";
-import { getObjective as getObjectiveShared, getDiscoveries, entityDisplayName } from "../shared/ui.js";
+import { getObjective as getObjectiveShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
 
 // FBXLoader is not imported — Synty FBX files are pre-converted to GLTF at build time
+
+// ── Toon shading gradient texture ──────────────────────────────
+// Creates a 4-step toon gradient: dark shadow → mid shadow → lit → highlight
+function createToonGradient(): THREE.DataTexture {
+  const colors = new Uint8Array([
+    40,   // very dark (deep shadow)
+    120,  // mid shadow
+    200,  // lit
+    255,  // highlight
+  ]);
+  const tex = new THREE.DataTexture(colors, colors.length, 1, THREE.RedFormat);
+  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Create a toon material with optional emissive glow */
+function makeToonMaterial(opts: {
+  color: number;
+  gradientMap: THREE.DataTexture;
+  emissive?: number;
+  emissiveIntensity?: number;
+  transparent?: boolean;
+  opacity?: number;
+  map?: THREE.Texture | null;
+}): THREE.MeshToonMaterial {
+  return new THREE.MeshToonMaterial({
+    color: opts.color,
+    gradientMap: opts.gradientMap,
+    emissive: opts.emissive ?? 0x000000,
+    emissiveIntensity: opts.emissiveIntensity ?? 0,
+    transparent: opts.transparent ?? false,
+    opacity: opts.opacity ?? 1.0,
+    map: opts.map ?? undefined,
+  });
+}
 
 // ── Color constants ──────────────────────────────────────────────
 const COLORS_3D = {
@@ -224,6 +262,13 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Resize handler
   private resizeHandler: () => void;
 
+  // Cel-shaded rendering
+  private outlineEffect: OutlineEffect;
+  private toonGradient: THREE.DataTexture;
+
+  // Room lights (colored point lights at room centers)
+  private roomLights: Map<string, THREE.PointLight> = new Map();
+
   constructor(container: HTMLElement, mapWidth?: number, mapHeight?: number) {
     this.container = container;
     this.mapWidth = mapWidth ?? DEFAULT_MAP_WIDTH;
@@ -260,20 +305,34 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.camera.position.set(0, 20, 12);
     this.camera.lookAt(0, 0, 0);
 
-    // ── Lights ──
-    const ambient = new THREE.AmbientLight(0x888888, 1.2);
+    // ── Cel-shading: Outline Effect ──
+    this.toonGradient = createToonGradient();
+    this.outlineEffect = new OutlineEffect(this.renderer, {
+      defaultThickness: 0.003,
+      defaultColor: [0, 0, 0],
+      defaultAlpha: 0.8,
+    });
+
+    // ── Lights (warmer, more dramatic for cel-shaded look) ──
+    const ambient = new THREE.AmbientLight(0x667788, 0.8);
     this.scene.add(ambient);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    // Strong key light — warm directional from upper-left
+    const dirLight = new THREE.DirectionalLight(0xffeedd, 1.4);
     dirLight.position.set(-8, 15, -5);
     this.scene.add(dirLight);
 
-    // Softer fill light from opposite side
-    const fillLight = new THREE.DirectionalLight(0x6688aa, 0.4);
+    // Cool fill light from opposite side
+    const fillLight = new THREE.DirectionalLight(0x4466aa, 0.5);
     fillLight.position.set(8, 10, 5);
     this.scene.add(fillLight);
 
-    this.playerLight = new THREE.PointLight(0x44ff66, 1.5, 12);
+    // Subtle rim light from behind for depth
+    const rimLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+    rimLight.position.set(0, 5, 15);
+    this.scene.add(rimLight);
+
+    this.playerLight = new THREE.PointLight(0x44ff66, 2.0, 14);
     this.playerLight.position.set(0, 3, 0);
     this.scene.add(this.playerLight);
 
@@ -742,6 +801,87 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (logPanel) {
       logPanel.scrollTop = logPanel.scrollHeight;
     }
+
+    // ── Dynamic legend — entities visible in current room ────────
+    this.renderLegend(state);
+  }
+
+  /** Populate the map-legend element with visible entity glyphs */
+  private renderLegend(state: GameState): void {
+    const mapLegendEl = document.getElementById("map-legend");
+    if (!mapLegendEl) return;
+
+    const currentRoom = this.getPlayerRoom(state);
+    const visibleEntityTypes = new Set<string>();
+
+    // Entities in current room
+    if (currentRoom) {
+      for (const [, entity] of state.entities) {
+        if (entity.pos.x >= currentRoom.x && entity.pos.x < currentRoom.x + currentRoom.width &&
+            entity.pos.y >= currentRoom.y && entity.pos.y < currentRoom.y + currentRoom.height) {
+          visibleEntityTypes.add(entity.type);
+        }
+      }
+    }
+
+    // Entities within 3 tiles of the player
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+    for (const [, entity] of state.entities) {
+      const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+      if (dist <= 3) visibleEntityTypes.add(entity.type);
+    }
+
+    // Legend items: use colored squares + entity names instead of glyphs (we're in 3D)
+    const allLegendItems: { key: string; color: string; label: string }[] = [
+      { key: EntityType.SensorPickup, color: "#0ff", label: "Sensor" },
+      { key: EntityType.Relay, color: "#ff0", label: "Relay" },
+      { key: EntityType.DataCore, color: "#f0f", label: "Data Core" },
+      { key: EntityType.LogTerminal, color: "#6cf", label: "Terminal" },
+      { key: EntityType.ServiceBot, color: "#fa0", label: "Service Bot" },
+      { key: EntityType.CrewItem, color: "#ca8", label: "Crew Item" },
+      { key: EntityType.Drone, color: "#8a8", label: "Drone" },
+      { key: EntityType.MedKit, color: "#f88", label: "Med Kit" },
+      { key: EntityType.RepairBot, color: "#fa8", label: "Repair Bot" },
+      { key: EntityType.RepairCradle, color: "#4df", label: "Repair Cradle" },
+      { key: EntityType.Breach, color: "#f44", label: "Breach" },
+      { key: EntityType.SecurityTerminal, color: "#4af", label: "Security" },
+      { key: EntityType.PatrolDrone, color: "#f22", label: "Patrol" },
+      { key: EntityType.PressureValve, color: "#4ba", label: "Valve" },
+      { key: EntityType.FuseBox, color: "#d80", label: "Fuse Box" },
+      { key: EntityType.PowerCell, color: "#fd4", label: "Power Cell" },
+      { key: EntityType.EscapePod, color: "#4fa", label: "Escape Pod" },
+      { key: EntityType.CrewNPC, color: "#fe6", label: "Crew" },
+      { key: EntityType.EvidenceTrace, color: "#ca8", label: "Evidence" },
+      { key: EntityType.Console, color: "#6ac", label: "Console" },
+      { key: EntityType.ToolPickup, color: "#fa4", label: "Tool" },
+      { key: EntityType.UtilityPickup, color: "#4da", label: "Utility" },
+      { key: EntityType.Airlock, color: "#88c", label: "Airlock" },
+    ];
+
+    const activeLegend = allLegendItems.filter(l => visibleEntityTypes.has(l.key));
+
+    if (activeLegend.length > 0) {
+      mapLegendEl.innerHTML = activeLegend.map(l => {
+        // Check if all entities of this type in the room are exhausted
+        let allExhausted = false;
+        if (currentRoom) {
+          const entitiesOfType: boolean[] = [];
+          for (const [, e] of state.entities) {
+            if (e.type !== l.key) continue;
+            if (e.pos.x < currentRoom.x || e.pos.x >= currentRoom.x + currentRoom.width) continue;
+            if (e.pos.y < currentRoom.y || e.pos.y >= currentRoom.y + currentRoom.height) continue;
+            entitiesOfType.push(isEntityExhausted(e));
+          }
+          allExhausted = entitiesOfType.length > 0 && entitiesOfType.every(x => x);
+        }
+        const color = allExhausted ? "#555" : l.color;
+        const labelStyle = allExhausted ? ' style="color:#555"' : "";
+        return `<span class="legend-item"><span class="legend-glyph" style="color:${color}">\u25a0</span><span class="legend-label"${labelStyle}>${l.label}</span></span>`;
+      }).join("");
+    } else {
+      mapLegendEl.innerHTML = `<span class="legend-label">No notable objects nearby.</span>`;
+    }
   }
 
   // ── Private: animation loop ─────────────────────────────────────
@@ -789,7 +929,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    this.renderer.render(this.scene, this.camera);
+    // Use outline effect for cel-shaded rendering with dark outlines
+    this.outlineEffect.render(this.scene, this.camera);
   };
 
   // ── Private: tile updates ───────────────────────────────────────
@@ -1415,6 +1556,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     const availH = window.innerHeight;
 
     this.renderer.setSize(availW, availH);
+    this.outlineEffect.setSize(availW, availH);
 
     const aspect = availW / availH;
     const frustumHeight = CAMERA_FRUSTUM_SIZE;
