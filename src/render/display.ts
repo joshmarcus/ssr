@@ -1369,6 +1369,8 @@ export class BrowserDisplay implements IGameDisplay {
       `<br>` + discoveryTag.replace(/ \| /, '') + evidenceTag.replace(/ \| /, '') + deductionTag.replace(/ \| /, '') +
       `<br>` + roomsTag.replace(/ \| /, '') +
       (state.player.attachments[AttachmentSlot.Tool] ? `<br><span class="label">TOOL:</span> <span style="color:#fa4">${this.escapeHtml(state.player.attachments[AttachmentSlot.Tool].name)}</span>` : '') +
+      (state.player.attachments[AttachmentSlot.Sensor] ? ` <span class="label">SENS:</span> <span style="color:#4da">${this.escapeHtml(state.player.attachments[AttachmentSlot.Sensor].name)}</span>` : '') +
+      (state.player.attachments[AttachmentSlot.Utility] ? ` <span class="label">UTIL:</span> <span style="color:#4dd">${this.escapeHtml(state.player.attachments[AttachmentSlot.Utility].name)}${state.player.entity.props["beaconTurnsLeft"] ? ` (${state.player.entity.props["beaconTurnsLeft"]}T)` : state.player.entity.props["hasScrubber"] ? " (active)" : ""}</span>` : '') +
       `<br>` + unreadTag.replace(/ \| /g, '').trim() + reportTag.replace(/ \| /, '') +
       interactHint +
       `</div>` + compassHtml + overlayLine;

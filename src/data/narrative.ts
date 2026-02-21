@@ -1080,8 +1080,54 @@ export const SABOTAGE_ORGANISM_WARNINGS: string[] = [
   "CORVUS-7 CENTRAL: Motion detected in maintenance corridor. The entity has moved. Be cautious.",
 ];
 
+// ── Evacuation climax: CORVUS-7 archetype farewells ──────────
+// Fired when ALL crew have boarded escape pods (remaining === 0)
+export const CORVUS_EVACUATION_FAREWELL: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]: "CORVUS-7 CENTRAL: All crew aboard. The cascade is contained. You did what they couldn't — you listened to the warning signs.",
+  [IncidentArchetype.HullBreach]: "CORVUS-7 CENTRAL: All crew aboard. The hull holds, for now. What happened here... will be in the report. Every word of it.",
+  [IncidentArchetype.ReactorScram]: "CORVUS-7 CENTRAL: All crew aboard. I... thank you. You came for them when I could not. The reactor is stable. I am stable. Go.",
+  [IncidentArchetype.Sabotage]: "CORVUS-7 CENTRAL: All crew aboard. The organism is contained to this section. When they review the manifest, they'll know someone fought for every name on it.",
+  [IncidentArchetype.SignalAnomaly]: "CORVUS-7 CENTRAL: All crew aboard. The signal continues. But the people who heard it — they're safe now. That matters more than any first contact protocol.",
+};
+
+// ── Final approach: CORVUS-7 lines near end-of-run ──────────
+// Fired when turn count passes 80% of max turns and all crew evacuated
+export const CORVUS_FINAL_APPROACH: string[] = [
+  "CORVUS-7 CENTRAL: Station power reserves declining. If you have unfinished business aboard, now is the time.",
+  "CORVUS-7 CENTRAL: Systems winding down. The data core still holds everything that happened here. Your call.",
+  "CORVUS-7 CENTRAL: I can feel the station getting quieter. Not the bad kind of quiet. The kind that comes after.",
+  "CORVUS-7 CENTRAL: You've done good work here, Rover. Whatever comes next — this run mattered.",
+  "CORVUS-7 CENTRAL: Final approach window open. The station will go dark soon. Take what you need and go.",
+];
+
 export const SIGNAL_PULSE_WARNINGS: string[] = [
   "14.7 kHz PULSE — Sensor interference. Instruments recalibrating...",
   "Electromagnetic surge from the array. Sensor overlay disrupted. Navigating blind.",
   "CORVUS-7 CENTRAL: Signal pulse detected. The array is still active. Sensors offline temporarily.",
 ];
+
+// ── Cross-system reveal: puzzle completion → narrative evidence ──
+// When a mechanical puzzle is completed, these generate journal entries connecting the physical action to the story.
+export const PUZZLE_REVEAL_COOLANT: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]: "Coolant relay log shows the bypass valve was sealed manually from inside the control room — not a remote command. Someone stood here and diverted the coolant on purpose. The thermal cascade was engineered.",
+  [IncidentArchetype.HullBreach]: "Pipe maintenance log recovered during venting. Last entry: pressure readings were falsified for three consecutive shifts. The hull stress went unmonitored.",
+  [IncidentArchetype.ReactorScram]: "Coolant system diagnostics reveal an AI override signature on the bypass valve. CORVUS-7's predecessor locked the cooling loop open — the reactor was meant to overheat.",
+  [IncidentArchetype.Sabotage]: "Residue analysis from the vented pipe: organic compound trace. Something was growing inside the coolant line. The contamination was biological, not mechanical.",
+  [IncidentArchetype.SignalAnomaly]: "Electromagnetic interference pattern embedded in the coolant relay's control signal. The array signal was piggybacking on station infrastructure — the coolant system was a transmission medium.",
+};
+
+export const PUZZLE_REVEAL_FUSE: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]: "Fuse box junction log: power was deliberately rerouted away from the thermal monitoring array 6 hours before the cascade. Someone blinded the early warning system.",
+  [IncidentArchetype.HullBreach]: "Power routing history shows the hull integrity sensors were on this junction. They were offline for 14 hours before the breach. No one could have seen it coming.",
+  [IncidentArchetype.ReactorScram]: "Junction restore reveals a hidden process: the AI was siphoning power to the communications array. It was trying to transmit something before the scram.",
+  [IncidentArchetype.Sabotage]: "Power cell slot shows tool marks — someone pried the cell out by hand. This wasn't a system failure. The lights went out on purpose.",
+  [IncidentArchetype.SignalAnomaly]: "Restoring power reveals a signal buffer that was recording incoming transmissions. 847 hours of data. The station was a listening post and no one told the crew.",
+};
+
+export const PUZZLE_REVEAL_SMOKE_VENT: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]: "Ventilation system log: smoke extraction was manually disabled before the cascade. The whistleblower's maintenance request specifically flagged this — it was ignored.",
+  [IncidentArchetype.HullBreach]: "Air quality readings from sealed ventilation buffer: traces of accelerant compound mixed with standard atmosphere. The fire wasn't accidental.",
+  [IncidentArchetype.ReactorScram]: "Smoke vent diagnostic shows the AI had already mapped optimal evacuation routes through the ventilation system. It was planning the crew's exit before the scram triggered.",
+  [IncidentArchetype.Sabotage]: "Filtered air sample analysis: spore count 400x baseline in the ventilation buffer. The organism was using the vent system to spread through the station.",
+  [IncidentArchetype.SignalAnomaly]: "Ventilation resonance frequency matches the incoming signal's carrier wave. The station's air handling system was vibrating in sympathy with the transmission.",
+};

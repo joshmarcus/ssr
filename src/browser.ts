@@ -38,6 +38,7 @@ import {
   FIRST_DISCOVERY_BEATS,
   COOLANT_CASCADE_WARNINGS, HULL_BREACH_CORRUPTION_WARNINGS,
   SABOTAGE_ORGANISM_WARNINGS, SIGNAL_PULSE_WARNINGS,
+  CORVUS_FINAL_APPROACH,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
@@ -247,6 +248,8 @@ let sabotageOrganismPhase = 0; // Sabotage: organism relocation ticks
 let signalPulseCounter = 0; // SignalAnomaly: turns until next pulse
 let sensorBlockedTurns = 0; // SignalAnomaly: turns remaining with sensors blocked
 let lastEvidenceViewCount = 0; // journal count when EVIDENCE tab was last viewed
+let scrubberHintFired = false; // one-time hint when scrubber first activates
+let beaconHintFired = false; // one-time hint when beacon first deploys
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
 
 // ── Wait message variety ────────────────────────────────────────
@@ -1009,6 +1012,8 @@ function resetGameState(newSeed: number): void {
   signalPulseCounter = 0;
   sensorBlockedTurns = 0;
   lastEvidenceViewCount = 0;
+  scrubberHintFired = false;
+  beaconHintFired = false;
   pendingCrewDoor = null;
   journalTab = "evidence";
   choiceSelectedIdx = 0;
@@ -1162,6 +1167,7 @@ function handleAction(action: Action): void {
   const ppx = state.player.entity.pos.x;
   const ppy = state.player.entity.pos.y;
   const prevDirt = state.tiles[ppy]?.[ppx]?.dirt ?? 0;
+  const hadEvacFarewell = state.milestones.has("corvus_evac_farewell");
   state = step(state, action);
 
   // Start background music on first player interaction
@@ -1181,6 +1187,27 @@ function handleAction(action: Action): void {
       triggeredTutorialHints.add("first_clean");
       display.addLog(TUTORIAL_HINT_FIRST_CLEAN, "system");
     }
+  }
+
+  // Screen flash when all crew evacuated (milestone transition detection)
+  if (state.milestones.has("corvus_evac_farewell") && !hadEvacFarewell) {
+    display.triggerScreenFlash("milestone");
+  }
+
+  // One-time utility attachment activation hints
+  if (!scrubberHintFired && state.player.entity.props["hasScrubber"] === true && state.turn % 3 === 0) {
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+    if (py >= 0 && py < state.height && px >= 0 && px < state.width && state.tiles[py][px].smoke < 10) {
+      // Scrubber cleared smoke — only show hint if there was smoke to clear
+    } else {
+      scrubberHintFired = true;
+      display.addLog("Atmospheric Scrubber cycling — smoke filtered from your position. Passive effect active.", "system");
+    }
+  }
+  if (!beaconHintFired && state.player.entity.props["hasBeacon"] === true) {
+    beaconHintFired = true;
+    display.addLog("Emergency Beacon deployed. Hazard spread suppressed in this room for 15 turns.", "milestone");
   }
 
   // Show sim-generated log messages (from interactions) with proper classification
@@ -1571,6 +1598,21 @@ function handleAction(action: Action): void {
         const idx = ((state.turn / 25) | 0) % pool.length;
         display.addLog(pool[idx], "narrative");
       }
+    }
+  }
+
+  // ── Final approach CORVUS-7 beat (late-game, post-evacuation) ──
+  if (state.turn !== prevTurn && !state.gameOver) {
+    const turnPct = state.turn / state.maxTurns;
+    const allEvacuated = state.mystery?.evacuation?.crewEvacuated?.length &&
+      state.mystery.evacuation.crewEvacuated.length > 0;
+    if (turnPct >= 0.8 && allEvacuated && !state.milestones.has("corvus_final_approach_fired")) {
+      // Fire once per run
+      const newMs = new Set(state.milestones);
+      newMs.add("corvus_final_approach_fired");
+      state = { ...state, milestones: newMs };
+      const faIdx = state.seed % CORVUS_FINAL_APPROACH.length;
+      display.addLog(CORVUS_FINAL_APPROACH[faIdx], "milestone");
     }
   }
 

@@ -16,6 +16,8 @@ import {
   CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
   CORVUS_REACTIONS,
   SENSOR_CLUES,
+  PUZZLE_REVEAL_COOLANT, PUZZLE_REVEAL_FUSE, PUZZLE_REVEAL_SMOKE_VENT,
+  CORVUS_EVACUATION_FAREWELL,
 } from "../data/narrative.js";
 
 /**
@@ -1901,6 +1903,19 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             read: false,
           },
         ];
+
+        // Cross-system reveal: fuse box completion → narrative evidence
+        if (allPowered) {
+          const fuseArchetype = next.mystery?.timeline?.archetype;
+          if (fuseArchetype) {
+            const revealPool = groupId === "smoke_vent" ? PUZZLE_REVEAL_SMOKE_VENT : PUZZLE_REVEAL_FUSE;
+            const revealText = revealPool[fuseArchetype];
+            if (revealText) {
+              const revealCat = groupId === "smoke_vent" ? "Ventilation System Analysis" : "Power Junction Forensics";
+              next = addJournalEntry(next, `journal_fuse_reveal_${groupId}`, "trace", revealCat, revealText, getPlayerRoomName(state), targetId);
+            }
+          }
+        }
       }
       break;
     }
@@ -2685,12 +2700,23 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           const totalEvacuated = (next.mystery?.evacuation?.crewEvacuated.length || 0) + newEvacuated.length;
           const boardDialogueFn = CREW_BOARDING_DIALOGUE[firstBoardPersonality];
           const boardingLine = boardDialogueFn ? boardDialogueFn(firstBoardName) : "";
+
+          // Escalating urgency message based on remaining crew
+          let boardMsg: string;
+          if (remaining === 0) {
+            boardMsg = `${names} boards ${podLabel}. That's everyone. All crew accounted for.`;
+          } else if (remaining === 1) {
+            boardMsg = `${names} boards ${podLabel}. One soul still aboard. Find them.`;
+          } else {
+            boardMsg = `${names} boards ${podLabel}. ${totalEvacuated} safe, ${remaining} still need rescue.`;
+          }
+
           const boardingLogs: LogEntry[] = [
             {
               id: `log_pod_board_${targetId}_${next.turn}`,
               timestamp: next.turn,
               source: "system",
-              text: `${names} boards escape ${podLabel}. ${totalEvacuated} crew evacuated, ${remaining} still need rescue.`,
+              text: boardMsg,
               read: false,
             },
           ];
@@ -2721,6 +2747,17 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           }
 
           next = fireMilestone(next, "first_crew_evacuated");
+
+          // CORVUS-7 archetype farewell when all crew are safe
+          if (remaining === 0 && !next.milestones.has("corvus_evac_farewell")) {
+            const evacArchetype = next.mystery?.timeline?.archetype;
+            if (evacArchetype && CORVUS_EVACUATION_FAREWELL[evacArchetype]) {
+              const newMs = new Set(next.milestones);
+              newMs.add("corvus_evac_farewell");
+              next = { ...next, milestones: newMs };
+              next.logs = [...next.logs, { id: `log_evac_farewell_${next.turn}`, timestamp: next.turn, source: "narrative", text: CORVUS_EVACUATION_FAREWELL[evacArchetype], read: false }];
+            }
+          }
 
           // Victory check: all living crew evacuated + mystery solved
           if (remaining === 0) {
@@ -2882,6 +2919,11 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             newMilestones.add("coolant_step_3");
             next = { ...next, entities: newEntities, tiles: newTiles, milestones: newMilestones };
             next.logs = [...state.logs, { id: `log_coolant_3_${next.turn}`, timestamp: next.turn, source: "system", text: "Coolant relay re-engaged. Primary loop restored — station thermal readings dropping. Well done.", read: false }];
+            // Cross-system reveal: coolant puzzle → narrative evidence
+            const coolantArchetype = next.mystery?.timeline?.archetype;
+            if (coolantArchetype && PUZZLE_REVEAL_COOLANT[coolantArchetype]) {
+              next = addJournalEntry(next, "journal_coolant_reveal", "trace", "Coolant System Forensic Analysis", PUZZLE_REVEAL_COOLANT[coolantArchetype], getPlayerRoomName(state), "coolant_step_3");
+            }
           }
         }
         break;
