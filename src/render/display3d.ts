@@ -22,17 +22,17 @@ function createFloorGridTexture(): THREE.CanvasTexture {
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
 
-  // Mid-gray base — instance color multiplies through this
-  ctx.fillStyle = "#aaaaaa";
+  // Light base — instance color multiplies through this, so lighter = brighter floors
+  ctx.fillStyle = "#dddddd";
   ctx.fillRect(0, 0, size, size);
 
-  // Outer panel edge — slightly brighter
-  ctx.strokeStyle = "#cccccc";
+  // Outer panel edge — bright highlight
+  ctx.strokeStyle = "#eeeeee";
   ctx.lineWidth = 1;
   ctx.strokeRect(1, 1, size - 2, size - 2);
 
   // Corner accents — blue-ish highlight
-  ctx.strokeStyle = "#bbccdd";
+  ctx.strokeStyle = "#ccddee";
   ctx.lineWidth = 2;
   const c = 8;
   ctx.beginPath();
@@ -43,7 +43,7 @@ function createFloorGridTexture(): THREE.CanvasTexture {
   ctx.stroke();
 
   // Subtle inner seam
-  ctx.strokeStyle = "#999999";
+  ctx.strokeStyle = "#bbbbbb";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(size / 2, 3);
@@ -126,11 +126,11 @@ function makeToonMaterial(opts: {
 
 // ── Color constants ──────────────────────────────────────────────
 const COLORS_3D = {
-  floor: 0x777777,
-  wall: 0x99aabb,
+  floor: 0x999999,     // brighter floor for better visibility
+  wall: 0xaabbcc,
   door: 0xdd8844,
   lockedDoor: 0xff4444,
-  corridor: 0x6a6a6a,
+  corridor: 0x888888,  // brighter corridors
   background: 0x0a0a12,
   player: 0x00ff00,
   fogFull: 0x000000,
@@ -138,7 +138,9 @@ const COLORS_3D = {
 } as const;
 
 // How many world-units tall the visible area is (zoom level)
-const CAMERA_FRUSTUM_SIZE = 7; // zoomed in for detail visibility
+const CAMERA_FRUSTUM_SIZE_DEFAULT = 5; // start zoomed in for detail visibility
+const CAMERA_FRUSTUM_SIZE_MIN = 3;     // max zoom in
+const CAMERA_FRUSTUM_SIZE_MAX = 12;    // max zoom out
 
 const ENTITY_COLORS_3D: Record<string, number> = {
   [EntityType.Relay]: 0xffcc00,
@@ -394,6 +396,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private lastRoomId = "";
   private showTrail = false;
   private cameraZoomPulse: number = 0; // >0 = zooming out briefly on room transition
+  private cameraFrustumSize: number = CAMERA_FRUSTUM_SIZE_DEFAULT; // current zoom level (mouse wheel adjustable)
+  private cameraElevation: number = 0.5; // 0 = top-down, 1 = side-on. Default = mid-angle
 
   // Room decoration props (placed once per room when explored)
   private decoratedRooms: Set<string> = new Set();
@@ -407,6 +411,8 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Resize handler
   private resizeHandler: () => void;
+  // Mouse wheel zoom handler
+  private boundWheelHandler: (e: WheelEvent) => void;
 
   // Cel-shaded rendering
   private outlineEffect: OutlineEffect;
@@ -478,7 +484,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Camera (orthographic, zoomed-in, follows player) ──
     const aspect = this.getAspect();
-    const frustumHeight = CAMERA_FRUSTUM_SIZE;
+    const frustumHeight = this.cameraFrustumSize;
     const frustumWidth = frustumHeight * aspect;
     this.camera = new THREE.OrthographicCamera(
       -frustumWidth / 2, frustumWidth / 2,
@@ -499,7 +505,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     });
 
     // ── Lights (brighter for visibility, still atmospheric) ──
-    const ambient = new THREE.AmbientLight(0x8899aa, 1.6);
+    const ambient = new THREE.AmbientLight(0x99aacc, 2.0);
     this.scene.add(ambient);
 
     // Strong key light — warm directional from upper-left
@@ -629,6 +635,10 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.resizeHandler = () => this.handleResize();
     window.addEventListener("resize", this.resizeHandler);
     this.handleResize();
+
+    // ── Mouse wheel zoom ──
+    this.boundWheelHandler = this.handleWheel.bind(this);
+    this.container.addEventListener("wheel", this.boundWheelHandler, { passive: false });
 
     // ── Start animation loop ──
     this.animate();
@@ -892,6 +902,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   destroy(): void {
     cancelAnimationFrame(this.animFrameId);
     window.removeEventListener("resize", this.resizeHandler);
+    this.container.removeEventListener("wheel", this.boundWheelHandler);
     if (this.roomFlashTimer) clearTimeout(this.roomFlashTimer);
     // Clean up overlays
     const overlay = document.getElementById("gameover-overlay");
@@ -1268,7 +1279,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.cameraZoomPulse = Math.max(0, this.cameraZoomPulse - delta * 2.0);
         // Update orthographic camera frustum
         const aspect = this.container.clientWidth / this.container.clientHeight;
-        const baseSize = CAMERA_FRUSTUM_SIZE + zoomOffset;
+        const baseSize = this.cameraFrustumSize + zoomOffset;
         this.camera.left = -baseSize * aspect;
         this.camera.right = baseSize * aspect;
         this.camera.top = baseSize;
@@ -1276,7 +1287,10 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.camera.updateProjectionMatrix();
       }
 
-      this.camera.position.set(this.cameraPosX + shakeX, 8 + zoomOffset * 0.5, this.cameraPosZ + 12 + shakeZ);
+      // Camera angle: elevation 0 = top-down (high Y, low Z offset), 1 = side-on (low Y, high Z)
+      const camY = 4 + (1 - this.cameraElevation) * 12; // 4-16 range
+      const camZOffset = 2 + this.cameraElevation * 16;  // 2-18 range
+      this.camera.position.set(this.cameraPosX + shakeX, camY + zoomOffset * 0.5, this.cameraPosZ + camZOffset + shakeZ);
       this.camera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
 
@@ -3242,10 +3256,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       const dx = px - this.lastPlayerX;
       const dy = py - this.lastPlayerY;
       if (dx !== 0 || dy !== 0) {
-        // GLTF models face -Z by default. In our coordinate system:
-        // +x = east, +z (mapped from y) = south. We add π to flip 180°
-        // so the model faces the movement direction, not away from it.
-        this.playerFacing = Math.atan2(dx, -dy) + Math.PI;
+        // Synty GLTF models face +Z by default. In our coordinate system:
+        // game +x = 3D +x (east), game +y = 3D +z (south).
+        // atan2(-dx, dy) gives the correct Y rotation for +Z-facing models.
+        this.playerFacing = Math.atan2(-dx, dy);
       }
     }
     this.lastPlayerX = px;
@@ -3307,15 +3321,43 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     this.renderer.setSize(availW, availH);
     this.outlineEffect.setSize(availW, availH);
+    this.updateCameraFrustum();
+  }
 
+  private updateCameraFrustum(): void {
+    const sidebarWidth = 340;
+    const availW = window.innerWidth - sidebarWidth;
+    const availH = window.innerHeight;
     const aspect = availW / availH;
-    const frustumHeight = CAMERA_FRUSTUM_SIZE;
-    const frustumWidth = frustumHeight * aspect;
-    this.camera.left = -frustumWidth / 2;
-    this.camera.right = frustumWidth / 2;
-    this.camera.top = frustumHeight / 2;
-    this.camera.bottom = -frustumHeight / 2;
+    const fh = this.cameraFrustumSize;
+    const fw = fh * aspect;
+    this.camera.left = -fw;
+    this.camera.right = fw;
+    this.camera.top = fh;
+    this.camera.bottom = -fh;
     this.camera.updateProjectionMatrix();
+  }
+
+  private handleWheel(e: WheelEvent): void {
+    e.preventDefault();
+    if (e.shiftKey) {
+      // Shift + scroll: change camera elevation angle
+      const angleStep = 0.05;
+      if (e.deltaY > 0) {
+        this.cameraElevation = Math.min(0.9, this.cameraElevation + angleStep);
+      } else if (e.deltaY < 0) {
+        this.cameraElevation = Math.max(0.05, this.cameraElevation - angleStep);
+      }
+    } else {
+      // Scroll up (negative deltaY) = zoom in (decrease frustum), scroll down = zoom out
+      const zoomStep = 0.3;
+      if (e.deltaY > 0) {
+        this.cameraFrustumSize = Math.min(CAMERA_FRUSTUM_SIZE_MAX, this.cameraFrustumSize + zoomStep);
+      } else if (e.deltaY < 0) {
+        this.cameraFrustumSize = Math.max(CAMERA_FRUSTUM_SIZE_MIN, this.cameraFrustumSize - zoomStep);
+      }
+      this.updateCameraFrustum();
+    }
   }
 
   // ── Private: model loading (GLTF + FBX) ─────────────────────────
