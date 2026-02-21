@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 71 complete (Sixth Archetype: The Mutiny + bot fix)
+- **Phase**: Sprint 72 complete (Clue Clarity Rework + Atmospheric Active Scan)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -13,7 +13,7 @@
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 1300, Normal: 1000, Hard: 700) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 12/12 VICTORY across seeds 1-12 (all 6 archetypes including Mutiny at seeds 5, 11)
+- **Playtest results**: Golden seed 184201 VICTORY confirmed
 
 ## What Works
 
@@ -104,6 +104,24 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 72 Changes
+
+### Clue Clarity Rework
+- **18 breadcrumb log templates** (3 per archetype): Each contains 1-2 keywords from the correct deduction_what answer. Players need 2-3 entries to assemble the full picture.
+- **Rewritten wrong answers**: deduction_what and deduction_sequence wrong answers now use vocabulary ABSENT from each archetype's evidence, preventing keyword-matching false positives
+- **Strengthened hero evidence**: Hero mentioned by full name 2x with distinctive action verbs ("risked", "saved", "confronted", "shielded") in CREW_QUESTIONING_TESTIMONY and FIRST_DISCOVERY_BEATS
+- **Hero-naming volatile terminals**: Each archetype's timed evidence now references the hero by full name in journalDetail
+- **Trigger room origin clues**: SENSOR_CLUES now explicitly say "this is where it started" / "the origin point" for each archetype's trigger room
+- **Browser hero selection**: Beat 3 of FIRST_DISCOVERY_BEATS now uses the correct hero role (from STORY_ROLES) instead of defaulting to engineer/scientist
+
+### Atmospheric Active Scan
+- **Pressure summary**: Scanning with atmospheric sensor logs room pressure status (nominal/reduced/critical) with tile count
+- **Breach direction**: Active scan detects nearest unsealed breach and reports compass direction + distance
+- **Visual pulse**: Low-pressure tiles briefly highlight in cyan on the atmospheric overlay during the scan turn
+
+### Archetype Spatial Signatures (from Sprint 71 carry-over)
+- Already committed as f95ffa9: `placeArchetypeSignatures()` with 6 archetype-specific hazard zone patterns
 
 ## Sprint 71 Changes
 
