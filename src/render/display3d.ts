@@ -232,8 +232,8 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   [EntityType.PatrolDrone]: "models/synty-space-gltf/SM_Veh_Drone_Attach_01.glb",
   [EntityType.EscapePod]: "models/synty-space-gltf/SM_Veh_EscapePod_Large_01.glb",
   [EntityType.CrewNPC]: "models/synty-space-gltf/SK_Chr_Crew_Male_01.glb",
-  [EntityType.Airlock]: "models/synty-space-gltf/SM_Sign_AirLock_01.glb",
-  [EntityType.ToolPickup]: "models/synty-space-gltf/SM_Wep_Pistol_01.glb",
+  [EntityType.Airlock]: "models/synty-space-gltf/SM_Bld_Wall_Doorframe_02.glb",
+  [EntityType.ToolPickup]: "models/synty-space-gltf/SM_Prop_Cart_01.glb",
   [EntityType.UtilityPickup]: "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
   [EntityType.Console]: "models/synty-space-gltf/SM_Prop_ControlPanel_02.glb",
   [EntityType.RepairCradle]: "models/synty-space-gltf/SM_Prop_CryoBed_01.glb",
@@ -1467,98 +1467,145 @@ export class BrowserDisplay3D implements IGameDisplay {
       "models/synty-space-gltf/SM_Prop_Bed_Medical_01.glb",
       "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
       "models/synty-space-gltf/SM_Prop_Decontamination_Shower_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Crate_health_02.glb",
     ],
     "Engineering Storage": [
       "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
       "models/synty-space-gltf/SM_Prop_Detail_Box_02.glb",
       "models/synty-space-gltf/SM_Prop_Cart_01.glb",
+      "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
     ],
     "Life Support": [
       "models/synty-space-gltf/SM_Prop_AirVent_Large_01.glb",
       "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
     ],
     "Data Core": [
       "models/synty-space-gltf/SM_Prop_CenterTube_02.glb",
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
     ],
     "Robotics Bay": [
       "models/synty-space-gltf/SM_Prop_Desk_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Cart_01.glb",
+      "models/synty-space-gltf/SM_Prop_ControlPanel_02.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
     ],
     "Research Lab": [
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Prop_Desk_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_CryoBed_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
     ],
     "Communications Hub": [
       "models/synty-space-gltf/SM_Prop_Satellite_Stand_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
       "models/synty-space-gltf/SM_Prop_Radar_Panel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Antenna_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
     ],
     "Power Relay Junction": [
       "models/synty-space-gltf/SM_Prop_Battery_03.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
       "models/synty-space-gltf/SM_Prop_ControlPanel_03.glb",
+      "models/synty-space-gltf/SM_Prop_Battery_01.glb",
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
     ],
     "Bridge": [
       "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
       "models/synty-space-gltf/SM_Prop_ControlPanel_01.glb",
+      "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_02.glb",
     ],
     "Engine Core": [
       "models/synty-space-gltf/SM_Prop_CenterTube_01.glb",
       "models/synty-space-gltf/SM_Prop_Battery_02.glb",
       "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-space-gltf/SM_Prop_ControlPanel_03.glb",
     ],
     "Cargo Hold": [
       "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
       "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
       "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
+      "models/synty-space-gltf/SM_Prop_Detail_Box_02.glb",
+      "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
     ],
     "Crew Quarters": [
       "models/synty-space-gltf/SM_Bld_Crew_Beds_01.glb",
       "models/synty-space-gltf/SM_Prop_Desk_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
+      "models/synty-space-gltf/SM_Bld_Crew_Beds_01.glb",
+      "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
     ],
     "Observation Deck": [
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_01.glb",
       "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
     ],
     "Escape Pod Bay": [
       "models/synty-space-gltf/SM_Prop_EscapePod_Hatch_Small_01.glb",
       "models/synty-space-gltf/SM_Sign_AirLock_01.glb",
+      "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
+      "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
     ],
     "Auxiliary Power": [
       "models/synty-space-gltf/SM_Prop_Battery_01.glb",
       "models/synty-space-gltf/SM_Prop_Battery_02.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-space-gltf/SM_Prop_Battery_03.glb",
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
     ],
     "Signal Room": [
       "models/synty-space-gltf/SM_Prop_Antenna_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Radar_Panel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
     ],
     "Server Annex": [
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
     ],
     "Armory": [
       "models/synty-space-gltf/SM_Prop_Detail_Box_02.glb",
       "models/synty-space-gltf/SM_Prop_Crate_health_02.glb",
+      "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
     ],
     "Arrival Bay": [
       "models/synty-space-gltf/SM_Prop_Cart_01.glb",
       "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
+      "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
     ],
     "Emergency Shelter": [
       "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
       "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
+      "models/synty-space-gltf/SM_Prop_Bed_Medical_01.glb",
+      "models/synty-space-gltf/SM_Prop_Crate_health_02.glb",
     ],
     "Maintenance Corridor": [
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Cart_01.glb",
+    ],
+    "Vent Control Room": [
+      "models/synty-space-gltf/SM_Prop_AirVent_Large_01.glb",
+      "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
       "models/synty-space-gltf/SM_Prop_Panel_01.glb",
     ],
   };
@@ -1597,8 +1644,8 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
-      // Place 1-3 decorations at deterministic positions (seeded by room id)
-      const maxDecor = Math.min(3, emptyFloors.length, decorModels.length);
+      // Place up to 5 decorations at deterministic positions (seeded by room id)
+      const maxDecor = Math.min(5, emptyFloors.length);
       // Simple deterministic shuffle based on room position
       const seed = room.x * 31 + room.y * 17;
       emptyFloors.sort((a, b) => ((a.x * 13 + a.y * 7 + seed) & 0xff) - ((b.x * 13 + b.y * 7 + seed) & 0xff));
@@ -1613,8 +1660,8 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (cached) {
           const clone = cached.clone();
           clone.position.set(pos.x, 0, pos.y);
-          // Scale down decorations slightly
-          clone.scale.multiplyScalar(0.6);
+          // Decorations at reasonable room-furniture scale
+          clone.scale.multiplyScalar(0.75);
           this.decorationGroup.add(clone);
         } else {
           // Load model and place when ready
@@ -1627,7 +1674,7 @@ export class BrowserDisplay3D implements IGameDisplay {
               const size = new THREE.Vector3();
               box.getSize(size);
               const maxDim = Math.max(size.x, size.y, size.z);
-              if (maxDim > 0) model.scale.multiplyScalar(0.5 / maxDim);
+              if (maxDim > 0) model.scale.multiplyScalar(0.65 / maxDim);
 
               // Center and sit on floor
               const b2 = new THREE.Box3().setFromObject(model);
@@ -2735,16 +2782,22 @@ export class BrowserDisplay3D implements IGameDisplay {
         const ph = Math.max(1, Math.ceil(scale));
 
         if (tile.type === TileType.Wall) {
-          ctx.fillStyle = tile.visible ? "#445566" : "#223344";
+          ctx.fillStyle = tile.visible ? "#556677" : "#334455";
         } else if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
-          ctx.fillStyle = tile.type === TileType.LockedDoor ? "#882222" : "#886633";
+          ctx.fillStyle = tile.type === TileType.LockedDoor ? "#aa3333" : "#997744";
         } else if (tile.walkable) {
-          if (tile.heat > 30) {
-            ctx.fillStyle = "#662200";
-          } else if (tile.pressure < 60) {
-            ctx.fillStyle = "#223366";
+          if (tile.heat > 50) {
+            ctx.fillStyle = "#aa3300"; // dangerous heat — bright red-orange
+          } else if (tile.heat > 25) {
+            ctx.fillStyle = "#774400"; // moderate heat — amber
+          } else if (tile.smoke > 40) {
+            ctx.fillStyle = "#444433"; // heavy smoke — murky
+          } else if (tile.pressure < 40) {
+            ctx.fillStyle = "#3344aa"; // vacuum — bright blue
+          } else if (tile.pressure < 70) {
+            ctx.fillStyle = "#223366"; // low pressure — dark blue
           } else {
-            ctx.fillStyle = tile.visible ? "#334433" : "#1a2a1a";
+            ctx.fillStyle = tile.visible ? "#445544" : "#223322";
           }
         } else {
           continue;
@@ -2753,7 +2806,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Entities as colored dots
+    // Entities as colored dots — larger for important types
+    const now = performance.now() / 1000;
     for (const [id, entity] of state.entities) {
       if (id === "player") continue;
       const tx = state.tiles[entity.pos.y]?.[entity.pos.x];
@@ -2761,18 +2815,33 @@ export class BrowserDisplay3D implements IGameDisplay {
       const color = ENTITY_COLORS_CSS[entity.type] || "#888";
       const px = Math.floor(entity.pos.x * scale);
       const py = Math.floor(entity.pos.y * scale);
+
+      // Breach entities pulse red as warning
+      if (entity.type === EntityType.Breach) {
+        const pulse = 0.5 + Math.sin(now * 4 + entity.pos.x) * 0.5;
+        const r = Math.round(255 * pulse);
+        ctx.fillStyle = `rgb(${r}, 30, 0)`;
+        ctx.fillRect(px - 2, py - 2, 5, 5);
+        continue;
+      }
+
+      // Important entities get bigger dots
+      const isLarge = entity.type === EntityType.DataCore || entity.type === EntityType.EscapePod ||
+                      entity.type === EntityType.CrewNPC;
+      const dotSize = isLarge ? 4 : 3;
+      const offset = Math.floor(dotSize / 2);
       ctx.fillStyle = color;
-      ctx.fillRect(px - 1, py - 1, 3, 3);
+      ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
     }
 
-    // Player: bright green dot with white border
+    // Player: bright green dot with white border, larger
     const ppx = Math.floor(state.player.entity.pos.x * scale);
     const ppy = Math.floor(state.player.entity.pos.y * scale);
     ctx.fillStyle = "#44ff88";
-    ctx.fillRect(ppx - 2, ppy - 2, 5, 5);
+    ctx.fillRect(ppx - 3, ppy - 3, 7, 7);
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1;
-    ctx.strokeRect(ppx - 2, ppy - 2, 5, 5);
+    ctx.strokeRect(ppx - 3, ppy - 3, 7, 7);
   }
 
   // ── Starfield background ─────────────────────────────────────
