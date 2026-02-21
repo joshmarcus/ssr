@@ -3350,10 +3350,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       const dx = px - this.lastPlayerX;
       const dy = py - this.lastPlayerY;
       if (dx !== 0 || dy !== 0) {
-        // Synty vehicle models face +X. In our coordinate system:
-        // game +x = 3D +x (east), game +y = 3D +z (south).
-        // -atan2(dy, dx) rotates the +X-facing model toward movement direction.
-        this.playerFacing = -Math.atan2(dy, dx);
+        // Synty Sweepo model needs -PI/2 correction from base atan2.
+        // Empirically calibrated: without offset the model is 90° CW from correct.
+        this.playerFacing = -Math.atan2(dy, dx) - Math.PI / 2;
       }
     }
     this.lastPlayerX = px;
