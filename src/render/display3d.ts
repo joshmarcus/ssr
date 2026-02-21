@@ -136,30 +136,30 @@ const ENTITY_COLORS_3D: Record<string, number> = {
   [EntityType.RepairCradle]: 0xaaff66,
 };
 
-// Room wall tints (hex versions — brighter for 3D)
+// Room wall tints — stronger color identity per zone
 const ROOM_WALL_TINTS_3D: Record<string, number> = {
-  "Engineering Storage": 0x998870,
-  "Power Relay Junction": 0x998860,
-  "Engine Core": 0x997050,
-  "Life Support": 0x708899,
-  "Vent Control Room": 0x707899,
-  "Communications Hub": 0x707899,
-  "Research Lab": 0x709970,
-  "Med Bay": 0x907080,
-  "Data Core": 0x906898,
-  "Robotics Bay": 0x888888,
-  "Bridge": 0x808898,
-  "Observation Deck": 0x708090,
-  "Escape Pod Bay": 0x709078,
-  "Auxiliary Power": 0x908860,
-  "Signal Room": 0x707098,
-  "Server Annex": 0x887098,
-  "Armory": 0x906060,
-  "Emergency Shelter": 0x709068,
-  "Cargo Hold": 0x908060,
-  "Crew Quarters": 0x908870,
-  "Arrival Bay": 0x708878,
-  "Maintenance Corridor": 0x808080,
+  "Engineering Storage": 0xbb9955,   // warm industrial amber
+  "Power Relay Junction": 0xccaa44,  // electric yellow
+  "Engine Core": 0xcc7733,           // hot orange
+  "Life Support": 0x55aacc,          // cool medical blue
+  "Vent Control Room": 0x6699bb,     // duct steel blue
+  "Communications Hub": 0x5577cc,    // comm blue
+  "Research Lab": 0x55bb77,          // lab green
+  "Med Bay": 0xcc6688,              // medical pink-red
+  "Data Core": 0xaa55cc,            // data purple
+  "Robotics Bay": 0x889999,         // metallic grey-teal
+  "Bridge": 0x7788bb,              // command blue-grey
+  "Observation Deck": 0x6699aa,     // sky viewport blue
+  "Escape Pod Bay": 0x55cc88,       // emergency green
+  "Auxiliary Power": 0xbbaa44,       // power amber
+  "Signal Room": 0x5566cc,          // signal deep blue
+  "Server Annex": 0x9955bb,         // server violet
+  "Armory": 0xcc5555,              // danger red
+  "Emergency Shelter": 0x66bb77,    // safe green
+  "Cargo Hold": 0xbb8844,          // cargo warm brown
+  "Crew Quarters": 0xbbaa66,        // residential warm gold
+  "Arrival Bay": 0x66aa88,          // teal arrival
+  "Maintenance Corridor": 0x889988, // utility grey-green
 };
 
 // Room ambient light colors — warm/cool per room function
@@ -1390,10 +1390,10 @@ export class BrowserDisplay3D implements IGameDisplay {
                   y >= room.y && y < room.y + room.height) {
                 const tint = ROOM_WALL_TINTS_3D[room.name];
                 if (tint) {
-                  // Blend floor color with room tint (25% tint)
-                  const r = ((COLORS_3D.floor >> 16) & 0xff) * 0.75 + ((tint >> 16) & 0xff) * 0.25;
-                  const g = ((COLORS_3D.floor >> 8) & 0xff) * 0.75 + ((tint >> 8) & 0xff) * 0.25;
-                  const b = (COLORS_3D.floor & 0xff) * 0.75 + (tint & 0xff) * 0.25;
+                  // Blend floor color with room tint (35% tint for distinct zone identity)
+                  const r = ((COLORS_3D.floor >> 16) & 0xff) * 0.65 + ((tint >> 16) & 0xff) * 0.35;
+                  const g = ((COLORS_3D.floor >> 8) & 0xff) * 0.65 + ((tint >> 8) & 0xff) * 0.35;
+                  const b = (COLORS_3D.floor & 0xff) * 0.65 + (tint & 0xff) * 0.35;
                   baseColor = (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
                 }
                 break;
@@ -1684,6 +1684,85 @@ export class BrowserDisplay3D implements IGameDisplay {
     ],
   };
 
+  // Wall-mounted props per room type — placed against inner walls, facing room center
+  private static readonly WALL_PROPS: Record<string, string[]> = {
+    "Bridge": [
+      "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+      "models/synty-space-gltf/SM_Prop_ControlPanel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+    ],
+    "Data Core": [
+      "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+    ],
+    "Communications Hub": [
+      "models/synty-space-gltf/SM_Prop_Radar_Panel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+    ],
+    "Engineering Storage": [
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+    ],
+    "Power Relay Junction": [
+      "models/synty-space-gltf/SM_Prop_ControlPanel_03.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+    ],
+    "Life Support": [
+      "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+    ],
+    "Med Bay": [
+      "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+    ],
+    "Research Lab": [
+      "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
+    ],
+    "Robotics Bay": [
+      "models/synty-space-gltf/SM_Prop_ControlPanel_02.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+    ],
+    "Server Annex": [
+      "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+    ],
+    "Signal Room": [
+      "models/synty-space-gltf/SM_Prop_Antenna_01.glb",
+      "models/synty-space-gltf/SM_Prop_Radar_Panel_01.glb",
+    ],
+    "Observation Deck": [
+      "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+    ],
+    "Armory": [
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
+    ],
+    "Escape Pod Bay": [
+      "models/synty-space-gltf/SM_Sign_AirLock_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+    ],
+    "Crew Quarters": [
+      "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+    ],
+    "Vent Control Room": [
+      "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_ControlPanel_02.glb",
+    ],
+    "Auxiliary Power": [
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+    ],
+    "Engine Core": [
+      "models/synty-space-gltf/SM_Prop_ControlPanel_03.glb",
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+    ],
+  };
+
   private placeRoomDecorations(state: GameState): void {
     for (const room of state.rooms) {
       if (this.decoratedRooms.has(room.id)) continue;
@@ -1778,6 +1857,85 @@ export class BrowserDisplay3D implements IGameDisplay {
               console.warn(`Failed to load decoration ${modelPath}:`, e);
             }
           }, undefined, () => {});
+        }
+      }
+
+      // ── Wall-mounted props: place against inner walls ──
+      const wallProps = BrowserDisplay3D.WALL_PROPS[room.name];
+      if (wallProps && wallProps.length > 0) {
+        // Find wall tiles that border room interior
+        type WallSlot = { x: number; y: number; rot: number }; // rot: facing direction into room
+        const wallSlots: WallSlot[] = [];
+        for (let y = room.y; y < room.y + room.height; y++) {
+          for (let x = room.x; x < room.x + room.width; x++) {
+            if (y < 0 || y >= state.height || x < 0 || x >= state.width) continue;
+            const tile = state.tiles[y][x];
+            if (tile.type !== TileType.Wall) continue;
+            // Check if this wall borders a room floor tile
+            const hasFloorN = y > 0 && state.tiles[y - 1][x].type === TileType.Floor;
+            const hasFloorS = y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Floor;
+            const hasFloorE = x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Floor;
+            const hasFloorW = x > 0 && state.tiles[y][x - 1].type === TileType.Floor;
+            if (hasFloorN) wallSlots.push({ x, y, rot: 0 }); // face north (toward floor)
+            else if (hasFloorS) wallSlots.push({ x, y, rot: Math.PI }); // face south
+            else if (hasFloorE) wallSlots.push({ x, y, rot: -Math.PI / 2 }); // face east
+            else if (hasFloorW) wallSlots.push({ x, y, rot: Math.PI / 2 }); // face west
+          }
+        }
+
+        // Deterministic selection of wall slots
+        const wallSeed = room.x * 37 + room.y * 23;
+        wallSlots.sort((a, b) => ((a.x * 19 + a.y * 11 + wallSeed) & 0xff) - ((b.x * 19 + b.y * 11 + wallSeed) & 0xff));
+        const maxWallProps = Math.min(wallProps.length, wallSlots.length, 3);
+
+        for (let i = 0; i < maxWallProps; i++) {
+          const slot = wallSlots[i];
+          const propPath = wallProps[i % wallProps.length];
+
+          const loadAndPlace = (propModel: THREE.Object3D) => {
+            const clone = propModel.clone();
+            // Scale wall props small — they're mounted decorations
+            const box = new THREE.Box3().setFromObject(clone);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0) clone.scale.multiplyScalar(0.5 / maxDim);
+
+            // Position against wall, raised up to wall-mount height
+            clone.position.set(slot.x, 0.7, slot.y);
+            clone.rotation.y = slot.rot;
+            this.decorationGroup.add(clone);
+          };
+
+          const cached = this.gltfCache.get(propPath);
+          if (cached) {
+            loadAndPlace(cached);
+          } else {
+            const url = import.meta.env.BASE_URL + propPath;
+            this.gltfLoader.load(url, (gltf) => {
+              try {
+                const model = gltf.scene.clone();
+                model.traverse((child) => {
+                  if (child instanceof THREE.Mesh) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    const oldMat = mats[0] as THREE.MeshStandardMaterial;
+                    const hasUVs = !!(child.geometry?.attributes?.uv);
+                    let tex = hasUVs && oldMat?.map ? oldMat.map : null;
+                    if (!tex && hasUVs && this.syntyAtlas) tex = this.syntyAtlas;
+                    child.material = makeToonMaterial({
+                      color: tex ? 0xffffff : (oldMat?.color?.getHex() ?? 0x888888),
+                      gradientMap: this.toonGradient,
+                      map: tex,
+                    });
+                  }
+                });
+                this.gltfCache.set(propPath, model);
+                loadAndPlace(model);
+              } catch (e) {
+                console.warn(`Failed to load wall prop ${propPath}:`, e);
+              }
+            }, undefined, () => {});
+          }
         }
       }
     }
