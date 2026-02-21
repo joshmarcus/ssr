@@ -1594,6 +1594,16 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
   }
 
+  // Entity types that get a small colored point light for visual emphasis
+  private static readonly ENTITY_GLOW_LIGHTS: Partial<Record<string, { color: number; intensity: number; distance: number }>> = {
+    [EntityType.DataCore]: { color: 0xff44ff, intensity: 1.2, distance: 5 },
+    [EntityType.Relay]: { color: 0xffcc00, intensity: 0.8, distance: 4 },
+    [EntityType.Breach]: { color: 0xff2200, intensity: 1.0, distance: 4 },
+    [EntityType.SensorPickup]: { color: 0x00ffee, intensity: 0.5, distance: 3 },
+    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 0.6, distance: 4 },
+    [EntityType.MedKit]: { color: 0xff4444, intensity: 0.4, distance: 3 },
+  };
+
   private createEntityMesh(entity: Entity): THREE.Object3D {
     // Try to use a loaded GLTF model first
     const gltfModel = this.gltfCache.get(entity.type);
@@ -1605,6 +1615,15 @@ export class BrowserDisplay3D implements IGameDisplay {
       const baseY = entity.type === EntityType.Drone ? 0.6 : 0.3;
       group.userData = { entityType: entity.type, baseY, isGltf: true };
       group.position.set(entity.pos.x, baseY, entity.pos.y);
+
+      // Add glow light for emphasis entities
+      const glowDef = BrowserDisplay3D.ENTITY_GLOW_LIGHTS[entity.type];
+      if (glowDef) {
+        const glow = new THREE.PointLight(glowDef.color, glowDef.intensity, glowDef.distance);
+        glow.position.set(0, 0.5, 0);
+        group.add(glow);
+      }
+
       return group;
     }
 
@@ -1872,6 +1891,15 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     group.userData = { entityType: entity.type, baseY, isGltf: false };
     group.position.set(entity.pos.x, baseY, entity.pos.y);
+
+    // Add glow light for emphasis entities (fallback geometry)
+    const glowDef = BrowserDisplay3D.ENTITY_GLOW_LIGHTS[entity.type];
+    if (glowDef) {
+      const glow = new THREE.PointLight(glowDef.color, glowDef.intensity, glowDef.distance);
+      glow.position.set(0, 0.5, 0);
+      group.add(glow);
+    }
+
     return group;
   }
 

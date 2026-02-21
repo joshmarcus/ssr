@@ -213,6 +213,19 @@
     .mode-3d #ui-panel .sidebar-stats {
       border-bottom-color: rgba(68, 255, 136, 0.08);
     }
+    /* Vignette overlay in 3D mode */
+    .mode-3d #rot-display::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 50%,
+        rgba(0, 0, 0, 0.4) 100%
+      );
+      z-index: 2;
+    }
 
     /* ── Game-over full-screen overlay ─────────────────── */
     #gameover-overlay {
