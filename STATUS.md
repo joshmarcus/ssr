@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 67 complete (Choice-Branching Epilogues, Captain's Secret Log, Room Examination)
+- **Phase**: Sprint 68 complete (Archetype Starting Conditions, Environmental Choices, CORVUS Witness)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -86,6 +86,10 @@
 - Choice-branching epilogues: 45 archetype×consequence×option ending paragraphs in game-over overlay
 - Captain's secret log: two-step hidden discovery (Crew Quarters override key → Bridge encrypted log) with 5 archetype-specific revelations
 - Room examination flavor text: 16 rooms × 3 variants of atmospheric prose on Look action
+- Archetype-keyed starting conditions: distinct opening hazard states per archetype (hot corridors, depressurized rooms, EM damage, organic contamination)
+- Environmental interaction choices: 4 binary decision consoles in themed rooms with immediate physical consequences
+- CORVUS-7 witness commentary: 50 investigation-reactive lines fired during evidence linking
+- Signal interference: first 3 turns suppress scan on SignalAnomaly with static-burst opening
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
@@ -94,6 +98,30 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 68 Changes
+
+### Archetype-Keyed Starting Conditions
+- **Distinct opening hazard states**: Each archetype starts with a physically different station
+  - CoolantCascade: Two early corridors at 45 heat (cascade already in progress)
+  - HullBreach: One mid-station room at 35 pressure (fragile sealed breach)
+  - ReactorScram: Data Core room at 30 heat + 8 smoke (reactor was running hot)
+  - Sabotage: Light smoke (12) in Cargo Hold, Engineering Storage, Maintenance Corridor (organic contamination)
+  - SignalAnomaly: Communications Hub at 35 heat + 10 smoke (electromagnetic damage) + 3-turn sensor interference
+- **First-turn readability**: Player reads the physical state before any terminal — "something happened here"
+- **Replayability**: Same archetype across seeds still feels unique due to room layout variance
+
+### Environmental Interaction Choices (Spatial Decision Points)
+- **4 binary decision consoles** in themed rooms (Power Relay Junction, Med Bay, Life Support, Auxiliary Power)
+- **Immediate physical consequences**: heat venting (clears corridors but stresses hull), emergency reserve (HP now vs crew bonus), atmo purge (full area clear vs quick room-only), power shunt (scan boost vs door seal)
+- **Integrated via pendingChoice system**: Uses existing mystery choice UI for seamless presentation
+- **No spoilers, no right answers**: Tactical decisions with transparent tradeoffs — player agency between terminals
+
+### CORVUS-7 Witness Commentary on Evidence Linking
+- **50 authored investigation-reactive lines** (5 archetypes × 5 deduction tiers × 2 variants)
+- **Fires when new evidence tags are covered**: CORVUS reacts to what the player is discovering, not just time-based events
+- **Archetype-specific investigation personality**: In ReactorScram, CORVUS expresses discomfort analyzing an AI sibling; in SignalAnomaly, CORVUS is awed by the signal data
+- **Investigation feels collaborative**: CORVUS becomes a partner in deduction, not just a narrator
 
 ## Sprint 67 Changes
 
