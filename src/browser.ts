@@ -30,6 +30,8 @@ import {
   ROOM_AMBIENT_EVENTS, ROOM_AMBIENT_DEFAULT, CORRIDOR_AMBIENT, CORRIDOR_AMBIENT_MOOD, MOOD_FLAVOR,
   type StationMood,
   CREW_ESCORT_ARC,
+  CORVUS_GREETING, CORVUS_PERSONALITY_REACTIONS, CORVUS_PERSONALITIES,
+  type CorvusPersonality,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
@@ -68,6 +70,8 @@ let seed = params.has("seed")
 // Derive station mood from seed (3 variants: cold/hot/silent)
 const MOOD_TYPES: StationMood[] = ["cold", "hot", "silent"];
 let stationMood: StationMood = MOOD_TYPES[seed % 3];
+// Derive CORVUS-7 personality from seed (3 variants: analytical/empathetic/cryptic)
+let corvusPersonality: CorvusPersonality = CORVUS_PERSONALITIES[(seed >> 2) % 3];
 const difficultyParam = params.get("difficulty") || "normal";
 const difficulty: Difficulty = difficultyParam === "easy" ? Difficulty.Easy
   : difficultyParam === "hard" ? Difficulty.Hard
@@ -486,7 +490,7 @@ function checkRoomEntry(): void {
         ];
         for (const t of thresholds) {
           if (pct >= t.pct && !state.milestones.has(t.key)) {
-            const text = CORVUS_REACTIONS[t.key];
+            const text = CORVUS_PERSONALITY_REACTIONS[corvusPersonality]?.[t.key] ?? CORVUS_REACTIONS[t.key];
             if (text) {
               const newMilestones = new Set(state.milestones);
               newMilestones.add(t.key);
@@ -736,6 +740,7 @@ function initGame(): void {
   // ── Dramatic link establishment sequence (compact) ──────────────
   display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. Rover A3 online.", "milestone");
   display.addLog(MOOD_FLAVOR[stationMood], "narrative");
+  display.addLog(CORVUS_GREETING[corvusPersonality], "narrative");
   display.addLog("Use arrow keys or h/j/k/l to move. Approach objects and press [i] to interact.", "system");
   lastObjectivePhase = ObjectivePhase.Clean;
 
@@ -928,6 +933,7 @@ function resetGameState(newSeed: number): void {
   deleteSave();
   seed = newSeed;
   stationMood = MOOD_TYPES[seed % 3];
+  corvusPersonality = CORVUS_PERSONALITIES[(seed >> 2) % 3];
   // Persist seed so next "New Game" increments from here
   try { localStorage.setItem(LAST_SEED_KEY, String(seed)); } catch { /* ignore */ }
   state = generate(seed, difficulty);

@@ -1,11 +1,11 @@
 import * as ROT from "rot-js";
 import type { GameState, Entity, Room } from "../shared/types.js";
-import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase, IncidentArchetype } from "../shared/types.js";
+import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase, IncidentArchetype, CrewFate } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HEAT_PAIN_THRESHOLD, MAX_TURNS, TURN_WARNING_THRESHOLD } from "../shared/constants.js";
 import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
 import { getRunHistory } from "../sim/saveLoad.js";
-import { GAMEOVER_EPILOGUE_VICTORY, GAMEOVER_EPILOGUE_DEFEAT } from "../data/narrative.js";
+import { GAMEOVER_EPILOGUE_VICTORY, GAMEOVER_EPILOGUE_DEFEAT, DEDUCTION_MISS_HINTS, VICTORY_EPILOGUE_VARIANT } from "../data/narrative.js";
 import type { IGameDisplay } from "./displayInterface.js";
 
 // ── Archetype display names for game-over screen ────────────────
@@ -469,9 +469,13 @@ export class BrowserDisplay implements IGameDisplay {
     }
 
     const archetype = state.mystery?.timeline.archetype as IncidentArchetype | undefined;
-    const epilogue = isVictory
+    const baseEpilogue = isVictory
       ? (archetype && GAMEOVER_EPILOGUE_VICTORY[archetype]) || "Recovery teams en route. The record is preserved."
       : (archetype && GAMEOVER_EPILOGUE_DEFEAT[archetype]) || "Another rover may reach the station. The data endures, waiting.";
+    // Seed-variant detail line for victory — adds texture across replays
+    const variantPool = isVictory && archetype ? (VICTORY_EPILOGUE_VARIANT[archetype] ?? []) : [];
+    const variantDetail = variantPool.length > 0 ? variantPool[state.seed % variantPool.length] : "";
+    const epilogue = variantDetail ? `${baseEpilogue}<br><span style="color:#667;font-size:11px">${variantDetail}</span>` : baseEpilogue;
 
     // ── Deduction retrospective ──
     let retrospectiveHtml = "";
@@ -501,6 +505,67 @@ export class BrowserDisplay implements IGameDisplay {
           </div>
           ${retLines.join("")}
         </div>`;
+    }
+
+    // ── Crew manifest ──
+    let crewManifestHtml = "";
+    if (state.mystery?.crew && state.mystery.crew.length > 0) {
+      const evac2 = state.mystery.evacuation;
+      const evacuatedIds = new Set(evac2?.crewEvacuated ?? []);
+      const deadIds = new Set(evac2?.crewDead ?? []);
+      const foundIds = new Set(evac2?.crewFound ?? []);
+
+      const crewLines = state.mystery.crew.map(c => {
+        const name = `${c.firstName} ${c.lastName}`;
+        const role = c.role.charAt(0).toUpperCase() + c.role.slice(1);
+        let status: string;
+        let color: string;
+        if (evacuatedIds.has(c.id)) {
+          status = "EVACUATED"; color = "#0f0";
+        } else if (deadIds.has(c.id)) {
+          status = "DECEASED"; color = "#f44";
+        } else if (foundIds.has(c.id)) {
+          status = "REMAINS ABOARD"; color = "#fa0";
+        } else if (c.fate === CrewFate.Dead) {
+          status = "DECEASED (pre-incident)"; color = "#844";
+        } else {
+          status = "NEVER LOCATED"; color = "#555";
+        }
+        return `<div style="margin:1px 0;font-size:11px;font-family:monospace">` +
+          `<span style="color:#888;display:inline-block;width:100px">${role}</span>` +
+          `<span style="color:#aaa">${this.escapeHtml(name)}</span> ` +
+          `<span style="color:${color};float:right">${status}</span></div>`;
+      });
+      crewManifestHtml = `
+        <div style="margin:10px 0 4px;border-top:1px solid #333;padding-top:8px">
+          <div style="color:#8ac;font-size:12px;font-weight:bold;text-align:center;margin-bottom:6px;letter-spacing:2px">
+            \u25b8 CREW MANIFEST \u25c2
+          </div>
+          ${crewLines.join("")}
+        </div>`;
+    }
+
+    // ── What you missed (unsolved deductions) ──
+    let missedHtml = "";
+    const unsolvedDeductions = deductions.filter(d => !d.solved);
+    if (unsolvedDeductions.length > 0) {
+      const missLines = unsolvedDeductions.slice(0, 3).map(d => {
+        const pool = DEDUCTION_MISS_HINTS[d.id] ?? DEDUCTION_MISS_HINTS["deduction_what"] ?? [];
+        if (pool.length === 0) return "";
+        const hint = pool[(state.seed + d.id.length) % pool.length];
+        return `<div style="margin:2px 0;font-size:11px;font-family:monospace;color:#667">` +
+          `\u25cb <span style="color:#888">${this.escapeHtml(d.question)}</span><br>` +
+          `<span style="margin-left:16px;color:#557;font-style:italic">${hint}</span></div>`;
+      }).filter(l => l.length > 0);
+      if (missLines.length > 0) {
+        missedHtml = `
+          <div style="margin:10px 0 4px;border-top:1px solid #333;padding-top:8px">
+            <div style="color:#668;font-size:12px;font-weight:bold;text-align:center;margin-bottom:6px;letter-spacing:2px">
+              \u25b8 WHAT REMAINS UNKNOWN \u25c2
+            </div>
+            ${missLines.join("")}
+          </div>`;
+      }
     }
 
     // ── Timeline reconstruction (victory only, if mystery data available) ──
@@ -570,6 +635,8 @@ export class BrowserDisplay implements IGameDisplay {
           ${choicesHtml}
         </div>
         ${retrospectiveHtml}
+        ${crewManifestHtml}
+        ${missedHtml}
         ${timelineHtml}
         <div class="gameover-epilogue">${epilogue}</div>
         <div style="text-align:center;margin:6px 0;color:#556;font-size:11px;font-family:monospace">

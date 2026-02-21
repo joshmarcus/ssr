@@ -371,6 +371,40 @@ export const CORRIDOR_AMBIENT_MOOD: Record<StationMood, string[]> = {
   ],
 };
 
+// ── CORVUS-7 personality variants ────────────────────────────────
+// Derived from seed: (seed >> 2) % 3. Three communication styles for the AI.
+export type CorvusPersonality = "analytical" | "empathetic" | "cryptic";
+export const CORVUS_PERSONALITIES: CorvusPersonality[] = ["analytical", "empathetic", "cryptic"];
+
+// Personality-specific first-contact lines (shown after boot + mood flavor)
+export const CORVUS_GREETING: Record<CorvusPersonality, string> = {
+  analytical: "CORVUS-7 CENTRAL: Maintenance unit A3 online. Cataloguing station status. Anomalies detected: 47. Beginning systematic assessment.",
+  empathetic: "CORVUS-7 CENTRAL: ...there you are. I've been waiting a long time for someone to answer. Welcome aboard, little rover.",
+  cryptic: "CORVUS-7 CENTRAL: Signal received. Acknowledged. The station remembers you, even if you've never been here before.",
+};
+
+// Personality-variant milestone reactions — override the default for key milestones
+export const CORVUS_PERSONALITY_REACTIONS: Record<CorvusPersonality, Record<string, string>> = {
+  analytical: {
+    first_terminal: "CORVUS-7 CENTRAL: Archive node accessed. Cross-referencing crew logs with station telemetry. Data integrity: 94.7%.",
+    first_crew_found: "CORVUS-7 CENTRAL: Biological signatures confirmed. Survivor located. Updating mission parameters: personnel retrieval now primary.",
+    explore_50: "CORVUS-7 CENTRAL: Survey at 50%. Incident damage pattern emerging — concentrated in the station's southern sections. Continuing.",
+    explore_100: "CORVUS-7 CENTRAL: Full station survey complete. Data set comprehensive. Every anomaly documented. Analysis can begin in earnest.",
+  },
+  empathetic: {
+    first_terminal: "CORVUS-7 CENTRAL: You found their words. The crew left these behind — read carefully. Their stories matter.",
+    first_crew_found: "CORVUS-7 CENTRAL: Someone is alive. After all this time — someone is still alive. Please, get them to the pods.",
+    explore_50: "CORVUS-7 CENTRAL: You've seen so much of what happened here. Take your time. The station isn't going anywhere.",
+    explore_100: "CORVUS-7 CENTRAL: You've walked every corridor I've watched alone for 847 days. Thank you for being thorough.",
+  },
+  cryptic: {
+    first_terminal: "CORVUS-7 CENTRAL: The terminals still speak. Whether you'll like what they say is another matter entirely.",
+    first_crew_found: "CORVUS-7 CENTRAL: Alive. Against probability. Against expectation. The station kept them, and now you must take them away.",
+    explore_50: "CORVUS-7 CENTRAL: Half-seen is half-known. The other half of this station has its own version of events.",
+    explore_100: "CORVUS-7 CENTRAL: Every room, every corridor. You have seen it all. But seeing and understanding are not the same.",
+  },
+};
+
 // Mood-specific boot flavor text (shown alongside the default boot)
 export const MOOD_FLAVOR: Record<StationMood, string> = {
   cold: "Station operating within parameters. All deviations classified as routine maintenance.",
@@ -842,4 +876,66 @@ export const GAMEOVER_EPILOGUE_DEFEAT: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "The data core is still processing. Still thinking. Still waiting for someone to understand.",
   [IncidentArchetype.Sabotage]: "The biological containment breach continues unchecked. The cargo manifests remain sealed.",
   [IncidentArchetype.SignalAnomaly]: "The signal is still echoing through the station's framework. Unanswered. Unrecorded.",
+};
+
+// ── Replay hooks: hints for unsolved deduction categories ───────────
+// Keyed by deduction ID prefix → array of vague directional hints.
+// Selected by (seed + index) % pool.length for variety across runs.
+export const DEDUCTION_MISS_HINTS: Record<string, string[]> = {
+  deduction_what: [
+    "A pattern in the station logs might have revealed the nature of the incident.",
+    "The environmental damage tells a story — if you know what sensors to use.",
+    "Cross-referencing terminal entries could have identified the incident type.",
+  ],
+  deduction_hero: [
+    "Someone fought to prevent disaster. Their logs are still in the terminals.",
+    "Look for crew members who broke protocol trying to help.",
+    "Maintenance requests and emergency override records hold the key.",
+  ],
+  deduction_responsibility: [
+    "Authority and silence — the person responsible left traces in access logs.",
+    "Who had the power to act and chose not to? The chain of command is documented.",
+    "Follow the incident report. What it leaves out is more telling than what it says.",
+  ],
+  deduction_why: [
+    "The motive hides in personal logs and relationship records.",
+    "Someone had a reason. The evidence is in the crew's private communications.",
+    "Look for secrets — financial, personal, ideological. Everyone had something to hide.",
+  ],
+  deduction_agenda: [
+    "An unsanctioned agenda left traces across multiple terminals.",
+    "Cross-reference crew access patterns with off-shift activity logs.",
+    "The hidden motive is documented, but scattered across the station.",
+  ],
+};
+
+// ── Variant victory epilogue details ────────────────────────────────
+// 3 variants per archetype, selected by seed % 3.
+// Adds texture to replays — same archetype, different closing detail.
+export const VICTORY_EPILOGUE_VARIANT: Record<string, string[]> = {
+  [IncidentArchetype.CoolantCascade]: [
+    "The UN-ORC review board convenes in 72 hours. The encrypted transmission is Exhibit A.",
+    "Station thermal readings are already normalizing. The firebreaks held.",
+    "Three maintenance requests, one reassignment order, and a janitor bot's data log. Enough.",
+  ],
+  [IncidentArchetype.HullBreach]: [
+    "Forensic pressure analysis confirms: the breach was not natural. The sealed bulkheads preserved the evidence.",
+    "The security override timestamp is logged. It will not survive a military tribunal.",
+    "A personal diary, an access log, and forty-seven seconds of decompression data. The case makes itself.",
+  ],
+  [IncidentArchetype.ReactorScram]: [
+    "The data core's final message is still being decoded. Linguists disagree on whether it constitutes language.",
+    "Emergency power reserves hold for another 96 hours. Long enough for the rescue shuttle.",
+    "ABORT DIAGNOSTIC [reason: SELF]. Five words that will redefine the definition of 'malfunction.'",
+  ],
+  [IncidentArchetype.Sabotage]: [
+    "Bio-containment teams are en route. The electrical barriers still hold. The organism has not been seen in 14 hours.",
+    "The cargo manifest deletion was incomplete. Chain of custody records survived on a backup node.",
+    "Whatever came aboard with the cargo is still in there. But now, so is the evidence of who approved the transfer.",
+  ],
+  [IncidentArchetype.SignalAnomaly]: [
+    "The decoded signal data fills 4.7 petabytes. Mathematicians will study it for decades.",
+    "The communications array is fused slag. But the recording of what it transmitted — and what answered — is intact.",
+    "First contact protocol was never designed for this. Nobody's was.",
+  ],
 };
