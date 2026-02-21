@@ -12,6 +12,50 @@ import { getUnlockedDeductions } from "../sim/deduction.js";
 
 // ── Toon shading gradient texture ──────────────────────────────
 // Creates a 4-step toon gradient: dark shadow → mid shadow → lit → highlight
+/** Create a procedural floor grid texture — subtle panel lines on top of base color.
+ *  Uses a mid-gray base so instance color multiplication produces the right result,
+ *  with slightly brighter lines creating a panel grid effect. */
+function createFloorGridTexture(): THREE.CanvasTexture {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  // Mid-gray base — instance color multiplies through this
+  ctx.fillStyle = "#aaaaaa";
+  ctx.fillRect(0, 0, size, size);
+
+  // Outer panel edge — slightly brighter
+  ctx.strokeStyle = "#cccccc";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(1, 1, size - 2, size - 2);
+
+  // Corner accents — blue-ish highlight
+  ctx.strokeStyle = "#bbccdd";
+  ctx.lineWidth = 2;
+  const c = 8;
+  ctx.beginPath();
+  ctx.moveTo(0, c); ctx.lineTo(0, 0); ctx.lineTo(c, 0);
+  ctx.moveTo(size - c, 0); ctx.lineTo(size, 0); ctx.lineTo(size, c);
+  ctx.moveTo(size, size - c); ctx.lineTo(size, size); ctx.lineTo(size - c, size);
+  ctx.moveTo(c, size); ctx.lineTo(0, size); ctx.lineTo(0, size - c);
+  ctx.stroke();
+
+  // Subtle inner seam
+  ctx.strokeStyle = "#999999";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(size / 2, 3);
+  ctx.lineTo(size / 2, size - 3);
+  ctx.stroke();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
 function createToonGradient(): THREE.DataTexture {
   const colors = new Uint8Array([
     40,   // very dark (deep shadow)
@@ -425,9 +469,10 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Instanced meshes for tiles ──
     // Material color is WHITE — instance colors control per-tile color directly
     // (Three.js multiplies material color * instance color, so white = passthrough)
-    const floorGeo = new THREE.PlaneGeometry(1, 1);
-    floorGeo.rotateX(-Math.PI / 2);
-    const floorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
+    const floorGeo = new THREE.BoxGeometry(1, 0.08, 1);
+    floorGeo.translate(0, -0.04, 0); // sit flush at y=0
+    const floorGridTex = createFloorGridTexture();
+    const floorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: floorGridTex });
     this.floorMesh = new THREE.InstancedMesh(floorGeo, floorMat, this.maxTiles);
     this.floorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.floorMesh.frustumCulled = false; // instances span entire map
@@ -451,7 +496,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.wallCornerMesh.count = 0;
     this.scene.add(this.wallCornerMesh);
 
-    const doorGeo = new THREE.BoxGeometry(0.8, 1.0, 0.15);
+    const doorGeo = new THREE.BoxGeometry(0.85, 1.6, 0.15);
     const doorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.doorMesh = new THREE.InstancedMesh(doorGeo, doorMat, 200);
     this.doorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
