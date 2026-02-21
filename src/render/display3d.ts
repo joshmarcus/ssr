@@ -1289,7 +1289,26 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         // Floor/corridor
         if (tile.walkable) {
-          baseColor = tile.type === TileType.Corridor ? COLORS_3D.corridor : COLORS_3D.floor;
+          if (tile.type === TileType.Corridor) {
+            baseColor = COLORS_3D.corridor;
+          } else {
+            // Room floors: subtle tint from room wall color
+            baseColor = COLORS_3D.floor;
+            for (const room of state.rooms) {
+              if (x >= room.x && x < room.x + room.width &&
+                  y >= room.y && y < room.y + room.height) {
+                const tint = ROOM_WALL_TINTS_3D[room.name];
+                if (tint) {
+                  // Blend floor color with room tint (25% tint)
+                  const r = ((COLORS_3D.floor >> 16) & 0xff) * 0.75 + ((tint >> 16) & 0xff) * 0.25;
+                  const g = ((COLORS_3D.floor >> 8) & 0xff) * 0.75 + ((tint >> 8) & 0xff) * 0.25;
+                  const b = (COLORS_3D.floor & 0xff) * 0.75 + (tint & 0xff) * 0.25;
+                  baseColor = (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
+                }
+                break;
+              }
+            }
+          }
 
           // Sensor overlays on floor tiles
           if (tile.visible) {
