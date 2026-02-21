@@ -147,13 +147,16 @@
 - **Sweepo facing direction**: Added π offset to rotation — model now correctly faces movement direction for all cardinal directions
 - **Space bar interact**: Space now contextually triggers Interact when adjacent to entities, falls back to Wait when nothing nearby
 
-### Visual Sprints (4 completed)
+### Visual Sprints (7 completed)
 - **Sprint V1 — Brightness**: Zoomed in camera (frustum 10→7), more overhead angle (Y14/Z10), ambient light 1.0→1.6, key light 1.4→1.8, brighter floor/wall colors, fog pushed out (18-35), memory fog lighter (0.5 opacity), explored-not-visible brightness 0.25→0.4
 - **Sprint V2 — Rich rooms**: Up to 5 decorations per room (was 3), all 21 room types have 4-5 model variants, better model choices (Airlock=doorframe, ToolPickup=cart), added Vent Control Room decorations
 - **Sprint V3 — Distress**: Taller walls (2.0 units), floating diamond interaction indicator (bobs/spins above nearest interactable), emergency room lights (red strobe in breach/hot rooms, amber pulse in warm/smoky rooms)
 - **Sprint V4 — Floor detail**: 3D floor tiles (0.08 unit thickness), procedural panel grid texture with corner accents, taller doors (1.6 units)
-- **Entity improvements**: Floating ? symbol for EvidenceTrace (procedural, no GLTF), procedural CrewItem mesh, entity glow lights expanded to 12 types (DataCore/Relay/Breach/SensorPickup/EscapePod/MedKit/EvidenceTrace/CrewNPC/LogTerminal/SecurityTerminal/Console/PowerCell), animations for EvidenceTrace/CrewItem/bots/PatrolDrone, increased entity scales
-- **Minimap overhaul**: Hazard coloring (red heat, blue vacuum, murky smoke), pulsing red breach markers, size-scaled entity dots, larger player indicator
+- **Sprint V5 — Zone walls**: 22 room types with vivid wall tints, wall-mounted props (screens, panels, vents, wires) placed against inner walls per room type, floor tint blend 35%
+- **Sprint V6 — Corridor polish**: Corridor tiles near rooms blend 15% of adjacent room's tint, dim corridor point lights every 3 tiles along explored corridors
+- **Sprint V7 — Atmosphere**: Corridor pipe/wire decorations along corridor walls, boosted entity glow lights (+25-40% intensity, 3 new types), emissive self-illumination on GLTF entity models, larger interaction indicator (0.18) with pulsing glow ring, minimap room boundary outlines with zone-colored strokes, ambient hazard floor tinting (heat=red, vacuum=blue) without sensor overlay
+- **Entity improvements**: Floating ? symbol for EvidenceTrace (procedural, no GLTF), procedural CrewItem mesh, entity glow lights expanded to 15 types (DataCore/Relay/Breach/SensorPickup/EscapePod/MedKit/EvidenceTrace/CrewNPC/LogTerminal/SecurityTerminal/Console/PowerCell/FuseBox/PressureValve/RepairCradle), animations for EvidenceTrace/CrewItem/bots/PatrolDrone, increased entity scales
+- **Minimap overhaul**: Hazard coloring (red heat, blue vacuum, murky smoke), pulsing red breach markers, size-scaled entity dots, larger player indicator, room boundary outlines
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
