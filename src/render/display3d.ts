@@ -411,9 +411,9 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   [EntityType.ClosedDoor]: "models/synty-space-gltf/SM_Bld_Wall_Doorframe_01.glb",
   [EntityType.RepairBot]: "models/quaternius-robot/Robot.glb",
   [EntityType.Drone]: "models/synty-space-gltf/SM_Veh_Drone_Attach_01.glb",
-  [EntityType.PatrolDrone]: "models/Characters/GLTF/Enemy_Flying.gltf",
+  [EntityType.PatrolDrone]: "models/Characters/GLTF/Enemy_ExtraSmall.gltf",
   [EntityType.EscapePod]: "models/synty-space-gltf/SM_Veh_EscapePod_Large_01.glb",
-  [EntityType.CrewNPC]: "models/Characters/GLTF/Astronaut_FernandoTheFlamingo.gltf",
+  [EntityType.CrewNPC]: "models/synty-space-gltf/SK_Chr_Crew_Male_01.glb",
   [EntityType.Airlock]: "models/kenney-space/gate-door.glb",
   [EntityType.ToolPickup]: "models/Items/GLTF/Pickup_Crate.gltf",
   [EntityType.UtilityPickup]: "models/Items/GLTF/Pickup_Thunder.gltf",
@@ -434,7 +434,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private camera: THREE.OrthographicCamera | THREE.PerspectiveCamera;
   private orthoCamera: THREE.OrthographicCamera;
   private chaseCamera: THREE.PerspectiveCamera;
-  private chaseCamActive: boolean = false;
+  private chaseCamActive: boolean = true; // default to chase cam
   private chaseCamPosX: number = 0;
   private chaseCamPosY: number = 1.8;
   private chaseCamPosZ: number = 0;
@@ -587,6 +587,20 @@ export class BrowserDisplay3D implements IGameDisplay {
   private static _archPostGeo: THREE.BoxGeometry | null = null;
   private static _archSpanGeo: THREE.BoxGeometry | null = null;
 
+  // Distance culling: per-room sub-groups for trim, decorations, ceiling
+  private roomTrimGroups: Map<string, THREE.Group> = new Map();
+  private roomDecoGroups: Map<string, THREE.Group> = new Map();
+  private roomCeilGroups: Map<string, THREE.Group> = new Map();
+  // Room center positions for distance culling lookups
+  private roomCenters: Map<string, { x: number; z: number }> = new Map();
+  // Spatial buckets for corridor elements (pipes, arches, strip lights)
+  private corridorBuckets: Map<string, THREE.Group> = new Map();
+  private static readonly CULL_DISTANCE = 12; // manhattan distance in tiles
+  private static readonly CORRIDOR_BUCKET_SIZE = 6; // tiles per bucket
+  private _cullFrame: number = 0;
+  // Outline effect toggle
+  private outlineEnabled: boolean = true;
+
   // Player movement trail
   private trailPoints: THREE.Points | null = null;
   private trailPositions: Float32Array = new Float32Array(0);
@@ -636,8 +650,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.chaseCamera.position.set(0, 2, 3);
     this.chaseCamera.lookAt(0, 0, 0);
 
-    // Default to ortho
-    this.camera = this.orthoCamera;
+    // Default to chase cam (F2 toggles)
+    this.camera = this.chaseCamera;
 
     // ── Cel-shading: Outline Effect ──
     this.toonGradient = createToonGradient();
@@ -823,6 +837,9 @@ export class BrowserDisplay3D implements IGameDisplay {
           this.chaseCamLookZ = this.playerCurrentZ + Math.cos(facing) * 2.0;
         }
         this.handleResize();
+      } else if (e.key === "F4") {
+        e.preventDefault();
+        this.outlineEnabled = !this.outlineEnabled;
       }
     };
     window.addEventListener("keydown", this.boundKeyHandler);
@@ -1315,6 +1332,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       `<span class="key">l</span> look ` +
       `<span class="key">F2</span> chase cam ` +
       `<span class="key">F3</span> toggle 2D/3D ` +
+      `<span class="key">F4</span> outlines ` +
       `<span class="key">Space</span> wait`;
 
     const infoHtml = `<div class="info-bar">${controlsHtml}</div>`;
@@ -1674,8 +1692,18 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Particle animations
     this.animateParticles(elapsed, delta);
 
-    // Use outline effect for cel-shaded rendering with dark outlines
-    this.outlineEffect.render(this.scene, this.camera);
+    // Distance culling: update every 5 frames to amortize cost
+    this._cullFrame++;
+    if (this._cullFrame % 5 === 0) {
+      this.updateDistanceCulling();
+    }
+
+    // Render: use outline effect or plain renderer
+    if (this.outlineEnabled) {
+      this.outlineEffect.render(this.scene, this.camera);
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   };
 
   // ── Private: tile updates ───────────────────────────────────────
@@ -2348,6 +2376,73 @@ export class BrowserDisplay3D implements IGameDisplay {
     ],
   };
 
+  /** Get or create a per-room sub-group within a parent group for distance culling */
+  private getRoomSubGroup(
+    parent: THREE.Group,
+    registry: Map<string, THREE.Group>,
+    room: Room,
+  ): THREE.Group {
+    let g = registry.get(room.id);
+    if (!g) {
+      g = new THREE.Group();
+      g.userData.roomCX = room.x + room.width / 2;
+      g.userData.roomCZ = room.y + room.height / 2;
+      parent.add(g);
+      registry.set(room.id, g);
+      // Cache room center for culling
+      if (!this.roomCenters.has(room.id)) {
+        this.roomCenters.set(room.id, {
+          x: room.x + room.width / 2,
+          z: room.y + room.height / 2,
+        });
+      }
+    }
+    return g;
+  }
+
+  /** Get or create a spatial bucket group for corridor elements */
+  private getCorridorBucket(parent: THREE.Group, x: number, y: number): THREE.Group {
+    const bs = BrowserDisplay3D.CORRIDOR_BUCKET_SIZE;
+    const bx = Math.floor(x / bs);
+    const by = Math.floor(y / bs);
+    const key = `${parent.uuid}_${bx},${by}`;
+    let g = this.corridorBuckets.get(key);
+    if (!g) {
+      g = new THREE.Group();
+      g.userData.bucketCX = (bx + 0.5) * bs;
+      g.userData.bucketCZ = (by + 0.5) * bs;
+      parent.add(g);
+      this.corridorBuckets.set(key, g);
+    }
+    return g;
+  }
+
+  /** Distance culling: toggle visibility of per-room/bucket groups based on player distance */
+  private updateDistanceCulling(): void {
+    const px = this.playerCurrentX;
+    const pz = this.playerCurrentZ;
+    const maxDist = BrowserDisplay3D.CULL_DISTANCE;
+
+    // Cull room-based groups
+    const roomMaps = [this.roomTrimGroups, this.roomDecoGroups, this.roomCeilGroups];
+    for (const map of roomMaps) {
+      for (const [roomId, group] of map) {
+        const center = this.roomCenters.get(roomId);
+        if (!center) continue;
+        const dist = Math.abs(px - center.x) + Math.abs(pz - center.z);
+        group.visible = dist <= maxDist;
+      }
+    }
+
+    // Cull corridor buckets
+    for (const [, group] of this.corridorBuckets) {
+      const cx = group.userData.bucketCX as number;
+      const cz = group.userData.bucketCZ as number;
+      const dist = Math.abs(px - cx) + Math.abs(pz - cz);
+      group.visible = dist <= maxDist;
+    }
+  }
+
   private placeDebris(state: GameState, room: Room, hasBreach: boolean): void {
     // Find empty floor tiles in the room
     const entityPositions = new Set<string>();
@@ -2398,7 +2493,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       );
       debris.rotation.y = nextRng() * Math.PI * 2;
       debris.rotation.z = (nextRng() - 0.5) * 0.3;
-      this.decorationGroup.add(debris);
+      this.getRoomSubGroup(this.decorationGroup, this.roomDecoGroups, room).add(debris);
     }
   }
 
@@ -2413,6 +2508,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (!state.tiles[cy][cx].explored) continue;
 
       this.decoratedRooms.add(room.id);
+      const decoGroup = this.getRoomSubGroup(this.decorationGroup, this.roomDecoGroups, room);
 
       const decorModels = BrowserDisplay3D.ROOM_DECORATIONS[room.name];
       if (!decorModels || decorModels.length === 0) continue;
@@ -2456,7 +2552,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           const clone = cached.clone();
           clone.position.set(pos.x, 0, pos.y);
           clone.scale.multiplyScalar(decorScale);
-          this.decorationGroup.add(clone);
+          decoGroup.add(clone);
         } else {
           // Load model and place when ready
           const url = import.meta.env.BASE_URL + modelPath;
@@ -2493,7 +2589,7 @@ export class BrowserDisplay3D implements IGameDisplay {
                 }
               });
 
-              this.decorationGroup.add(model);
+              decoGroup.add(model);
               this.gltfCache.set(modelPath, model); // cache for future rooms
             } catch (e) {
               console.warn(`Failed to load decoration ${modelPath}:`, e);
@@ -2546,7 +2642,7 @@ export class BrowserDisplay3D implements IGameDisplay {
             // Position against wall, raised up to wall-mount height
             clone.position.set(slot.x, 0.7, slot.y);
             clone.rotation.y = slot.rot;
-            this.decorationGroup.add(clone);
+            decoGroup.add(clone);
           };
 
           const cached = this.gltfCache.get(propPath);
@@ -2613,6 +2709,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
       if (!state.tiles[cy][cx].explored) continue;
       this.trimmedRooms.add(room.id);
+      const trimSubGroup = this.getRoomSubGroup(this.trimGroup, this.roomTrimGroups, room);
 
       const tint = ROOM_WALL_TINTS_3D[room.name] ?? COLORS_3D.wall;
       // Brighter accent color for trim
@@ -2663,21 +2760,21 @@ export class BrowserDisplay3D implements IGameDisplay {
             bb.rotation.y = Math.PI / 2;
             bb.position.set(x - 0.47, 0.03, y);
           }
-          this.trimGroup.add(bb);
+          trimSubGroup.add(bb);
 
           // Sci-fi edge glow strip: thin bright line at floor-wall junction
           const glow = new THREE.Mesh(BrowserDisplay3D._edgeGlowGeo!, glowMat);
           glow.position.copy(bb.position);
           glow.position.y = 0.01; // right at floor level
           glow.rotation.copy(bb.rotation);
-          this.trimGroup.add(glow);
+          trimSubGroup.add(glow);
 
           // Top rail: thin strip at top of wall (shared geo)
           const rail = new THREE.Mesh(railGeo, trimMat);
           rail.position.copy(bb.position);
           rail.position.y = 1.98;
           rail.rotation.copy(bb.rotation);
-          this.trimGroup.add(rail);
+          trimSubGroup.add(rail);
         }
       }
 
@@ -2714,7 +2811,7 @@ export class BrowserDisplay3D implements IGameDisplay {
             pillar1.position.set(x - 0.46, 1.05, y);
             pillar2.position.set(x + 0.46, 1.05, y);
           }
-          this.trimGroup.add(pillar1, pillar2);
+          trimSubGroup.add(pillar1, pillar2);
 
           // Top lintel across the door
           const lintelGeo = new THREE.BoxGeometry(
@@ -2724,7 +2821,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           );
           const lintel = new THREE.Mesh(lintelGeo, frameMat);
           lintel.position.set(x, 2.05, y);
-          this.trimGroup.add(lintel);
+          trimSubGroup.add(lintel);
 
           // Floor threshold glow strip — bright line at door base
           const thresholdMat = makeToonMaterial({
@@ -2740,7 +2837,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           );
           const threshold = new THREE.Mesh(threshGeo, thresholdMat);
           threshold.position.set(x, 0.008, y);
-          this.trimGroup.add(threshold);
+          trimSubGroup.add(threshold);
         }
       }
     }
@@ -2766,6 +2863,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
       if (!state.tiles[cy][cx].explored) continue;
       this.ceilingRooms.add(room.id);
+      const ceilSubGroup = this.getRoomSubGroup(this.ceilingGroup, this.roomCeilGroups, room);
 
       const tint = ROOM_WALL_TINTS_3D[room.name] ?? COLORS_3D.wall;
       // Beams: dark metallic grey with subtle room color influence (industrial look)
@@ -2786,7 +2884,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           if (state.tiles[ry][rx].type !== TileType.Floor) continue;
           const beam = new THREE.Mesh(BrowserDisplay3D._beamGeoH!, beamMat);
           beam.position.set(rx, beamY, ry);
-          this.ceilingGroup.add(beam);
+          ceilSubGroup.add(beam);
         }
       }
 
@@ -2798,7 +2896,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           if (state.tiles[ry][rx].type !== TileType.Floor) continue;
           const beam = new THREE.Mesh(BrowserDisplay3D._beamGeoV!, beamMat);
           beam.position.set(rx, beamY - 0.04, ry); // slightly below H-beams
-          this.ceilingGroup.add(beam);
+          ceilSubGroup.add(beam);
         }
       }
 
@@ -2836,7 +2934,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         0.3,
         room.y + room.height / 2 - 0.5
       );
-      this.ceilingGroup.add(haze); // reuse ceiling group for room overlays
+      this.getRoomSubGroup(this.ceilingGroup, this.roomCeilGroups, room).add(haze);
     }
   }
 
@@ -2879,7 +2977,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           });
           const plane = new THREE.Mesh(planeGeo, planeMat);
           plane.position.set(tx, 0.01, ty); // just above floor surface
-          this.cautionStripeGroup.add(plane);
+          this.getCorridorBucket(this.cautionStripeGroup, tx, ty).add(plane);
         }
       }
     }
@@ -2928,7 +3026,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           });
           const plane = new THREE.Mesh(planeGeo, planeMat);
           plane.position.set(x, 0.01, y);
-          this.cautionStripeGroup.add(plane);
+          this.getCorridorBucket(this.cautionStripeGroup, x, y).add(plane);
         }
       }
     }
@@ -2984,7 +3082,8 @@ export class BrowserDisplay3D implements IGameDisplay {
           pipe.rotation.z = Math.PI / 4;
         }
 
-        this.pipeGroup.add(pipe);
+        const pipeBucket = this.getCorridorBucket(this.pipeGroup, x, y);
+        pipeBucket.add(pipe);
 
         // Secondary thinner pipe offset to the side
         if (pipeHash > 7) {
@@ -2999,7 +3098,7 @@ export class BrowserDisplay3D implements IGameDisplay {
             pipe2.rotation.x = Math.PI / 2;
             pipe2.position.z = y - 0.2;
           }
-          this.pipeGroup.add(pipe2);
+          pipeBucket.add(pipe2);
         }
       }
     }
@@ -3053,7 +3152,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           if (isHorizontal) {
             clone.rotation.y = Math.PI / 2;
           }
-          this.ceilingGroup.add(clone);
+          this.getCorridorBucket(this.ceilingGroup, x, y).add(clone);
         } else {
           // Fallback: procedural posts + span
           const post1 = new THREE.Mesh(BrowserDisplay3D._archPostGeo!, archMat);
@@ -3072,7 +3171,8 @@ export class BrowserDisplay3D implements IGameDisplay {
             span.position.set(x, 1.62, y);
           }
 
-          this.ceilingGroup.add(post1, post2, span);
+          const archBucket = this.getCorridorBucket(this.ceilingGroup, x, y);
+          archBucket.add(post1, post2, span);
         }
       }
     }
@@ -3122,27 +3222,28 @@ export class BrowserDisplay3D implements IGameDisplay {
         const isBright = ((x * 3 + y * 7) & 0x3) < 2;
         const mat = isBright ? stripMat : stripMatDim;
 
+        const stripBucket = this.getCorridorBucket(this.ceilingGroup, x, y);
         if (wallN) {
           const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
           strip.position.set(x, -0.05, y - 0.46);
-          this.ceilingGroup.add(strip);
+          stripBucket.add(strip);
         }
         if (wallS) {
           const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
           strip.position.set(x, -0.05, y + 0.46);
-          this.ceilingGroup.add(strip);
+          stripBucket.add(strip);
         }
         if (wallE) {
           const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
           strip.rotation.y = Math.PI / 2;
           strip.position.set(x + 0.46, -0.05, y);
-          this.ceilingGroup.add(strip);
+          stripBucket.add(strip);
         }
         if (wallW) {
           const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
           strip.rotation.y = Math.PI / 2;
           strip.position.set(x - 0.46, -0.05, y);
-          this.ceilingGroup.add(strip);
+          stripBucket.add(strip);
         }
       }
     }
@@ -3212,7 +3313,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           // Position against wall, slightly elevated
           clone.position.set(x, 0.6, y);
           clone.rotation.y = rot;
-          this.decorationGroup.add(clone);
+          this.getCorridorBucket(this.decorationGroup, x, y).add(clone);
         };
 
         const cached = this.gltfCache.get(modelPath);
@@ -3369,7 +3470,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           if (maxDim > 0) clone.scale.multiplyScalar(0.4 / maxDim);
           clone.position.set(x, 0.8, y);
           clone.rotation.y = rot;
-          this.decorationGroup.add(clone);
+          this.getCorridorBucket(this.decorationGroup, x, y).add(clone);
         } else {
           const capturedX = x, capturedY = y, capturedRot = rot;
           const url = import.meta.env.BASE_URL + modelPath;
@@ -3399,7 +3500,7 @@ export class BrowserDisplay3D implements IGameDisplay {
               if (maxDim > 0) clone.scale.multiplyScalar(0.4 / maxDim);
               clone.position.set(capturedX, 0.8, capturedY);
               clone.rotation.y = capturedRot;
-              this.decorationGroup.add(clone);
+              this.getCorridorBucket(this.decorationGroup, capturedX, capturedY).add(clone);
             } catch (e) { /* ignore load failure */ }
           }, undefined, () => {});
         }
