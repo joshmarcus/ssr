@@ -503,7 +503,7 @@ function parseAction(responseText: string): Action | null {
 
 // ── System prompt ────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are playing a roguelike game as a maintenance robot (Janitor Rover) exploring a silent research station. You receive text-based observations each turn and must respond with a single action.
+const SYSTEM_PROMPT = `You are playing a roguelike game as a cleaning bot called Sweepo, exploring a silent research station. You receive text-based observations each turn and must respond with a single action.
 
 GOAL: Explore the station, solve puzzles, restore power systems, and transmit data from the Data Core to win.
 

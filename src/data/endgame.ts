@@ -34,7 +34,7 @@ export function getVictoryText(mystery?: MysteryState): string[] {
         ``,
         `${engineer} was right about the coolant loop. Filed three maintenance`,
         `requests and wrote a backup procedure nobody asked for. ${captain}`,
-        `buried every one. A janitor bot and a fragile terminal link — that's`,
+        `buried every one. A cleaning bot called Sweepo and a fragile terminal link — that's`,
         `all it took to prove ${engineer} right and ${captain} wrong.`,
         ``,
         `The crew of CORVUS-7 will see home again. Their work survives.`,
@@ -48,7 +48,7 @@ export function getVictoryText(mystery?: MysteryState): string[] {
         ``,
         `${security} disabled the alarms. Weakened the hull. Made it look like`,
         `structural failure. But the evidence tells a different story now —`,
-        `one that a janitor bot pieced together from scuff marks, pressure`,
+        `one that a cleaning bot called Sweepo pieced together from scuff marks, pressure`,
         `differentials, and a medical officer's final log entry.`,
         ``,
         `The crew of CORVUS-7 will see home again. Justice travels with them.`,
@@ -80,7 +80,7 @@ export function getVictoryText(mystery?: MysteryState): string[] {
         `${captain} signed the transfer order. ${security} tried to stop it.`,
         `The biological agent in the cargo was never supposed to be here,`,
         `and the crew paid the price for one person's ambition. But the`,
-        `evidence survived, thanks to a janitor bot that doesn't know`,
+        `evidence survived, thanks to a cleaning bot called Sweepo that doesn't know`,
         `how to look the other way.`,
         ``,
         `The crew of CORVUS-7 will see home again. The truth goes with them.`,
@@ -95,7 +95,7 @@ export function getVictoryText(mystery?: MysteryState): string[] {
         `${scientist} modified the array in secret and transmitted without`,
         `authorization. ${engineer} physically disconnected it before the`,
         `overload could take the whole station. First contact — or something`,
-        `like it — happened here, and only a janitor bot was left to`,
+        `like it — happened here, and only a cleaning bot called Sweepo was left to`,
         `document what it cost.`,
         ``,
         `The crew of CORVUS-7 will see home again. What they found out`,
@@ -125,7 +125,7 @@ export function getVictoryText(mystery?: MysteryState): string[] {
         `through the low-band uplink. Slow, but steady. Somewhere far away,`,
         `a receiving dish locks on. The research bundle is preserved.`,
         ``,
-        `A janitor bot and a fragile terminal link — that's all it took.`,
+        `A cleaning bot called Sweepo and a fragile terminal link — that's all it took.`,
         ``,
         `The crew of CORVUS-7 will see home again. Their work survives.`,
       ];
@@ -141,7 +141,7 @@ export const VICTORY_TEXT: string[] = [
   `The data core hums to life. The station's research data streams`,
   `through the low-band uplink. The research bundle is preserved.`,
   ``,
-  `A janitor bot and a fragile terminal link — that's all it took.`,
+  `A cleaning bot called Sweepo and a fragile terminal link — that's all it took.`,
   ``,
   `The crew of CORVUS-7 will see home again. Their work survives.`,
 ];
@@ -233,7 +233,7 @@ export function getDefeatText(mystery?: MysteryState): string[] {
   const engineer = findName(mystery, CrewRole.Engineer, "the engineer");
   const medic = findName(mystery, CrewRole.Medic, "the medic");
   return [
-    `The terminal feed dissolves into static. Rover A3's last telemetry`,
+    `The terminal feed dissolves into static. Sweepo's last telemetry`,
     `shows critical damage across the main board — then nothing.`,
     `The link is gone.`,
     ``,
@@ -249,7 +249,7 @@ export function getDefeatText(mystery?: MysteryState): string[] {
 
 // Legacy static version
 export const DEFEAT_TEXT: string[] = [
-  `The terminal feed dissolves into static. Rover A3's last telemetry`,
+  `The terminal feed dissolves into static. Sweepo's last telemetry`,
   `shows critical damage across the main board — then nothing.`,
   `The link is gone.`,
   ``,

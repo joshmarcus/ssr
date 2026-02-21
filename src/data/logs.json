@@ -157,7 +157,7 @@
     "timestamp": "2187-03-14T16:02:00Z",
     "source": "BOT-CTL",
     "title": "Bot Controller — Status Report",
-    "text": "[16:02] Janitor Rover A3: STANDBY at Arrival Bay. Battery: 100%. Sensor: CLEANLINESS only. Awaiting remote operator link. Service Bot B07: DORMANT in Robotics Bay (powered down by crew)."
+    "text": "[16:02] Cleaning Bot Sweepo: STANDBY at Arrival Bay. Battery: 100%. Sensor: CLEANLINESS only. Awaiting remote operator link. Service Bot B07: DORMANT in Robotics Bay (powered down by crew)."
   },
   {
     "id": "LOG_SYS_011",

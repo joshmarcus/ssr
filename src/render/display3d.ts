@@ -255,6 +255,18 @@ export class BrowserDisplay3D implements IGameDisplay {
   private lastPlayerX: number = -1;
   private lastPlayerY: number = -1;
 
+  // Smooth movement interpolation
+  private playerTargetX: number = 0;
+  private playerTargetZ: number = 0;
+  private playerCurrentX: number = 0;
+  private playerCurrentZ: number = 0;
+  private cameraTargetX: number = 0;
+  private cameraTargetZ: number = 0;
+  private cameraPosX: number = 0;
+  private cameraPosZ: number = 0;
+  private static readonly LERP_SPEED = 12; // units per second — snappy but smooth
+  private _lastAnimTime: number | null = null;
+
   // Display state
   private sensorMode: SensorType | null = null;
   private logHistory: DisplayLogEntry[] = [];
@@ -304,6 +316,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Scene ──
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(COLORS_3D.background);
+    // Atmospheric fog — fades distant tiles into darkness
+    this.scene.fog = new THREE.Fog(COLORS_3D.background, 8, 20);
 
     // ── Camera (orthographic, zoomed-in, follows player) ──
     const aspect = this.getAspect();
@@ -513,7 +527,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     const titleClass = isVictory ? "victory" : "defeat";
     const subtitle = isVictory
       ? "The crew's research data streams through the low-band relay.<br>Nine months of work, preserved."
-      : "Rover A3 signal lost. The data core remains sealed.<br>CORVUS-7 drifts on, silent.";
+      : "Sweepo signal lost. The data core remains sealed.<br>CORVUS-7 drifts on, silent.";
 
     // Deduction and evidence stats
     const deductions = state.mystery?.deductions ?? [];
@@ -902,10 +916,32 @@ export class BrowserDisplay3D implements IGameDisplay {
   private animate = (): void => {
     this.animFrameId = requestAnimationFrame(this.animate);
     const elapsed = this.clock.getElapsedTime();
+    const delta = Math.min(elapsed - (this._lastAnimTime ?? elapsed), 0.1); // cap at 100ms
+    this._lastAnimTime = elapsed;
 
-    // Player bob
+    // Smooth movement interpolation for player
     if (this.playerMesh) {
+      const lerpFactor = Math.min(1, BrowserDisplay3D.LERP_SPEED * delta);
+      this.playerCurrentX += (this.playerTargetX - this.playerCurrentX) * lerpFactor;
+      this.playerCurrentZ += (this.playerTargetZ - this.playerCurrentZ) * lerpFactor;
+
+      // Snap if very close to avoid endless micro-movement
+      if (Math.abs(this.playerTargetX - this.playerCurrentX) < 0.01) this.playerCurrentX = this.playerTargetX;
+      if (Math.abs(this.playerTargetZ - this.playerCurrentZ) < 0.01) this.playerCurrentZ = this.playerTargetZ;
+
+      this.playerMesh.position.x = this.playerCurrentX;
+      this.playerMesh.position.z = this.playerCurrentZ;
       this.playerMesh.position.y = 0.4 + Math.sin(elapsed * 2) * 0.05;
+
+      // Smoothly move camera and light to follow
+      this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
+      this.cameraPosZ += (this.cameraTargetZ - this.cameraPosZ) * lerpFactor;
+      if (Math.abs(this.cameraTargetX - this.cameraPosX) < 0.01) this.cameraPosX = this.cameraTargetX;
+      if (Math.abs(this.cameraTargetZ - this.cameraPosZ) < 0.01) this.cameraPosZ = this.cameraTargetZ;
+
+      this.camera.position.set(this.cameraPosX, 12, this.cameraPosZ + 14);
+      this.camera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
+      this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
     }
 
     // Entity animations
@@ -1541,17 +1577,25 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.lastPlayerX = px;
     this.lastPlayerY = py;
 
-    this.playerMesh.position.x = px;
-    this.playerMesh.position.z = py;
+    // Set targets for smooth interpolation (animate loop handles actual movement)
+    this.playerTargetX = px;
+    this.playerTargetZ = py;
+    this.cameraTargetX = px;
+    this.cameraTargetZ = py;
     this.playerMesh.rotation.y = this.playerFacing;
-    // Y is handled by animation loop (bob)
 
-    // Update player light
-    this.playerLight.position.set(px, 3, py);
-
-    // Camera follows player (isometric offset)
-    this.camera.position.set(px, 12, py + 14);
-    this.camera.lookAt(px, 0, py);
+    // On first render, snap immediately (no lerp from origin)
+    if (this.lastPlayerX === -1) {
+      this.playerCurrentX = px;
+      this.playerCurrentZ = py;
+      this.cameraPosX = px;
+      this.cameraPosZ = py;
+      this.playerMesh.position.x = px;
+      this.playerMesh.position.z = py;
+      this.playerLight.position.set(px, 3, py);
+      this.camera.position.set(px, 12, py + 14);
+      this.camera.lookAt(px, 0, py);
+    }
   }
 
   // ── Private: resize handling ────────────────────────────────────

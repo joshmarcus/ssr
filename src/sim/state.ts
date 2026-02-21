@@ -18,7 +18,7 @@ export function createEmptyState(seed: number, width: number, height: number, di
     props: {},
   };
 
-  // Player starts with a cleanliness sensor (base sensor for a janitor bot)
+  // Player starts with a cleanliness sensor (base sensor for Sweepo)
   const cleanlinessSensor: Attachment = {
     slot: AttachmentSlot.Sensor,
     name: "cleanliness sensor",

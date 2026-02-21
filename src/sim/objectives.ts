@@ -60,7 +60,7 @@ export function checkLossCondition(state: GameState): GameState {
           id: `log_recovery_${state.turn}`,
           timestamp: state.turn,
           source: "system",
-          text: "Rover A3 offline — critical heat damage. Transferring link to Service Bot B07. Connection re-established. The mission continues.",
+          text: "Sweepo offline — critical heat damage. Transferring link to Service Bot B07. Connection re-established. The mission continues.",
           read: false,
         },
       ],

@@ -19,8 +19,8 @@ const OPENING_INTRO: string[] = [
   ``,
   `Fourteen hours ago, the station went silent. Reactor still online,`,
   `life support partial, all crew channels dead. The only response to`,
-  `emergency ping: a single automated handshake from a janitor-class`,
-  `rover standing by in the arrival bay.`,
+  `emergency ping: a single automated handshake from a cleaning bot —`,
+  `cleaning bot — designation Sweepo — standing by in the arrival bay.`,
 ];
 
 /**
@@ -99,7 +99,7 @@ export const OPENING_CRAWL: string[] = getOpeningCrawl(IncidentArchetype.Coolant
 export const OPENING_SUMMARY =
   `Research station CORVUS-7 went silent fourteen hours ago. ` +
   `Reactor online, life support partial, all crew channels dead. ` +
-  `The only response: a handshake from a janitor-class rover in the arrival bay. ` +
+  `The only response: a handshake from a cleaning bot called Sweepo in the arrival bay. ` +
   `You are the remote operator — recover the research bundle and find out what happened.`;
 
 /**

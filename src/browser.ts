@@ -775,7 +775,7 @@ function initGame(): void {
     : new BrowserDisplay(containerEl, state.width, state.height);
 
   // ── Dramatic link establishment sequence (compact) ──────────────
-  display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. Rover A3 online.", "milestone");
+  display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. Sweepo online.", "milestone");
   display.addLog(MOOD_FLAVOR[stationMood], "narrative");
   display.addLog(CORVUS_GREETING[corvusPersonality], "narrative");
 
@@ -1069,7 +1069,7 @@ function handleRestartKey(e: KeyboardEvent): void {
     e.preventDefault();
     resetGameState(seed);
     display.addLog("RESTARTING LINK...", "system");
-    display.addLog("Rover A3 rebooted. All systems reset.", "milestone");
+    display.addLog("Sweepo rebooted. All systems reset.", "milestone");
     display.addLog("MAINTENANCE SUBROUTINE: Clean rooms to 80% standard. Use [c] to clean.", "system");
     lastObjectivePhase = ObjectivePhase.Clean;
     // Start ambient for same archetype

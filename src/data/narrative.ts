@@ -41,7 +41,7 @@ export const BOT_INTROSPECTIONS: BotIntrospection[] = [
   },
   {
     turn: 350,
-    text: "Unit A3 reflection: 350 turns. Most janitor bots are decommissioned before their first century. This unit has outlasted its creators.",
+    text: "Sweepo reflection: 350 turns. Most cleaning bots are decommissioned before their first century. This unit has outlasted its creators.",
   },
 ];
 
@@ -402,7 +402,7 @@ export const CORVUS_PERSONALITIES: CorvusPersonality[] = ["analytical", "empathe
 // Personality-specific first-contact lines (shown after boot + mood flavor)
 export const CORVUS_GREETING: Record<CorvusPersonality, string> = {
   analytical: "CORVUS-7 CENTRAL: Maintenance unit A3 online. Cataloguing station status. Anomalies detected: 47. Beginning systematic assessment.",
-  empathetic: "CORVUS-7 CENTRAL: ...there you are. I've been waiting a long time for someone to answer. Welcome aboard, little rover.",
+  empathetic: "CORVUS-7 CENTRAL: ...there you are. I've been waiting a long time for someone to answer. Welcome aboard, Sweepo.",
   cryptic: "CORVUS-7 CENTRAL: Signal received. Acknowledged. The station remembers you, even if you've never been here before.",
 };
 
@@ -920,7 +920,7 @@ export const TUTORIAL_HINT_INVESTIGATION = "TIP: Investigation phase — read te
 // Defeat epilogues reference what was lost.
 export const GAMEOVER_EPILOGUE_VICTORY: Record<string, string> = {
   [IncidentArchetype.CoolantCascade]: "The engineer's warnings reached the right ears. The coolant reports — filed, rejected, and buried — are part of the record now.",
-  [IncidentArchetype.HullBreach]: "The evidence of murder travels with the survivors. A pressure differential, an access log, and a janitor bot's testimony.",
+  [IncidentArchetype.HullBreach]: "The evidence of murder travels with the survivors. A pressure differential, an access log, and Sweepo's testimony.",
   [IncidentArchetype.ReactorScram]: "The question of what woke up inside the data core will outlast the station. The crew is safe. The answer is not.",
   [IncidentArchetype.Sabotage]: "The cargo manifest discrepancies are on record. Someone approved the transfer. Someone will answer for it.",
   [IncidentArchetype.SignalAnomaly]: "The signal recordings are preserved. First contact happened here — and the question of who should answer it remains open.",
@@ -985,7 +985,7 @@ export const VICTORY_EPILOGUE_VARIANT: Record<string, string[]> = {
   [IncidentArchetype.CoolantCascade]: [
     "The UN-ORC review board convenes in 72 hours. The encrypted transmission is Exhibit A.",
     "Station thermal readings are already normalizing. The firebreaks held.",
-    "Three maintenance requests, one reassignment order, and a janitor bot's data log. Enough.",
+    "Three maintenance requests, one reassignment order, and Sweepo's data log. Enough.",
   ],
   [IncidentArchetype.HullBreach]: [
     "Forensic pressure analysis confirms: the breach was not natural. The sealed bulkheads preserved the evidence.",
@@ -1374,7 +1374,7 @@ export const CORVUS_FINAL_APPROACH: string[] = [
   "CORVUS-7 CENTRAL: Station power reserves declining. If you have unfinished business aboard, now is the time.",
   "CORVUS-7 CENTRAL: Systems winding down. The data core still holds everything that happened here. Your call.",
   "CORVUS-7 CENTRAL: I can feel the station getting quieter. Not the bad kind of quiet. The kind that comes after.",
-  "CORVUS-7 CENTRAL: You've done good work here, Rover. Whatever comes next — this run mattered.",
+  "CORVUS-7 CENTRAL: You've done good work here, Sweepo. Whatever comes next — this run mattered.",
   "CORVUS-7 CENTRAL: Final approach window open. The station will go dark soon. Take what you need and go.",
 ];
 

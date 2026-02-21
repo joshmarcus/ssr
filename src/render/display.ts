@@ -423,7 +423,7 @@ export class BrowserDisplay implements IGameDisplay {
           : "The crew is gone, but their research survives.<br>Nine months of work, transmitted through the relay.")
       : isTimeOut
         ? "Station orbit has decayed below recovery threshold.<br>Terminal link severed. CORVUS-7 falls silent."
-        : "Rover A3 signal lost. The station drifts on, silent.";
+        : "Sweepo signal lost. The station drifts on, silent.";
 
     // Crew evacuation stats
     const evac = state.mystery?.evacuation;
@@ -1271,7 +1271,7 @@ export class BrowserDisplay implements IGameDisplay {
       this.renderCenteredText("The record is preserved. Recovery teams en route.", centerY + 3, "#4a8", "#000");
     } else {
       this.renderCenteredText("The data core remains sealed.", centerY - 1, "#f88", "#000");
-      this.renderCenteredText(`Rover A3 lost at turn ${state.turn}.`, centerY + 0, "#888", "#000");
+      this.renderCenteredText(`Sweepo lost at turn ${state.turn}.`, centerY + 0, "#888", "#000");
       this.renderCenteredText("CORVUS-7 drifts on, silent.", centerY + 2, "#666", "#000");
     }
 
