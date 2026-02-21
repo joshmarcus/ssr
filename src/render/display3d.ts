@@ -52,19 +52,19 @@ function makeToonMaterial(opts: {
 
 // ── Color constants ──────────────────────────────────────────────
 const COLORS_3D = {
-  floor: 0x555555,
-  wall: 0x8899aa,
-  door: 0xcc7733,
-  lockedDoor: 0xff3333,
-  corridor: 0x444444,
-  background: 0x111118,
+  floor: 0x777777,
+  wall: 0x99aabb,
+  door: 0xdd8844,
+  lockedDoor: 0xff4444,
+  corridor: 0x606060,
+  background: 0x0a0a12,
   player: 0x00ff00,
   fogFull: 0x000000,
   fogMemory: 0x111111,
 } as const;
 
 // How many world-units tall the visible area is (zoom level)
-const CAMERA_FRUSTUM_SIZE = 10; // balanced zoom — close enough for detail, wide enough for context
+const CAMERA_FRUSTUM_SIZE = 7; // zoomed in for detail visibility
 
 const ENTITY_COLORS_3D: Record<string, number> = {
   [EntityType.Relay]: 0xffcc00,
@@ -241,7 +241,7 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   [EntityType.FuseBox]: "models/synty-space-gltf/SM_Prop_Panel_01.glb",
   [EntityType.PowerCell]: "models/synty-space-gltf/SM_Prop_Battery_02.glb",
   [EntityType.Breach]: "models/synty-space-gltf/SM_Prop_Wires_01.glb",
-  [EntityType.EvidenceTrace]: "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+  // EvidenceTrace uses procedural ? mesh (no GLTF — more distinctive)
 };
 
 // ── BrowserDisplay3D ─────────────────────────────────────────────
@@ -370,8 +370,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Scene ──
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(COLORS_3D.background);
-    // Atmospheric fog — subtle fade at the edges of visible area
-    this.scene.fog = new THREE.Fog(COLORS_3D.background, 14, 28);
+    // Atmospheric fog — subtle fade at the far edges only
+    this.scene.fog = new THREE.Fog(COLORS_3D.background, 18, 35);
 
     // ── Camera (orthographic, zoomed-in, follows player) ──
     const aspect = this.getAspect();
@@ -384,7 +384,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     );
     // Isometric-ish offset: camera sits above+behind the target
     // Will be repositioned each frame to follow the player
-    this.camera.position.set(0, 12, 14);
+    this.camera.position.set(0, 14, 10);
     this.camera.lookAt(0, 0, 0);
 
     // ── Cel-shading: Outline Effect ──
@@ -395,26 +395,26 @@ export class BrowserDisplay3D implements IGameDisplay {
       defaultAlpha: 0.8,
     });
 
-    // ── Lights (warmer, more dramatic for cel-shaded look) ──
-    const ambient = new THREE.AmbientLight(0x778899, 1.0);
+    // ── Lights (brighter for visibility, still atmospheric) ──
+    const ambient = new THREE.AmbientLight(0x8899aa, 1.6);
     this.scene.add(ambient);
 
     // Strong key light — warm directional from upper-left
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 1.4);
+    const dirLight = new THREE.DirectionalLight(0xffeedd, 1.8);
     dirLight.position.set(-8, 15, -5);
     this.scene.add(dirLight);
 
     // Cool fill light from opposite side
-    const fillLight = new THREE.DirectionalLight(0x4466aa, 0.5);
+    const fillLight = new THREE.DirectionalLight(0x4466aa, 0.8);
     fillLight.position.set(8, 10, 5);
     this.scene.add(fillLight);
 
     // Subtle rim light from behind for depth
-    const rimLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+    const rimLight = new THREE.DirectionalLight(0x8888ff, 0.4);
     rimLight.position.set(0, 5, 15);
     this.scene.add(rimLight);
 
-    this.playerLight = new THREE.PointLight(0x44ff66, 2.0, 14);
+    this.playerLight = new THREE.PointLight(0x44ff66, 2.5, 16);
     this.playerLight.position.set(0, 3, 0);
     this.scene.add(this.playerLight);
 
@@ -472,7 +472,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     const fogMemMat = new THREE.MeshBasicMaterial({
       color: 0x000000,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.5,
     });
     this.fogMemoryMesh = new THREE.InstancedMesh(fogMemGeo, fogMemMat, this.maxTiles);
     this.fogMemoryMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1126,7 +1126,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.cameraShakeIntensity *= Math.max(0, 1 - this.cameraShakeDecay * delta);
       }
 
-      this.camera.position.set(this.cameraPosX + shakeX, 12, this.cameraPosZ + 14 + shakeZ);
+      this.camera.position.set(this.cameraPosX + shakeX, 14, this.cameraPosZ + 10 + shakeZ);
       this.camera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
 
@@ -1192,6 +1192,23 @@ export class BrowserDisplay3D implements IGameDisplay {
             child.material.emissiveIntensity = 0.1 + Math.sin(elapsed * 6 + mesh.position.z) * 0.08;
           }
         });
+      } else if (userData.entityType === EntityType.EvidenceTrace) {
+        // Float and spin — attention-grabbing mystery marker
+        const ud = mesh.userData as { baseY?: number };
+        mesh.position.y = (ud.baseY ?? 0.15) + Math.sin(elapsed * 2.0) * 0.1;
+        mesh.rotation.y = elapsed * 1.2;
+      } else if (userData.entityType === EntityType.CrewItem) {
+        // Gentle glow pulse
+        const ud = mesh.userData as { baseY?: number };
+        mesh.position.y = (ud.baseY ?? 0.1) + Math.sin(elapsed * 1.5 + mesh.position.x) * 0.03;
+      } else if (userData.entityType === EntityType.RepairBot || userData.entityType === EntityType.ServiceBot) {
+        // Hover and wobble
+        mesh.position.y = 0.4 + Math.sin(elapsed * 1.8 + mesh.position.z) * 0.06;
+        mesh.rotation.y = Math.sin(elapsed * 0.5) * 0.2;
+      } else if (userData.entityType === EntityType.PatrolDrone) {
+        // Patrol sweep motion
+        mesh.position.y = 0.7 + Math.sin(elapsed * 2.5) * 0.1;
+        mesh.rotation.y = elapsed * 1.5;
       }
     }
 
@@ -1225,7 +1242,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         // Determine base color with sensor overlays
         let baseColor: number = COLORS_3D.floor;
-        let brightness = tile.visible ? 1.0 : 0.25;
+        let brightness = tile.visible ? 1.0 : 0.4;
 
         if (tile.type === TileType.Wall) {
           // Check which neighbors are non-wall (open space)
@@ -1239,7 +1256,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
           baseColor = this.getWallColor3D(state, x, y);
           tempColor.setHex(baseColor);
-          if (!tile.visible) tempColor.multiplyScalar(0.25);
+          if (!tile.visible) tempColor.multiplyScalar(0.4);
 
           this.dummy.position.set(x, 0, y);
           this.dummy.scale.set(1, 1, 1);
@@ -1281,7 +1298,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           if (doorIdx < 200) {
             this.doorMesh.setMatrixAt(doorIdx, this.dummy.matrix);
             tempColor.setHex(doorColor);
-            if (!tile.visible) tempColor.multiplyScalar(0.25);
+            if (!tile.visible) tempColor.multiplyScalar(0.4);
             this.doorMesh.setColorAt(doorIdx, tempColor);
             doorIdx++;
           }
@@ -1649,20 +1666,52 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   private updateRoomLights(state: GameState): void {
     for (const room of state.rooms) {
-      if (this.roomLights.has(room.id)) continue; // already placed
-
       // Check if any tile in the room is explored
       const centerX = room.x + Math.floor(room.width / 2);
       const centerY = room.y + Math.floor(room.height / 2);
       if (centerY < 0 || centerY >= state.height || centerX < 0 || centerX >= state.width) continue;
       if (!state.tiles[centerY][centerX].explored) continue;
 
-      // Place a colored point light at the room center
-      const lightColor = ROOM_LIGHT_COLORS[room.name] ?? 0x667788;
-      const light = new THREE.PointLight(lightColor, 0.6, room.width + room.height + 4);
-      light.position.set(centerX, 2.5, centerY);
-      this.scene.add(light);
-      this.roomLights.set(room.id, light);
+      if (!this.roomLights.has(room.id)) {
+        // Check if room has hazards (heat, smoke, low pressure, breaches)
+        let maxHeat = 0;
+        let maxSmoke = 0;
+        let hasBreach = false;
+        for (let ry = room.y; ry < room.y + room.height; ry++) {
+          for (let rx = room.x; rx < room.x + room.width; rx++) {
+            if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+              const t = state.tiles[ry][rx];
+              if (t.heat > maxHeat) maxHeat = t.heat;
+              if (t.smoke > maxSmoke) maxSmoke = t.smoke;
+            }
+          }
+        }
+        for (const [, ent] of state.entities) {
+          if (ent.type === EntityType.Breach &&
+              ent.pos.x >= room.x && ent.pos.x < room.x + room.width &&
+              ent.pos.y >= room.y && ent.pos.y < room.y + room.height) {
+            hasBreach = true;
+          }
+        }
+
+        // Distressed rooms get red/amber warning lights
+        let lightColor: number;
+        let intensity = 0.8;
+        if (hasBreach || maxHeat > 40) {
+          lightColor = 0xff2200; // red emergency
+          intensity = 1.0;
+        } else if (maxHeat > 20 || maxSmoke > 30) {
+          lightColor = 0xff8800; // amber warning
+          intensity = 0.9;
+        } else {
+          lightColor = ROOM_LIGHT_COLORS[room.name] ?? 0x667788;
+        }
+
+        const light = new THREE.PointLight(lightColor, intensity, room.width + room.height + 4);
+        light.position.set(centerX, 2.5, centerY);
+        this.scene.add(light);
+        this.roomLights.set(room.id, light);
+      }
     }
   }
 
@@ -1742,12 +1791,18 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Entity types that get a small colored point light for visual emphasis
   private static readonly ENTITY_GLOW_LIGHTS: Partial<Record<string, { color: number; intensity: number; distance: number }>> = {
-    [EntityType.DataCore]: { color: 0xff44ff, intensity: 1.2, distance: 5 },
-    [EntityType.Relay]: { color: 0xffcc00, intensity: 0.8, distance: 4 },
-    [EntityType.Breach]: { color: 0xff2200, intensity: 1.0, distance: 4 },
-    [EntityType.SensorPickup]: { color: 0x00ffee, intensity: 0.5, distance: 3 },
-    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 0.6, distance: 4 },
-    [EntityType.MedKit]: { color: 0xff4444, intensity: 0.4, distance: 3 },
+    [EntityType.DataCore]: { color: 0xff44ff, intensity: 1.5, distance: 6 },
+    [EntityType.Relay]: { color: 0xffcc00, intensity: 1.0, distance: 5 },
+    [EntityType.Breach]: { color: 0xff2200, intensity: 1.2, distance: 5 },
+    [EntityType.SensorPickup]: { color: 0x00ffee, intensity: 0.7, distance: 4 },
+    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 0.8, distance: 5 },
+    [EntityType.MedKit]: { color: 0xff4444, intensity: 0.5, distance: 3 },
+    [EntityType.EvidenceTrace]: { color: 0xffaa00, intensity: 0.8, distance: 4 },
+    [EntityType.CrewNPC]: { color: 0xffcc88, intensity: 0.6, distance: 4 },
+    [EntityType.LogTerminal]: { color: 0x66ccff, intensity: 0.5, distance: 3 },
+    [EntityType.SecurityTerminal]: { color: 0x44aaff, intensity: 0.5, distance: 3 },
+    [EntityType.Console]: { color: 0x66aaff, intensity: 0.4, distance: 3 },
+    [EntityType.PowerCell]: { color: 0xffdd44, intensity: 0.5, distance: 3 },
   };
 
   private createEntityMesh(entity: Entity): THREE.Object3D {
@@ -2027,6 +2082,42 @@ export class BrowserDisplay3D implements IGameDisplay {
         baseY = 0.05;
         break;
       }
+      case EntityType.EvidenceTrace: {
+        // Glowing floating question mark — torus ring + vertical bar + dot
+        const qMat = new THREE.MeshBasicMaterial({ color: 0xffcc44 });
+        // Curved top of ?
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.04, 8, 12, Math.PI * 1.5), qMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(0, 0.35, 0);
+        // Vertical stroke
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.15, 6), qMat);
+        stem.position.set(0.12, 0.2, 0);
+        // Dot at bottom
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), qMat);
+        dot.position.set(0, 0.06, 0);
+        // Glow ring on ground
+        const glowRing = new THREE.Mesh(
+          new THREE.RingGeometry(0.2, 0.35, 16),
+          new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+        );
+        glowRing.rotation.x = -Math.PI / 2;
+        glowRing.position.y = 0.02;
+        group.add(ring, stem, dot, glowRing);
+        baseY = 0.15;
+        break;
+      }
+      case EntityType.CrewItem: {
+        // Small personal item — box with a glowing tag
+        const itemBox = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.15), glowMat);
+        const tag = new THREE.Mesh(
+          new THREE.BoxGeometry(0.08, 0.08, 0.02),
+          new THREE.MeshBasicMaterial({ color })
+        );
+        tag.position.set(0, 0.1, 0.08);
+        group.add(itemBox, tag);
+        baseY = 0.1;
+        break;
+      }
       default: {
         const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
         group.add(new THREE.Mesh(geo, glowMat));
@@ -2100,6 +2191,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private updatePlayer(state: GameState): void {
     const px = state.player.entity.pos.x;
     const py = state.player.entity.pos.y;
+    const isFirstRender = this.lastPlayerX < 0;
 
     // Track movement direction and update facing
     if (this.lastPlayerX >= 0 && this.lastPlayerY >= 0) {
@@ -2123,7 +2215,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Rotation is smoothly interpolated in the animate loop
 
     // On first render, snap immediately (no lerp from origin)
-    if (this.lastPlayerX === -1) {
+    if (isFirstRender) {
       this.playerCurrentX = px;
       this.playerCurrentZ = py;
       this.cameraPosX = px;
@@ -2131,7 +2223,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.playerMesh.position.x = px;
       this.playerMesh.position.z = py;
       this.playerLight.position.set(px, 3, py);
-      this.camera.position.set(px, 12, py + 14);
+      this.camera.position.set(px, 14, py + 10);
       this.camera.lookAt(px, 0, py);
     }
   }
@@ -2344,18 +2436,31 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Synty models are huge (~100 units); normalize to fit in ~0.7 unit box
     // Player gets slightly larger, small pickups get smaller
     const ENTITY_SCALE: Partial<Record<string, number>> = {
-      player: 0.8,
-      [EntityType.ToolPickup]: 0.5,
-      [EntityType.UtilityPickup]: 0.5,
-      [EntityType.SensorPickup]: 0.6,
-      [EntityType.MedKit]: 0.5,
-      [EntityType.PowerCell]: 0.5,
-      [EntityType.EvidenceTrace]: 0.4,
-      [EntityType.EscapePod]: 0.9,
-      [EntityType.CrewNPC]: 0.85,
-      [EntityType.DataCore]: 0.8,
+      player: 0.9,
+      [EntityType.Relay]: 0.85,
+      [EntityType.DataCore]: 0.95,
+      [EntityType.LogTerminal]: 0.9,
+      [EntityType.SecurityTerminal]: 0.9,
+      [EntityType.Console]: 0.85,
+      [EntityType.RepairCradle]: 0.85,
+      [EntityType.ServiceBot]: 0.75,
+      [EntityType.RepairBot]: 0.75,
+      [EntityType.Drone]: 0.7,
+      [EntityType.PatrolDrone]: 0.7,
+      [EntityType.ToolPickup]: 0.6,
+      [EntityType.UtilityPickup]: 0.6,
+      [EntityType.SensorPickup]: 0.7,
+      [EntityType.MedKit]: 0.6,
+      [EntityType.PowerCell]: 0.6,
+      [EntityType.EvidenceTrace]: 0.5,
+      [EntityType.EscapePod]: 1.0,
+      [EntityType.CrewNPC]: 0.9,
+      [EntityType.Breach]: 0.8,
+      [EntityType.ClosedDoor]: 0.9,
+      [EntityType.Airlock]: 0.9,
+      [EntityType.CrewItem]: 0.55,
     };
-    const targetSize = ENTITY_SCALE[key] ?? 0.7;
+    const targetSize = ENTITY_SCALE[key] ?? 0.8;
 
     const box = new THREE.Box3().setFromObject(model);
     const size = new THREE.Vector3();
