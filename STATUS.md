@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 68 complete (Archetype Starting Conditions, Environmental Choices, CORVUS Witness)
+- **Phase**: Sprint 69 complete (Env Choice Epilogues, Deduction Tag Fix, Map Readability)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -98,6 +98,28 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 69 Changes
+
+### Environmental Choice Epilogues in Game-Over
+- **8 authored epilogue sentences** (4 choices × 2 options) wired into game-over "YOUR DECISIONS" section
+- **Reads envChoiceId/envChoiceResult from entity props**: Environmental decisions now appear alongside mystery choice consequences
+- **Consistent formatting**: Both mystery choices and env choices rendered in same block
+
+### Deduction Tag Spoiler Fix
+- **All 5 archetypes now have explicit tag overrides**: Tier 3 (why) deduction tags can no longer leak crew names that reveal Tier 5 answers
+- **Fixed archetypes**: CoolantCascade (was using crew name, now "coolant"/"maintenance"), ReactorScram (now "reactor"/"diagnostic")
+- **Already clean**: HullBreach ("hull"/"forensic"), Sabotage ("electrical"/"biological"), SignalAnomaly ("signal"/"transmission")
+
+### Map Readability Improvements
+- **Exhausted room dimming**: Rooms where all interactable entities have been used get a subtle dark-green "cleared" tint on floor tiles
+  - Pre-computed per-frame: Set of room IDs where all non-mob entities are exhausted
+  - Visual signal: `#1c1c1c` floor fg + `#080a08` bg (vs normal `#333` floor)
+  - Immediately tells players "nothing more to do here" without checking entity glyphs
+- **Off-screen room arrows**: Directional arrows (↑↓←→) drawn at viewport edges pointing to nearby explored rooms
+  - Color-coded: `#5a8` (green) for rooms with active interactions, `#333` (dim grey) for exhausted rooms
+  - Only shown for rooms within 12 tiles of viewport edge with at least one explored tile
+  - Avoids row 0 (header) and row 1 (flash) — arrows start at row 2
 
 ## Sprint 68 Changes
 
