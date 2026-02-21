@@ -828,7 +828,9 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           }
         }
 
-        if (livingCrewRemaining > 0) {
+        // Emergency override: at critical turn threshold, allow transmission even with crew aboard
+        const emergencyOverride = next.turn >= Math.floor(next.maxTurns * 0.9);
+        if (livingCrewRemaining > 0 && !emergencyOverride) {
           // Living crew still aboard — can't transmit yet, must evacuate
           const evacuated = next.mystery?.evacuation?.crewEvacuated.length || 0;
           let rescueText: string;

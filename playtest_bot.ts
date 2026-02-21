@@ -390,6 +390,12 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
         }
       }
 
+      // Exclude rescue-blocked crew from count (4+ failed interaction attempts)
+      const rescueBlockedCount = foundNotFollowing.filter(c =>
+        (interactAttempts.get(c.id) ?? 0) >= 4
+      ).length;
+      foundLivingRemaining -= rescueBlockedCount;
+
       // Under time pressure, use data core fallback if all found crew are evacuated
       const timePressure = state.turn > 400 && foundLivingRemaining === 0;
       if ((foundLivingRemaining > 0 || unfoundCrew.length > 0) && !timePressure) {
@@ -399,13 +405,15 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
           // Before heading to pod, recruit nearby found-not-following crew (batch pickup)
           if (foundNotFollowing.length > 0) {
             const nearbyCrew = foundNotFollowing.filter(c =>
-              manhattan({ x: px, y: py }, c.pos) <= 10
+              manhattan({ x: px, y: py }, c.pos) <= 10 &&
+              (interactAttempts.get(c.id) ?? 0) < 4
             ).sort((a, b) =>
               manhattan({ x: px, y: py }, a.pos) - manhattan({ x: px, y: py }, b.pos)
             );
             if (nearbyCrew.length > 0) {
               const target = nearbyCrew[0];
               if (manhattan({ x: px, y: py }, target.pos) <= 1) {
+                interactAttempts.set(target.id, (interactAttempts.get(target.id) ?? 0) + 1);
                 return { type: ActionType.Interact, targetId: target.id };
               }
               const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
@@ -489,12 +497,17 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
             }
           }
         } else if (foundNotFollowing.length > 0) {
-          // Found crew not yet following — go recruit nearest
-          const sorted = foundNotFollowing.sort((a, b) =>
+          // Found crew not yet following — go recruit nearest (skip rescue-blocked after 4 attempts)
+          const recruitable = foundNotFollowing.filter(c =>
+            (interactAttempts.get(c.id) ?? 0) < 4
+          );
+          if (recruitable.length > 0) {
+          const sorted = recruitable.sort((a, b) =>
             manhattan({ x: px, y: py }, a.pos) - manhattan({ x: px, y: py }, b.pos)
           );
           const target = sorted[0];
           if (manhattan({ x: px, y: py }, target.pos) <= 1) {
+            interactAttempts.set(target.id, (interactAttempts.get(target.id) ?? 0) + 1);
             return { type: ActionType.Interact, targetId: target.id };
           }
           const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
@@ -502,6 +515,8 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
           ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
             manhattan({ x, y }, target.pos) <= 1, true);
           if (dir) return { type: ActionType.Move, direction: dir };
+          }
+          // All recruitable crew are rescue-blocked — fall through to unfound or data core
         } else if (unfoundCrew.length > 0) {
           // Crew exist but haven't been discovered — go find nearest
           const sorted = unfoundCrew.sort((a, b) =>
