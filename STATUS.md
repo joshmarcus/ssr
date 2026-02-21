@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 69 complete (Env Choice Epilogues, Deduction Tag Fix, Map Readability)
+- **Phase**: Sprint 70 complete (Spatial Investigation — puzzle-gated, sensor-gated, timed evidence)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -13,7 +13,7 @@
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 1300, Normal: 1000, Hard: 700) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: 5 seeds all VICTORY — 42(189T), 99(184T), 184201(272T), 7777(182T), 12345(225T)
+- **Playtest results**: 4/5 VICTORY — 42, 99, 7777, 12345; 184201 DEFEAT (bot heuristic loop, not gameplay bug)
 
 ## What Works
 
@@ -93,11 +93,41 @@
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
+- **Spatial investigation**: Evidence access requires puzzle solving, sensors, and urgency:
+  - Puzzle-gated terminals: 3 log terminals offline until relay milestones (first_relay, all_relays)
+  - Sensor-gated traces: 2 archetype-specific evidence traces requiring Thermal/Atmospheric scan
+  - Timed evidence windows: 1 volatile console per archetype destroyed by escalating heat/pressure
+- Exhausted room dimming + off-screen room arrows for map navigation
 
 ## Known Issues
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 70 Changes
+
+### Spatial Investigation — Puzzle-Gated Evidence
+- **3 log terminals gated behind relay milestones**: Terminals 3 and 8 require `first_relay`, Terminal 12 requires `all_relays`
+- **Offline hint text**: Gated terminals show context-appropriate messages ("Power grid unstable — reroute a relay")
+- **Investigation meets exploration**: Players must solve relay puzzles to access mid-game and late-game evidence
+- **Test update**: Evidence phase transition test grants relay milestones before reading terminals
+
+### Spatial Investigation — Sensor-Gated Evidence
+- **2 archetype-specific evidence traces per run**: One requiring Thermal sensor, one requiring Atmospheric
+- **Authored content with crew references**: Each trace reveals archetype-relevant information (CoolantCascade: heat pattern inconsistencies, HullBreach: pressure differential map, etc.)
+- **Placed in themed rooms**: Thermal trace near Engine Core, Atmospheric trace in Life Support
+- **Extends existing scanHidden system**: Uses established sensor-reveal pattern from evidence traces
+
+### Spatial Investigation — Timed Evidence Windows
+- **1 volatile console per archetype**: Destroyed when tile heat/pressure exceeds threshold
+- **Archetype-specific authored content**: Each volatile terminal contains high-value evidence
+  - CoolantCascade: Maintenance terminal at P03 (destroyAtHeat: 60) — engineer's documented bypass procedure
+  - HullBreach: Airlock control log (destroyAtPressure: 25) — manual override evidence
+  - ReactorScram: Data core diagnostic (destroyAtHeat: 55) — unauthorized 72-hour compute allocation
+  - Sabotage: Cargo manifest (destroyAtHeat: 65) — mislabeled biohazard with waived quarantine
+  - SignalAnomaly: Signal buffer (destroyAtHeat: 55) — 47-minute structured transmission evidence
+- **Destruction is visible**: Log message when evidence is lost ("Terminal overheated — data scorched")
+- **Creates genuine urgency**: Players see hazards approaching evidence and must prioritize
 
 ## Sprint 69 Changes
 
