@@ -6,6 +6,7 @@ import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared,
 import { getUnlockedDeductions } from "../sim/deduction.js";
 import { getRunHistory } from "../sim/saveLoad.js";
 import { GAMEOVER_EPILOGUE_VICTORY, GAMEOVER_EPILOGUE_DEFEAT, DEDUCTION_MISS_HINTS, VICTORY_EPILOGUE_VARIANT } from "../data/narrative.js";
+import { computeBranchedEpilogue } from "../sim/mysteryChoices.js";
 import type { IGameDisplay } from "./displayInterface.js";
 
 // ── Archetype display names for game-over screen ────────────────
@@ -634,6 +635,25 @@ export class BrowserDisplay implements IGameDisplay {
         <div style="color:#8ac;font-size:11px;margin-top:4px;font-style:italic">${revealLine}</div>
       </div>` : "";
 
+    // Choice-branched epilogue section
+    let choiceBranchedHtml = "";
+    const choicesForEpilogue = state.mystery?.choices ?? [];
+    if (archetype && choicesForEpilogue.some(c => c.chosen)) {
+      const branchedLines = computeBranchedEpilogue(choicesForEpilogue, archetype as IncidentArchetype);
+      if (branchedLines.length > 0) {
+        const branchedDivs = branchedLines.map(l =>
+          `<div style="margin:3px 0;font-size:11px;font-family:monospace;color:#9ab">${this.escapeHtml(l)}</div>`
+        ).join("");
+        choiceBranchedHtml = `
+          <div style="margin:10px 0 4px;border-top:1px solid #333;padding-top:8px">
+            <div style="color:#8ac;font-size:12px;font-weight:bold;text-align:center;margin-bottom:6px;letter-spacing:2px">
+              \u25b8 YOUR DECISIONS \u25c2
+            </div>
+            ${branchedDivs}
+          </div>`;
+      }
+    }
+
     overlay.innerHTML = `
       <div class="gameover-box ${titleClass}">
         <div class="gameover-title ${titleClass}">${title}</div>
@@ -659,6 +679,7 @@ export class BrowserDisplay implements IGameDisplay {
         </div>
         ${missedHtml}
         ${timelineHtml}
+        ${choiceBranchedHtml}
         <div class="gameover-epilogue">${epilogue}</div>
         <div style="text-align:center;margin:6px 0;color:#556;font-size:11px;font-family:monospace">
           SEED ${state.seed} &middot; ${archetypeDisplayName}${state.difficulty && state.difficulty !== "normal" ? ` &middot; ${state.difficulty.toUpperCase()}` : ""} &middot; ${rating} Rating &middot; ${state.turn} turns

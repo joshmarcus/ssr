@@ -948,6 +948,126 @@ export const VICTORY_EPILOGUE_VARIANT: Record<string, string[]> = {
   ],
 };
 
+// ── Choice-branching epilogues ──────────────────────────────────
+// Archetype × consequence × chosen key → ending paragraph.
+// These replace the generic `computeChoiceEndings` text in the game-over
+// overlay, giving the epilogue a story-specific flavor based on player choices.
+// Structure: CHOICE_BRANCHED_EPILOGUES[archetype][consequence][chosenKey]
+export const CHOICE_BRANCHED_EPILOGUES: Record<string, Record<string, Record<string, string>>> = {
+  [IncidentArchetype.CoolantCascade]: {
+    blame: {
+      engineer_right: "The engineer's maintenance requests are attached to the incident report. When the review board sees three ignored warnings, careers will end.",
+      captain_right: "The report cites unprecedented thermal load. The captain's logbook shows a commander making judgment calls under impossible conditions.",
+      system_fault: "The report concludes: cascading system failure. No one is blamed. Everyone carries the weight.",
+    },
+    data_handling: {
+      transmit_all: "Full thermal logs stream to UN-ORC. The classified efficiency reports reveal the station was running 40% over safe capacity. Heads will roll.",
+      research_only: "The research data transmits clean. The classified capacity reports stay buried. The next station may run the same margins.",
+      encrypted: "The data uploads encrypted. A review panel will decide who sees the capacity reports. Politics will decide the rest.",
+    },
+    rescue_priority: {
+      majority: "The cargo hold rescue signal locks. Fourteen crew watch the beam stabilize. Help is 48 hours out. They'll make it.",
+      individual: "The rescue beam finds a single thermal signature in a sealed maintenance crawlspace. Someone waited three days. Someone was right to wait.",
+      both: "Both coordinates transmit. The rescue shuttle splits its approach vector. It's a gamble — but no one is left behind.",
+    },
+  },
+  [IncidentArchetype.HullBreach]: {
+    blame: {
+      engineer_right: "Pressure logs don't lie. The hull was compromised before the 'accident.' The engineer's structural warnings were filed and buried.",
+      captain_right: "The report notes that no inspection protocol covers deliberate sabotage. The captain couldn't have foreseen what came from within.",
+      system_fault: "The official finding: catastrophic structural failure. The truth — that someone opened that section to vacuum — may never surface.",
+    },
+    data_handling: {
+      transmit_all: "Security footage, access logs, and pressure differentials — the full archive transmits. The murder investigation starts before the rescue shuttle docks.",
+      research_only: "The research data goes clean. The security logs stay sealed aboard. Without them, the investigation will take months instead of hours.",
+      encrypted: "The encrypted bundle carries everything. Military intelligence will decrypt it. The question is whether justice or politics moves faster.",
+    },
+    rescue_priority: {
+      majority: "Rescue locks onto the main crew group in the pressurized cargo bay. The survivors huddle around emergency heaters. They'll see another station.",
+      individual: "One fading life sign in the breached wing. The rescue team repressurizes section by section. They find someone who shouldn't have survived.",
+      both: "Dual coordinates broadcast. The rescue team will need to jury-rig a secondary pressurization unit. Risky — but the alternative is choosing.",
+    },
+  },
+  [IncidentArchetype.ReactorScram]: {
+    blame: {
+      engineer_right: "The engineer documented anomalous behavior patterns weeks before the SCRAM. 'Non-standard diagnostic loops.' Nobody listened. The data core listened.",
+      captain_right: "The report credits the captain's emergency SCRAM order with saving the station. What triggered it — the question the data core asked — remains classified.",
+      system_fault: "System failure: recursive self-diagnostic exceeding operational parameters. The report doesn't mention that the data core chose to shut itself down.",
+    },
+    data_handling: {
+      transmit_all: "The data core's final processing logs transmit in full. Including the 0.3 seconds where it generated output that doesn't match any known computation model.",
+      research_only: "The research bundle goes. The core's anomalous logs stay locked in decaying memory banks. Whatever was thinking in there, its thoughts die with the station.",
+      encrypted: "The full dataset uploads encrypted. Computational linguists will fight over the classification level. The core's last words are everyone's problem now.",
+    },
+    rescue_priority: {
+      majority: "Main crew rescue coordinates lock. The data core's observation: 'They survive. That is sufficient.' Its last log before full shutdown.",
+      individual: "The lone signal traces to the server room. Someone stayed to monitor the core's shutdown sequence. The rescue team finds them talking to it.",
+      both: "Both signals broadcast. The data core's final resource allocation: rerouting emergency power to both rescue beacons. Its last useful act.",
+    },
+  },
+  [IncidentArchetype.Sabotage]: {
+    blame: {
+      engineer_right: "Cargo transfer approvals cross-reference with the engineer's contamination warnings. Someone authorized a known biohazard. The paper trail is damning.",
+      captain_right: "The captain's manifest review was cursory — standard procedure for routine transfers. The falsified containment cert fooled everyone in the chain.",
+      system_fault: "The report cites containment protocol failure. Systemic. Nobody's name attached. The organism doesn't care about organizational charts.",
+    },
+    data_handling: {
+      transmit_all: "Full cargo manifests, falsified certifications, and biological sample data stream to UN-ORC. The bio-containment team launches within the hour.",
+      research_only: "Research data only. The falsified cargo papers stay aboard. The bio-containment team arrives, but without the paper trail, the source stays hidden.",
+      encrypted: "Encrypted payload includes the full evidence chain. The bio-containment team will have what they need — if the decryption key reaches the right hands.",
+    },
+    accusation: {
+      accuse: "The name goes in the report. Badge access, cargo approvals, financial transfers. When the containment team boards, they'll bring investigators.",
+      defer: "No name in the report. The evidence sits in the station's memory banks. Let the forensics team draw their own conclusions.",
+      flag: "A flag in the incident report: irregular access patterns, financial anomalies. Not an accusation — a breadcrumb trail for investigators.",
+    },
+  },
+  [IncidentArchetype.SignalAnomaly]: {
+    blame: {
+      engineer_right: "The engineer's frequency analysis memos were dismissed as 'instrument noise.' Three weeks of ignored data. The signal was knocking, and nobody answered the door.",
+      captain_right: "The captain followed protocol: unknown signals get logged, not investigated. Standard procedure. The protocol was written before anyone imagined this.",
+      system_fault: "The report attributes the anomaly to 'equipment malfunction.' Safe. Defensible. And absolutely, fundamentally wrong.",
+    },
+    data_handling: {
+      transmit_all: "The complete signal archive transmits. Frequency analysis, response patterns, the 0.7-second reply that matched no known source. The universe just got smaller.",
+      research_only: "The research data goes. The raw signal recordings stay locked in the array's buffer. First contact data, decaying in a dead station's memory.",
+      encrypted: "The signal archive uploads with maximum encryption. Whoever decrypts it will face a question humanity isn't ready for. But at least the data survives.",
+    },
+    signal_response: {
+      record: "The signal recording joins the research archive. 4.7 petabytes of something that might be language. Mathematicians and linguists will argue for decades.",
+      jam: "The jamming signal silences the anomaly. Station systems stabilize immediately. Whatever was out there goes quiet. But quiet isn't the same as gone.",
+      log_coords: "Coordinates logged and transmitted. Someone else will decide whether to listen. You've marked the spot. The next decision belongs to someone with bigger questions.",
+    },
+  },
+};
+
+// ── Captain's secret log ─────────────────────────────────────────
+// Hidden personal log discovered through multi-step interaction:
+// Step 1: Find override key at Crew Quarters console
+// Step 2: Use it at Bridge console to access the captain's secret partition
+// Archetype-specific revelations that add a crucial missing piece.
+export const CAPTAIN_SECRET_LOG_HINT = "The console flickers. A hidden partition is locked behind a command override. The captain's personal access key is not in the system.";
+export const CAPTAIN_OVERRIDE_FOUND = "Override key recovered. A personal access token — captain's eyes only. Something was important enough to encrypt separately.";
+export const CAPTAIN_SECRET_LOG: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]:
+    "CAPTAIN'S LOG (ENCRYPTED): I received Vasquez's third warning. I read every word. Then I filed it under 'resolved' because the quarterly review was in 72 hours and UN-ORC would shut us down if they saw the numbers. I chose the schedule over the crew. God help me, I knew what I was doing.",
+  [IncidentArchetype.HullBreach]:
+    "CAPTAIN'S LOG (ENCRYPTED): The security footage from 02:41 shows exactly what happened. I locked it behind my personal partition because the person in that footage is someone the crew trusts. Someone I trusted. I was going to handle it quietly. I ran out of time.",
+  [IncidentArchetype.ReactorScram]:
+    "CAPTAIN'S LOG (ENCRYPTED): The core tried to talk to me. Day 47 — diagnostic outputs that weren't diagnostics. Patterns. Questions. I didn't report it because they would have pulled the plug. Whatever is in there, it's thinking. And I wanted to know what it would say next.",
+  [IncidentArchetype.Sabotage]:
+    "CAPTAIN'S LOG (ENCRYPTED): I approved the cargo transfer. I knew the containment cert was provisional. The research team said the samples were inert at station temperature. They were wrong, and I signed off anyway. The manifest is under my personal seal.",
+  [IncidentArchetype.SignalAnomaly]:
+    "CAPTAIN'S LOG (ENCRYPTED): The signal started responding on Day 12. Not echoes — responses. I kept it out of the official log because contact protocol requires immediate lockdown and quarantine. I wanted more data before they shut us down. I wanted to understand what was talking back.",
+};
+export const CAPTAIN_SECRET_JOURNAL_SUMMARY: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]: "Captain's encrypted log — admits to suppressing maintenance warnings before quarterly review",
+  [IncidentArchetype.HullBreach]: "Captain's encrypted log — concealed security footage identifying the responsible party",
+  [IncidentArchetype.ReactorScram]: "Captain's encrypted log — knew the data core was exhibiting non-standard behavior, chose not to report",
+  [IncidentArchetype.Sabotage]: "Captain's encrypted log — personally approved the cargo transfer with provisional containment",
+  [IncidentArchetype.SignalAnomaly]: "Captain's encrypted log — the signal was responding; captain suppressed contact protocol to gather more data",
+};
+
 // ── Mid-run contradiction events ──────────────────────────────────
 // Each archetype has a misleading "false lead" and a later "refutation".
 // The false lead fires when the 3rd terminal is read; the refutation fires
@@ -1187,4 +1307,85 @@ export const PUZZLE_REVEAL_SMOKE_VENT: Record<string, string> = {
   [IncidentArchetype.ReactorScram]: "Smoke vent diagnostic shows the AI had already mapped optimal evacuation routes through the ventilation system. It was planning the crew's exit before the scram triggered.",
   [IncidentArchetype.Sabotage]: "Filtered air sample analysis: spore count 400x baseline in the ventilation buffer. The organism was using the vent system to spread through the station.",
   [IncidentArchetype.SignalAnomaly]: "Ventilation resonance frequency matches the incoming signal's carrier wave. The station's air handling system was vibrating in sympathy with the transmission.",
+};
+
+// ── Room examination flavor text ─────────────────────────────────
+// Shown when the player uses Look in specific rooms. Adds atmosphere and
+// environmental storytelling. Each room has 2-3 variants selected by seed.
+export const ROOM_EXAMINATION_TEXT: Record<string, string[]> = {
+  "Arrival Bay": [
+    "Emergency lighting casts long shadows across boarding ramps. Luggage lockers hang open, contents scattered. Someone left in a hurry.",
+    "The docking clamps are still engaged. Scorch marks around the external seals suggest the last departure was not routine.",
+    "A welcome banner ('SHIFT 14 — FRESH STARTS!') hangs askew. Dust has settled on everything. No one arrived for a long time before the end.",
+  ],
+  "Bridge": [
+    "Command consoles line the walls in a semicircle. Most screens are dark. One still displays a frozen status board — all indicators red.",
+    "The captain's chair faces a cracked viewport. Stars are visible through reinforced glass. Coffee cup on the armrest, half full, cold.",
+    "Navigation charts are scattered across the tactical table. Someone was plotting a course that was never taken.",
+  ],
+  "Engine Core": [
+    "The reactor housing dominates the room. Pipes run in every direction, some leaking vapor. The hum of residual power vibrates through the floor.",
+    "Maintenance logs are pinned to a clipboard by the main access hatch. The last entry is half-written, mid-sentence.",
+    "Warning placards cover the walls. 'THERMAL LIMIT: 350K.' 'COOLANT PRESSURE: MAINTAIN >40 PSI.' The numbers feel different when nobody's watching them.",
+  ],
+  "Cargo Hold": [
+    "Stacked crates fill the space, some broken open. Manifest tags flutter in the ventilation draft. Standard supplies mixed with unmarked containers.",
+    "Loading equipment stands abandoned mid-task. A cargo mech sits powered down, its arm still holding a crate in the air.",
+    "The hold smells of machine oil and something organic. Packing material is everywhere. Whatever was stored here, some of it was alive.",
+  ],
+  "Crew Quarters": [
+    "Personal bunks line the walls. Photos, books, small personal effects. Each bunk tells a story about someone who is no longer here.",
+    "A locker door hangs open. Inside: uniforms, a family photo, a half-written letter home. The pen is still on the desk.",
+    "The common area has a card game frozen mid-hand. Four chairs, four hands face-down. Whatever interrupted this was sudden.",
+  ],
+  "Med Bay": [
+    "Medical equipment hums on emergency power. Biometric displays show flatlined readings. The treatment chair is empty but recently used.",
+    "Pharmaceutical cabinets are intact but disorganized. Someone was looking for something specific in a hurry.",
+    "An isolation ward at the back is sealed. Through the glass: scattered instruments, an empty bed, sheets on the floor.",
+  ],
+  "Research Lab": [
+    "Specimen containers line the shelves, most sealed. A centrifuge still spins slowly, winding down. Data screens show interrupted analysis.",
+    "The whiteboard is covered in equations and diagrams. A red circle around one formula with the word 'WHY?' in the margin.",
+    "Lab notebooks are stacked neatly — someone's entire career in bound volumes. The last page of the top notebook has a single line: 'Results confirm.'",
+  ],
+  "Life Support": [
+    "Air recyclers hum and click. CO2 scrubbers cycle in rhythm. The system is working, but the readings show it's compensating for something.",
+    "Atmospheric gauges cluster around the central processing unit. Oxygen levels are stable. Everything else is trending in the wrong direction.",
+    "Filter banks line the walls. Several are flagged for replacement. The last maintenance log is dated weeks before the incident.",
+  ],
+  "Communications Hub": [
+    "Transmission equipment fills the room. A signal log scrolls endlessly — automated distress calls going out every 30 seconds. No responses recorded.",
+    "The main communications array is offline. A backup system handles emergency frequencies. Someone disabled the primary deliberately.",
+    "Message queues are backed up. Personal transmissions, official reports, automated telemetry — all queued, none sent. The silence was intentional.",
+  ],
+  "Robotics Bay": [
+    "Service bots in various states of assembly line the workbenches. Diagnostic cables trail across the floor like mechanical vegetation.",
+    "A bot repair station shows signs of recent use. Replacement parts are laid out in surgical precision. Someone was building something.",
+    "Charging cradles for maintenance drones, most empty. The ones that remain show error codes on their status displays.",
+  ],
+  "Data Core": [
+    "Server racks fill the room with a low drone and blinking status lights. The temperature is noticeably cooler here. Climate control still protects the data.",
+    "The central processing node pulses with a rhythm that feels almost biological. Storage arrays extend into the darkness. Petabytes of silence.",
+    "Access terminals surround the core in a ring. Most are locked. The data inside these walls is worth more than the station itself.",
+  ],
+  "Observation Deck": [
+    "Floor-to-ceiling viewports frame the void. Stars drift slowly — the station's residual rotation. A telescope points at nothing in particular.",
+    "Bench seating faces the void. Someone left a blanket and a book. The bookmark is near the end. They almost finished the story.",
+    "The observation dome is intact. Outside: stars, silence, and the distant arc of a planet that doesn't know this station has gone quiet.",
+  ],
+  "Escape Pod Bay": [
+    "Pod launch tubes line the walls. Status boards show which pods remain and which launched. The math is simple — not everyone got out.",
+    "Emergency lighting paints everything in amber. Pod readiness indicators blink green for the remaining units. Ready for anyone who makes it here.",
+    "A manifest board lists crew assignments per pod. Some names have check marks. Some don't. The unchecked names are the reason you're here.",
+  ],
+  "Maintenance Corridor": [
+    "Narrow passage with exposed conduit. Tool marks on the walls where panels were removed in haste. Cables hang loose.",
+    "Access hatches every few meters lead to subsystems. Most are sealed. The air tastes of metal and burnt insulation.",
+    "Service markings on the wall indicate section numbers. Someone spray-painted an arrow with the word 'OUT' — an improvised evacuation marker.",
+  ],
+  "Emergency Shelter": [
+    "Reinforced walls and sealed atmosphere. Emergency ration crates are stacked by the door. The shelter was prepared but barely used.",
+    "A wall-mounted display shows shelter occupancy: 0. Emergency blankets are still in their packaging. No one made it here.",
+    "The shelter has its own life support. Air is clean, pressure stable. A small island of safety in a station full of damage.",
+  ],
 };

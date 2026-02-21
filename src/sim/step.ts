@@ -18,6 +18,9 @@ import {
   SENSOR_CLUES,
   PUZZLE_REVEAL_COOLANT, PUZZLE_REVEAL_FUSE, PUZZLE_REVEAL_SMOKE_VENT,
   CORVUS_EVACUATION_FAREWELL,
+  CAPTAIN_SECRET_LOG_HINT, CAPTAIN_OVERRIDE_FOUND,
+  CAPTAIN_SECRET_LOG, CAPTAIN_SECRET_JOURNAL_SUMMARY,
+  ROOM_EXAMINATION_TEXT,
 } from "../data/narrative.js";
 
 /**
@@ -2929,6 +2932,57 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
         break;
       }
 
+      // ── Captain's override key (Crew Quarters terminal) ──
+      if (target.props["captainOverrideKey"] === true) {
+        if (target.props["read"] === true) {
+          next.logs = [...state.logs, { id: `log_captain_key_done_${next.turn}`, timestamp: next.turn, source: "system", text: "Personal Locker Terminal: Override key already recovered.", read: false }];
+        } else {
+          const newEntities = new Map(state.entities);
+          newEntities.set(targetId, { ...target, props: { ...target.props, read: true } });
+          const newMilestones = new Set(state.milestones);
+          newMilestones.add("captain_override_key");
+          next = { ...next, entities: newEntities, milestones: newMilestones };
+          next.logs = [
+            ...state.logs,
+            { id: `log_captain_key_${next.turn}`, timestamp: next.turn, source: "narrative", text: `[Personal Locker Terminal] ${target.props["text"] as string}`, read: false },
+            { id: `log_captain_key_hint_${next.turn}`, timestamp: next.turn, source: "system", text: CAPTAIN_OVERRIDE_FOUND, read: false },
+          ];
+        }
+        break;
+      }
+
+      // ── Captain's secret log (Bridge terminal) ──
+      if (target.props["captainSecretLog"] === true) {
+        if (target.props["read"] === true) {
+          next.logs = [...state.logs, { id: `log_captain_log_done_${next.turn}`, timestamp: next.turn, source: "system", text: "Captain's Terminal: Encrypted partition already accessed.", read: false }];
+        } else if (!state.milestones.has("captain_override_key")) {
+          next.logs = [...state.logs, { id: `log_captain_log_locked_${next.turn}`, timestamp: next.turn, source: "system", text: CAPTAIN_SECRET_LOG_HINT, read: false }];
+        } else {
+          const archetype = state.mystery?.timeline?.archetype;
+          const logText = archetype ? (CAPTAIN_SECRET_LOG[archetype] ?? "The encrypted partition is empty.") : "The encrypted partition is empty.";
+          const journalSum = archetype ? (CAPTAIN_SECRET_JOURNAL_SUMMARY[archetype] ?? null) : null;
+          const newEntities = new Map(state.entities);
+          newEntities.set(targetId, { ...target, props: { ...target.props, read: true } });
+          const newMilestones = new Set(state.milestones);
+          newMilestones.add("captain_secret_log");
+          next = { ...next, entities: newEntities, milestones: newMilestones };
+          next.logs = [...state.logs, { id: `log_captain_secret_${next.turn}`, timestamp: next.turn, source: "narrative", text: logText, read: false }];
+          // Add journal entry for the secret log
+          if (journalSum && archetype) {
+            next = addJournalEntry(
+              next,
+              "journal_captain_secret_log",
+              "log",
+              journalSum,
+              logText,
+              getPlayerRoomName(state),
+              targetId,
+            );
+          }
+        }
+        break;
+      }
+
       const consoleName = (target.props["name"] as string) || "Console";
       const consoleText = (target.props["text"] as string) || "The console is offline.";
       const alreadyRead = target.props["read"] === true;
@@ -3241,6 +3295,11 @@ function handleLook(state: GameState): GameState {
     parts.push(`${smokeDesc} (smoke: ${tile.smoke})`);
   }
 
+  if (tile.pressure < 100) {
+    const pDesc = tile.pressure < 40 ? "dangerously low pressure" : tile.pressure < 70 ? "low pressure" : "slightly reduced pressure";
+    parts.push(`${pDesc} (${tile.pressure}%)`);
+  }
+
   // Describe adjacent entities
   const deltas = [
     { x: 0, y: -1, label: "north" },
@@ -3270,19 +3329,37 @@ function handleLook(state: GameState): GameState {
 
   const text = parts.length > 0 ? parts.join(". ") + "." : "Nothing notable here.";
 
-  return {
-    ...state,
-    logs: [
-      ...state.logs,
-      {
-        id: `log_look_${state.turn}`,
-        timestamp: state.turn,
-        source: "sensor",
-        text,
-        read: false,
-      },
-    ],
-  };
+  // Room examination flavor text — seed-selected variant
+  const roomName = getPlayerRoomName(state);
+  const flavorPool = ROOM_EXAMINATION_TEXT[roomName];
+  let flavorText = "";
+  if (flavorPool && flavorPool.length > 0) {
+    const idx = (state.seed + state.turn) % flavorPool.length;
+    flavorText = flavorPool[idx];
+  }
+
+  const logs = [
+    ...state.logs,
+    {
+      id: `log_look_${state.turn}`,
+      timestamp: state.turn,
+      source: "sensor" as const,
+      text,
+      read: false,
+    },
+  ];
+
+  if (flavorText) {
+    logs.push({
+      id: `log_look_flavor_${state.turn}`,
+      timestamp: state.turn,
+      source: "narrative" as const,
+      text: flavorText,
+      read: false,
+    });
+  }
+
+  return { ...state, logs };
 }
 
 /**

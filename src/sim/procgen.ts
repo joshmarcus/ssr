@@ -203,6 +203,9 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
   // Place landmark consoles in themed rooms
   placeLandmarkConsoles(state, rooms);
 
+  // Place captain's secret log (hidden multi-step discovery)
+  placeCaptainSecretLog(state, rooms);
+
   // Apply difficulty-based deterioration interval (archetype may override further)
   state.deteriorationInterval = DIFFICULTY_SETTINGS[difficulty].deteriorationInterval;
 
@@ -2278,5 +2281,70 @@ function placeEnvironmentalDoors(state: GameState, rooms: DiggerRoom[]): void {
         return; // Only place 1 environmental door
       }
     }
+  }
+}
+
+/**
+ * Place a two-step captain's secret log discovery:
+ * 1. Override key console in Crew Quarters — gives the milestone "captain_override_key"
+ * 2. Secret log console in Bridge — requires the milestone to access
+ */
+function placeCaptainSecretLog(state: GameState, rooms: DiggerRoom[]): void {
+  const n = rooms.length;
+  if (n < 4) return;
+
+  // Find Crew Quarters and Bridge rooms
+  const crewQuartersIdx = state.rooms.findIndex(r => r.name === "Crew Quarters");
+  const bridgeIdx = state.rooms.findIndex(r => r.name === "Bridge");
+
+  if (crewQuartersIdx < 0 || crewQuartersIdx >= n || bridgeIdx < 0 || bridgeIdx >= n) return;
+
+  // Step 1: Override key console in Crew Quarters
+  const cqRoom = rooms[crewQuartersIdx];
+  const keyPos = getRoomPos(cqRoom, 1, 0);
+  // Don't place on existing entity
+  let keyOccupied = false;
+  for (const [, entity] of state.entities) {
+    if (entity.pos.x === keyPos.x && entity.pos.y === keyPos.y) {
+      keyOccupied = true;
+      break;
+    }
+  }
+  if (!keyOccupied) {
+    state.entities.set("captain_override_console", {
+      id: "captain_override_console",
+      type: EntityType.Console,
+      pos: keyPos,
+      props: {
+        name: "Personal Locker Terminal",
+        text: "A crew personal effects terminal. One drawer is flagged 'CAPTAIN — COMMAND OVERRIDE.' A physical key card is inside.",
+        read: false,
+        captainOverrideKey: true,
+      },
+    });
+  }
+
+  // Step 2: Secret log console in Bridge
+  const bridgeRoom = rooms[bridgeIdx];
+  const logPos = getRoomPos(bridgeRoom, -1, -1);
+  let logOccupied = false;
+  for (const [, entity] of state.entities) {
+    if (entity.pos.x === logPos.x && entity.pos.y === logPos.y) {
+      logOccupied = true;
+      break;
+    }
+  }
+  if (!logOccupied) {
+    state.entities.set("captain_secret_log", {
+      id: "captain_secret_log",
+      type: EntityType.Console,
+      pos: logPos,
+      props: {
+        name: "Captain's Terminal",
+        text: "",  // Overridden by step.ts handler
+        read: false,
+        captainSecretLog: true,
+      },
+    });
   }
 }

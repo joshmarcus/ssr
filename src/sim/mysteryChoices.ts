@@ -9,6 +9,7 @@ import * as ROT from "rot-js";
 import type { CrewMember, IncidentTimeline, MysteryChoice } from "../shared/types.js";
 import { IncidentArchetype, CrewRole } from "../shared/types.js";
 import { findByRole, findSecretHolder } from "./crewGen.js";
+import { CHOICE_BRANCHED_EPILOGUES } from "../data/narrative.js";
 
 /**
  * Generate 3-4 mystery choices for the run.
@@ -160,4 +161,27 @@ export function computeChoiceEndings(choices: MysteryChoice[]): string[] {
   }
 
   return lines;
+}
+
+/**
+ * Compute archetype-specific choice epilogue lines.
+ * Falls back to generic computeChoiceEndings if no branched text exists.
+ */
+export function computeBranchedEpilogue(
+  choices: MysteryChoice[],
+  archetype: IncidentArchetype,
+): string[] {
+  const pool = CHOICE_BRANCHED_EPILOGUES[archetype];
+  if (!pool) return computeChoiceEndings(choices);
+
+  const lines: string[] = [];
+  for (const choice of choices) {
+    if (!choice.chosen) continue;
+    const consequencePool = pool[choice.consequence];
+    if (consequencePool && consequencePool[choice.chosen]) {
+      lines.push(consequencePool[choice.chosen]);
+    }
+  }
+  // Fall back to generic if branched pool produced nothing
+  return lines.length > 0 ? lines : computeChoiceEndings(choices);
 }

@@ -44,7 +44,7 @@ import {
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
-import { computeChoiceEndings } from "./sim/mysteryChoices.js";
+import { computeChoiceEndings, computeBranchedEpilogue } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence, getTagExplanation } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave, recordRun } from "./sim/saveLoad.js";
@@ -2022,8 +2022,11 @@ function handleAction(action: Action): void {
           }
         }
 
-        // Choice endings
-        const choiceLines = computeChoiceEndings(state.mystery.choices);
+        // Choice endings (archetype-branched)
+        const choiceArchetype = state.mystery.timeline.archetype;
+        const choiceLines = choiceArchetype
+          ? computeBranchedEpilogue(state.mystery.choices, choiceArchetype)
+          : computeChoiceEndings(state.mystery.choices);
         if (choiceLines.length > 0) {
           display.addLog("", "system");
           display.addLog("── Your Decisions ──", "milestone");
