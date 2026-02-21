@@ -948,7 +948,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
     this.updateRoomLabels(state);
-    this.updateEntityLabels(state);
+    // Entity labels removed — sidebar already shows nearby entities
     this.renderMinimap(state);
   }
 
