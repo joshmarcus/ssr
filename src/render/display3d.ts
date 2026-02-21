@@ -527,7 +527,52 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   toggleSensor(type: SensorType): void {
+    const wasNull = this.sensorMode === null;
     this.sensorMode = this.sensorMode === type ? null : type;
+
+    // Visual scan wave when activating a sensor
+    if (this.sensorMode && wasNull !== (this.sensorMode === null)) {
+      this.triggerScanWave();
+    }
+  }
+
+  private triggerScanWave(): void {
+    const sensorColors: Record<string, number> = {
+      [SensorType.Thermal]: 0xff4422,
+      [SensorType.Atmospheric]: 0x44aaff,
+      [SensorType.Cleanliness]: 0x88cc44,
+    };
+    const waveColor = sensorColors[this.sensorMode ?? ""] ?? 0x44ff88;
+
+    const ringGeo = new THREE.RingGeometry(0.1, 0.3, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: waveColor,
+      transparent: true,
+      opacity: 0.6,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(this.playerCurrentX, 0.1, this.playerCurrentZ);
+    this.scene.add(ring);
+
+    const startTime = this.clock.getElapsedTime();
+    const duration = 1.0;
+    const animateWave = () => {
+      const t = (this.clock.getElapsedTime() - startTime) / duration;
+      if (t >= 1) {
+        this.scene.remove(ring);
+        ringGeo.dispose();
+        ringMat.dispose();
+        return;
+      }
+      const scale = 1 + t * 15;
+      ring.scale.set(scale, 1, scale);
+      ringMat.opacity = 0.6 * (1 - t * t); // quadratic fade
+      requestAnimationFrame(animateWave);
+    };
+    requestAnimationFrame(animateWave);
   }
 
   addLog(msg: string, type: LogType = "system"): void {
