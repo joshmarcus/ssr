@@ -213,6 +213,18 @@
     .mode-3d #ui-panel .sidebar-stats {
       border-bottom-color: rgba(68, 255, 136, 0.08);
     }
+    /* 3D minimap overlay */
+    .mode-3d #minimap-canvas {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 10;
+      border: 1px solid rgba(68, 255, 136, 0.3);
+      border-radius: 4px;
+      background: rgba(8, 10, 16, 0.75);
+      image-rendering: pixelated;
+      pointer-events: none;
+    }
     /* Vignette overlay in 3D mode */
     .mode-3d #rot-display::after {
       content: "";
@@ -647,7 +659,7 @@
   <div id="game-container">
     <div id="ui-panel"></div>
     <div id="map-column">
-      <div id="rot-display"></div>
+      <div id="rot-display"><canvas id="minimap-canvas" width="120" height="120" style="display:none"></canvas></div>
       <div id="map-legend"></div>
     </div>
   </div>

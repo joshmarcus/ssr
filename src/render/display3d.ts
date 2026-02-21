@@ -727,6 +727,10 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Remove mode-3d class
     document.getElementById("game-container")?.classList.remove("mode-3d");
 
+    // Hide minimap
+    const minimap = document.getElementById("minimap-canvas");
+    if (minimap) minimap.style.display = "none";
+
     // Dispose all geometries and materials
     this.scene.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
@@ -754,6 +758,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateFog(state);
     this.updateRoomLights(state);
     this.placeRoomDecorations(state);
+    this.renderMinimap(state);
   }
 
   // ── Render sidebar UI (same HTML as 2D) ─────────────────────────
@@ -2523,6 +2528,82 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   private escapeHtml(text: string): string {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  // ── Minimap ────────────────────────────────────────────────
+
+  private minimapCanvas: HTMLCanvasElement | null = null;
+  private minimapCtx: CanvasRenderingContext2D | null = null;
+
+  private renderMinimap(state: GameState): void {
+    if (!this.minimapCanvas) {
+      this.minimapCanvas = document.getElementById("minimap-canvas") as HTMLCanvasElement;
+      if (this.minimapCanvas) {
+        this.minimapCanvas.style.display = "block";
+        this.minimapCtx = this.minimapCanvas.getContext("2d");
+      }
+    }
+    if (!this.minimapCtx || !this.minimapCanvas) return;
+
+    const ctx = this.minimapCtx;
+    const w = this.minimapCanvas.width;
+    const h = this.minimapCanvas.height;
+
+    const scaleX = w / state.width;
+    const scaleY = h / state.height;
+    const scale = Math.min(scaleX, scaleY);
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored) continue;
+
+        const px = Math.floor(x * scale);
+        const py = Math.floor(y * scale);
+        const pw = Math.max(1, Math.ceil(scale));
+        const ph = Math.max(1, Math.ceil(scale));
+
+        if (tile.type === TileType.Wall) {
+          ctx.fillStyle = tile.visible ? "#445566" : "#223344";
+        } else if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
+          ctx.fillStyle = tile.type === TileType.LockedDoor ? "#882222" : "#886633";
+        } else if (tile.walkable) {
+          if (tile.heat > 30) {
+            ctx.fillStyle = "#662200";
+          } else if (tile.pressure < 60) {
+            ctx.fillStyle = "#223366";
+          } else {
+            ctx.fillStyle = tile.visible ? "#334433" : "#1a2a1a";
+          }
+        } else {
+          continue;
+        }
+        ctx.fillRect(px, py, pw, ph);
+      }
+    }
+
+    // Entities as colored dots
+    for (const [id, entity] of state.entities) {
+      if (id === "player") continue;
+      const tx = state.tiles[entity.pos.y]?.[entity.pos.x];
+      if (!tx?.explored) continue;
+      const color = ENTITY_COLORS_CSS[entity.type] || "#888";
+      const px = Math.floor(entity.pos.x * scale);
+      const py = Math.floor(entity.pos.y * scale);
+      ctx.fillStyle = color;
+      ctx.fillRect(px - 1, py - 1, 3, 3);
+    }
+
+    // Player: bright green dot with white border
+    const ppx = Math.floor(state.player.entity.pos.x * scale);
+    const ppy = Math.floor(state.player.entity.pos.y * scale);
+    ctx.fillStyle = "#44ff88";
+    ctx.fillRect(ppx - 2, ppy - 2, 5, 5);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ppx - 2, ppy - 2, 5, 5);
   }
 
   // ── Starfield background ─────────────────────────────────────
