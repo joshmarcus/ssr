@@ -430,9 +430,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       frustumHeight / 2, -frustumHeight / 2,
       0.1, 200
     );
-    // Isometric-ish offset: camera sits above+behind the target
+    // Low-angle offset: camera sits behind and slightly above for drama
     // Will be repositioned each frame to follow the player
-    this.camera.position.set(0, 14, 10);
+    this.camera.position.set(0, 8, 12);
     this.camera.lookAt(0, 0, 0);
 
     // ── Cel-shading: Outline Effect ──
@@ -1182,7 +1182,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.cameraShakeIntensity *= Math.max(0, 1 - this.cameraShakeDecay * delta);
       }
 
-      this.camera.position.set(this.cameraPosX + shakeX, 14, this.cameraPosZ + 10 + shakeZ);
+      this.camera.position.set(this.cameraPosX + shakeX, 8, this.cameraPosZ + 12 + shakeZ);
       this.camera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
 
@@ -2239,18 +2239,34 @@ export class BrowserDisplay3D implements IGameDisplay {
         break;
       }
       case EntityType.EvidenceTrace: {
-        // Glowing floating question mark — torus ring + vertical bar + dot
-        const qMat = new THREE.MeshBasicMaterial({ color: 0xffcc44 });
-        // Curved top of ?
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.04, 8, 12, Math.PI * 1.5), qMat);
-        ring.rotation.x = -Math.PI / 2;
-        ring.position.set(0, 0.35, 0);
-        // Vertical stroke
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.15, 6), qMat);
-        stem.position.set(0.12, 0.2, 0);
-        // Dot at bottom
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), qMat);
-        dot.position.set(0, 0.06, 0);
+        // Floating "?" sprite — canvas-rendered text for crisp question mark
+        const qCanvas = document.createElement("canvas");
+        qCanvas.width = 128;
+        qCanvas.height = 128;
+        const qCtx = qCanvas.getContext("2d")!;
+        // Outer glow
+        qCtx.shadowColor = "#ffaa00";
+        qCtx.shadowBlur = 20;
+        qCtx.fillStyle = "#ffcc44";
+        qCtx.font = "bold 100px Arial, sans-serif";
+        qCtx.textAlign = "center";
+        qCtx.textBaseline = "middle";
+        qCtx.fillText("?", 64, 60);
+        // Second pass for stronger center
+        qCtx.shadowBlur = 0;
+        qCtx.fillText("?", 64, 60);
+
+        const qTex = new THREE.CanvasTexture(qCanvas);
+        const qSpriteMat = new THREE.SpriteMaterial({
+          map: qTex,
+          transparent: true,
+          depthWrite: false,
+        });
+        const qSprite = new THREE.Sprite(qSpriteMat);
+        qSprite.scale.set(0.7, 0.7, 1);
+        qSprite.position.y = 0.4;
+        group.add(qSprite);
+
         // Glow ring on ground
         const glowRing = new THREE.Mesh(
           new THREE.RingGeometry(0.2, 0.35, 16),
@@ -2258,7 +2274,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         );
         glowRing.rotation.x = -Math.PI / 2;
         glowRing.position.y = 0.02;
-        group.add(ring, stem, dot, glowRing);
+        group.add(glowRing);
         baseY = 0.15;
         break;
       }
@@ -2379,7 +2395,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.playerMesh.position.x = px;
       this.playerMesh.position.z = py;
       this.playerLight.position.set(px, 3, py);
-      this.camera.position.set(px, 14, py + 10);
+      this.camera.position.set(px, 8, py + 12);
       this.camera.lookAt(px, 0, py);
     }
   }
