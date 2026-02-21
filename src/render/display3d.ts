@@ -1,9 +1,11 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { GameState, Entity, Room } from "../shared/types.js";
-import { TileType, EntityType, AttachmentSlot, SensorType } from "../shared/types.js";
+import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
 import type { IGameDisplay, LogType, DisplayLogEntry } from "./displayInterface.js";
+import { getObjective as getObjectiveShared, getDiscoveries, entityDisplayName } from "../shared/ui.js";
+import { getUnlockedDeductions } from "../sim/deduction.js";
 
 // FBXLoader is not imported — Synty FBX files are pre-converted to GLTF at build time
 
@@ -40,6 +42,13 @@ const ENTITY_COLORS_3D: Record<string, number> = {
   [EntityType.PressureValve]: 0x44bbaa,
   [EntityType.FuseBox]: 0xdd8800,
   [EntityType.PowerCell]: 0xffdd44,
+  [EntityType.EscapePod]: 0x44ffaa,
+  [EntityType.CrewNPC]: 0xffcc88,
+  [EntityType.Airlock]: 0x8888cc,
+  [EntityType.ToolPickup]: 0xffaa00,
+  [EntityType.UtilityPickup]: 0x88ddff,
+  [EntityType.Console]: 0x66aaff,
+  [EntityType.RepairCradle]: 0xaaff66,
 };
 
 // Room wall tints (hex versions — brighter for 3D)
@@ -82,6 +91,13 @@ const ENTITY_NAMES: Record<string, string> = {
   [EntityType.PressureValve]: "Pressure Valve",
   [EntityType.FuseBox]: "Fuse Box",
   [EntityType.PowerCell]: "Power Cell",
+  [EntityType.EscapePod]: "Escape Pod",
+  [EntityType.CrewNPC]: "Crew Member",
+  [EntityType.Airlock]: "Airlock",
+  [EntityType.ToolPickup]: "Tool Module",
+  [EntityType.UtilityPickup]: "Utility Module",
+  [EntityType.Console]: "Console",
+  [EntityType.RepairCradle]: "Repair Cradle",
 };
 
 const ENTITY_COLORS_CSS: Record<string, string> = {
@@ -101,6 +117,13 @@ const ENTITY_COLORS_CSS: Record<string, string> = {
   [EntityType.PressureValve]: "#44bbaa",
   [EntityType.FuseBox]: "#dd8800",
   [EntityType.PowerCell]: "#ffdd44",
+  [EntityType.EscapePod]: "#44ffaa",
+  [EntityType.CrewNPC]: "#ffcc88",
+  [EntityType.Airlock]: "#8888cc",
+  [EntityType.ToolPickup]: "#ffaa00",
+  [EntityType.UtilityPickup]: "#88ddff",
+  [EntityType.Console]: "#66aaff",
+  [EntityType.RepairCradle]: "#aaff66",
 };
 
 // ── GLTF Model paths ────────────────────────────────────────────
@@ -124,6 +147,13 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   [EntityType.RepairBot]: "models/Characters/GLTF/Mech_FinnTheFrog.gltf",
   [EntityType.Drone]: "models/Characters/GLTF/Mech_BarbaraTheBee.gltf",
   [EntityType.PatrolDrone]: "models/Characters/GLTF/Mech_BarbaraTheBee.gltf",
+  [EntityType.EscapePod]: "models/synty-gltf/SM_Container.glb",
+  [EntityType.CrewNPC]: "models/Characters/GLTF/Astronaut_FernandoTheFlamingo.gltf",
+  [EntityType.Airlock]: "models/kenney-space/gate-door.glb",
+  [EntityType.ToolPickup]: "models/Items/GLTF/Pickup_KeyCard.gltf",
+  [EntityType.UtilityPickup]: "models/Items/GLTF/Pickup_Thunder.gltf",
+  [EntityType.Console]: "models/synty-gltf/SM_Computer.glb",
+  [EntityType.RepairCradle]: "models/synty-gltf/SM_Laboratory_Table.glb",
 };
 
 // ── BrowserDisplay3D ─────────────────────────────────────────────
@@ -526,19 +556,29 @@ export class BrowserDisplay3D implements IGameDisplay {
     // This shares the same HTML-rendering logic as BrowserDisplay.
     // We duplicate the essential parts here so display3d.ts is self-contained.
 
-    let sensorTag = "";
-    if (this.sensorMode === SensorType.Thermal) {
-      sensorTag = " <span class='thermal-active'>[THERMAL]</span>";
-    } else if (this.sensorMode === SensorType.Cleanliness) {
-      sensorTag = " <span class='thermal-active'>[CLEANLINESS]</span>";
-    } else if (this.sensorMode === SensorType.Atmospheric) {
-      sensorTag = " <span class='thermal-active'>[ATMOSPHERIC]</span>";
-    }
+    // Sensor mode tag
+    const sensorNames: Record<string, string> = {
+      [SensorType.Thermal]: "THERMAL",
+      [SensorType.Cleanliness]: "CLEANLINESS",
+      [SensorType.Atmospheric]: "ATMOSPHERIC",
+    };
+    const sensorTag = this.sensorMode
+      ? ` <span class='thermal-active'>[${sensorNames[this.sensorMode] ?? this.sensorMode.toUpperCase()}]</span>`
+      : "";
 
-    // Objective
+    // Objective with phase indicator
     const objective = this.getObjective(state);
+    const phaseLabels: Record<string, { label: string; color: string }> = {
+      [ObjectivePhase.Clean]: { label: "MAINTENANCE", color: "#4a4" },
+      [ObjectivePhase.Investigate]: { label: "INVESTIGATION", color: "#fa0" },
+      [ObjectivePhase.Recover]: { label: "RECOVERY", color: "#f44" },
+      [ObjectivePhase.Evacuate]: { label: "EVACUATION", color: "#f0f" },
+    };
+    const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
+    const phaseInfo = phaseLabels[phase] ?? { label: "UNKNOWN", color: "#888" };
+    const phaseTag = `<span style="color:${phaseInfo.color};font-weight:bold;font-size:11px;letter-spacing:1px">[${phaseInfo.label}]</span> `;
     const objectiveHtml = `<div class="objective-panel">` +
-      `<span class="objective-label">OBJECTIVE:</span> ` +
+      `${phaseTag}<span class="objective-label">OBJECTIVE:</span> ` +
       `<span class="objective-text">${this.escapeHtml(objective.text)}</span>` +
       `<br><span class="objective-detail">${this.escapeHtml(objective.detail)}</span>` +
       `</div>`;
@@ -549,7 +589,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       const nearby = this.getAdjacentInteractables(state);
       if (nearby.length > 0) {
         const target = nearby[0];
-        const name = ENTITY_NAMES[target.type] || target.type;
+        const name = entityDisplayName(target);
         interactHint = `<span class="interact-hint"> ▸ [i] ${this.escapeHtml(name)}</span>`;
       }
     }
@@ -560,7 +600,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       const nearbyEnts = this.getNearbyEntities(state, 3);
       if (nearbyEnts.length > 0) {
         const items = nearbyEnts.slice(0, 4).map(n => {
-          const name = ENTITY_NAMES[n.entity.type] || n.entity.type;
+          const name = entityDisplayName(n.entity);
           const color = ENTITY_COLORS_CSS[n.entity.type] || "#aaa";
           return `<span style="color:${color}">${this.escapeHtml(name)}</span> <span class="label">(${n.dist} tile${n.dist > 1 ? "s" : ""} ${n.dir})</span>`;
         });
@@ -570,8 +610,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Status bar
     const room = this.getPlayerRoom(state);
+    const zoneTag = room?.zone ? ` <span class="label">[${this.escapeHtml(room.zone)}]</span>` : "";
     const roomLabel = room
-      ? ` | <span class="value">${this.escapeHtml(room.name)}</span>`
+      ? ` | <span class="value">${this.escapeHtml(room.name)}</span>${zoneTag}`
       : "";
 
     const hpPercent = Math.round((state.player.hp / state.player.maxHp) * 100);
@@ -580,41 +621,49 @@ export class BrowserDisplay3D implements IGameDisplay {
     const filledBlocks = Math.round((state.player.hp / state.player.maxHp) * hpBarWidth);
     const emptyBlocks = hpBarWidth - filledBlocks;
     const hpBar = "\u2588".repeat(filledBlocks) + "\u2591".repeat(emptyBlocks);
-    const hpTag = ` | <span class="label">HP:</span><span style="color:${hpColor}">${hpBar} ${state.player.hp}/${state.player.maxHp}</span>`;
+    const hpCriticalClass = hpPercent <= 25 ? " hp-critical" : "";
+    const hpWarning = hpPercent <= 25 ? " \u26a0 CRITICAL" : hpPercent <= 50 ? " \u26a0" : "";
+    const hpTag = ` | <span class="label">HP:</span><span class="${hpCriticalClass}" style="color:${hpColor}">${hpBar} ${state.player.hp}/${state.player.maxHp}${hpWarning}</span>`;
+
+    // Stun indicator
+    const stunTag = state.player.stunTurns > 0
+      ? ` | <span style="color:#44f; font-weight:bold">\u26a1 STUNNED (${state.player.stunTurns})</span>`
+      : "";
 
     const unreadCount = state.logs.filter(l => l.read === false).length;
     const unreadTag = unreadCount > 0
       ? ` | <span style="color:#ca8">[${unreadCount} UNREAD]</span>`
       : "";
 
-    // Discovery counter
-    let totalDiscoverables = 0;
-    let discovered = 0;
-    for (const [, entity] of state.entities) {
-      if (entity.type === EntityType.CrewItem && entity.props["hidden"] !== true) {
-        totalDiscoverables++;
-        if (entity.props["examined"] === true) discovered++;
+    // Discovery counter (shared utility)
+    const disc = getDiscoveries(state);
+    const discoveryTag = ` | <span class="label">Discoveries:</span> <span style="color:#ca8">${disc.discovered}/${disc.total}</span>`;
+
+    // Evidence & deduction progress
+    let evidenceTag = "";
+    let deductionTag = "";
+    if (state.mystery) {
+      const jCount = state.mystery.journal.length;
+      if (jCount > 0) {
+        evidenceTag = ` | <span class="label">Evidence:</span> <span style="color:#6cf">${jCount}</span>`;
       }
-      if (entity.type === EntityType.LogTerminal) {
-        totalDiscoverables++;
-        if (state.logs.some(l => l.id === `log_terminal_${entity.id}`)) discovered++;
-      }
-    }
-    for (const [, entity] of state.entities) {
-      if (entity.type === EntityType.CrewItem && entity.props["hidden"] === true) {
-        if (entity.props["revealed"] === true) {
-          totalDiscoverables++;
-          if (entity.props["examined"] === true) discovered++;
+      const deductions = state.mystery.deductions ?? [];
+      const unlocked = getUnlockedDeductions(deductions, state.mystery.journal);
+      if (deductions.length > 0) {
+        const correct = deductions.filter(d => d.answeredCorrectly).length;
+        const solved = deductions.filter(d => d.solved).length;
+        deductionTag = ` | <span class="label">Deductions:</span> <span style="color:#fa0">${correct}/${solved}</span>`;
+        if (unlocked.length > 0) {
+          deductionTag += ` <span style="color:#ff0">[${unlocked.length} NEW]</span>`;
         }
       }
     }
-    const discoveryTag = ` | <span class="label">Discoveries:</span> <span style="color:#ca8">${discovered}/${totalDiscoverables}</span>`;
 
     const statusHtml = `<div class="status-bar">` +
       `<span class="label">T:</span><span class="value">${state.turn}</span>` +
-      roomLabel + sensorTag +
+      roomLabel + sensorTag + stunTag +
       `<br>` + hpTag.replace(/ \| /, '') +
-      `<br>` + discoveryTag.replace(/ \| /, '') + unreadTag.replace(/ \| /g, '') +
+      `<br>` + discoveryTag.replace(/ \| /, '') + evidenceTag.replace(/ \| /, '') + deductionTag.replace(/ \| /, '') + unreadTag.replace(/ \| /g, '') +
       interactHint +
       `</div>`;
 
@@ -719,6 +768,24 @@ export class BrowserDisplay3D implements IGameDisplay {
         mesh.scale.set(scale, scale, scale);
       } else if (userData.entityType === EntityType.Drone) {
         mesh.position.y = 0.6 + Math.sin(elapsed * 2 + mesh.position.x) * 0.08;
+      } else if (userData.entityType === EntityType.EscapePod) {
+        // Slow pulsing glow
+        const podScale = 1 + Math.sin(elapsed * 1.2) * 0.04;
+        mesh.scale.set(podScale, podScale, podScale);
+      } else if (userData.entityType === EntityType.CrewNPC) {
+        // Subtle idle sway
+        mesh.rotation.y = Math.sin(elapsed * 0.8 + mesh.position.x * 2) * 0.15;
+      } else if (userData.entityType === EntityType.Console) {
+        // Screen flicker: subtle Y-scale jitter on the group
+        mesh.children.forEach(child => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
+            child.material.opacity = 0.2 + Math.sin(elapsed * 8 + mesh.position.x) * 0.15;
+          }
+        });
+      } else if (userData.entityType === EntityType.UtilityPickup) {
+        // Gentle float
+        const ud = mesh.userData as { baseY?: number };
+        mesh.position.y = (ud.baseY ?? 0.1) + Math.sin(elapsed * 2.5 + mesh.position.z) * 0.06;
       }
     }
 
@@ -1148,6 +1215,110 @@ export class BrowserDisplay3D implements IGameDisplay {
         lid.rotation.x = -0.3;
         group.add(box, lid);
         baseY = 0.1;
+        break;
+      }
+      case EntityType.EscapePod: {
+        // Capsule shape: cylinder body + hemisphere ends
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.5, 8), glowMat);
+        body.rotation.z = Math.PI / 2;
+        const topCap = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+          glowMat);
+        topCap.rotation.z = Math.PI / 2;
+        topCap.position.x = 0.25;
+        const bottomCap = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+          glowMat);
+        bottomCap.rotation.z = -Math.PI / 2;
+        bottomCap.position.x = -0.25;
+        const window = new THREE.Mesh(new THREE.CircleGeometry(0.12, 8),
+          new THREE.MeshBasicMaterial({ color: 0x88ffcc, transparent: true, opacity: 0.6 }));
+        window.position.set(0, 0.15, 0.2);
+        group.add(body, topCap, bottomCap, window);
+        baseY = 0.3;
+        break;
+      }
+      case EntityType.CrewNPC: {
+        // Humanoid silhouette: cylinder body + sphere head
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.4, 8), glowMat);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6),
+          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.2 }));
+        head.position.y = 0.3;
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.04),
+          new THREE.MeshBasicMaterial({ color: 0x44ccff }));
+        visor.position.set(0, 0.3, 0.09);
+        group.add(torso, head, visor);
+        baseY = 0.25;
+        break;
+      }
+      case EntityType.Airlock: {
+        // Large door frame with warning stripes
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.1),
+          new THREE.MeshLambertMaterial({ color: 0x556688 }));
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.12),
+          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.3 }));
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.11),
+          new THREE.MeshBasicMaterial({ color: 0xffaa00 }));
+        stripe.position.y = 0.5;
+        group.add(frame, panel, stripe);
+        baseY = 0.6;
+        break;
+      }
+      case EntityType.ToolPickup: {
+        // Small tool box
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.2), glowMat);
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.03),
+          new THREE.MeshLambertMaterial({ color: 0x888888 }));
+        handle.position.y = 0.09;
+        const indicator = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 4),
+          new THREE.MeshBasicMaterial({ color }));
+        indicator.position.set(0.1, 0.06, 0.11);
+        group.add(box, handle, indicator);
+        baseY = 0.1;
+        break;
+      }
+      case EntityType.UtilityPickup: {
+        // Glowing utility orb on a small stand
+        const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.1, 6),
+          new THREE.MeshLambertMaterial({ color: 0x666666 }));
+        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8),
+          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 }));
+        orb.position.y = 0.2;
+        group.add(stand, orb);
+        baseY = 0.1;
+        break;
+      }
+      case EntityType.Console: {
+        // Angled screen on a stand
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.3),
+          new THREE.MeshLambertMaterial({ color: 0x444455 }));
+        const screen = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.03),
+          new THREE.MeshLambertMaterial({ color: 0x112233, emissive: color, emissiveIntensity: 0.5 }));
+        screen.position.set(0, 0.25, 0.12);
+        screen.rotation.x = -0.3;
+        const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.22),
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3 }));
+        glow.position.set(0, 0.25, 0.14);
+        glow.rotation.x = -0.3;
+        group.add(base, screen, glow);
+        baseY = 0.2;
+        break;
+      }
+      case EntityType.RepairCradle: {
+        // Flat platform with mechanical arms
+        const platform = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.08, 0.5), glowMat);
+        const arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.35, 0.04),
+          new THREE.MeshLambertMaterial({ color: 0x888888 }));
+        arm1.position.set(-0.25, 0.2, 0);
+        const arm2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.35, 0.04),
+          new THREE.MeshLambertMaterial({ color: 0x888888 }));
+        arm2.position.set(0.25, 0.2, 0);
+        const clamp1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.12),
+          new THREE.MeshLambertMaterial({ color }));
+        clamp1.position.set(-0.25, 0.38, 0);
+        const clamp2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.12),
+          new THREE.MeshLambertMaterial({ color }));
+        clamp2.position.set(0.25, 0.38, 0);
+        group.add(platform, arm1, arm2, clamp1, clamp2);
+        baseY = 0.05;
         break;
       }
       default: {
@@ -1611,54 +1782,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   private getObjective(state: GameState): { text: string; detail: string } {
-    if (state.gameOver) {
-      return state.victory
-        ? { text: "MISSION COMPLETE", detail: "Transmission sent. The crew's work survives." }
-        : { text: "CONNECTION LOST", detail: "Refresh to try again." };
-    }
-
-    const hasThermal = state.player.sensors?.includes(SensorType.Thermal) ?? false;
-    const sensorExists = Array.from(state.entities.values()).some(e => e.type === EntityType.SensorPickup);
-
-    let totalRelays = 0;
-    let activatedRelays = 0;
-    for (const [, e] of state.entities) {
-      if (e.type === EntityType.Relay && e.props["locked"] !== true) {
-        totalRelays++;
-        if (e.props["activated"] === true) activatedRelays++;
-      }
-    }
-    const remaining = totalRelays - activatedRelays;
-    const hasLockedDoor = state.tiles.some(row => row.some(t => t.type === TileType.LockedDoor));
-
-    if (!hasThermal && sensorExists) {
-      return {
-        text: "Step 1: Find the Thermal Sensor",
-        detail: "Explore rooms until you find the cyan S glyph. Walk next to it and press [i] to equip it.",
-      };
-    }
-    if (!hasThermal && !sensorExists) {
-      return { text: "Explore the station", detail: "Search rooms for useful equipment." };
-    }
-
-    if (remaining > 0) {
-      return {
-        text: `Step 2: Reroute ${remaining} overheating relay${remaining > 1 ? "s" : ""}`,
-        detail: `Press [t] to toggle thermal vision — hot zones glow red. Find the yellow R relays and press [i] next to each one. ${activatedRelays}/${totalRelays} done.`,
-      };
-    }
-
-    if (hasLockedDoor) {
-      return {
-        text: "Step 3: Reach the Data Core",
-        detail: "All relays rerouted but door is still locked. Look for another way in.",
-      };
-    }
-
-    return {
-      text: "Step 3: Transmit from the Data Core",
-      detail: "The locked door (X) is now open. Find the magenta D and press [i] to transmit the research data.",
-    };
+    return getObjectiveShared(state);
   }
 
   private escapeHtml(text: string): string {
