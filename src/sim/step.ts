@@ -2503,6 +2503,8 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           const engineerLast = next.mystery.crew.find(c => c.role === CrewRole.Engineer)?.lastName ?? "the engineer";
           const captainLast = next.mystery.crew.find(c => c.role === CrewRole.Captain)?.lastName ?? "the captain";
           const scientistLast = next.mystery.crew.find(c => c.role === CrewRole.Scientist)?.lastName ?? "the scientist";
+          const medicLast = next.mystery.crew.find(c => c.role === CrewRole.Medic)?.lastName ?? "the medic";
+          const securityLast = next.mystery.crew.find(c => c.role === CrewRole.Security)?.lastName ?? "security";
           // Key crew members give first-person accounts instead of third-person references
           const crewLast = crewLastName;
           const crewRole = target.props["role"] as string || "";
@@ -2516,7 +2518,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
               ? selfFn(crewName)
               : { text: `${crewName}: "I was there. I know what happened. The terminal logs have the details — but I can tell you, it wasn't an accident."`, summary: `Crew testimony: ${crewName} confirms the incident was not accidental` };
           } else {
-            testimony = testimonyFn(crewName, engineerLast, captainLast, scientistLast);
+            testimony = testimonyFn(crewName, engineerLast, captainLast, scientistLast, medicLast, securityLast);
           }
 
           // Mark as questioned
@@ -3279,6 +3281,72 @@ function handleScan(state: GameState): GameState {
         next.mystery = { ...next.mystery, triggeredEchoes: newEchoes };
       }
     }
+  }
+
+  // ── Atmospheric Active Scan: pressure summary + breach direction ──
+  if (sensors.includes(SensorType.Atmospheric) && scanRoom) {
+    // Count low-pressure tiles in the room
+    let lowPressureTiles = 0;
+    let totalTiles = 0;
+    let avgPressure = 0;
+    let nearestBreach: Entity | null = null;
+    let nearestBreachDist = Infinity;
+    for (let ry = scanRoom.y; ry < scanRoom.y + scanRoom.height; ry++) {
+      for (let rx = scanRoom.x; rx < scanRoom.x + scanRoom.width; rx++) {
+        const tile = next.tiles[ry]?.[rx];
+        if (!tile || tile.type === TileType.Wall) continue;
+        totalTiles++;
+        avgPressure += tile.pressure;
+        if (tile.pressure < 60) lowPressureTiles++;
+      }
+    }
+    avgPressure = totalTiles > 0 ? Math.round(avgPressure / totalTiles) : 100;
+
+    // Find nearest breach entity
+    for (const [, entity] of next.entities) {
+      if (entity.type !== EntityType.Breach) continue;
+      if (entity.props["sealed"] === true) continue;
+      const d = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+      if (d < nearestBreachDist) {
+        nearestBreachDist = d;
+        nearestBreach = entity;
+      }
+    }
+
+    // Build atmospheric summary log
+    const pressureParts: string[] = [];
+    if (avgPressure >= 90) {
+      pressureParts.push("[ATMOSPHERIC] Room pressure nominal — no decompression detected.");
+    } else if (avgPressure >= 60) {
+      pressureParts.push(`[ATMOSPHERIC] Room pressure reduced (${avgPressure}%). ${lowPressureTiles} low-pressure tile${lowPressureTiles !== 1 ? "s" : ""} detected.`);
+    } else {
+      pressureParts.push(`[ATMOSPHERIC] WARNING — Room pressure critical (${avgPressure}%). ${lowPressureTiles} decompressed tile${lowPressureTiles !== 1 ? "s" : ""}.`);
+    }
+    if (nearestBreach) {
+      const dx = nearestBreach.pos.x - px;
+      const dy = nearestBreach.pos.y - py;
+      const dir = dx > 0 ? (dy > 0 ? "southeast" : dy < 0 ? "northeast" : "east") :
+                  dx < 0 ? (dy > 0 ? "southwest" : dy < 0 ? "northwest" : "west") :
+                  dy > 0 ? "south" : "north";
+      pressureParts.push(`Hull breach detected ${Math.round(nearestBreachDist)} tiles to the ${dir}.`);
+    }
+
+    next.logs = [
+      ...next.logs,
+      {
+        id: `log_atmo_scan_${state.turn}`,
+        timestamp: state.turn,
+        source: "sensor",
+        text: pressureParts.join(" "),
+        read: false,
+      },
+    ];
+
+    // Set atmospheric scan pulse milestone for display rendering
+    // Encode the turn into the milestone key so display can check recency
+    const newMilestones = new Set(next.milestones);
+    newMilestones.add(`atmospheric_scan_pulse_${state.turn}`);
+    next = { ...next, milestones: newMilestones };
   }
 
   // ── Sensor Clues: sensor-specific environmental evidence ──

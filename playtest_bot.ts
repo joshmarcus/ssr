@@ -8,14 +8,139 @@ import { isValidAction, hasUnlockedDoorAt, isAutoSealedBulkhead } from "./src/si
 import { getUnlockedDeductions, generateEvidenceTags } from "./src/sim/deduction.js";
 import { getRoomCleanliness, getRoomAt } from "./src/sim/rooms.js";
 import { isEntityExhausted } from "./src/shared/ui.js";
-import type { GameState, Action, Position, Entity, Direction } from "./src/shared/types.js";
+import type { GameState, Action, Position, Entity, Direction, Deduction, JournalEntry } from "./src/shared/types.js";
 import { ActionType, EntityType, ObjectivePhase, Difficulty } from "./src/shared/types.js";
 
 const SEED = parseInt(process.argv[2] || "42", 10);
 const diffArg = process.argv[3] || "normal";
+const NARRATIVE_MODE = process.argv.includes("--narrative");
 const DIFFICULTY: Difficulty = diffArg === "easy" ? Difficulty.Easy
   : diffArg === "hard" ? Difficulty.Hard
   : Difficulty.Normal;
+
+// ── Narrative Reasoning Mode ──────────────────────────────────
+// Instead of reading the `correct` flag, score each option by how many
+// journal-entry keywords overlap with the option text. This simulates
+// a player who reads the evidence and tries to match it to the answer.
+
+interface NarrativeResult {
+  deductionId: string;
+  question: string;
+  chosenKey: string;
+  chosenLabel: string;
+  oracleKey: string;  // what `correct` flag says
+  oracleLabel: string;
+  wasCorrect: boolean;
+  reasoning: string;  // why the bot picked this option
+  scores: Array<{ key: string; label: string; score: number; topMatches: string[] }>;
+}
+const narrativeResults: NarrativeResult[] = [];
+
+/**
+ * Score a deduction option by how well the journal evidence supports it.
+ * Returns a numeric score and the top matching keywords.
+ */
+function scoreOptionByNarrative(
+  optionLabel: string,
+  journal: JournalEntry[],
+): { score: number; topMatches: string[] } {
+  // Extract significant words from the option (3+ chars, not stop words)
+  const stopWords = new Set([
+    "the", "and", "was", "for", "that", "this", "with", "from", "they", "had",
+    "have", "has", "not", "been", "were", "are", "but", "its", "into", "who",
+    "which", "their", "them", "when", "what", "how", "all", "each", "than",
+    "any", "she", "his", "her", "him", "did", "will", "could", "should",
+    "would", "about", "just", "over", "also", "after", "before", "during",
+    "between", "through", "because", "while", "single", "person", "access",
+    "opportunity",
+  ]);
+  const optionWords = optionLabel.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !stopWords.has(w));
+
+  // Also extract multi-word phrases (2-3 word ngrams)
+  const optionLower = optionLabel.toLowerCase();
+  const phrases: string[] = [];
+  const phrasePatterns = [
+    // Key narrative phrases that distinguish options
+    "coolant cascade", "thermal cascade", "hull breach", "reactor scram",
+    "power surge", "micro-meteorite", "alien organism", "classified",
+    "scuttle order", "deliberate", "sabotage", "signal anomaly",
+    "first contact", "unauthorized", "containment", "deferred maintenance",
+    "manufacturing", "software", "external impact", "crew split",
+    "faction", "barricade", "lockdown", "life support",
+    "data core", "self-preservation", "predator", "organism",
+    "biological", "cargo", "forensic", "tool marks",
+    "cover-up", "suppressed", "falsified", "warnings",
+  ];
+  for (const phrase of phrasePatterns) {
+    if (optionLower.includes(phrase)) phrases.push(phrase);
+  }
+
+  let score = 0;
+  const topMatches: string[] = [];
+
+  // Score by journal content overlap
+  for (const entry of journal) {
+    const entryText = (entry.detail + " " + entry.summary).toLowerCase();
+
+    // Word matches (1 point each, but only first match per word across all entries)
+    for (const word of optionWords) {
+      if (entryText.includes(word)) {
+        score += 1;
+        if (topMatches.length < 6 && !topMatches.includes(word)) {
+          topMatches.push(word);
+        }
+      }
+    }
+
+    // Phrase matches (3 points each — much more signal)
+    for (const phrase of phrases) {
+      if (entryText.includes(phrase)) {
+        score += 3;
+        if (topMatches.length < 6 && !topMatches.includes(phrase)) {
+          topMatches.push(`"${phrase}"`);
+        }
+      }
+    }
+  }
+
+  return { score, topMatches };
+}
+
+/**
+ * Pick the best answer to a deduction using only journal text, not the `correct` flag.
+ */
+function narrativePickAnswer(
+  ded: Deduction,
+  journal: JournalEntry[],
+): { key: string; reasoning: string; scores: NarrativeResult["scores"] } {
+  const scores = ded.options.map(opt => {
+    const { score, topMatches } = scoreOptionByNarrative(opt.label, journal);
+    return { key: opt.key, label: opt.label, score, topMatches };
+  });
+
+  // Sort by score descending
+  scores.sort((a, b) => b.score - a.score);
+
+  const best = scores[0];
+  const runnerUp = scores[1];
+  const margin = best.score - (runnerUp?.score ?? 0);
+
+  let reasoning: string;
+  if (best.score === 0) {
+    reasoning = "No keyword matches — guessing first option";
+  } else if (margin === 0) {
+    reasoning = `Tie (score ${best.score}) — picking first tied option`;
+  } else if (margin <= 2) {
+    reasoning = `Narrow win (${best.score} vs ${runnerUp.score}) — keywords: ${best.topMatches.join(", ")}`;
+  } else {
+    reasoning = `Clear signal (${best.score} vs ${runnerUp?.score ?? 0}) — keywords: ${best.topMatches.join(", ")}`;
+  }
+
+  return { key: best.key, reasoning, scores };
+}
 
 const DIRS: Array<{ dir: Direction; dx: number; dy: number }> = [
   { dir: "north" as Direction, dx: 0, dy: -1 },
@@ -254,7 +379,31 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
     if (unlocked.length > 0) {
       const ded = unlocked[0];
-      // Pick the correct answer if we can figure it out, otherwise the first option
+
+      if (NARRATIVE_MODE) {
+        // Narrative reasoning: pick answer by journal text matching, not `correct` flag
+        const { key, reasoning, scores } = narrativePickAnswer(ded, state.mystery.journal);
+        const oracleOpt = ded.options.find(o => o.correct) ?? ded.options[0];
+        const chosenOpt = ded.options.find(o => o.key === key) ?? ded.options[0];
+        narrativeResults.push({
+          deductionId: ded.id,
+          question: ded.question,
+          chosenKey: key,
+          chosenLabel: chosenOpt.label,
+          oracleKey: oracleOpt.key,
+          oracleLabel: oracleOpt.label,
+          wasCorrect: key === oracleOpt.key,
+          reasoning,
+          scores,
+        });
+        return {
+          type: ActionType.SubmitDeduction,
+          deductionId: ded.id,
+          answerKey: key,
+        };
+      }
+
+      // Oracle mode: pick the correct answer directly
       const correctOpt = ded.options.find(o => o.correct) ?? ded.options[0];
       return {
         type: ActionType.SubmitDeduction,
@@ -923,6 +1072,49 @@ if (evac && evac.active) {
 if (issueLog.length > 0) {
   console.log("\nIssues detected:");
   for (const issue of [...new Set(issueLog)]) console.log(`  ${issue}`);
+}
+
+// ── Narrative Reasoning Report ──────────────────────────────
+if (NARRATIVE_MODE && narrativeResults.length > 0) {
+  console.log("\n" + "=".repeat(70));
+  console.log("NARRATIVE REASONING REPORT");
+  console.log("(Bot picked answers by matching journal text to options, NOT using correct flag)");
+  console.log("=".repeat(70));
+
+  const correctCount = narrativeResults.filter(r => r.wasCorrect).length;
+  console.log(`\nAccuracy: ${correctCount}/${narrativeResults.length} (${Math.round(correctCount / narrativeResults.length * 100)}%)`);
+
+  for (const result of narrativeResults) {
+    console.log(`\n--- ${result.deductionId}: "${result.question}" ---`);
+    console.log(`  Bot chose: ${result.chosenLabel}`);
+    if (!result.wasCorrect) {
+      console.log(`  WRONG — Oracle answer: ${result.oracleLabel}`);
+    } else {
+      console.log(`  CORRECT`);
+    }
+    console.log(`  Reasoning: ${result.reasoning}`);
+    console.log(`  Score breakdown:`);
+    for (const s of result.scores) {
+      const marker = s.key === result.chosenKey ? " <<<" : s.key === result.oracleKey ? " (oracle)" : "";
+      console.log(`    [${String(s.score).padStart(3)}] ${s.label.slice(0, 80)}${marker}`);
+      if (s.topMatches.length > 0) {
+        console.log(`          matches: ${s.topMatches.join(", ")}`);
+      }
+    }
+  }
+
+  // Summary of which deduction tiers are easy/hard for narrative reasoning
+  console.log(`\n--- SUMMARY ---`);
+  const byTier = new Map<string, { correct: number; total: number }>();
+  for (const r of narrativeResults) {
+    const tier = byTier.get(r.deductionId) ?? { correct: 0, total: 0 };
+    tier.total++;
+    if (r.wasCorrect) tier.correct++;
+    byTier.set(r.deductionId, tier);
+  }
+  for (const [id, { correct: c, total: t }] of byTier) {
+    console.log(`  ${id}: ${c}/${t} correct`);
+  }
 }
 
 process.exit(state.victory ? 0 : 1);

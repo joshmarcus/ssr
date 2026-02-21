@@ -436,6 +436,148 @@ export const LOG_TEMPLATES: LogTemplate[] = [
     source: "{comms_last}",
   },
 
+  // ── Breadcrumb logs (archetype-specific deduction keywords) ──────
+  // Each archetype gets 3 templates containing 1-2 keywords from the correct
+  // deduction_what answer. Players need 2-3 of these to assemble the full picture.
+
+  // CoolantCascade: "coolant system failure", "thermal cascade", "relay network"
+  {
+    id: "breadcrumb_coolant_1",
+    category: "maintenance",
+    title: "Coolant Diagnostic Summary",
+    text: "DIAGNOSTIC: Coolant system failure detected in loop B. Flow rate dropped to zero before junction P03 tripped. {engineer_last} flagged this weeks ago.",
+    source: "system",
+  },
+  {
+    id: "breadcrumb_coolant_2",
+    category: "warning",
+    title: "Thermal Cascade Propagation",
+    text: "{engineer}: The thermal cascade has reached junctions P02 through P05. Each failed relay feeds heat to the next. This was preventable.",
+    source: "{engineer_last}",
+  },
+  {
+    id: "breadcrumb_coolant_3",
+    category: "emergency",
+    title: "Relay Network Status",
+    text: "AUTOMATED: Relay network thermal tolerance exceeded across 4 junctions. Coolant loop B offline. Cascade propagation continues unchecked.",
+    source: "system",
+  },
+
+  // HullBreach: "hull integrity", "depressurization", "multiple sections"
+  {
+    id: "breadcrumb_hull_1",
+    category: "hull_breach",
+    title: "Hull Integrity Assessment",
+    text: "{engineer}: Hull integrity in section 4 has fallen below critical threshold. Micro-fracture propagation accelerating. We need emergency reinforcement NOW.",
+    source: "{engineer_last}",
+  },
+  {
+    id: "breadcrumb_hull_2",
+    category: "hull_breach",
+    title: "Depressurization Event Log",
+    text: "EMERGENCY: Rapid depressurization detected. Atmospheric pressure dropping at 8 kPa/min. Emergency bulkheads deploying — some failing to seal.",
+    source: "system",
+  },
+  {
+    id: "breadcrumb_hull_3",
+    category: "hull_breach",
+    title: "Multi-Section Pressure Loss",
+    text: "{life_support}: Pressure loss spreading to multiple sections. The breach wavefront is outpacing the bulkhead response. We're losing atmosphere in three zones simultaneously.",
+    source: "{life_support_last}",
+  },
+
+  // ReactorScram: "emergency shutdown", "containment failure", "reactor"
+  {
+    id: "breadcrumb_reactor_1",
+    category: "reactor_scram",
+    title: "Emergency Shutdown Sequence",
+    text: "AUTOMATED: Reactor emergency shutdown initiated. SCRAM sequence completed in 4.7 seconds. All control rods inserted. Core temperature dropping.",
+    source: "system",
+  },
+  {
+    id: "breadcrumb_reactor_2",
+    category: "reactor_scram",
+    title: "Containment Failure Analysis",
+    text: "{scientist}: Containment failure was not gradual — the field dropped from 91% to 73% in under a minute. The reactor's own diagnostic triggered the response.",
+    source: "{scientist_last}",
+  },
+  {
+    id: "breadcrumb_reactor_3",
+    category: "reactor_scram",
+    title: "Reactor Status — Post-SCRAM",
+    text: "{engineer}: Reactor core is stable at subcritical levels. The containment field degradation preceded the emergency shutdown. The core protected itself.",
+    source: "{engineer_last}",
+  },
+
+  // Sabotage: "deliberately sabotaged", "systematic", "someone aboard"
+  {
+    id: "breadcrumb_sabotage_1",
+    category: "confrontation",
+    title: "Junction Damage Assessment",
+    text: "{engineer}: These junctions weren't just damaged — they were deliberately sabotaged. The wiring was cut in a specific sequence to maximize disruption.",
+    source: "{engineer_last}",
+  },
+  {
+    id: "breadcrumb_sabotage_2",
+    category: "confrontation",
+    title: "Pattern Analysis",
+    text: "{security}: The failures are systematic — each junction disabled in order, radiating from cargo bay 3. This isn't random. This is methodical.",
+    source: "{security_last}",
+  },
+  {
+    id: "breadcrumb_sabotage_3",
+    category: "confrontation",
+    title: "Internal Threat Assessment",
+    text: "{security}: No external access points were breached. Whatever did this is someone — or something — aboard this station. The threat is inside.",
+    source: "{security_last}",
+  },
+
+  // SignalAnomaly: "anomalous signal", "external signal", "system interference"
+  {
+    id: "breadcrumb_signal_1",
+    category: "signal_anomaly",
+    title: "Anomalous Signal Report",
+    text: "{comms}: The anomalous signal on 7.4GHz has been active for 72 hours. Structured, repeating, definitely not natural background noise.",
+    source: "{comms_last}",
+  },
+  {
+    id: "breadcrumb_signal_2",
+    category: "signal_anomaly",
+    title: "External Signal Source Analysis",
+    text: "{scientist}: Triangulation confirms the signal originates from an external source — beyond the station, beyond the local debris field. Something out there is transmitting.",
+    source: "{scientist_last}",
+  },
+  {
+    id: "breadcrumb_signal_3",
+    category: "signal_anomaly",
+    title: "System Interference Report",
+    text: "AUTOMATED: System interference escalating across all subsystems. Navigation, medical, environmental — every networked system showing anomalous behavior correlated with the signal.",
+    source: "system",
+  },
+
+  // Mutiny: "factions", "disabled life support", "contested sections"
+  {
+    id: "breadcrumb_mutiny_1",
+    category: "aftermath",
+    title: "Crew Division Report",
+    text: "{medic}: The crew has split into factions. Research team on one side, security detail on the other. The barricades went up within an hour of the transmission.",
+    source: "{medic_last}",
+  },
+  {
+    id: "breadcrumb_mutiny_2",
+    category: "aftermath",
+    title: "Life Support Override Log",
+    text: "ALERT: Life support disabled in research wing via security terminal override. Manual restart attempted from inside — blocked by remote lockout. Someone is using air as a weapon.",
+    source: "system",
+  },
+  {
+    id: "breadcrumb_mutiny_3",
+    category: "aftermath",
+    title: "Contested Sections Status",
+    text: "{captain}: Three contested sections — research wing, bridge, and cargo hold. Neither faction controls all of them. Crew are trapped between barricades in the corridors.",
+    source: "{captain_last}",
+  },
+
   // ── Relationship-revealing logs ─────────────────────────────────
   {
     id: "rel_ally_support",

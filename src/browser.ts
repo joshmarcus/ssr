@@ -1,5 +1,6 @@
 import { generate } from "./sim/procgen.js";
 import { step, applyDeductionReward as applyDeductionRewardSim } from "./sim/step.js";
+import { STORY_ROLES } from "./sim/deduction.js";
 import { BrowserDisplay } from "./render/display.js";
 import type { IGameDisplay } from "./render/displayInterface.js";
 import type { LogType } from "./render/display.js";
@@ -536,9 +537,11 @@ function checkRoomEntry(): void {
           } else if (beatIdx === 1) {
             display.addLog(beats[1], "narrative");
           } else {
-            // Beat 3 uses crew data — find a relevant crew member for this archetype
+            // Beat 3 uses crew data — find the hero crew member for this archetype
             const crewAll = state.mystery.crew;
-            const central = crewAll.find(c => c.role === CrewRole.Engineer)
+            const heroRole = STORY_ROLES[arch]?.hero;
+            const central = (heroRole ? crewAll.find(c => c.role === heroRole) : null)
+              ?? crewAll.find(c => c.role === CrewRole.Engineer)
               ?? crewAll.find(c => c.role === CrewRole.Scientist)
               ?? crewAll[0];
             if (central) {

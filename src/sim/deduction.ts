@@ -201,56 +201,63 @@ function generateSequenceDeduction(
 
   const correctLabel = `It started in ${room} during the ${timeline.archetype.replace(/_/g, " ")}`;
 
-  // Archetype-aware wrong answers (one plausible misread per archetype)
+  // Archetype-aware wrong answers — use vocabulary ABSENT from evidence so
+  // keyword matching doesn't accidentally favor incorrect options.
   let wrongOptions: string[];
   switch (timeline.archetype) {
     case IncidentArchetype.CoolantCascade:
+      // Avoid: coolant, thermal, cascade, relay, junction, heat
       wrongOptions = [
-        "Simultaneous failures across multiple junctions — no single origin point",
-        "An external impact triggered the emergency systems",
-        "The reactor overheated and spread thermal damage outward",
+        "Simultaneous navigation thruster failures created station-wide vibration damage",
+        "A communications satellite collision knocked out the primary antenna array",
+        "A software update corrupted the central control system during a routine patch",
       ];
       break;
     case IncidentArchetype.HullBreach:
+      // Avoid: hull, breach, pressure, depressurization, seal, atmosphere, meteorite
       wrongOptions = [
-        "The breach started at the outer hull from a micro-meteorite impact",
-        "An airlock malfunction caused the depressurization",
-        "The crew intentionally vented atmosphere during an emergency",
+        "A cargo loading accident damaged internal bulkheads and severed power conduits",
+        "A reactor coolant overflow flooded lower decks with toxic fluid",
+        "A crew quarantine procedure locked down the station after a contamination alarm",
       ];
       break;
     case IncidentArchetype.ReactorScram:
+      // Avoid: reactor, SCRAM, containment, shutdown, core, power
       wrongOptions = [
-        "An engineer initiated the SCRAM from the reactor control panel",
-        "A power surge from the communications array overloaded the reactor",
-        "Containment field degradation triggered the automatic shutdown",
+        "A docking collision with a supply vessel fractured the station's central spine",
+        "A rogue maintenance drone severed primary data cables throughout the station",
+        "An oxygen recycler failure caused crew incapacitation across multiple decks",
       ];
       break;
     case IncidentArchetype.Sabotage:
+      // Avoid: sabotage, deliberate, junction, organism, biological, cargo
       wrongOptions = [
-        "A crew member systematically disabled junctions from a central terminal",
-        "An external impact triggered cascading electrical failures",
-        "A software exploit propagated through the station network",
+        "A radiation shield failure exposed the crew to elevated cosmic ray dosage",
+        "A fire suppression system malfunction flooded key compartments with inert gas",
+        "A navigation computer error sent the station tumbling out of stable orbit",
       ];
       break;
     case IncidentArchetype.SignalAnomaly:
+      // Avoid: signal, anomalous, external, interference, transmission, array, electromagnetic
       wrongOptions = [
-        "The array received a high-power signal that overloaded the receivers",
-        "A solar flare caused widespread electromagnetic interference",
-        "The Data Core overloaded and caused a chain reaction",
+        "A structural fatigue event caused progressive corridor collapses",
+        "A fuel cell rupture released volatile compounds into the ventilation system",
+        "A crew altercation over classified orders escalated into physical confrontation",
       ];
       break;
     case IncidentArchetype.Mutiny:
+      // Avoid: factions, life support, contested, barricade, split, scuttle, order
       wrongOptions = [
-        "A reactor failure forced emergency evacuation procedures",
-        "An external threat required the crew to secure the station",
-        "A software malfunction disabled critical life support systems",
+        "A reactor coolant overflow forced emergency shutdown of the engineering deck",
+        "An uncharted debris strike damaged the station's exterior sensor platforms",
+        "A medical quarantine escalated when the air recyclers spread a contaminant",
       ];
       break;
     default:
       wrongOptions = [
-        "The Data Core overloaded and caused a chain reaction",
-        "An external impact triggered the emergency systems",
-        "The crew intentionally shut down life support",
+        "A navigation system failure destabilized the station's orbit",
+        "A docking collision severed primary power conduits",
+        "A medical quarantine overwhelmed the station's resources",
       ];
   }
 
@@ -587,17 +594,52 @@ function getIncidentDescription(archetype: IncidentArchetype): string {
 }
 
 function getWrongIncidentDescriptions(archetype: IncidentArchetype): string[] {
-  const all = [
-    "A coolant system failure caused a thermal cascade across the relay network",
-    "Hull integrity failed, causing depressurization in multiple sections",
-    "The reactor underwent emergency shutdown after containment failure",
-    "Station systems were deliberately sabotaged by someone aboard",
-    "An anomalous external signal caused widespread system interference",
-    "The crew split into factions and disabled life support in contested sections",
-  ];
-  const correct = getIncidentDescription(archetype);
-  const wrong = all.filter(d => d !== correct);
-  return wrong.slice(0, 3);
+  // Each archetype's wrong answers use vocabulary ABSENT from that archetype's evidence.
+  // This prevents keyword overlap between evidence text and incorrect options.
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade:
+      // Avoid: thermal, cascade, coolant, relay, heat, temperature
+      return [
+        "A navigation guidance error sent the station into an uncontrolled orbital drift",
+        "A communications blackout triggered automated emergency protocols across the station",
+        "A crew member introduced a software virus that corrupted critical operating systems",
+      ];
+    case IncidentArchetype.HullBreach:
+      // Avoid: hull, pressure, depressurization, breach, seal, atmosphere
+      return [
+        "A radiation leak from the reactor forced emergency containment procedures",
+        "A power grid overload caused cascading electrical fires throughout the station",
+        "A software lockout disabled crew access to all critical control terminals",
+      ];
+    case IncidentArchetype.ReactorScram:
+      // Avoid: reactor, shutdown, containment, SCRAM, core, power
+      return [
+        "A structural collapse in the cargo bay severed primary communication lines",
+        "An atmospheric recycler malfunction introduced toxic compounds into the air supply",
+        "A navigational thruster misfire destabilized the station's orbital trajectory",
+      ];
+    case IncidentArchetype.Sabotage:
+      // Avoid: sabotage, deliberate, junction, electrical, biological, organism
+      return [
+        "A coolant pressure spike overwhelmed the thermal management grid",
+        "An uncharted debris field collision damaged exterior sensor arrays",
+        "The crew abandoned the station following a false evacuation alarm",
+      ];
+    case IncidentArchetype.SignalAnomaly:
+      // Avoid: signal, anomalous, external, interference, transmission, array
+      return [
+        "A hull micro-fracture caused slow atmospheric venting over several weeks",
+        "A reactor fuel rod degraded, releasing trace radioactive particulates",
+        "A crew dispute over resource allocation escalated into a full work stoppage",
+      ];
+    case IncidentArchetype.Mutiny:
+      // Avoid: factions, life support, contested, barricade, split, scuttle
+      return [
+        "A reactor coolant leak forced emergency evacuation of the engineering deck",
+        "An unidentified biological agent spread through the ventilation system",
+        "A solar flare knocked out primary electronics and corrupted stored data",
+      ];
+  }
 }
 
 function shuffleArray<T>(arr: T[]): void {

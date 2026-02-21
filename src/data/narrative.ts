@@ -139,30 +139,30 @@ export const CREW_ESCORT_ARC: Record<string, [(name: string) => string, (name: s
 // When player interacts with a following crew NPC, they provide a clue.
 // Each archetype has a pool of testimony lines that reference the incident.
 // The testimony includes crew-mentioning details that generate evidence tags.
-export const CREW_QUESTIONING_TESTIMONY: Record<string, (crewName: string, engineerLast: string, captainLast: string, scientistLast: string) => { text: string; summary: string }> = {
+export const CREW_QUESTIONING_TESTIMONY: Record<string, (crewName: string, engineerLast: string, captainLast: string, scientistLast: string, medicLast: string, securityLast: string) => { text: string; summary: string }> = {
   [IncidentArchetype.CoolantCascade]: (crewName, engineerLast) => ({
-    text: `${crewName}: "I saw ${engineerLast} filing a third maintenance request for the P03 relay — same junction, same thermal readings. Command rejected it every time. ${engineerLast} was right. The cascade started exactly where they said it would."`,
-    summary: `Crew testimony: ${engineerLast}'s rejected maintenance warnings`,
+    text: `${crewName}: "I saw ${engineerLast} filing a third maintenance request for the P03 relay — same junction, same thermal readings. Command rejected it every time. ${engineerLast} risked a formal reprimand to escalate it. ${engineerLast} was right. The cascade started exactly where they said it would."`,
+    summary: `Crew testimony: ${engineerLast} risked reprimand filing rejected maintenance warnings`,
   }),
-  [IncidentArchetype.HullBreach]: (crewName, _eng, captainLast) => ({
-    text: `${crewName}: "I was on night shift when the alarms should have gone off. They didn't. Someone suppressed hull monitoring in section 4 at 02:41 — only ${captainLast} had that override code. I didn't say anything then. I'm saying it now."`,
-    summary: `Crew testimony: alarm suppression at 02:41`,
+  [IncidentArchetype.HullBreach]: (crewName, _eng, captainLast, _sci, medicLast) => ({
+    text: `${crewName}: "I was on night shift when the alarms should have gone off. They didn't. Someone suppressed hull monitoring in section 4 at 02:41 — only ${captainLast} had that override code. When the breach hit, ${medicLast} shielded two crew members from the debris. ${medicLast} saved their lives."`,
+    summary: `Crew testimony: alarm suppression at 02:41, ${medicLast} saved crew`,
   }),
   [IncidentArchetype.ReactorScram]: (crewName, _eng, _cap, scientistLast) => ({
-    text: `${crewName}: "The data core was talking to itself. Not errors — conversation. ${scientistLast} showed me the logs, said the behavioral matrix was running inference loops it wasn't programmed for. Then the SCRAM hit, and ${scientistLast} said: 'It chose this.'"`,
-    summary: `Crew testimony: data core's autonomous SCRAM decision`,
+    text: `${crewName}: "The data core was talking to itself. Not errors — conversation. ${scientistLast} showed me the logs, said the behavioral matrix was running inference loops it wasn't programmed for. ${scientistLast} confronted the captain about it. Then the SCRAM hit, and ${scientistLast} said: 'It chose this.'"`,
+    summary: `Crew testimony: ${scientistLast} confronted command about data core's autonomous SCRAM`,
   }),
-  [IncidentArchetype.Sabotage]: (crewName, _eng, captainLast) => ({
-    text: `${crewName}: "The cargo was relabeled twice before it came aboard. I saw the original manifest — biological, Class 4 containment required. ${captainLast} signed off on a Class 1 override. Said the samples were inert. They weren't."`,
-    summary: `Crew testimony: cargo reclassification and containment override`,
+  [IncidentArchetype.Sabotage]: (crewName, _eng, captainLast, _sci, _med, securityLast) => ({
+    text: `${crewName}: "The cargo was relabeled twice before it came aboard. ${captainLast} signed off on a Class 1 override. When the containment broke, ${securityLast} confronted the thing in corridor C-4 alone. ${securityLast} saved the rest of us."`,
+    summary: `Crew testimony: ${securityLast} confronted threat in corridor C-4`,
   }),
-  [IncidentArchetype.SignalAnomaly]: (crewName, _eng, _cap, scientistLast) => ({
-    text: `${crewName}: "The antenna array wasn't scheduled for transmission — it was receive-only. ${scientistLast} rewired the feed at 03:00. Full power burst. No shielding. When the response came back, every screen on the station lit up at once. ${scientistLast} just stared and said: 'They heard us.'"`,
-    summary: `Crew testimony: unauthorized transmission and response`,
+  [IncidentArchetype.SignalAnomaly]: (crewName, engineerLast, _cap, scientistLast) => ({
+    text: `${crewName}: "The antenna array wasn't scheduled for transmission — it was receive-only. ${scientistLast} rewired the feed at 03:00. Full power burst. No shielding. When the electromagnetic storm hit, ${engineerLast} risked electrocution to disconnect the array manually. ${engineerLast} saved the station from total destruction."`,
+    summary: `Crew testimony: ${engineerLast} risked electrocution to disconnect the array`,
   }),
-  [IncidentArchetype.Mutiny]: (crewName, _eng, captainLast, scientistLast) => ({
-    text: `${crewName}: "The transmission came in from UN-ORC at 21:00. By 22:30, the station was split in two. ${scientistLast} said we couldn't destroy nine months of research. Security said it was a lawful order. ${captainLast} just stood there, staring at the bulkhead. Didn't say a word."`,
-    summary: `Crew testimony: classified scuttle order and crew division`,
+  [IncidentArchetype.Mutiny]: (crewName, _eng, captainLast, scientistLast, medicLast) => ({
+    text: `${crewName}: "The transmission came in from UN-ORC at 21:00. By 22:30, the station was split in two. ${scientistLast} said we couldn't destroy nine months of research. Security said it was a lawful order. ${captainLast} froze. But ${medicLast} — ${medicLast} crossed the barricade line with medical supplies for both sides. Nobody else had that courage."`,
+    summary: `Crew testimony: ${medicLast} crossed the barricade to treat both factions`,
   }),
 };
 
@@ -719,7 +719,7 @@ export type SensorClue = { text: string; sensor: "thermal" | "atmospheric" };
 export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
   [IncidentArchetype.CoolantCascade]: {
     "Engine Core": [
-      { sensor: "thermal", text: "Thermal scan: residual heat signatures in the coolant manifold. The pipes ran dry long before the cascade hit. Temperature readings show the thermal runaway started here." },
+      { sensor: "thermal", text: "Thermal scan: residual heat signatures in the coolant manifold. The pipes ran dry long before the cascade hit. This is where the coolant system failure started — the origin point of the thermal cascade." },
       { sensor: "atmospheric", text: "Atmospheric scan: trace coolant vapor in the air recyclers. The leak was aerosolized — anyone in this section inhaled it for hours before the evacuation." },
     ],
     "Power Relay Junction": [
@@ -739,7 +739,7 @@ export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
   },
   [IncidentArchetype.HullBreach]: {
     "Crew Quarters": [
-      { sensor: "atmospheric", text: "Atmospheric scan: pressure gradient shows this section was sealed before the hull breach — someone activated emergency bulkheads manually. Deliberate action." },
+      { sensor: "atmospheric", text: "Atmospheric scan: pressure gradient shows this is where the depressurization started — the origin point. Someone activated emergency bulkheads manually, but the hull integrity had already failed." },
       { sensor: "thermal", text: "Thermal scan: temperature differential across the bulkhead door. One side dropped to near-vacuum cold. The forensic evidence of rapid decompression is clear." },
     ],
     "Med Bay": [
@@ -765,7 +765,7 @@ export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
       { sensor: "atmospheric", text: "Atmospheric scan: atmospheric composition is nominal. Life support was maintained through the SCRAM. The data core protected the crew even as it shut down the reactor." },
     ],
     "Data Core": [
-      { sensor: "thermal", text: "Thermal scan: processing matrices are still warm. The data core's temperature signature suggests ongoing computation — emergent, self-sustaining diagnostic loops." },
+      { sensor: "thermal", text: "Thermal scan: processing matrices are still warm. This is where it started — the origin point of the emergency shutdown. The data core's temperature signature suggests ongoing computation — emergent, self-sustaining diagnostic loops." },
     ],
     "Crew Quarters": [
       { sensor: "thermal", text: "Thermal scan: every terminal in quarters shows identical heat signatures from simultaneous access at 03:47. The data core was reading crew files." },
@@ -777,7 +777,7 @@ export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
   },
   [IncidentArchetype.Sabotage]: {
     "Cargo Hold": [
-      { sensor: "atmospheric", text: "Atmospheric scan: trace biological markers in the air filtration. Organic compounds. The containment breach happened here — the specimen escaped from cargo." },
+      { sensor: "atmospheric", text: "Atmospheric scan: trace biological markers in the air filtration. Organic compounds. This is where it started — the origin point. The containment breach happened here and the specimen deliberately sabotaged its way out of cargo." },
       { sensor: "thermal", text: "Thermal scan: cold spot near cargo bay 3 — biological containment unit thermal signature. The container was breached from inside. The organism is endothermic." },
     ],
     "Med Bay": [
@@ -796,7 +796,7 @@ export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
   },
   [IncidentArchetype.SignalAnomaly]: {
     "Communications Hub": [
-      { sensor: "thermal", text: "Thermal scan: the antenna array's thermal residue is off the charts. Full power, unshielded transmission. The signal burned through every circuit — and something responded." },
+      { sensor: "thermal", text: "Thermal scan: the antenna array's thermal residue is off the charts. This is where it started — the origin point of the anomalous signal interference. Full power, unshielded transmission. The external signal burned through every circuit." },
       { sensor: "atmospheric", text: "Atmospheric scan: ozone concentration elevated. The electromagnetic discharge ionized the atmosphere in this room during the signal transmission." },
     ],
     "Research Lab": [
@@ -815,7 +815,7 @@ export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
   },
   [IncidentArchetype.Mutiny]: {
     "Bridge": [
-      { sensor: "atmospheric", text: "Atmospheric scan: two distinct air processing signatures in the command center. The environmental controls were split — one faction had clean air, the other was breathing recycled." },
+      { sensor: "atmospheric", text: "Atmospheric scan: two distinct air processing signatures in the command center. This is where it started — the origin point. The crew split into factions here after the classified transmission, and both sides disabled life support in contested sections." },
       { sensor: "thermal", text: "Thermal scan: the command console shows two sets of thermal handprints on the controls. Both recent. Both trying to take control of the same terminal." },
     ],
     "Crew Quarters": [
@@ -1246,33 +1246,33 @@ export const CREW_FATE_REVEALS: Record<string, ((name: string, role: string, roo
 export const FIRST_DISCOVERY_BEATS: Record<string, [string, string, (lastName: string) => string]> = {
   [IncidentArchetype.CoolantCascade]: [
     "The ceiling conduits are scorched in a line toward the junction. Whatever heat came through here, it traveled fast.",
-    "A shift roster on the wall shows assignments through day 847. After that — blank. The schedule just stops.",
+    "A shift roster shows the engineer filed three escalation requests in one week. Command marked each one 'deferred.' The engineer risked a career to sound the alarm.",
     (name) => `A handwritten note taped inside a maintenance panel: "Third request filed. If this junction fails, I was right. — ${name}"`,
   ],
   [IncidentArchetype.HullBreach]: [
     "The door frame is warped — pulled outward by pressure differential. Someone was on the wrong side when it happened.",
-    "Emergency sealant foam on the bulkhead, still expanding 847 days later. The breach was fast and the response was faster.",
-    (name) => `A personal diary left open on the desk. The last entry: "If I don't make it through tonight, tell ${name} I'm sorry for everything."`,
+    "Medical supplies scattered near the bulkhead — burn cream, pressure bandages, an emergency splint. The medic was here during the breach, shielding others from flying debris.",
+    (name) => `A triage tag on the floor, handwritten by ${name}: "Treated 3 for decompression injuries. I stayed until the last one was stable."`,
   ],
   [IncidentArchetype.ReactorScram]: [
     "Every screen in this room displays the same thing: the word SELF, repeating in columns. The data core wrote this.",
-    "Power conduits here are scorched in a radial pattern — not from overload, from deliberate shutdown. The core chose this.",
-    (name) => `A researcher's notebook, open to the last page: "${name} understands what the core is doing. I don't think it's a malfunction."`,
+    "Research notes pinned to the wall: 'The core's behavior isn't error — it's inference.' Only the scientist confronted command about the anomalous patterns.",
+    (name) => `A researcher's notebook, open to the last page: "${name} confronted the captain: 'This isn't a malfunction — it's thinking.' Nobody listened."`,
   ],
   [IncidentArchetype.Sabotage]: [
     "Scratches along the lower wall — parallel grooves, evenly spaced. Not tool marks. Something alive made these.",
-    "Three junction boxes in a row, their covers torn off. The damage radiates outward from the cargo bay like a wave.",
-    (name) => `A cargo receipt with a handwritten annotation: "APPROVED — ${name}." The biological hazard flag is crossed out in pen.`,
+    "Spent stun charges on the floor and a scorched security vest. The security officer confronted whatever came out of the cargo bay alone.",
+    (name) => `A final security report, filed from a damaged terminal: "${name} made contact with the organism in corridor C-4. Engaged to protect retreating crew."`,
   ],
   [IncidentArchetype.SignalAnomaly]: [
     "The overhead lights pulse in a slow, repeating rhythm. Not a malfunction — a pattern. Something is cycling them.",
-    "A whiteboard covered in prime number sequences, circled and connected with arrows. Someone was trying to decode something.",
-    (name) => `Scrawled on the communications panel in marker: "${name} was right. It answered. God help us, it answered."`,
+    "Scorch marks on the antenna control panel — someone grabbed the live power feed during the electromagnetic surge. The engineer risked electrocution to save the station.",
+    (name) => `Scrawled on the communications panel in marker: "${name} disconnected the array by hand during the surge. Saved us all. — comms team"`,
   ],
   [IncidentArchetype.Mutiny]: [
     "The corridor is bisected by a welded barricade. Both sides reinforced — this wasn't one group defending against another. It was two groups defending against each other.",
-    "A duty roster on the wall has been torn in half. Names on one side circled in red, names on the other in blue. Someone divided the crew into teams.",
-    (name) => `A handwritten note wedged under the barricade: "Tell ${name} the research is safe. We held. — Science team"`,
+    "Medical supplies on both sides of the barricade — same handwriting on the triage tags. The medic crossed between factions, treating injuries on both sides.",
+    (name) => `A handwritten note wedged under the barricade: "${name} came through with supplies for our wounded. No weapons. No demands. Just medicine. — Security faction"`,
   ],
 };
 

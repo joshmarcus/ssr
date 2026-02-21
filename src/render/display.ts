@@ -1051,7 +1051,14 @@ export class BrowserDisplay implements IGameDisplay {
         }
 
         // Atmospheric overlay: pressure visualization (requires atmospheric sensor)
-        if (this.sensorMode === SensorType.Atmospheric && tile.walkable) {
+        // Active scan pulse: briefly highlight all low-pressure tiles with a bright cyan flash
+        const isAtmoScanPulse = this.sensorMode === SensorType.Atmospheric && tile.walkable &&
+          state.milestones.has(`atmospheric_scan_pulse_${state.turn}`);
+        if (isAtmoScanPulse && tile.pressure < 60) {
+          glyph = tile.pressure < 30 ? "!" : "\u25A0"; // block char for pulse
+          fg = "#0ff";
+          bg = "#044";
+        } else if (this.sensorMode === SensorType.Atmospheric && tile.walkable) {
           if (tile.pressure < 30) {
             // Dangerous low pressure: red/orange
             glyph = "!";

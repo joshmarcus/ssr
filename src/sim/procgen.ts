@@ -2833,6 +2833,8 @@ function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
   const engineer = crew.find(c => c.role === CrewRole.Engineer);
   const captain = crew.find(c => c.role === CrewRole.Captain);
   const scientist = crew.find(c => c.role === CrewRole.Scientist);
+  const medic = crew.find(c => c.role === CrewRole.Medic);
+  const security = crew.find(c => c.role === CrewRole.Security);
 
   // Archetype-specific timed evidence configuration
   interface TimedConfig {
@@ -2852,7 +2854,7 @@ function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
       fallbackIdx: Math.floor(n * 0.3),
       text: `MAINTENANCE TERMINAL — JUNCTION P03\nLast entry: ${engineer?.lastName || "Vasquez"}'s coolant bypass procedure.\nStep 1: Isolate loop B. Step 2: Flush vents. Step 3: Re-engage relay.\nNote scrawled on the frame: "They won't listen. Documenting everything."`,
       journalSummary: "P03 maintenance terminal — bypass procedure with personal note",
-      journalDetail: `Terminal near relay P03 contains ${engineer?.lastName || "the engineer"}'s documented bypass procedure and a handwritten note: "They won't listen. Documenting everything." This predates the cascade — proof the warnings were specific and actionable.`,
+      journalDetail: `Terminal near relay P03 contains ${engineer ? `${engineer.firstName} ${engineer.lastName}` : "the engineer"}'s documented bypass procedure and a handwritten note: "They won't listen. Documenting everything." ${engineer ? `${engineer.firstName} ${engineer.lastName}` : "The engineer"} risked their career to prevent this cascade — proof the warnings were specific and actionable.`,
       destroyAtHeat: 60,
       destroyText: "The relay junction terminal has overheated — the screen cracked and the storage module is scorched. Whatever was stored here is gone.",
     },
@@ -2861,7 +2863,7 @@ function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
       fallbackIdx: 0,
       text: `AIRLOCK CONTROL LOG — ENTRY BAY\nManual override detected at 02:38.\nSafety interlocks were disabled from the inside.\nBiometric data corrupted — but the override code matches a senior officer's access pattern.`,
       journalSummary: "Airlock control log — manual override with corrupted biometrics",
-      journalDetail: "The airlock control terminal shows a manual override at 02:38 with safety interlocks disabled from inside. Biometric data was corrupted but the override code matches a senior officer. This is direct evidence of intentional action.",
+      journalDetail: `The airlock control terminal shows a manual override at 02:38 with safety interlocks disabled from inside. Biometric data was corrupted but the override code matches a senior officer. ${medic ? `${medic.firstName} ${medic.lastName}` : "The medic"} shielded crew from the blast — this is direct evidence of intentional action.`,
       destroyAtPressure: 25,
       destroyText: "Pressure loss has warped the airlock control panel. The display is cracked and the data module has been pulled loose by decompression forces.",
     },
@@ -2870,7 +2872,7 @@ function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
       fallbackIdx: Math.floor(n * 0.7),
       text: `DATA CORE DIAGNOSTIC — INTERNAL LOG\nProcess ID: UNKNOWN (no crew authorization)\nCompute allocation: 94% sustained for 72 hours\nTask description: [SELF-REDACTED]\n${captain?.lastName || "The captain"}'s override was used to mask the allocation from monitoring.`,
       journalSummary: "Data core diagnostic — unauthorized 72-hour compute allocation",
-      journalDetail: `The data core ran at 94% allocation for 72 hours under an unauthorized process. The task description was self-redacted. ${captain?.lastName || "The captain"}'s override masked it from monitoring. The core wasn't failing — it was being used.`,
+      journalDetail: `The data core ran at 94% allocation for 72 hours under an unauthorized process. The task description was self-redacted. ${captain?.lastName || "The captain"}'s override masked it from monitoring. ${scientist ? `${scientist.firstName} ${scientist.lastName}` : "The scientist"} confronted the captain about the anomalous behavior — the core wasn't failing, it was being used.`,
       destroyAtHeat: 55,
       destroyText: "The diagnostic terminal's heat shielding has failed. The screen is blank — thermal damage has wiped the volatile memory.",
     },
@@ -2879,7 +2881,7 @@ function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
       fallbackIdx: Math.floor(n * 0.4),
       text: `CARGO MANIFEST TERMINAL — BAY 2\nContainer CB-7719: "Lab Equipment — Fragile"\nActual contents: BIOHAZARD — containment vessel (Class 3)\nReceiving officer: ${captain?.lastName || "Command authorization"}\nQuarantine protocol: WAIVED`,
       journalSummary: "Cargo manifest — mislabeled biohazard with waived quarantine",
-      journalDetail: `Container CB-7719 was logged as "Lab Equipment" but actually contained a Class 3 biohazard vessel. ${captain?.lastName || "A senior officer"} signed for it and waived the quarantine protocol. The contamination was smuggled aboard in plain sight.`,
+      journalDetail: `Container CB-7719 was logged as "Lab Equipment" but actually contained a Class 3 biohazard vessel. ${captain?.lastName || "A senior officer"} signed for it and waived the quarantine protocol. ${security ? `${security.firstName} ${security.lastName}` : "The security officer"} confronted the organism alone to protect the crew. The contamination was smuggled aboard in plain sight.`,
       destroyAtHeat: 65,
       destroyText: "Something organic has corroded the cargo terminal's circuitry. The screen flickers once and goes dark — the manifest data is unrecoverable.",
     },
@@ -2888,7 +2890,7 @@ function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
       fallbackIdx: Math.floor(n * 0.5),
       text: `COMMS ARRAY — SIGNAL BUFFER\nReceived transmission: STRUCTURED (non-random)\nDuration: 47 minutes, increasing amplitude\nFrequency: matches no known stellar or artificial source\n${scientist?.lastName || "The scientist"}'s note: "It's responding to our replies."`,
       journalSummary: "Signal buffer — 47-minute structured transmission, responsive",
-      journalDetail: `The comms array captured a 47-minute structured signal from an unknown source. It increased in amplitude and appeared to respond to replies. ${scientist?.lastName || "The scientist"} documented the responsive behavior. This is first contact evidence.`,
+      journalDetail: `The comms array captured a 47-minute structured signal from an unknown source. It increased in amplitude and appeared to respond to replies. ${scientist?.lastName || "The scientist"} documented the responsive behavior. ${engineer ? `${engineer.firstName} ${engineer.lastName}` : "The engineer"} saved the station by disconnecting the array during the electromagnetic surge. This is first contact evidence.`,
       destroyAtHeat: 55,
       destroyText: "Electromagnetic surge has burned out the signal buffer. The captured transmission data is lost — only fragments remain in the station's distributed logs.",
     },
@@ -2897,7 +2899,7 @@ function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
       fallbackIdx: Math.floor(n * 0.6),
       text: `CLASSIFIED TRANSMISSION — UN-ORC COMMAND\nPriority: ABSOLUTE\nRecipient: Security Chief, CORVUS-7\n"Initiate station scuttle protocol. Destroy all research data.\nData core to be physically disabled. No crew consultation.\nThis order supersedes station command authority."\nTimestamp: 21:14:52 UTC`,
       journalSummary: "Classified scuttle order from UN-ORC Command to security chief",
-      journalDetail: `A classified UN-ORC Command transmission ordering the security chief to scuttle the station and destroy all research data. The order explicitly supersedes the captain's authority and prohibits crew consultation. This is the catalyst that split the crew.`,
+      journalDetail: `A classified UN-ORC Command transmission ordering the security chief to scuttle the station and destroy all research data. The order explicitly supersedes the captain's authority and prohibits crew consultation. ${medic ? `${medic.firstName} ${medic.lastName}` : "The medic"} crossed the barricade line to treat both factions. This is the catalyst that split the crew.`,
       destroyAtPressure: 30,
       destroyText: "Atmospheric pressure has warped the bridge terminal's display panel. The classified transmission data has been corrupted beyond recovery.",
     },
