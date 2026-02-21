@@ -2953,23 +2953,18 @@ export class BrowserDisplay3D implements IGameDisplay {
       canvas.height = 64;
       const ctx = canvas.getContext("2d")!;
 
-      // Room zone color for text
-      const tint = ROOM_WALL_TINTS_3D[room.name] ?? 0xcccccc;
-      const r = Math.min(255, ((tint >> 16) & 0xff) + 60);
-      const g = Math.min(255, ((tint >> 8) & 0xff) + 60);
-      const b = Math.min(255, (tint & 0xff) + 60);
-
       const label = room.name.toUpperCase();
-      ctx.font = "bold 28px 'Courier New', monospace";
+      ctx.font = "bold 26px 'Courier New', monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      // Drop shadow for readability
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      // Strong dark drop shadow for readability
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
       ctx.fillText(label, 257, 34);
+      ctx.fillText(label, 258, 35); // double shadow for thickness
 
-      // Main text — bright room-tinted color
-      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      // Main text — crisp white with slight warm tint
+      ctx.fillStyle = "#ffe8cc";
       ctx.fillText(label, 256, 32);
 
       const tex = new THREE.CanvasTexture(canvas);
