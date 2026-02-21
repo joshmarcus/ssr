@@ -291,6 +291,10 @@ export class BrowserDisplay3D implements IGameDisplay {
   private lastRoomId = "";
   private showTrail = false;
 
+  // Room decoration props (placed once per room when explored)
+  private decoratedRooms: Set<string> = new Set();
+  private decorationGroup: THREE.Group = new THREE.Group();
+
   // Dummy objects for instance matrix computation
   private dummy = new THREE.Object3D();
 
@@ -309,6 +313,10 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Synty texture atlas (loaded at startup, applied to models that lack embedded textures)
   private syntyAtlas: THREE.Texture | null = null;
+
+  // Particle systems
+  private dustParticles: THREE.Points | null = null;
+  private starfieldPoints: THREE.Points | null = null;
 
   constructor(container: HTMLElement, mapWidth?: number, mapHeight?: number) {
     this.container = container;
@@ -444,6 +452,15 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Entity group ──
     this.entityGroup = new THREE.Group();
     this.scene.add(this.entityGroup);
+
+    // ── Decoration group (room props) ──
+    this.scene.add(this.decorationGroup);
+
+    // ── Starfield background (distant stars visible through station gaps) ──
+    this.createStarfield();
+
+    // ── Ambient dust particles (floating motes near the camera) ──
+    this.createDustParticles();
 
     // ── Player mesh (green cylinder + antenna box) ──
     this.playerMesh = this.createPlayerMesh();
@@ -650,6 +667,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updatePlayer(state);
     this.updateFog(state);
     this.updateRoomLights(state);
+    this.placeRoomDecorations(state);
   }
 
   // ── Render sidebar UI (same HTML as 2D) ─────────────────────────
@@ -994,6 +1012,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Particle animations
+    this.animateParticles(elapsed, delta);
+
     // Use outline effect for cel-shaded rendering with dark outlines
     this.outlineEffect.render(this.scene, this.camera);
   };
@@ -1183,6 +1204,209 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     this.fogFullMesh.instanceMatrix.needsUpdate = true;
     this.fogMemoryMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // ── Private: room decorations ──────────────────────────────────
+
+  // Decoration model paths per room type (placed at empty floor tiles)
+  private static readonly ROOM_DECORATIONS: Record<string, string[]> = {
+    "Med Bay": [
+      "models/synty-space-gltf/SM_Prop_Bed_Medical_01.glb",
+      "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
+      "models/synty-space-gltf/SM_Prop_Decontamination_Shower_01.glb",
+    ],
+    "Engineering Storage": [
+      "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Detail_Box_02.glb",
+      "models/synty-space-gltf/SM_Prop_Cart_01.glb",
+    ],
+    "Life Support": [
+      "models/synty-space-gltf/SM_Prop_AirVent_Large_01.glb",
+      "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+    ],
+    "Data Core": [
+      "models/synty-space-gltf/SM_Prop_CenterTube_02.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+    ],
+    "Robotics Bay": [
+      "models/synty-space-gltf/SM_Prop_Desk_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Cart_01.glb",
+    ],
+    "Research Lab": [
+      "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-space-gltf/SM_Prop_Desk_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_CryoBed_01.glb",
+    ],
+    "Communications Hub": [
+      "models/synty-space-gltf/SM_Prop_Satellite_Stand_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+      "models/synty-space-gltf/SM_Prop_Radar_Panel_01.glb",
+    ],
+    "Power Relay Junction": [
+      "models/synty-space-gltf/SM_Prop_Battery_03.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-space-gltf/SM_Prop_ControlPanel_03.glb",
+    ],
+    "Bridge": [
+      "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+      "models/synty-space-gltf/SM_Prop_ControlPanel_01.glb",
+    ],
+    "Engine Core": [
+      "models/synty-space-gltf/SM_Prop_CenterTube_01.glb",
+      "models/synty-space-gltf/SM_Prop_Battery_02.glb",
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+    ],
+    "Cargo Hold": [
+      "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
+      "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
+      "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
+    ],
+    "Crew Quarters": [
+      "models/synty-space-gltf/SM_Bld_Crew_Beds_01.glb",
+      "models/synty-space-gltf/SM_Prop_Desk_Small_01.glb",
+      "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
+    ],
+    "Observation Deck": [
+      "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
+    ],
+    "Escape Pod Bay": [
+      "models/synty-space-gltf/SM_Prop_EscapePod_Hatch_Small_01.glb",
+      "models/synty-space-gltf/SM_Sign_AirLock_01.glb",
+    ],
+    "Auxiliary Power": [
+      "models/synty-space-gltf/SM_Prop_Battery_01.glb",
+      "models/synty-space-gltf/SM_Prop_Battery_02.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+    ],
+    "Signal Room": [
+      "models/synty-space-gltf/SM_Prop_Antenna_01.glb",
+      "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+    ],
+    "Server Annex": [
+      "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
+    ],
+    "Armory": [
+      "models/synty-space-gltf/SM_Prop_Detail_Box_02.glb",
+      "models/synty-space-gltf/SM_Prop_Crate_health_02.glb",
+    ],
+    "Arrival Bay": [
+      "models/synty-space-gltf/SM_Prop_Cart_01.glb",
+      "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
+    ],
+    "Emergency Shelter": [
+      "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
+      "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
+    ],
+    "Maintenance Corridor": [
+      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+    ],
+  };
+
+  private placeRoomDecorations(state: GameState): void {
+    for (const room of state.rooms) {
+      if (this.decoratedRooms.has(room.id)) continue;
+
+      // Check if room center is explored
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
+      if (!state.tiles[cy][cx].explored) continue;
+
+      this.decoratedRooms.add(room.id);
+
+      const decorModels = BrowserDisplay3D.ROOM_DECORATIONS[room.name];
+      if (!decorModels || decorModels.length === 0) continue;
+
+      // Find empty floor tiles in this room (no entity)
+      const entityPositions = new Set<string>();
+      for (const [, e] of state.entities) {
+        entityPositions.add(`${e.pos.x},${e.pos.y}`);
+      }
+      // Player position
+      entityPositions.add(`${state.player.entity.pos.x},${state.player.entity.pos.y}`);
+
+      const emptyFloors: { x: number; y: number }[] = [];
+      for (let y = room.y; y < room.y + room.height; y++) {
+        for (let x = room.x; x < room.x + room.width; x++) {
+          if (y < 0 || y >= state.height || x < 0 || x >= state.width) continue;
+          const tile = state.tiles[y][x];
+          if (tile.type !== TileType.Floor) continue;
+          if (entityPositions.has(`${x},${y}`)) continue;
+          emptyFloors.push({ x, y });
+        }
+      }
+
+      // Place 1-3 decorations at deterministic positions (seeded by room id)
+      const maxDecor = Math.min(3, emptyFloors.length, decorModels.length);
+      // Simple deterministic shuffle based on room position
+      const seed = room.x * 31 + room.y * 17;
+      emptyFloors.sort((a, b) => ((a.x * 13 + a.y * 7 + seed) & 0xff) - ((b.x * 13 + b.y * 7 + seed) & 0xff));
+
+      for (let i = 0; i < maxDecor; i++) {
+        const pos = emptyFloors[i];
+        const modelPath = decorModels[i % decorModels.length];
+        const modelKey = `decor_${room.id}_${i}`;
+
+        // Check if we have this model cached
+        const cached = this.gltfCache.get(modelPath);
+        if (cached) {
+          const clone = cached.clone();
+          clone.position.set(pos.x, 0, pos.y);
+          // Scale down decorations slightly
+          clone.scale.multiplyScalar(0.6);
+          this.decorationGroup.add(clone);
+        } else {
+          // Load model and place when ready
+          const url = import.meta.env.BASE_URL + modelPath;
+          this.gltfLoader.load(url, (gltf) => {
+            try {
+              const model = gltf.scene.clone();
+              // Normalize size
+              const box = new THREE.Box3().setFromObject(model);
+              const size = new THREE.Vector3();
+              box.getSize(size);
+              const maxDim = Math.max(size.x, size.y, size.z);
+              if (maxDim > 0) model.scale.multiplyScalar(0.5 / maxDim);
+
+              // Center and sit on floor
+              const b2 = new THREE.Box3().setFromObject(model);
+              const c = new THREE.Vector3();
+              b2.getCenter(c);
+              model.position.set(pos.x - c.x, -b2.min.y, pos.y - c.z);
+
+              // Apply toon material with atlas
+              model.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  const oldMat = mats[0] as THREE.MeshStandardMaterial;
+                  const hasUVs = !!(child.geometry?.attributes?.uv);
+                  let tex = hasUVs && oldMat?.map ? oldMat.map : null;
+                  if (!tex && hasUVs && this.syntyAtlas) tex = this.syntyAtlas;
+                  child.material = makeToonMaterial({
+                    color: tex ? 0xffffff : (oldMat?.color?.getHex() ?? 0x888888),
+                    gradientMap: this.toonGradient,
+                    map: tex,
+                  });
+                }
+              });
+
+              this.decorationGroup.add(model);
+              this.gltfCache.set(modelPath, model); // cache for future rooms
+            } catch (e) {
+              console.warn(`Failed to load decoration ${modelPath}:`, e);
+            }
+          }, undefined, () => {});
+        }
+      }
+    }
   }
 
   // ── Private: room ambient lights ────────────────────────────────
@@ -2062,5 +2286,112 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   private escapeHtml(text: string): string {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  // ── Starfield background ─────────────────────────────────────
+
+  private createStarfield(): void {
+    const starCount = 400;
+    const positions = new Float32Array(starCount * 3);
+    const colors = new Float32Array(starCount * 3);
+    const sizes = new Float32Array(starCount);
+
+    for (let i = 0; i < starCount; i++) {
+      // Spread stars in a large dome below the station
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI * 0.5; // hemisphere below
+      const radius = 40 + Math.random() * 60;
+      positions[i * 3] = Math.cos(theta) * Math.sin(phi) * radius;
+      positions[i * 3 + 1] = -5 - Math.random() * 30; // below the floor
+      positions[i * 3 + 2] = Math.sin(theta) * Math.sin(phi) * radius;
+
+      // Star colors: mostly white, some blue, some warm
+      const temp = Math.random();
+      if (temp < 0.7) {
+        colors[i * 3] = 0.9; colors[i * 3 + 1] = 0.9; colors[i * 3 + 2] = 1.0;
+      } else if (temp < 0.85) {
+        colors[i * 3] = 0.6; colors[i * 3 + 1] = 0.7; colors[i * 3 + 2] = 1.0;
+      } else {
+        colors[i * 3] = 1.0; colors[i * 3 + 1] = 0.85; colors[i * 3 + 2] = 0.7;
+      }
+
+      sizes[i] = 0.05 + Math.random() * 0.15;
+    }
+
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    starGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    starGeo.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
+
+    const starMat = new THREE.PointsMaterial({
+      size: 0.15,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.6,
+      sizeAttenuation: true,
+      depthWrite: false,
+    });
+
+    this.starfieldPoints = new THREE.Points(starGeo, starMat);
+    this.starfieldPoints.renderOrder = -1; // render behind everything
+    this.scene.add(this.starfieldPoints);
+  }
+
+  // ── Ambient dust particles ───────────────────────────────────
+
+  private createDustParticles(): void {
+    const dustCount = 80;
+    const positions = new Float32Array(dustCount * 3);
+
+    for (let i = 0; i < dustCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 20;
+      positions[i * 3 + 1] = Math.random() * 3;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+    }
+
+    const dustGeo = new THREE.BufferGeometry();
+    dustGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+    const dustMat = new THREE.PointsMaterial({
+      size: 0.04,
+      color: 0xaabbcc,
+      transparent: true,
+      opacity: 0.3,
+      sizeAttenuation: true,
+      depthWrite: false,
+    });
+
+    this.dustParticles = new THREE.Points(dustGeo, dustMat);
+    this.scene.add(this.dustParticles);
+  }
+
+  // ── Animate particles ────────────────────────────────────────
+
+  private animateParticles(elapsed: number, delta: number): void {
+    // Dust motes: slowly drift and follow camera center
+    if (this.dustParticles) {
+      const posArr = this.dustParticles.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < posArr.length; i += 3) {
+        // Slow upward drift + gentle swirl
+        posArr[i] += Math.sin(elapsed * 0.3 + i) * delta * 0.1;
+        posArr[i + 1] += delta * 0.05;
+        posArr[i + 2] += Math.cos(elapsed * 0.2 + i * 0.7) * delta * 0.1;
+
+        // Wrap particles to stay near camera
+        if (posArr[i + 1] > 3) posArr[i + 1] = 0;
+      }
+      this.dustParticles.geometry.attributes.position.needsUpdate = true;
+
+      // Keep dust centered on camera target
+      this.dustParticles.position.set(this.cameraPosX, 0, this.cameraPosZ);
+    }
+
+    // Starfield: subtle twinkle by varying opacity
+    if (this.starfieldPoints) {
+      const mat = this.starfieldPoints.material as THREE.PointsMaterial;
+      mat.opacity = 0.4 + Math.sin(elapsed * 0.5) * 0.2;
+      // Keep starfield centered on camera
+      this.starfieldPoints.position.set(this.cameraPosX, 0, this.cameraPosZ);
+    }
   }
 }
