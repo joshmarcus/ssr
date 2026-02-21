@@ -173,13 +173,45 @@
       border-bottom: 1px solid #222;
     }
 
-    /* ── 3D mode: disable CRT barrel distortion ──────── */
+    /* ── 3D mode: disable CRT barrel distortion + enhance UI ──────── */
     .mode-3d #rot-display canvas {
       transform: none !important;
       filter: none;
     }
     .mode-3d #rot-display {
       perspective: none;
+    }
+    .mode-3d #ui-panel {
+      background: rgba(8, 10, 16, 0.88);
+      border-right: 1px solid rgba(68, 255, 136, 0.15);
+      backdrop-filter: blur(8px);
+    }
+    .mode-3d #ui-panel .label {
+      color: #5a7a6a;
+    }
+    .mode-3d #ui-panel .value {
+      color: #44ff88;
+      text-shadow: 0 0 6px rgba(68, 255, 136, 0.3);
+    }
+    .mode-3d #ui-panel .objective-label {
+      color: #44ff88;
+      text-shadow: 0 0 8px rgba(68, 255, 136, 0.4);
+    }
+    .mode-3d #ui-panel .objective-panel {
+      border-color: rgba(68, 255, 136, 0.2);
+      background: rgba(0, 20, 10, 0.3);
+    }
+    .mode-3d #ui-panel .log-milestone {
+      text-shadow: 0 0 12px rgba(0, 255, 0, 0.6);
+    }
+    .mode-3d #ui-panel .log-narrative {
+      border-left-color: rgba(0, 255, 200, 0.3);
+    }
+    .mode-3d #ui-panel .room-list-panel {
+      border-color: rgba(68, 255, 136, 0.1);
+    }
+    .mode-3d #ui-panel .sidebar-stats {
+      border-bottom-color: rgba(68, 255, 136, 0.08);
     }
 
     /* ── Game-over full-screen overlay ─────────────────── */
@@ -274,6 +306,42 @@
     #damage-flash.damage { background: radial-gradient(ellipse at center, transparent 40%, rgba(255,0,0,0.3) 100%); }
     #damage-flash.milestone { background: radial-gradient(ellipse at center, rgba(0,255,0,0.15) 0%, transparent 70%); }
     #damage-flash.stun { background: radial-gradient(ellipse at center, rgba(0,100,255,0.2) 0%, transparent 70%); }
+
+    /* ── 3D room name banner ────────────────────────────── */
+    #room-banner {
+      position: fixed;
+      top: 15%;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 75;
+      font-family: monospace;
+      font-size: 22px;
+      font-weight: bold;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #44ff88;
+      text-shadow: 0 0 20px rgba(68, 255, 136, 0.6), 0 0 40px rgba(68, 255, 136, 0.3);
+      opacity: 0;
+      transition: opacity 0.3s ease-in;
+    }
+    #room-banner.active {
+      opacity: 1;
+      transition: opacity 0.15s ease-in;
+    }
+    #room-banner.fade-out {
+      opacity: 0;
+      transition: opacity 0.8s ease-out;
+    }
+    #room-banner .banner-zone {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #5a7a6a;
+      text-shadow: none;
+      margin-top: 4px;
+      text-align: center;
+    }
 
     /* ── Narrative log highlight ────────────────────────── */
     #ui-panel .log-narrative-terminal {
@@ -558,6 +626,7 @@
 </head>
 <body>
   <div id="damage-flash"></div>
+  <div id="room-banner"></div>
   <div id="gameover-overlay"></div>
   <div id="broadcast-overlay"></div>
   <div id="journal-overlay"></div>

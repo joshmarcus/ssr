@@ -551,6 +551,17 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (roomId && roomId !== this.lastRoomId) {
       this.roomFlashMessage = room!.name;
       if (this.roomFlashTimer) clearTimeout(this.roomFlashTimer);
+
+      // Show room name banner on the 3D viewport
+      const banner = document.getElementById("room-banner");
+      if (banner) {
+        const zone = room?.zone ? `<span class="banner-zone">${room.zone} Sector</span>` : "";
+        banner.innerHTML = room!.name + zone;
+        banner.className = "active";
+        setTimeout(() => { banner.className = "fade-out"; }, 1200);
+        setTimeout(() => { banner.className = ""; banner.innerHTML = ""; }, 2200);
+      }
+
       this.roomFlashTimer = setTimeout(() => {
         this.roomFlashMessage = "";
         this.roomFlashTimer = null;
