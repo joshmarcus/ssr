@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 66 complete (Opening Transmission, Pacing Nudges, Game-Over Polish)
+- **Phase**: Sprint 67 complete (Choice-Branching Epilogues, Captain's Secret Log, Room Examination)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 5`), all 5 archetypes reachable
@@ -83,6 +83,9 @@
 - CORVUS-7 opening mission briefing (3 archetype-specific lines per run)
 - Pacing nudges: objective-aware CORVUS hints after idle turns
 - Game-over archetype reveal with story summary + reordered sections
+- Choice-branching epilogues: 45 archetype×consequence×option ending paragraphs in game-over overlay
+- Captain's secret log: two-step hidden discovery (Crew Quarters override key → Bridge encrypted log) with 5 archetype-specific revelations
+- Room examination flavor text: 16 rooms × 3 variants of atmospheric prose on Look action
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
@@ -91,6 +94,35 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 67 Changes
+
+### Choice-Branching Epilogues
+- **45 archetype-specific ending paragraphs**: Each of the 5 archetypes × 3 consequences (blame, data, incident-specific) × 3 options = unique ending text
+- **`computeBranchedEpilogue()` function**: Replaces generic choice endings with story-aware epilogue lines
+- **"YOUR DECISIONS" game-over section**: Appears between timeline reconstruction and base epilogue
+- **Browser log panel upgrade**: Game-over log also uses branched epilogue text instead of generic
+- **Story resonance**: In CoolantCascade, blaming the engineer means "careers will end"; in SignalAnomaly, transmitting all data means "the universe just got smaller"
+
+### Captain's Secret Log (Hidden Multi-Step Discovery)
+- **Two-step discovery chain**: (1) Find override key at Crew Quarters "Personal Locker Terminal", (2) Use it at Bridge "Captain's Terminal"
+- **Milestone-gated access**: Bridge terminal shows hint text until `captain_override_key` milestone earned
+- **5 archetype-specific revelations**: Each archetype reveals the captain's personal complicity in the incident
+  - CoolantCascade: Captain suppressed warnings before quarterly review
+  - HullBreach: Captain concealed security footage identifying the killer
+  - ReactorScram: Captain knew the data core was exhibiting consciousness
+  - Sabotage: Captain personally approved the cargo transfer with provisional containment
+  - SignalAnomaly: Captain suppressed contact protocol after the signal started responding
+- **Journal entry auto-generated**: Secret log becomes evidence with auto-tagged crew mentions
+
+### Room Examination Flavor Text
+- **16 rooms × 3 variants each** (48 authored environmental descriptions)
+- **Seed+turn selection**: Different text appears on repeat Look actions
+- **Atmospheric storytelling**: Each room tells a micro-story about the crew's final moments
+  - Bridge: frozen status board, cold coffee on the captain's chair
+  - Crew Quarters: card game frozen mid-hand, half-written letter home
+  - Escape Pod Bay: manifest board with unchecked names
+- **Pressure info added to Look**: Low/dangerous pressure now reported alongside heat/smoke
 
 ## Sprint 66 Changes
 
