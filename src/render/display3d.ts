@@ -245,7 +245,7 @@ const COLORS_3D = {
 
 // How many world-units tall the visible area is (zoom level)
 const CAMERA_FRUSTUM_SIZE_DEFAULT = 3.0; // start zoomed in close for detail
-const CAMERA_FRUSTUM_SIZE_MIN = 2.5;    // max zoom in
+const CAMERA_FRUSTUM_SIZE_MIN = 1.5;    // max zoom in (very close detail view)
 const CAMERA_FRUSTUM_SIZE_MAX = 12;     // max zoom out
 
 const ENTITY_COLORS_3D: Record<string, number> = {
@@ -417,7 +417,7 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   [EntityType.Airlock]: "models/synty-space-gltf/SM_Bld_Wall_Doorframe_02.glb",
   [EntityType.ToolPickup]: "models/synty-space-gltf/SM_Prop_Cart_01.glb",
   [EntityType.UtilityPickup]: "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
-  [EntityType.Console]: "models/synty-space-gltf/SM_Prop_ControlPanel_02.glb",
+  [EntityType.Console]: "models/synty-space-gltf/SM_Bld_Bridge_Console_01.glb",
   [EntityType.RepairCradle]: "models/synty-space-gltf/SM_Prop_CryoBed_01.glb",
   [EntityType.PressureValve]: "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
   [EntityType.FuseBox]: "models/synty-space-gltf/SM_Prop_Panel_01.glb",
@@ -431,7 +431,10 @@ export class BrowserDisplay3D implements IGameDisplay {
   private container: HTMLElement;
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
-  private camera: THREE.OrthographicCamera;
+  private camera: THREE.OrthographicCamera | THREE.PerspectiveCamera;
+  private orthoCamera: THREE.OrthographicCamera;
+  private chaseCamera: THREE.PerspectiveCamera;
+  private chaseCamActive: boolean = false;
   private mapWidth: number;
   private mapHeight: number;
 
@@ -520,6 +523,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private resizeHandler: () => void;
   // Mouse wheel zoom handler
   private boundWheelHandler: (e: WheelEvent) => void;
+  // F2 chase cam toggle handler
+  private boundKeyHandler: (e: KeyboardEvent) => void;
 
   // Cel-shaded rendering
   private outlineEffect: OutlineEffect;
@@ -574,8 +579,6 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Shared ceiling geometries
   private static _beamGeoH: THREE.BoxGeometry | null = null;
   private static _beamGeoV: THREE.BoxGeometry | null = null;
-  private static _lightFixtureGeo: THREE.BoxGeometry | null = null;
-  private static _lightBulbGeo: THREE.SphereGeometry | null = null;
   private static _archPostGeo: THREE.BoxGeometry | null = null;
   private static _archSpanGeo: THREE.BoxGeometry | null = null;
 
@@ -613,15 +616,23 @@ export class BrowserDisplay3D implements IGameDisplay {
     const aspect = this.getAspect();
     const frustumHeight = this.cameraFrustumSize;
     const frustumWidth = frustumHeight * aspect;
-    this.camera = new THREE.OrthographicCamera(
+    this.orthoCamera = new THREE.OrthographicCamera(
       -frustumWidth / 2, frustumWidth / 2,
       frustumHeight / 2, -frustumHeight / 2,
       0.1, 200
     );
     // Low-angle offset: camera sits behind and slightly above for drama
     // Will be repositioned each frame to follow the player
-    this.camera.position.set(0, 8, 12);
-    this.camera.lookAt(0, 0, 0);
+    this.orthoCamera.position.set(0, 8, 12);
+    this.orthoCamera.lookAt(0, 0, 0);
+
+    // ── Chase camera (3rd person, behind Sweepo) ──
+    this.chaseCamera = new THREE.PerspectiveCamera(60, aspect, 0.1, 100);
+    this.chaseCamera.position.set(0, 2, 3);
+    this.chaseCamera.lookAt(0, 0, 0);
+
+    // Default to ortho
+    this.camera = this.orthoCamera;
 
     // ── Cel-shading: Outline Effect ──
     this.toonGradient = createToonGradient();
@@ -790,6 +801,17 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Mouse wheel zoom ──
     this.boundWheelHandler = this.handleWheel.bind(this);
     this.container.addEventListener("wheel", this.boundWheelHandler, { passive: false });
+
+    // ── F2 chase cam toggle ──
+    this.boundKeyHandler = (e: KeyboardEvent) => {
+      if (e.key === "F2") {
+        e.preventDefault();
+        this.chaseCamActive = !this.chaseCamActive;
+        this.camera = this.chaseCamActive ? this.chaseCamera : this.orthoCamera;
+        this.handleResize(); // update aspect ratio for the active camera
+      }
+    };
+    window.addEventListener("keydown", this.boundKeyHandler);
 
     // ── Start animation loop ──
     this.animate();
@@ -1053,6 +1075,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   destroy(): void {
     cancelAnimationFrame(this.animFrameId);
     window.removeEventListener("resize", this.resizeHandler);
+    window.removeEventListener("keydown", this.boundKeyHandler);
     this.container.removeEventListener("wheel", this.boundWheelHandler);
     if (this.roomFlashTimer) clearTimeout(this.roomFlashTimer);
     // Clean up overlays
@@ -1276,6 +1299,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       `<span class="key">t</span> sensor ` +
       `<span class="key">c</span> clean ` +
       `<span class="key">l</span> look ` +
+      `<span class="key">F2</span> chase cam ` +
       `<span class="key">F3</span> toggle 2D/3D ` +
       `<span class="key">Space</span> wait`;
 
@@ -1434,21 +1458,39 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Smooth ease-out bump: brief zoom-out then return
         zoomOffset = Math.sin(this.cameraZoomPulse * Math.PI) * 1.5;
         this.cameraZoomPulse = Math.max(0, this.cameraZoomPulse - delta * 2.0);
-        // Update orthographic camera frustum
-        const aspect = this.container.clientWidth / this.container.clientHeight;
-        const baseSize = this.cameraFrustumSize + zoomOffset;
-        this.camera.left = -baseSize * aspect;
-        this.camera.right = baseSize * aspect;
-        this.camera.top = baseSize;
-        this.camera.bottom = -baseSize;
-        this.camera.updateProjectionMatrix();
+        if (!this.chaseCamActive) {
+          // Update orthographic camera frustum
+          const aspect = this.container.clientWidth / this.container.clientHeight;
+          const baseSize = this.cameraFrustumSize + zoomOffset;
+          this.orthoCamera.left = -baseSize * aspect;
+          this.orthoCamera.right = baseSize * aspect;
+          this.orthoCamera.top = baseSize;
+          this.orthoCamera.bottom = -baseSize;
+          this.orthoCamera.updateProjectionMatrix();
+        }
       }
 
-      // Camera angle: elevation 0 = top-down (high Y, low Z offset), 1 = side-on (low Y, high Z)
-      const camY = 4 + (1 - this.cameraElevation) * 12; // 4-16 range
-      const camZOffset = 2 + this.cameraElevation * 16;  // 2-18 range
-      this.camera.position.set(this.cameraPosX + shakeX, camY + zoomOffset * 0.5, this.cameraPosZ + camZOffset + shakeZ);
-      this.camera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
+      if (this.chaseCamActive) {
+        // 3rd-person chase cam: behind and above Sweepo, looking forward
+        const facing = this.playerMesh.rotation.y;
+        // Camera sits behind the player relative to facing direction
+        const chaseDist = 2.5;  // distance behind
+        const chaseHeight = 1.8; // height above ground
+        const camX = this.playerCurrentX - Math.sin(facing) * chaseDist + shakeX;
+        const camZ = this.playerCurrentZ - Math.cos(facing) * chaseDist + shakeZ;
+        this.chaseCamera.position.set(camX, chaseHeight, camZ);
+        // Look ahead of the player
+        const lookDist = 2.0;
+        const lookX = this.playerCurrentX + Math.sin(facing) * lookDist;
+        const lookZ = this.playerCurrentZ + Math.cos(facing) * lookDist;
+        this.chaseCamera.lookAt(lookX, 0.6, lookZ);
+      } else {
+        // Orthographic top-down/isometric camera
+        const camY = 4 + (1 - this.cameraElevation) * 12; // 4-16 range
+        const camZOffset = 2 + this.cameraElevation * 16;  // 2-18 range
+        this.orthoCamera.position.set(this.cameraPosX + shakeX, camY + zoomOffset * 0.5, this.cameraPosZ + camZOffset + shakeZ);
+        this.orthoCamera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
+      }
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
 
       // Update movement trail
@@ -1936,55 +1978,78 @@ export class BrowserDisplay3D implements IGameDisplay {
       "models/synty-space-gltf/SM_Prop_Decontamination_Shower_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Crate_health_02.glb",
+      "models/synty-gltf/SM_X-ray.glb",
+      "models/synty-gltf/SM_First-aid_Kit.glb",
+      "models/synty-gltf/SM_Syringe.glb",
     ],
     "Engineering Storage": [
       "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
       "models/synty-space-gltf/SM_Prop_Detail_Box_02.glb",
       "models/synty-space-gltf/SM_Prop_Cart_01.glb",
-      "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
       "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
+      "models/synty-gltf/SM_Barrel_Oxygen.glb",
+      "models/synty-gltf/SM_Canister.glb",
+      "models/synty-gltf/SM_Floor_Locker_01.glb",
+      "models/synty-gltf/SM_Fuel_Tank.glb",
     ],
     "Life Support": [
       "models/synty-space-gltf/SM_Prop_AirVent_Large_01.glb",
       "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
-      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
       "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
+      "models/synty-gltf/SM_Ventilation.glb",
+      "models/synty-gltf/SM_Water_Tank.glb",
+      "models/synty-gltf/SM_Water_boiler.glb",
+      "models/synty-gltf/SM_Valve.glb",
     ],
     "Data Core": [
       "models/synty-space-gltf/SM_Prop_CenterTube_02.glb",
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
-      "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
+      "models/synty-gltf/SM_Computer.glb",
+      "models/synty-gltf/SM_Screen.glb",
+      "models/synty-gltf/SM_Floor_Locker_01.glb",
+      "models/synty-gltf/SM_Device_01.glb",
     ],
     "Robotics Bay": [
       "models/synty-space-gltf/SM_Prop_Desk_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Cart_01.glb",
       "models/synty-space-gltf/SM_Prop_ControlPanel_02.glb",
-      "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-gltf/SM_Device_03.glb",
+      "models/synty-gltf/SM_Treatment_Gun.glb",
+      "models/synty-gltf/SM_Canister_Holder_1.glb",
+      "models/synty-gltf/SM_Laboratory_Table.glb",
     ],
     "Research Lab": [
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Prop_Desk_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_CryoBed_01.glb",
-      "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
-      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-gltf/SM_Microscope.glb",
+      "models/synty-gltf/SM_Lab_Computer.glb",
+      "models/synty-gltf/SM__Flask_01.glb",
+      "models/synty-gltf/SM__Flask_02.glb",
+      "models/synty-gltf/SM_Laboratory_Table.glb",
     ],
     "Communications Hub": [
       "models/synty-space-gltf/SM_Prop_Satellite_Stand_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
       "models/synty-space-gltf/SM_Prop_Radar_Panel_01.glb",
       "models/synty-space-gltf/SM_Prop_Antenna_01.glb",
-      "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
+      "models/synty-gltf/SM_Screen.glb",
+      "models/synty-gltf/SM_Desktop.glb",
+      "models/synty-gltf/SM_Device_02.glb",
     ],
     "Power Relay Junction": [
       "models/synty-space-gltf/SM_Prop_Battery_03.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
       "models/synty-space-gltf/SM_Prop_ControlPanel_03.glb",
       "models/synty-space-gltf/SM_Prop_Battery_01.glb",
-      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-gltf/SM_Electric_Generator_For_Type_01.glb",
+      "models/synty-gltf/SM_Uranium_cell.glb",
+      "models/synty-gltf/SM_Box_for_energy_cells.glb",
+      "models/synty-gltf/SM_Electric_pipe.glb",
     ],
     "Bridge": [
       "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
@@ -1992,88 +2057,119 @@ export class BrowserDisplay3D implements IGameDisplay {
       "models/synty-space-gltf/SM_Prop_ControlPanel_01.glb",
       "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-gltf/SM_Desktop_01.glb",
+      "models/synty-gltf/SM_Chair.glb",
     ],
     "Engine Core": [
       "models/synty-space-gltf/SM_Prop_CenterTube_01.glb",
       "models/synty-space-gltf/SM_Prop_Battery_02.glb",
       "models/synty-space-gltf/SM_Prop_Panel_01.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
-      "models/synty-space-gltf/SM_Prop_ControlPanel_03.glb",
+      "models/synty-gltf/SM_Turbine_platform.glb",
+      "models/synty-gltf/SM_Boiler.glb",
+      "models/synty-gltf/SM_Pipe.glb",
+      "models/synty-gltf/SM_Foundry.glb",
     ],
     "Cargo Hold": [
       "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
       "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
       "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
       "models/synty-space-gltf/SM_Prop_Detail_Box_02.glb",
-      "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
+      "models/synty-gltf/SM_Container.glb",
+      "models/synty-gltf/SM_Barrel_Gas.glb",
+      "models/synty-gltf/SM_Barrel_Water.glb",
+      "models/synty-gltf/SM_Canister_Holder_2.glb",
     ],
     "Crew Quarters": [
       "models/synty-space-gltf/SM_Bld_Crew_Beds_01.glb",
       "models/synty-space-gltf/SM_Prop_Desk_Small_01.glb",
-      "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
       "models/synty-space-gltf/SM_Bld_Crew_Beds_01.glb",
-      "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
+      "models/synty-gltf/SM_Sofa.glb",
+      "models/synty-gltf/SM_Chair_Indoor.glb",
+      "models/synty-gltf/SM_Fridge.glb",
+      "models/synty-gltf/SM_Wall_Shelf.glb",
+      "models/synty-gltf/SM_Coffee_Table.glb",
     ],
     "Observation Deck": [
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
       "models/synty-space-gltf/SM_Bld_Bridge_Chair_01.glb",
+      "models/synty-gltf/SM_Window_For_Type_01.glb",
+      "models/synty-gltf/SM_Chair.glb",
     ],
     "Escape Pod Bay": [
       "models/synty-space-gltf/SM_Prop_EscapePod_Hatch_Small_01.glb",
       "models/synty-space-gltf/SM_Sign_AirLock_01.glb",
       "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
       "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
+      "models/synty-space-gltf/SM_Bld_Wall_EscPod_Hatch_01.glb",
+      "models/synty-space-gltf/SM_Veh_EscapePod_Small_01.glb",
     ],
     "Auxiliary Power": [
       "models/synty-space-gltf/SM_Prop_Battery_01.glb",
       "models/synty-space-gltf/SM_Prop_Battery_02.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
       "models/synty-space-gltf/SM_Prop_Battery_03.glb",
-      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-gltf/SM_Electric_Generator_02_For_Type_01.glb",
+      "models/synty-gltf/SM_Uranium_cell.glb",
+      "models/synty-gltf/SM_Fuel_Tank.glb",
     ],
     "Signal Room": [
       "models/synty-space-gltf/SM_Prop_Antenna_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Radar_Panel_01.glb",
-      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-gltf/SM_Detector.glb",
+      "models/synty-gltf/SM_Device_04.glb",
+      "models/synty-gltf/SM_Screen.glb",
     ],
     "Server Annex": [
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
-      "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
-      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-gltf/SM_Computer.glb",
+      "models/synty-gltf/SM_Floor_Locker_01.glb",
+      "models/synty-gltf/SM_Device_05.glb",
+      "models/synty-gltf/SM_Lab_Computer.glb",
     ],
     "Armory": [
       "models/synty-space-gltf/SM_Prop_Detail_Box_02.glb",
       "models/synty-space-gltf/SM_Prop_Crate_health_02.glb",
       "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
-      "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
+      "models/synty-gltf/SM_Wall_Locker_01.glb",
+      "models/synty-gltf/SM_Wall_Locker_02.glb",
+      "models/synty-gltf/SM_Floor_Locker_01.glb",
     ],
     "Arrival Bay": [
       "models/synty-space-gltf/SM_Prop_Cart_01.glb",
       "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
       "models/synty-space-gltf/SM_Prop_Barrel_01.glb",
       "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
+      "models/synty-gltf/SM_Container.glb",
+      "models/synty-gltf/SM_Canister.glb",
     ],
     "Emergency Shelter": [
       "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
       "models/synty-space-gltf/SM_Prop_Oxygen_Tank.glb",
       "models/synty-space-gltf/SM_Prop_Bed_Medical_01.glb",
-      "models/synty-space-gltf/SM_Prop_Crate_health_02.glb",
+      "models/synty-gltf/SM_First-aid_Kit.glb",
+      "models/synty-gltf/SM_Water_Tank.glb",
+      "models/synty-gltf/SM_Cryochamber.glb",
     ],
     "Maintenance Corridor": [
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
       "models/synty-space-gltf/SM_Prop_Panel_01.glb",
       "models/synty-space-gltf/SM_Prop_Cart_01.glb",
+      "models/synty-gltf/SM_Valve.glb",
+      "models/synty-gltf/SM_Pipe.glb",
     ],
     "Vent Control Room": [
       "models/synty-space-gltf/SM_Prop_AirVent_Large_01.glb",
       "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
-      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-gltf/SM_Ventilation.glb",
+      "models/synty-gltf/SM_Roof_ventilation.glb",
+      "models/synty-gltf/SM_Control_Panel.glb",
     ],
   };
 
@@ -2083,76 +2179,132 @@ export class BrowserDisplay3D implements IGameDisplay {
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
       "models/synty-space-gltf/SM_Prop_ControlPanel_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
+      "models/synty-gltf/SM_Screen.glb",
+      "models/synty-gltf/SM_Wall_remote_control.glb",
     ],
     "Data Core": [
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-gltf/SM_Screen.glb",
+      "models/synty-gltf/SM_Wall_remote_control.glb",
     ],
     "Communications Hub": [
       "models/synty-space-gltf/SM_Prop_Radar_Panel_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+      "models/synty-gltf/SM_Screen.glb",
+      "models/synty-gltf/SM_Camera.glb",
     ],
     "Engineering Storage": [
       "models/synty-space-gltf/SM_Prop_Panel_01.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-gltf/SM_Wall_Locker_01.glb",
+      "models/synty-gltf/SM_Lantern_1.glb",
     ],
     "Power Relay Junction": [
       "models/synty-space-gltf/SM_Prop_ControlPanel_03.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
       "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-gltf/SM_Wall_remote_control.glb",
+      "models/synty-gltf/SM_Electric_pipe.glb",
     ],
     "Life Support": [
       "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-gltf/SM_Wall_ventilation.glb",
+      "models/synty-gltf/SM_Valve.glb",
     ],
     "Med Bay": [
       "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-gltf/SM_Fisrt-aid_Kit_On_Wall.glb",
+      "models/synty-gltf/SM_Screen.glb",
     ],
     "Research Lab": [
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
+      "models/synty-gltf/SM_Screen.glb",
+      "models/synty-gltf/SM_Camera.glb",
     ],
     "Robotics Bay": [
       "models/synty-space-gltf/SM_Prop_ControlPanel_02.glb",
       "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+      "models/synty-gltf/SM_Wall_remote_control.glb",
+      "models/synty-gltf/SM_Lantern_1.glb",
     ],
     "Server Annex": [
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
       "models/synty-space-gltf/SM_Prop_Screen_02.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-gltf/SM_Screen.glb",
+      "models/synty-gltf/SM_Camera.glb",
     ],
     "Signal Room": [
       "models/synty-space-gltf/SM_Prop_Antenna_01.glb",
       "models/synty-space-gltf/SM_Prop_Radar_Panel_01.glb",
+      "models/synty-gltf/SM_Detector.glb",
+      "models/synty-gltf/SM_Screen.glb",
     ],
     "Observation Deck": [
       "models/synty-space-gltf/SM_Prop_Screen_01.glb",
+      "models/synty-gltf/SM_Window_For_Type_01.glb",
+      "models/synty-gltf/SM_Camera.glb",
     ],
     "Armory": [
       "models/synty-space-gltf/SM_Prop_Panel_01.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_02.glb",
+      "models/synty-gltf/SM_Wall_Locker_01.glb",
+      "models/synty-gltf/SM_Wall_Locker_02.glb",
     ],
     "Escape Pod Bay": [
       "models/synty-space-gltf/SM_Sign_AirLock_01.glb",
       "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-gltf/SM_Fisrt-aid_Kit_On_Wall.glb",
+      "models/synty-gltf/SM_Lantern_1.glb",
     ],
     "Crew Quarters": [
       "models/synty-space-gltf/SM_Prop_Screen_Small_01.glb",
+      "models/synty-gltf/SM_Wall_Shelf.glb",
+      "models/synty-gltf/SM_Lantern_1.glb",
     ],
     "Vent Control Room": [
       "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
       "models/synty-space-gltf/SM_Prop_ControlPanel_02.glb",
+      "models/synty-gltf/SM_Wall_ventilation.glb",
+      "models/synty-gltf/SM_Roof_ventilation.glb",
     ],
     "Auxiliary Power": [
       "models/synty-space-gltf/SM_Prop_Panel_01.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-gltf/SM_Wall_remote_control.glb",
+      "models/synty-gltf/SM_Electric_pipe.glb",
     ],
     "Engine Core": [
       "models/synty-space-gltf/SM_Prop_ControlPanel_03.glb",
       "models/synty-space-gltf/SM_Prop_Panel_01.glb",
       "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+      "models/synty-gltf/SM_Valve.glb",
+      "models/synty-gltf/SM_Pipe.glb",
+    ],
+    "Emergency Shelter": [
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-gltf/SM_Fisrt-aid_Kit_On_Wall.glb",
+      "models/synty-gltf/SM_Lantern_1.glb",
+    ],
+    "Maintenance Corridor": [
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-gltf/SM_Valve.glb",
+      "models/synty-gltf/SM_Pipe.glb",
+    ],
+    "Cargo Hold": [
+      "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+      "models/synty-gltf/SM_Wall_Locker_01.glb",
+      "models/synty-gltf/SM_Lantern_1.glb",
+    ],
+    "Arrival Bay": [
+      "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
+      "models/synty-space-gltf/SM_Sign_AirLock_01.glb",
+      "models/synty-gltf/SM_Camera.glb",
     ],
   };
 
@@ -2560,8 +2712,6 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (!BrowserDisplay3D._beamGeoH) {
       BrowserDisplay3D._beamGeoH = new THREE.BoxGeometry(1.04, 0.06, 0.08); // horizontal beam (X-axis)
       BrowserDisplay3D._beamGeoV = new THREE.BoxGeometry(0.08, 0.06, 1.04); // vertical beam (Z-axis)
-      BrowserDisplay3D._lightFixtureGeo = new THREE.BoxGeometry(0.3, 0.04, 0.3); // flat light housing
-      BrowserDisplay3D._lightBulbGeo = new THREE.SphereGeometry(0.08, 8, 6);
     }
 
     const ceilingY = 2.0; // ceiling height (matches wall top)
@@ -2612,45 +2762,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
-      // Place overhead light fixtures — one per 4-6 floor tiles (deterministic)
-      const lightColor = ROOM_LIGHT_COLORS[room.name] ?? 0xccddff;
-      const fixtureMat = makeToonMaterial({
-        color: 0x888899,
-        gradientMap: this.toonGradient,
-      });
-      const bulbMat = makeToonMaterial({
-        color: lightColor,
-        gradientMap: this.toonGradient,
-        emissive: lightColor,
-        emissiveIntensity: 0.8,
-      });
-
-      let fixtureCount = 0;
-      const maxFixtures = Math.min(4, Math.floor(room.width * room.height / 6));
-      for (let ry = room.y + 1; ry < room.y + room.height - 1; ry++) {
-        for (let rx = room.x + 1; rx < room.x + room.width - 1; rx++) {
-          if (fixtureCount >= maxFixtures) break;
-          if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
-          if (state.tiles[ry][rx].type !== TileType.Floor) continue;
-
-          // Deterministic placement: use position hash
-          const hash = ((rx * 23 + ry * 41 + room.x * 7) & 0xff);
-          if (hash > 40) continue; // ~15% density
-
-          // Light housing (flat box on ceiling)
-          const fixture = new THREE.Mesh(BrowserDisplay3D._lightFixtureGeo!, fixtureMat);
-          fixture.position.set(rx, ceilingY - 0.02, ry);
-          this.ceilingGroup.add(fixture);
-
-          // Glowing bulb hanging slightly below
-          const bulb = new THREE.Mesh(BrowserDisplay3D._lightBulbGeo!, bulbMat);
-          bulb.position.set(rx, ceilingY - 0.12, ry);
-          this.ceilingGroup.add(bulb);
-
-          fixtureCount++;
-        }
-        if (fixtureCount >= maxFixtures) break;
-      }
+      // (Ceiling light fixtures removed — they obscured the camera view)
     }
   }
 
@@ -2995,6 +3107,12 @@ export class BrowserDisplay3D implements IGameDisplay {
     "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
     "models/synty-space-gltf/SM_Prop_Wires_01.glb",
     "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
+    "models/synty-gltf/SM_Valve.glb",
+    "models/synty-gltf/SM_Pipe.glb",
+    "models/synty-gltf/SM_Camera.glb",
+    "models/synty-gltf/SM_Detector.glb",
+    "models/synty-gltf/SM_Lantern_1.glb",
+    "models/synty-gltf/SM_Wall_remote_control.glb",
   ];
 
   private placeCorridorWallProps(state: GameState): void {
@@ -3803,19 +3921,43 @@ export class BrowserDisplay3D implements IGameDisplay {
         break;
       }
       case EntityType.Console: {
-        // Angled screen on a stand
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.3),
-          makeToonMaterial({ color: 0x444455, gradientMap: this.toonGradient }));
-        const screen = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.03),
-          makeToonMaterial({ color: 0x112233, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.5 }));
-        screen.position.set(0, 0.25, 0.12);
-        screen.rotation.x = -0.3;
-        const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.22),
-          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3 }));
-        glow.position.set(0, 0.25, 0.14);
-        glow.rotation.x = -0.3;
-        group.add(base, screen, glow);
-        baseY = 0.2;
+        // Large multi-cell bridge console — wide U-shaped desk with multiple screens
+        const deskMat = makeToonMaterial({ color: 0x444455, gradientMap: this.toonGradient });
+        const screenMat = makeToonMaterial({ color: 0x112233, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.5 });
+        const glowMesh = (w: number, h: number, px: number, py: number, pz: number, rx: number) => {
+          const g = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3 }));
+          g.position.set(px, py, pz);
+          g.rotation.x = rx;
+          return g;
+        };
+        // Center desk section
+        const centerDesk = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.4, 0.5), deskMat);
+        centerDesk.position.set(0, 0.2, 0);
+        // Left wing
+        const leftWing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.8), deskMat);
+        leftWing.position.set(-0.85, 0.2, -0.3);
+        // Right wing
+        const rightWing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.8), deskMat);
+        rightWing.position.set(0.85, 0.2, -0.3);
+        // Center screens (3 monitors)
+        for (let si = -1; si <= 1; si++) {
+          const scr = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.03), screenMat);
+          scr.position.set(si * 0.45, 0.55, 0.18);
+          scr.rotation.x = -0.25;
+          group.add(scr, glowMesh(0.35, 0.22, si * 0.45, 0.55, 0.20, -0.25));
+        }
+        // Side screens (angled inward)
+        const leftScr = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.03), screenMat);
+        leftScr.position.set(-0.85, 0.5, -0.1);
+        leftScr.rotation.y = 0.5;
+        leftScr.rotation.x = -0.2;
+        const rightScr = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.03), screenMat);
+        rightScr.position.set(0.85, 0.5, -0.1);
+        rightScr.rotation.y = -0.5;
+        rightScr.rotation.x = -0.2;
+        group.add(centerDesk, leftWing, rightWing, leftScr, rightScr);
+        baseY = 0.05;
         break;
       }
       case EntityType.RepairCradle: {
@@ -3978,9 +4120,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       const dx = px - this.lastPlayerX;
       const dy = py - this.lastPlayerY;
       if (dx !== 0 || dy !== 0) {
-        // Synty Sweepo model needs -PI/2 correction from base atan2.
-        // Empirically calibrated: without offset the model is 90° CW from correct.
-        this.playerFacing = -Math.atan2(dy, dx) - Math.PI / 2;
+        // Synty Sweepo model needs +PI/2 correction (flipped 180° from previous -PI/2).
+        this.playerFacing = -Math.atan2(dy, dx) + Math.PI / 2;
       }
     }
     this.lastPlayerX = px;
@@ -4108,13 +4249,19 @@ export class BrowserDisplay3D implements IGameDisplay {
     const availW = window.innerWidth - sidebarWidth;
     const availH = window.innerHeight;
     const aspect = availW / availH;
+
+    // Update ortho camera frustum
     const fh = this.cameraFrustumSize;
     const fw = fh * aspect;
-    this.camera.left = -fw;
-    this.camera.right = fw;
-    this.camera.top = fh;
-    this.camera.bottom = -fh;
-    this.camera.updateProjectionMatrix();
+    this.orthoCamera.left = -fw;
+    this.orthoCamera.right = fw;
+    this.orthoCamera.top = fh;
+    this.orthoCamera.bottom = -fh;
+    this.orthoCamera.updateProjectionMatrix();
+
+    // Update chase camera aspect
+    this.chaseCamera.aspect = aspect;
+    this.chaseCamera.updateProjectionMatrix();
   }
 
   private handleWheel(e: WheelEvent): void {
@@ -4325,7 +4472,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       [EntityType.DataCore]: 0.7,            // large server rack
       [EntityType.LogTerminal]: 0.55,        // desk terminal
       [EntityType.SecurityTerminal]: 0.55,   // wall panel
-      [EntityType.Console]: 0.6,             // standing console
+      [EntityType.Console]: 1.8,             // large bridge console — spans ~2-3 cells
       [EntityType.RepairCradle]: 0.65,       // work bench
       [EntityType.ServiceBot]: 0.4,          // small bot
       [EntityType.RepairBot]: 0.45,          // medium bot
