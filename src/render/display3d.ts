@@ -564,11 +564,15 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Ceiling beam structure (cross-beams spanning rooms)
   private ceilingGroup: THREE.Group = new THREE.Group();
   private ceilingRooms: Set<string> = new Set();
+  // Corridor arch supports
+  private corridorArchTiles: Set<string> = new Set();
   // Shared ceiling geometries
   private static _beamGeoH: THREE.BoxGeometry | null = null;
   private static _beamGeoV: THREE.BoxGeometry | null = null;
   private static _lightFixtureGeo: THREE.BoxGeometry | null = null;
   private static _lightBulbGeo: THREE.SphereGeometry | null = null;
+  private static _archPostGeo: THREE.BoxGeometry | null = null;
+  private static _archSpanGeo: THREE.BoxGeometry | null = null;
 
   // Player movement trail
   private trailPoints: THREE.Points | null = null;
@@ -1088,6 +1092,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeRoomCeiling(state);
     this.placeCautionMarkings(state);
     this.placeCorridorPipes(state);
+    this.placeCorridorArches(state);
     this.placeCorridorWallProps(state);
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
@@ -2510,8 +2515,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private placeRoomCeiling(state: GameState): void {
     // Create shared geometries once
     if (!BrowserDisplay3D._beamGeoH) {
-      BrowserDisplay3D._beamGeoH = new THREE.BoxGeometry(1.04, 0.08, 0.1); // horizontal beam (X-axis)
-      BrowserDisplay3D._beamGeoV = new THREE.BoxGeometry(0.1, 0.08, 1.04); // vertical beam (Z-axis)
+      BrowserDisplay3D._beamGeoH = new THREE.BoxGeometry(1.04, 0.06, 0.08); // horizontal beam (X-axis)
+      BrowserDisplay3D._beamGeoV = new THREE.BoxGeometry(0.08, 0.06, 1.04); // vertical beam (Z-axis)
       BrowserDisplay3D._lightFixtureGeo = new THREE.BoxGeometry(0.3, 0.04, 0.3); // flat light housing
       BrowserDisplay3D._lightBulbGeo = new THREE.SphereGeometry(0.08, 8, 6);
     }
@@ -2530,19 +2535,19 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.ceilingRooms.add(room.id);
 
       const tint = ROOM_WALL_TINTS_3D[room.name] ?? COLORS_3D.wall;
-      // Beams: slightly darker than walls for contrast
-      const br = Math.max(0, ((tint >> 16) & 0xff) - 30);
-      const bg = Math.max(0, ((tint >> 8) & 0xff) - 30);
-      const bb = Math.max(0, (tint & 0xff) - 30);
+      // Beams: dark metallic grey with subtle room color influence (industrial look)
+      const br = Math.min(0x80, Math.round(((tint >> 16) & 0xff) * 0.25 + 0x40));
+      const bg = Math.min(0x80, Math.round(((tint >> 8) & 0xff) * 0.25 + 0x40));
+      const bb = Math.min(0x80, Math.round((tint & 0xff) * 0.25 + 0x48));
       const beamColor = (br << 16) | (bg << 8) | bb;
       const beamMat = makeToonMaterial({
         color: beamColor,
         gradientMap: this.toonGradient,
       });
 
-      // Place horizontal beams (running east-west) every 2 tiles
+      // Place horizontal beams (running east-west) every 3 tiles
       for (let ry = room.y; ry < room.y + room.height; ry++) {
-        if ((ry - room.y) % 2 !== 0) continue; // every 2nd row
+        if ((ry - room.y) % 3 !== 0) continue; // every 3rd row
         for (let rx = room.x; rx < room.x + room.width; rx++) {
           if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
           if (state.tiles[ry][rx].type !== TileType.Floor) continue;
@@ -2767,6 +2772,66 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
           this.pipeGroup.add(pipe2);
         }
+      }
+    }
+  }
+
+  // ── Private: corridor arch supports ────────────────────────────
+
+  private placeCorridorArches(state: GameState): void {
+    // Create shared geometry once
+    if (!BrowserDisplay3D._archPostGeo) {
+      BrowserDisplay3D._archPostGeo = new THREE.BoxGeometry(0.06, 1.6, 0.06); // vertical post
+      BrowserDisplay3D._archSpanGeo = new THREE.BoxGeometry(1.1, 0.06, 0.06);  // horizontal span
+    }
+
+    const archMat = makeToonMaterial({
+      color: 0x667788,
+      gradientMap: this.toonGradient,
+    });
+
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored || tile.type !== TileType.Corridor) continue;
+
+        const key = `arch_${x},${y}`;
+        if (this.corridorArchTiles.has(key)) continue;
+
+        // Place arches every 3rd corridor tile
+        if ((x + y * 3) % 3 !== 0) continue;
+        this.corridorArchTiles.add(key);
+
+        // Determine corridor direction
+        const hasE = x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Corridor;
+        const hasW = x > 0 && state.tiles[y][x - 1].type === TileType.Corridor;
+        const hasN = y > 0 && state.tiles[y - 1][x].type === TileType.Corridor;
+        const hasS = y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Corridor;
+        const isHorizontal = (hasE || hasW) && !hasN && !hasS;
+        const isVertical = (hasN || hasS) && !hasE && !hasW;
+
+        if (!isHorizontal && !isVertical) continue; // skip junctions
+
+        // Two posts on each side + a crossbar on top
+        const post1 = new THREE.Mesh(BrowserDisplay3D._archPostGeo!, archMat);
+        const post2 = new THREE.Mesh(BrowserDisplay3D._archPostGeo!, archMat);
+        const span = new THREE.Mesh(BrowserDisplay3D._archSpanGeo!, archMat);
+
+        if (isHorizontal) {
+          // Posts on north/south sides
+          post1.position.set(x, 0.8, y - 0.47);
+          post2.position.set(x, 0.8, y + 0.47);
+          span.position.set(x, 1.62, y);
+          span.rotation.y = Math.PI / 2; // rotate span to run N-S
+          span.scale.x = 0.86; // slightly narrower to fit between posts
+        } else {
+          // Posts on east/west sides
+          post1.position.set(x - 0.47, 0.8, y);
+          post2.position.set(x + 0.47, 0.8, y);
+          span.position.set(x, 1.62, y);
+        }
+
+        this.ceilingGroup.add(post1, post2, span);
       }
     }
   }
