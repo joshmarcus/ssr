@@ -2393,6 +2393,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private static _bbGeo: THREE.BoxGeometry | null = null;
   private static _railGeo: THREE.BoxGeometry | null = null;
   private static _pillarGeo: THREE.BoxGeometry | null = null;
+  private static _edgeGlowGeo: THREE.BoxGeometry | null = null;
 
   private placeRoomTrim(state: GameState): void {
     // Create shared geometries once
@@ -2400,6 +2401,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       BrowserDisplay3D._bbGeo = new THREE.BoxGeometry(1.02, 0.06, 0.08);
       BrowserDisplay3D._railGeo = new THREE.BoxGeometry(1.02, 0.04, 0.06);
       BrowserDisplay3D._pillarGeo = new THREE.BoxGeometry(0.08, 2.1, 0.08);
+      BrowserDisplay3D._edgeGlowGeo = new THREE.BoxGeometry(1.0, 0.02, 0.02); // very thin glow strip
     }
     const bbGeo = BrowserDisplay3D._bbGeo!;
     const railGeo = BrowserDisplay3D._railGeo!;
@@ -2424,6 +2426,14 @@ export class BrowserDisplay3D implements IGameDisplay {
         gradientMap: this.toonGradient,
         emissive: trimColor,
         emissiveIntensity: 0.15,
+      });
+
+      // Sci-fi edge glow: bright emissive strip at wall base
+      const glowMat = makeToonMaterial({
+        color: tint,
+        gradientMap: this.toonGradient,
+        emissive: tint,
+        emissiveIntensity: 0.6,
       });
 
       // Scan room perimeter for wall tiles adjacent to floor
@@ -2456,6 +2466,13 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
           this.trimGroup.add(bb);
 
+          // Sci-fi edge glow strip: thin bright line at floor-wall junction
+          const glow = new THREE.Mesh(BrowserDisplay3D._edgeGlowGeo!, glowMat);
+          glow.position.copy(bb.position);
+          glow.position.y = 0.01; // right at floor level
+          glow.rotation.copy(bb.rotation);
+          this.trimGroup.add(glow);
+
           // Top rail: thin strip at top of wall (shared geo)
           const rail = new THREE.Mesh(railGeo, trimMat);
           rail.position.copy(bb.position);
@@ -2472,11 +2489,14 @@ export class BrowserDisplay3D implements IGameDisplay {
           const tile = state.tiles[y][x];
           if (tile.type !== TileType.Door && tile.type !== TileType.LockedDoor) continue;
 
+          const isLocked = tile.type === TileType.LockedDoor;
+          const frameColor = isLocked ? 0xff6666 : 0xeedd88;
+          const frameEmissive = isLocked ? 0xff2222 : 0xccaa44;
           const frameMat = makeToonMaterial({
-            color: tile.type === TileType.LockedDoor ? 0xff6666 : 0xeedd88,
+            color: frameColor,
             gradientMap: this.toonGradient,
-            emissive: tile.type === TileType.LockedDoor ? 0xff2222 : 0xccaa44,
-            emissiveIntensity: 0.2,
+            emissive: frameEmissive,
+            emissiveIntensity: 0.3,
           });
 
           // Determine door orientation (horizontal or vertical)
@@ -2506,6 +2526,22 @@ export class BrowserDisplay3D implements IGameDisplay {
           const lintel = new THREE.Mesh(lintelGeo, frameMat);
           lintel.position.set(x, 2.05, y);
           this.trimGroup.add(lintel);
+
+          // Floor threshold glow strip — bright line at door base
+          const thresholdMat = makeToonMaterial({
+            color: frameColor,
+            gradientMap: this.toonGradient,
+            emissive: frameEmissive,
+            emissiveIntensity: 0.7,
+          });
+          const threshGeo = new THREE.BoxGeometry(
+            isHorizontal ? 0.06 : 0.85,
+            0.015,
+            isHorizontal ? 0.85 : 0.06
+          );
+          const threshold = new THREE.Mesh(threshGeo, thresholdMat);
+          threshold.position.set(x, 0.008, y);
+          this.trimGroup.add(threshold);
         }
       }
     }
