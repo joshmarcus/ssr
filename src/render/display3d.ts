@@ -96,6 +96,7 @@ const ENTITY_COLORS_3D: Record<string, number> = {
 const ROOM_WALL_TINTS_3D: Record<string, number> = {
   "Engineering Storage": 0x998870,
   "Power Relay Junction": 0x998860,
+  "Engine Core": 0x997050,
   "Life Support": 0x708899,
   "Vent Control Room": 0x707899,
   "Communications Hub": 0x707899,
@@ -103,6 +104,18 @@ const ROOM_WALL_TINTS_3D: Record<string, number> = {
   "Med Bay": 0x907080,
   "Data Core": 0x906898,
   "Robotics Bay": 0x888888,
+  "Bridge": 0x808898,
+  "Observation Deck": 0x708090,
+  "Escape Pod Bay": 0x709078,
+  "Auxiliary Power": 0x908860,
+  "Signal Room": 0x707098,
+  "Server Annex": 0x887098,
+  "Armory": 0x906060,
+  "Emergency Shelter": 0x709068,
+  "Cargo Hold": 0x908060,
+  "Crew Quarters": 0x908870,
+  "Arrival Bay": 0x708878,
+  "Maintenance Corridor": 0x808080,
 };
 
 // Room ambient light colors — warm/cool per room function
@@ -117,6 +130,16 @@ const ROOM_LIGHT_COLORS: Record<string, number> = {
   "Data Core": 0xaa44ff,             // purple
   "Robotics Bay": 0x88aacc,          // neutral blue
   "Arrival Bay": 0x88ccaa,           // teal
+  "Observation Deck": 0x6688bb,      // sky blue
+  "Escape Pod Bay": 0x44ffaa,        // emergency green
+  "Auxiliary Power": 0xffaa33,       // amber
+  "Signal Room": 0x4466ff,           // deep blue
+  "Server Annex": 0x8844dd,          // violet
+  "Armory": 0xcc4444,               // red
+  "Emergency Shelter": 0x66cc88,     // calm green
+  "Maintenance Corridor": 0x778899,  // grey-blue
+  "Cargo Hold": 0xaa8844,           // warm brown
+  "Crew Quarters": 0xddaa66,        // warm gold
   "Corridor": 0x667788,              // dim grey-blue
 };
 
