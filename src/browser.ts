@@ -39,6 +39,8 @@ import {
   COOLANT_CASCADE_WARNINGS, HULL_BREACH_CORRUPTION_WARNINGS,
   SABOTAGE_ORGANISM_WARNINGS, SIGNAL_PULSE_WARNINGS,
   CORVUS_FINAL_APPROACH,
+  CORVUS_MISSION_BRIEFING,
+  PACING_NUDGE_CLEAN, PACING_NUDGE_INVESTIGATE, PACING_NUDGE_RECOVER, PACING_NUDGE_EVACUATE,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
@@ -250,6 +252,8 @@ let sensorBlockedTurns = 0; // SignalAnomaly: turns remaining with sensors block
 let lastEvidenceViewCount = 0; // journal count when EVIDENCE tab was last viewed
 let scrubberHintFired = false; // one-time hint when scrubber first activates
 let beaconHintFired = false; // one-time hint when beacon first deploys
+let lastProgressTurn = 0; // last turn where player made meaningful progress
+let lastNudgeTurn = 0; // prevent nudge spam
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
 
 // ── Wait message variety ────────────────────────────────────────
@@ -760,6 +764,15 @@ function initGame(): void {
   display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. Rover A3 online.", "milestone");
   display.addLog(MOOD_FLAVOR[stationMood], "narrative");
   display.addLog(CORVUS_GREETING[corvusPersonality], "narrative");
+
+  // Archetype-specific mission briefing (3 lines setting stakes)
+  const briefingArchetype = state.mystery?.timeline?.archetype;
+  if (briefingArchetype && CORVUS_MISSION_BRIEFING[briefingArchetype]) {
+    for (const line of CORVUS_MISSION_BRIEFING[briefingArchetype]) {
+      display.addLog(line, "narrative");
+    }
+  }
+
   display.addLog("Use arrow keys or h/j/k/l to move. Approach objects and press [i] to interact.", "system");
   lastObjectivePhase = ObjectivePhase.Clean;
 
@@ -1014,6 +1027,8 @@ function resetGameState(newSeed: number): void {
   lastEvidenceViewCount = 0;
   scrubberHintFired = false;
   beaconHintFired = false;
+  lastProgressTurn = 0;
+  lastNudgeTurn = 0;
   pendingCrewDoor = null;
   journalTab = "evidence";
   choiceSelectedIdx = 0;
@@ -1598,6 +1613,34 @@ function handleAction(action: Action): void {
         const idx = ((state.turn / 25) | 0) % pool.length;
         display.addLog(pool[idx], "narrative");
       }
+    }
+  }
+
+  // ── Track progress for pacing nudges ──
+  if (state.turn !== prevTurn) {
+    // Count interaction or new room entry as progress
+    if (action.type === ActionType.Interact || action.type === ActionType.Scan) {
+      lastProgressTurn = state.turn;
+    }
+    // New room entry counts as progress
+    const currentRoomId = getRoomAt(state, state.player.entity.pos)?.name ?? "";
+    if (currentRoomId && currentRoomId !== lastPlayerRoomId) {
+      lastProgressTurn = state.turn;
+    }
+
+    // Fire nudge after 8 turns of no progress (max once per 12 turns)
+    const turnsSinceProgress = state.turn - lastProgressTurn;
+    const turnsSinceNudge = state.turn - lastNudgeTurn;
+    if (turnsSinceProgress >= 8 && turnsSinceNudge >= 12 && !state.gameOver) {
+      const phase = state.mystery?.objectivePhase;
+      let nudgePool: string[];
+      if (phase === ObjectivePhase.Evacuate) nudgePool = PACING_NUDGE_EVACUATE;
+      else if (phase === ObjectivePhase.Recover) nudgePool = PACING_NUDGE_RECOVER;
+      else if (phase === ObjectivePhase.Investigate) nudgePool = PACING_NUDGE_INVESTIGATE;
+      else nudgePool = PACING_NUDGE_CLEAN;
+      const nudgeIdx = (state.turn * 7 + state.seed) % nudgePool.length;
+      display.addLog(nudgePool[nudgeIdx], "system");
+      lastNudgeTurn = state.turn;
     }
   }
 

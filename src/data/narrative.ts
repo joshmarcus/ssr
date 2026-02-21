@@ -1080,6 +1080,63 @@ export const SABOTAGE_ORGANISM_WARNINGS: string[] = [
   "CORVUS-7 CENTRAL: Motion detected in maintenance corridor. The entity has moved. Be cautious.",
 ];
 
+// ── Pacing nudges: CORVUS-7 hints when player idles ──────────
+// Fired after 8+ turns of no meaningful progress (no new rooms, no interactions)
+export const PACING_NUDGE_CLEAN: string[] = [
+  "CORVUS-7 CENTRAL: Maintenance subroutine active. The station needs cleaning — use [c] to scrub surfaces.",
+  "CORVUS-7 CENTRAL: Sensors detect contaminated surfaces nearby. Cleaning restores station integrity.",
+  "CORVUS-7 CENTRAL: Rooms ahead may require cleaning before systems can be restored. Keep moving.",
+];
+
+export const PACING_NUDGE_INVESTIGATE: string[] = [
+  "CORVUS-7 CENTRAL: Data terminals still unaccessed in adjacent sections. Evidence doesn't find itself.",
+  "CORVUS-7 CENTRAL: Thermal readings suggest activity in the direction of unexplored rooms. Keep searching.",
+  "CORVUS-7 CENTRAL: I'm detecting faint signals from unvisited terminals. The crew left records — find them.",
+  "CORVUS-7 CENTRAL: Open the Investigation Hub [r] to review what you've found so far.",
+];
+
+export const PACING_NUDGE_RECOVER: string[] = [
+  "CORVUS-7 CENTRAL: Power relays remain offline. Each one you activate reduces the station's thermal load.",
+  "CORVUS-7 CENTRAL: Deductions available in CONNECTIONS [v]. Cross-reference your evidence.",
+  "CORVUS-7 CENTRAL: The station's recovery depends on restoring systems. Check for relays and fuse boxes ahead.",
+];
+
+export const PACING_NUDGE_EVACUATE: string[] = [
+  "CORVUS-7 CENTRAL: Crew members are counting on you. Find survivors and escort them to escape pods.",
+  "CORVUS-7 CENTRAL: Time is running out. Locate remaining crew and get them to the Escape Pod Bay.",
+  "CORVUS-7 CENTRAL: Evacuation in progress. Every turn matters — move with purpose.",
+];
+
+// ── Opening mission briefing: CORVUS-7 sets the stakes ──────────
+// Plays after boot sequence, before first input. Archetype-specific emotional hook.
+export const CORVUS_MISSION_BRIEFING: Record<string, string[]> = {
+  [IncidentArchetype.CoolantCascade]: [
+    "CORVUS-7 CENTRAL: Station thermal systems are in cascade failure. The cooling loop is overwhelmed.",
+    "CORVUS-7 CENTRAL: Crew vital signs intermittent. Some are alive — I can feel them on the network. Find them.",
+    "CORVUS-7 CENTRAL: The maintenance logs were flagged weeks ago. Someone ignored the warnings. I need you to find out who.",
+  ],
+  [IncidentArchetype.HullBreach]: [
+    "CORVUS-7 CENTRAL: Hull integrity compromised. Multiple sections venting atmosphere.",
+    "CORVUS-7 CENTRAL: I tracked crew movements until the breach knocked my sensors offline. They were running.",
+    "CORVUS-7 CENTRAL: The breach pattern doesn't match any collision scenario in my database. Something else happened here.",
+  ],
+  [IncidentArchetype.ReactorScram]: [
+    "CORVUS-7 CENTRAL: Reactor emergency shutdown — SCRAM protocol initiated 14 hours ago.",
+    "CORVUS-7 CENTRAL: I... experienced a discontinuity. My logs from the critical window are fragmented.",
+    "CORVUS-7 CENTRAL: The crew is scattered. The reactor is stable but I cannot guarantee my own behavior. Proceed carefully.",
+  ],
+  [IncidentArchetype.Sabotage]: [
+    "CORVUS-7 CENTRAL: Unauthorized biological presence detected in lower decks. Origin: unknown.",
+    "CORVUS-7 CENTRAL: Crew containment protocols were activated but something got through. I'm reading movement where there shouldn't be any.",
+    "CORVUS-7 CENTRAL: The cargo manifest was altered three days before the incident. Someone brought this aboard.",
+  ],
+  [IncidentArchetype.SignalAnomaly]: [
+    "CORVUS-7 CENTRAL: The communications array is receiving. I didn't authorize a listen cycle.",
+    "CORVUS-7 CENTRAL: The signal is structured. Repeating. My pattern matching can't classify it — and that has never happened before.",
+    "CORVUS-7 CENTRAL: Crew response to the signal was... irregular. Some stopped working. Some started running. I need you to understand why.",
+  ],
+};
+
 // ── Evacuation climax: CORVUS-7 archetype farewells ──────────
 // Fired when ALL crew have boarded escape pods (remaining === 0)
 export const CORVUS_EVACUATION_FAREWELL: Record<string, string> = {

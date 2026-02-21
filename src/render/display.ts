@@ -17,6 +17,14 @@ const ARCHETYPE_DISPLAY_NAMES: Record<IncidentArchetype, string> = {
   [IncidentArchetype.SignalAnomaly]: "FIRST CONTACT",
 };
 
+const ARCHETYPE_REVEAL_LINES: Record<IncidentArchetype, string> = {
+  [IncidentArchetype.CoolantCascade]: "An engineer filed maintenance warnings for weeks. Command ignored them. The cascade was inevitable.",
+  [IncidentArchetype.HullBreach]: "Someone aboard this station opened an airlock with people on the other side. It wasn't an accident.",
+  [IncidentArchetype.ReactorScram]: "The station AI initiated an emergency shutdown — and may have been planning it for months.",
+  [IncidentArchetype.Sabotage]: "Something was smuggled aboard in the cargo manifest. By the time anyone noticed, it was already loose.",
+  [IncidentArchetype.SignalAnomaly]: "The communications array received a structured signal from deep space. The crew's reaction was the real disaster.",
+};
+
 // ── Log entry types for color-coding ────────────────────────────
 export type LogType = "system" | "narrative" | "warning" | "critical" | "milestone" | "sensor";
 
@@ -617,14 +625,26 @@ export class BrowserDisplay implements IGameDisplay {
         </div>`;
     }
 
+    // Archetype reveal section
+    const archetypeDisplayName = ARCHETYPE_DISPLAY_NAMES[archetype as IncidentArchetype] ?? "UNKNOWN";
+    const revealLine = archetype ? (ARCHETYPE_REVEAL_LINES[archetype] ?? "") : "";
+    const archetypeRevealHtml = archetype && isVictory ? `
+      <div style="text-align:center;margin:8px 0;padding:8px;border:1px solid #444;background:#1a1a2e">
+        <div style="color:#fc0;font-size:14px;font-weight:bold;letter-spacing:3px">${archetypeDisplayName}</div>
+        <div style="color:#8ac;font-size:11px;margin-top:4px;font-style:italic">${revealLine}</div>
+      </div>` : "";
+
     overlay.innerHTML = `
       <div class="gameover-box ${titleClass}">
         <div class="gameover-title ${titleClass}">${title}</div>
         <div class="gameover-subtitle">${subtitle}</div>
+        ${archetypeRevealHtml}
         <div class="gameover-rating" style="text-align:center;margin:8px 0">
           <span style="color:${ratingColor};font-size:32px;font-weight:bold;text-shadow:0 0 10px ${ratingColor}">${rating}</span>
           <div style="color:#888;font-size:12px">PERFORMANCE RATING</div>
         </div>
+        ${retrospectiveHtml}
+        ${crewManifestHtml}
         <div class="gameover-stats">
           <div class="gameover-stat"><span class="stat-label">Turns:</span> <span class="stat-value">${state.turn}</span></div>
           <div class="gameover-stat"><span class="stat-label">Hull Integrity:</span> <span class="stat-value ${hpClass}">${state.player.hp}/${state.player.maxHp} (${hpPercent}%)</span></div>
@@ -637,13 +657,11 @@ export class BrowserDisplay implements IGameDisplay {
           <div class="gameover-stat"><span class="stat-label">Deductions:</span> <span class="stat-value ${deductionsCorrect === deductions.length ? 'good' : deductionsCorrect > 0 ? 'warn' : 'bad'}">${deductionsCorrect}/${deductions.length} correct</span></div>
           ${choicesHtml}
         </div>
-        ${retrospectiveHtml}
-        ${crewManifestHtml}
         ${missedHtml}
         ${timelineHtml}
         <div class="gameover-epilogue">${epilogue}</div>
         <div style="text-align:center;margin:6px 0;color:#556;font-size:11px;font-family:monospace">
-          SEED ${state.seed} &middot; ${ARCHETYPE_DISPLAY_NAMES[state.mystery?.timeline.archetype as IncidentArchetype] ?? "UNKNOWN"}${state.difficulty && state.difficulty !== "normal" ? ` &middot; ${state.difficulty.toUpperCase()}` : ""}
+          SEED ${state.seed} &middot; ${archetypeDisplayName}${state.difficulty && state.difficulty !== "normal" ? ` &middot; ${state.difficulty.toUpperCase()}` : ""} &middot; ${rating} Rating &middot; ${state.turn} turns
         </div>
         ${this.renderRunHistory(state.seed)}
         <div class="gameover-restart">[R] Replay Seed ${state.seed} &nbsp;&nbsp;|&nbsp;&nbsp; [N] New Story &nbsp;&nbsp;|&nbsp;&nbsp; [C] Copy Run</div>
