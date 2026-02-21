@@ -406,17 +406,17 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   [EntityType.ServiceBot]: "models/synty-space-gltf/SM_Veh_Drone_Attach_01.glb",
   [EntityType.LogTerminal]: "models/synty-space-gltf/SM_Bld_Crew_Desk_01.glb",
   [EntityType.SecurityTerminal]: "models/synty-space-gltf/SM_Bld_Bridge_Console_01.glb",
-  [EntityType.MedKit]: "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
+  [EntityType.MedKit]: "models/Items/GLTF/Pickup_Health.gltf",
   [EntityType.CrewItem]: "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
   [EntityType.ClosedDoor]: "models/synty-space-gltf/SM_Bld_Wall_Doorframe_01.glb",
-  [EntityType.RepairBot]: "models/synty-space-gltf/SM_Veh_Drone_Repair_01.glb",
+  [EntityType.RepairBot]: "models/quaternius-robot/Robot.glb",
   [EntityType.Drone]: "models/synty-space-gltf/SM_Veh_Drone_Attach_01.glb",
-  [EntityType.PatrolDrone]: "models/synty-space-gltf/SM_Veh_Drone_Attach_01.glb",
+  [EntityType.PatrolDrone]: "models/Characters/GLTF/Enemy_Flying.gltf",
   [EntityType.EscapePod]: "models/synty-space-gltf/SM_Veh_EscapePod_Large_01.glb",
-  [EntityType.CrewNPC]: "models/synty-space-gltf/SK_Chr_Crew_Male_01.glb",
-  [EntityType.Airlock]: "models/synty-space-gltf/SM_Bld_Wall_Doorframe_02.glb",
-  [EntityType.ToolPickup]: "models/synty-space-gltf/SM_Prop_Cart_01.glb",
-  [EntityType.UtilityPickup]: "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
+  [EntityType.CrewNPC]: "models/Characters/GLTF/Astronaut_FernandoTheFlamingo.gltf",
+  [EntityType.Airlock]: "models/kenney-space/gate-door.glb",
+  [EntityType.ToolPickup]: "models/Items/GLTF/Pickup_Crate.gltf",
+  [EntityType.UtilityPickup]: "models/Items/GLTF/Pickup_Thunder.gltf",
   [EntityType.Console]: "models/synty-space-gltf/SM_Bld_Bridge_Console_01.glb",
   [EntityType.RepairCradle]: "models/synty-space-gltf/SM_Prop_CryoBed_01.glb",
   [EntityType.PressureValve]: "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
@@ -1809,6 +1809,14 @@ export class BrowserDisplay3D implements IGameDisplay {
           // Sensor overlays on floor tiles
           if (tile.visible) {
             baseColor = this.applyFloorSensorColor(tile, baseColor);
+          }
+
+          // Subtle checkerboard floor pattern for visual texture
+          if (tile.type !== TileType.Corridor && (x + y) % 2 === 0) {
+            const cr = Math.max(0, ((baseColor >> 16) & 0xff) - 8);
+            const cg = Math.max(0, ((baseColor >> 8) & 0xff) - 8);
+            const cb = Math.max(0, (baseColor & 0xff) - 8);
+            baseColor = (cr << 16) | (cg << 8) | cb;
           }
 
           // Simulated ambient occlusion: darken floor tiles adjacent to walls
