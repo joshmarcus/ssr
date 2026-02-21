@@ -188,11 +188,20 @@ function showOpeningCrawl(): void {
 try { localStorage.setItem(LAST_SEED_KEY, String(seed)); } catch { /* ignore */ }
 let state = generate(seed, difficulty);
 let display: IGameDisplay = undefined!; // assigned in initGame()
-let is3D = false;
+let is3D = true; // default to 3D mode
 
-// Lazy-loaded 3D renderer constructor — only populated when user first presses F3
+// 3D renderer constructor — eagerly loaded on startup
 let BrowserDisplay3D: (new (container: HTMLElement, w: number, h: number) => IGameDisplay) | null = null;
 let display3dLoadFailed = false;
+
+// Eagerly load 3D renderer module so it's ready by the time the crawl is dismissed
+import("./render/display3d.js").then((mod) => {
+  BrowserDisplay3D = mod.BrowserDisplay3D;
+}).catch((err) => {
+  console.warn("Failed to preload 3D renderer module:", err);
+  display3dLoadFailed = true;
+  is3D = false; // fall back to 2D
+});
 let inputHandler: InputHandler;
 let lastPlayerRoomId = "";
 const visitedRoomIds = new Set<string>();

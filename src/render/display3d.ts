@@ -26,24 +26,27 @@ function createToonGradient(): THREE.DataTexture {
   return tex;
 }
 
-/** Create a toon material with optional emissive glow */
+/** Create a material with optional emissive glow.
+ *  Currently uses MeshStandardMaterial for proper texture display.
+ *  Switch to MeshToonMaterial + gradientMap for cel-shaded look. */
 function makeToonMaterial(opts: {
   color: number;
-  gradientMap: THREE.DataTexture;
+  gradientMap?: THREE.DataTexture;
   emissive?: number;
   emissiveIntensity?: number;
   transparent?: boolean;
   opacity?: number;
   map?: THREE.Texture | null;
-}): THREE.MeshToonMaterial {
-  return new THREE.MeshToonMaterial({
+}): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
     color: opts.color,
-    gradientMap: opts.gradientMap,
     emissive: opts.emissive ?? 0x000000,
     emissiveIntensity: opts.emissiveIntensity ?? 0,
     transparent: opts.transparent ?? false,
     opacity: opts.opacity ?? 1.0,
     map: opts.map ?? undefined,
+    roughness: 0.7,
+    metalness: 0.1,
   });
 }
 
@@ -61,7 +64,7 @@ const COLORS_3D = {
 } as const;
 
 // How many world-units tall the visible area is (zoom level)
-const CAMERA_FRUSTUM_SIZE = 12;
+const CAMERA_FRUSTUM_SIZE = 8; // zoomed in for better detail
 
 const ENTITY_COLORS_3D: Record<string, number> = {
   [EntityType.Relay]: 0xffcc00,
@@ -167,31 +170,39 @@ const ENTITY_COLORS_CSS: Record<string, string> = {
 // ── GLTF Model paths ────────────────────────────────────────────
 // Synty FBX files are converted to GLTF via convert-models script.
 // Quaternius models are already GLTF.
-const WALL_MODEL_PATH = "models/kenney-space/template-wall.glb";
-const WALL_CORNER_MODEL_PATH = "models/kenney-space/template-wall-corner.glb";
-const FLOOR_MODEL_PATH = "models/kenney-space/template-floor.glb";
+// Tile model paths (Synty Space building pieces)
+const WALL_MODEL_PATH = "models/synty-space-gltf/SM_Bld_Wall_01.glb";
+const WALL_CORNER_MODEL_PATH = "models/synty-space-gltf/SM_Bld_Wall_03.glb";
+const FLOOR_MODEL_PATH = "models/synty-space-gltf/SM_Bld_Floor_Small_01.glb";
 
 const MODEL_PATHS: Partial<Record<string, string>> = {
-  player: "models/Vehicles/GLTF/Rover_Round.gltf",
-  [EntityType.Relay]: "models/synty-gltf/SM_Electric_Generator_For_Type_01.glb",
-  [EntityType.SensorPickup]: "models/synty-gltf/SM_Detector.glb",
-  [EntityType.DataCore]: "models/synty-gltf/SM_Lab_Computer.glb",
-  [EntityType.ServiceBot]: "models/quaternius-robot/Robot.glb",
-  [EntityType.LogTerminal]: "models/synty-gltf/SM_Lab_Computer.glb",
-  [EntityType.SecurityTerminal]: "models/synty-gltf/SM_Camera.glb",
-  [EntityType.MedKit]: "models/synty-gltf/SM_Box_for_energy_cells.glb",
-  [EntityType.CrewItem]: "models/synty-gltf/SM_Floor_Locker_01.glb",
-  [EntityType.ClosedDoor]: "models/synty-gltf/SM_Door_For_Type_01.glb",
-  [EntityType.RepairBot]: "models/Characters/GLTF/Mech_FinnTheFrog.gltf",
-  [EntityType.Drone]: "models/Characters/GLTF/Mech_BarbaraTheBee.gltf",
-  [EntityType.PatrolDrone]: "models/Characters/GLTF/Mech_BarbaraTheBee.gltf",
-  [EntityType.EscapePod]: "models/synty-gltf/SM_Container.glb",
-  [EntityType.CrewNPC]: "models/Characters/GLTF/Astronaut_FernandoTheFlamingo.gltf",
-  [EntityType.Airlock]: "models/kenney-space/gate-door.glb",
-  [EntityType.ToolPickup]: "models/Items/GLTF/Pickup_KeyCard.gltf",
-  [EntityType.UtilityPickup]: "models/Items/GLTF/Pickup_Thunder.gltf",
-  [EntityType.Console]: "models/synty-gltf/SM_Computer.glb",
-  [EntityType.RepairCradle]: "models/synty-gltf/SM_Laboratory_Table.glb",
+  // Player bot (Sweepo cleaning robot)
+  player: "models/synty-space-gltf/SM_Veh_Sweepo_01.glb",
+  // Station systems
+  [EntityType.Relay]: "models/synty-space-gltf/SM_Prop_Battery_01.glb",
+  [EntityType.SensorPickup]: "models/synty-space-gltf/SM_Prop_Antenna_01.glb",
+  [EntityType.DataCore]: "models/synty-space-gltf/SM_Prop_CenterTube_01.glb",
+  [EntityType.ServiceBot]: "models/synty-space-gltf/SM_Veh_Drone_Attach_01.glb",
+  [EntityType.LogTerminal]: "models/synty-space-gltf/SM_Bld_Crew_Desk_01.glb",
+  [EntityType.SecurityTerminal]: "models/synty-space-gltf/SM_Bld_Bridge_Console_01.glb",
+  [EntityType.MedKit]: "models/synty-space-gltf/SM_Prop_Crate_health_01.glb",
+  [EntityType.CrewItem]: "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
+  [EntityType.ClosedDoor]: "models/synty-space-gltf/SM_Bld_Wall_Doorframe_01.glb",
+  [EntityType.RepairBot]: "models/synty-space-gltf/SM_Veh_Drone_Repair_01.glb",
+  [EntityType.Drone]: "models/synty-space-gltf/SM_Veh_Drone_Attach_01.glb",
+  [EntityType.PatrolDrone]: "models/synty-space-gltf/SM_Veh_Drone_Attach_01.glb",
+  [EntityType.EscapePod]: "models/synty-space-gltf/SM_Veh_EscapePod_Large_01.glb",
+  [EntityType.CrewNPC]: "models/synty-space-gltf/SK_Chr_Crew_Male_01.glb",
+  [EntityType.Airlock]: "models/synty-space-gltf/SM_Sign_AirLock_01.glb",
+  [EntityType.ToolPickup]: "models/synty-space-gltf/SM_Wep_Pistol_01.glb",
+  [EntityType.UtilityPickup]: "models/synty-space-gltf/SM_Prop_Oxygen_Tank_Small.glb",
+  [EntityType.Console]: "models/synty-space-gltf/SM_Prop_ControlPanel_02.glb",
+  [EntityType.RepairCradle]: "models/synty-space-gltf/SM_Prop_CryoBed_01.glb",
+  [EntityType.PressureValve]: "models/synty-space-gltf/SM_Prop_AirVent_Small_01.glb",
+  [EntityType.FuseBox]: "models/synty-space-gltf/SM_Prop_Panel_01.glb",
+  [EntityType.PowerCell]: "models/synty-space-gltf/SM_Prop_Battery_02.glb",
+  [EntityType.Breach]: "models/synty-space-gltf/SM_Prop_Wires_01.glb",
+  [EntityType.EvidenceTrace]: "models/synty-space-gltf/SM_Prop_Buttons_01.glb",
 };
 
 // ── BrowserDisplay3D ─────────────────────────────────────────────
@@ -269,6 +280,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Room lights (colored point lights at room centers)
   private roomLights: Map<string, THREE.PointLight> = new Map();
 
+  // Synty texture atlas (loaded at startup, applied to models that lack embedded textures)
+  private syntyAtlas: THREE.Texture | null = null;
+
   constructor(container: HTMLElement, mapWidth?: number, mapHeight?: number) {
     this.container = container;
     this.mapWidth = mapWidth ?? DEFAULT_MAP_WIDTH;
@@ -302,7 +316,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     );
     // Isometric-ish offset: camera sits above+behind the target
     // Will be repositioned each frame to follow the player
-    this.camera.position.set(0, 20, 12);
+    this.camera.position.set(0, 12, 14);
     this.camera.lookAt(0, 0, 0);
 
     // ── Cel-shading: Outline Effect ──
@@ -341,7 +355,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     // (Three.js multiplies material color * instance color, so white = passthrough)
     const floorGeo = new THREE.PlaneGeometry(1, 1);
     floorGeo.rotateX(-Math.PI / 2);
-    const floorMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const floorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.floorMesh = new THREE.InstancedMesh(floorGeo, floorMat, this.maxTiles);
     this.floorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.floorMesh.frustumCulled = false; // instances span entire map
@@ -349,7 +363,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.add(this.floorMesh);
 
     const wallGeo = new THREE.BoxGeometry(1, 1.5, 1);
-    const wallMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const wallMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, this.maxTiles);
     this.wallMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.wallMesh.frustumCulled = false;
@@ -358,7 +372,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Corner walls (placeholder geo, replaced when model loads)
     const cornerGeo = new THREE.BoxGeometry(1, 1.5, 1);
-    const cornerMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const cornerMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.wallCornerMesh = new THREE.InstancedMesh(cornerGeo, cornerMat, this.maxTiles);
     this.wallCornerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.wallCornerMesh.frustumCulled = false;
@@ -366,7 +380,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.add(this.wallCornerMesh);
 
     const doorGeo = new THREE.BoxGeometry(0.8, 1.0, 0.15);
-    const doorMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const doorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.doorMesh = new THREE.InstancedMesh(doorGeo, doorMat, 200);
     this.doorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.doorMesh.frustumCulled = false;
@@ -414,9 +428,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Start animation loop ──
     this.animate();
 
-    // ── Load GLTF models ──
-    this.loadTileModels();
-    this.loadModels();
+    // ── Load Synty texture atlas, then GLTF models ──
+    this.loadAtlasThenModels();
   }
 
   // ── Public interface ────────────────────────────────────────────
@@ -1210,7 +1223,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Fallback: styled primitive geometry with emissive toon glow
     const color = ENTITY_COLORS_3D[entity.type] ?? 0xffffff;
-    const glowMat = new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+    const glowMat = makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.3 });
     const group = new THREE.Group();
     let baseY = 0.3;
 
@@ -1219,7 +1232,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.25), glowMat);
         const ring = new THREE.Mesh(
           new THREE.TorusGeometry(0.35, 0.03, 8, 24),
-          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.5 })
+          makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.5 })
         );
         ring.rotation.x = Math.PI / 2;
         group.add(core, ring);
@@ -1233,7 +1246,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         const base = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.3, 6), glowMat);
         const ring = new THREE.Mesh(
           new THREE.TorusGeometry(0.2, 0.02, 6, 16),
-          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.6 })
+          makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.6 })
         );
         ring.position.y = 0.3;
         group.add(dish, base, ring);
@@ -1252,7 +1265,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       case EntityType.ServiceBot: {
         const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.35, 0.3), glowMat);
         const head = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.2),
-          new THREE.MeshLambertMaterial({ color: 0xddaa44, emissive: 0x442200, emissiveIntensity: 0.3 }));
+          makeToonMaterial({ color: 0xddaa44, gradientMap: this.toonGradient, emissive: 0x442200, emissiveIntensity: 0.3 }));
         head.position.y = 0.25;
         const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4),
           new THREE.MeshBasicMaterial({ color: 0xff4400 }));
@@ -1264,7 +1277,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       case EntityType.LogTerminal: {
         const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, 0.3, 6), glowMat);
         const screen = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.04),
-          new THREE.MeshLambertMaterial({ color: 0x112233, emissive: color, emissiveIntensity: 0.5 }));
+          makeToonMaterial({ color: 0x112233, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.5 }));
         screen.position.y = 0.32;
         const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.27),
           new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3 }));
@@ -1277,7 +1290,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), glowMat);
         const propRing = new THREE.Mesh(
           new THREE.TorusGeometry(0.3, 0.02, 6, 16),
-          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.4 })
+          makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.4 })
         );
         propRing.rotation.x = Math.PI / 2;
         propRing.position.y = 0.1;
@@ -1291,7 +1304,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       case EntityType.Breach: {
         const ring = new THREE.Mesh(
           new THREE.TorusGeometry(0.35, 0.06, 6, 8),
-          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.7 })
+          makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.7 })
         );
         ring.rotation.x = -Math.PI / 2;
         const sparks = new THREE.Mesh(
@@ -1304,7 +1317,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
       case EntityType.MedKit: {
         const box = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.15, 0.25),
-          new THREE.MeshLambertMaterial({ color: 0xeeeeee }));
+          makeToonMaterial({ color: 0xeeeeee, gradientMap: this.toonGradient }));
         const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 0.04),
           new THREE.MeshBasicMaterial({ color: 0xff2222 }));
         crossH.position.z = 0.13;
@@ -1330,16 +1343,16 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
       case EntityType.ClosedDoor: {
         const frame = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.08),
-          new THREE.MeshLambertMaterial({ color: 0x664422 }));
+          makeToonMaterial({ color: 0x664422, gradientMap: this.toonGradient }));
         const panel = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.1),
-          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.2 }));
+          makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.2 }));
         group.add(frame, panel);
         baseY = 0.6;
         break;
       }
       case EntityType.SecurityTerminal: {
         const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6),
-          new THREE.MeshLambertMaterial({ color: 0x666666 }));
+          makeToonMaterial({ color: 0x666666, gradientMap: this.toonGradient }));
         const cam = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.12, 0.2), glowMat);
         cam.position.y = 0.35;
         const lens = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6),
@@ -1381,7 +1394,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Humanoid silhouette: cylinder body + sphere head
         const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.4, 8), glowMat);
         const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6),
-          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.2 }));
+          makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.2 }));
         head.position.y = 0.3;
         const visor = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.04),
           new THREE.MeshBasicMaterial({ color: 0x44ccff }));
@@ -1393,9 +1406,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       case EntityType.Airlock: {
         // Large door frame with warning stripes
         const frame = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.1),
-          new THREE.MeshLambertMaterial({ color: 0x556688 }));
+          makeToonMaterial({ color: 0x556688, gradientMap: this.toonGradient }));
         const panel = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.12),
-          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.3 }));
+          makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.3 }));
         const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.11),
           new THREE.MeshBasicMaterial({ color: 0xffaa00 }));
         stripe.position.y = 0.5;
@@ -1407,7 +1420,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Small tool box
         const box = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.2), glowMat);
         const handle = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.03),
-          new THREE.MeshLambertMaterial({ color: 0x888888 }));
+          makeToonMaterial({ color: 0x888888, gradientMap: this.toonGradient }));
         handle.position.y = 0.09;
         const indicator = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 4),
           new THREE.MeshBasicMaterial({ color }));
@@ -1419,9 +1432,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       case EntityType.UtilityPickup: {
         // Glowing utility orb on a small stand
         const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.1, 6),
-          new THREE.MeshLambertMaterial({ color: 0x666666 }));
+          makeToonMaterial({ color: 0x666666, gradientMap: this.toonGradient }));
         const orb = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8),
-          new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 }));
+          makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 }));
         orb.position.y = 0.2;
         group.add(stand, orb);
         baseY = 0.1;
@@ -1430,9 +1443,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       case EntityType.Console: {
         // Angled screen on a stand
         const base = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.3),
-          new THREE.MeshLambertMaterial({ color: 0x444455 }));
+          makeToonMaterial({ color: 0x444455, gradientMap: this.toonGradient }));
         const screen = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.03),
-          new THREE.MeshLambertMaterial({ color: 0x112233, emissive: color, emissiveIntensity: 0.5 }));
+          makeToonMaterial({ color: 0x112233, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.5 }));
         screen.position.set(0, 0.25, 0.12);
         screen.rotation.x = -0.3;
         const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.22),
@@ -1447,16 +1460,16 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Flat platform with mechanical arms
         const platform = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.08, 0.5), glowMat);
         const arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.35, 0.04),
-          new THREE.MeshLambertMaterial({ color: 0x888888 }));
+          makeToonMaterial({ color: 0x888888, gradientMap: this.toonGradient }));
         arm1.position.set(-0.25, 0.2, 0);
         const arm2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.35, 0.04),
-          new THREE.MeshLambertMaterial({ color: 0x888888 }));
+          makeToonMaterial({ color: 0x888888, gradientMap: this.toonGradient }));
         arm2.position.set(0.25, 0.2, 0);
         const clamp1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.12),
-          new THREE.MeshLambertMaterial({ color }));
+          makeToonMaterial({ color, gradientMap: this.toonGradient }));
         clamp1.position.set(-0.25, 0.38, 0);
         const clamp2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.12),
-          new THREE.MeshLambertMaterial({ color }));
+          makeToonMaterial({ color, gradientMap: this.toonGradient }));
         clamp2.position.set(0.25, 0.38, 0);
         group.add(platform, arm1, arm2, clamp1, clamp2);
         baseY = 0.05;
@@ -1482,28 +1495,28 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Body: cylinder
     const bodyGeo = new THREE.CylinderGeometry(0.25, 0.3, 0.5, 12);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: COLORS_3D.player });
+    const bodyMat = makeToonMaterial({ color: COLORS_3D.player, gradientMap: this.toonGradient });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 0;
     group.add(body);
 
     // Head / antenna box
     const headGeo = new THREE.BoxGeometry(0.15, 0.25, 0.15);
-    const headMat = new THREE.MeshLambertMaterial({ color: 0x00cc00 });
+    const headMat = makeToonMaterial({ color: 0x00cc00, gradientMap: this.toonGradient });
     const head = new THREE.Mesh(headGeo, headMat);
     head.position.y = 0.35;
     group.add(head);
 
     // Antenna
     const antennaGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.2, 4);
-    const antennaMat = new THREE.MeshLambertMaterial({ color: 0x88ff88 });
+    const antennaMat = makeToonMaterial({ color: 0x88ff88, gradientMap: this.toonGradient });
     const antenna = new THREE.Mesh(antennaGeo, antennaMat);
     antenna.position.y = 0.55;
     group.add(antenna);
 
     // Small tip sphere
     const tipGeo = new THREE.SphereGeometry(0.04, 6, 4);
-    const tip = new THREE.Mesh(tipGeo, new THREE.MeshLambertMaterial({ color: 0x00ff44 }));
+    const tip = new THREE.Mesh(tipGeo, makeToonMaterial({ color: 0x00ff44, gradientMap: this.toonGradient }));
     tip.position.y = 0.67;
     group.add(tip);
 
@@ -1537,7 +1550,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.playerLight.position.set(px, 3, py);
 
     // Camera follows player (isometric offset)
-    this.camera.position.set(px, 20, py + 12);
+    this.camera.position.set(px, 12, py + 14);
     this.camera.lookAt(px, 0, py);
   }
 
@@ -1627,11 +1640,16 @@ export class BrowserDisplay3D implements IGameDisplay {
         foundGeo = child.geometry.clone();
         const oldMat = Array.isArray(child.material) ? child.material[0] : child.material;
         const hasUVs = !!(child.geometry?.attributes?.uv);
-        const tex = hasUVs && (oldMat as THREE.MeshStandardMaterial)?.map
+        let tex = hasUVs && (oldMat as THREE.MeshStandardMaterial)?.map
           ? (oldMat as THREE.MeshStandardMaterial).map
           : null;
-        foundMat = new THREE.MeshLambertMaterial({
+        // Apply Synty atlas if model has UVs but no embedded texture
+        if (!tex && hasUVs && this.syntyAtlas) {
+          tex = this.syntyAtlas;
+        }
+        foundMat = makeToonMaterial({
           color: tex ? 0xffffff : ((oldMat as THREE.MeshStandardMaterial)?.color?.getHex() ?? 0xaaaaaa),
+          gradientMap: this.toonGradient,
           map: tex,
         });
       }
@@ -1669,7 +1687,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Use the loaded material (with embedded texture) directly;
     // instance colors will multiply with texture color for per-room tinting
-    const mat = this.wallModelMat ?? new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const mat = this.wallModelMat ?? makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
 
     this.wallMesh = new THREE.InstancedMesh(this.wallModelGeo, mat, this.maxTiles);
     this.wallMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1684,7 +1702,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.remove(this.wallCornerMesh);
     this.wallCornerMesh.dispose();
 
-    const mat = this.wallCornerModelMat ?? new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const mat = this.wallCornerModelMat ?? makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
 
     this.wallCornerMesh = new THREE.InstancedMesh(this.wallCornerModelGeo, mat, this.maxTiles);
     this.wallCornerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1699,7 +1717,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.remove(this.floorMesh);
     this.floorMesh.dispose();
 
-    const mat = this.floorModelMat ?? new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const mat = this.floorModelMat ?? makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
 
     this.floorMesh = new THREE.InstancedMesh(this.floorModelGeo, mat, this.maxTiles);
     this.floorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1708,27 +1726,39 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.add(this.floorMesh);
   }
 
-  /** Post-process a loaded model: normalize scale, center, apply materials */
+  /** Post-process a loaded model: normalize scale, center, apply toon materials */
   private prepareModel(key: string, scene: THREE.Object3D): void {
     const model = scene;
 
-    // Normalize scale to fit in a ~0.6–0.8 unit box
+    // Synty models are huge (~100 units); normalize to fit in ~0.7 unit box
+    // Player gets slightly larger, small pickups get smaller
+    const ENTITY_SCALE: Partial<Record<string, number>> = {
+      player: 0.8,
+      [EntityType.ToolPickup]: 0.5,
+      [EntityType.UtilityPickup]: 0.5,
+      [EntityType.SensorPickup]: 0.6,
+      [EntityType.MedKit]: 0.5,
+      [EntityType.PowerCell]: 0.5,
+      [EntityType.EvidenceTrace]: 0.4,
+      [EntityType.EscapePod]: 0.9,
+      [EntityType.CrewNPC]: 0.85,
+      [EntityType.DataCore]: 0.8,
+    };
+    const targetSize = ENTITY_SCALE[key] ?? 0.7;
+
     const box = new THREE.Box3().setFromObject(model);
     const size = new THREE.Vector3();
     box.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z);
-    const targetSize = key === "player" ? 1.0 : 1.0;
     if (maxDim > 0) {
       const s = targetSize / maxDim;
       model.scale.multiplyScalar(s);
     }
 
-    // Rotate models to face toward the camera. Camera looks from (px, 20, py+12) at (px, 0, py).
-    // Player rotation is controlled dynamically based on movement direction.
-    // Entities face +Z (toward camera) at 0° — GLTF models typically face -Z by default.
+    // Rotate to face camera (GLTF models typically face -Z)
     model.rotation.y = 0;
 
-    // Re-measure after scaling + rotation, center horizontally, sit on floor
+    // Re-measure after scaling, center horizontally, sit on floor
     const scaledBox = new THREE.Box3().setFromObject(model);
     const center = new THREE.Vector3();
     scaledBox.getCenter(center);
@@ -1736,34 +1766,56 @@ export class BrowserDisplay3D implements IGameDisplay {
     model.position.z -= center.z;
     model.position.y -= scaledBox.min.y; // sit on y=0
 
-    // Convert materials to Lambert, keeping textures where available
+    // Convert materials to toon-shaded, applying Synty atlas where models have UVs but no embedded texture
+    const tintColor = key === "player" ? COLORS_3D.player : ENTITY_COLORS_3D[key];
+    const isSyntyModel = MODEL_PATHS[key]?.includes("synty-space-gltf");
     model.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         const oldMat = mats[0] as THREE.MeshStandardMaterial;
         const hasUVs = !!(child.geometry?.attributes?.uv);
-        const tex = hasUVs && oldMat?.map ? oldMat.map : null;
-        child.material = new THREE.MeshLambertMaterial({
-          color: tex ? 0xffffff : (oldMat?.color?.getHex() ?? 0xaaaaaa),
+        // Use embedded texture if available, otherwise apply Synty atlas for Synty models with UVs
+        let tex = hasUVs && oldMat?.map ? oldMat.map : null;
+        if (!tex && hasUVs && isSyntyModel && this.syntyAtlas) {
+          tex = this.syntyAtlas;
+        }
+
+        child.material = makeToonMaterial({
+          color: tex ? 0xffffff : (tintColor ?? oldMat?.color?.getHex() ?? 0xaaaaaa),
+          gradientMap: this.toonGradient,
           map: tex,
+          emissive: tintColor ? tintColor : 0x000000,
+          emissiveIntensity: tex ? 0.05 : 0.15, // subtle glow for untextured pieces
         });
+
+        child.castShadow = true;
+        child.receiveShadow = true;
       }
     });
 
-    // For models without textures, tint with game color
-    const tintColor = key === "player" ? COLORS_3D.player : ENTITY_COLORS_3D[key];
-    if (tintColor !== undefined) {
-      model.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          const mat = child.material as THREE.MeshLambertMaterial;
-          if (!mat.map) {
-            mat.color.setHex(tintColor);
-          }
-        }
-      });
-    }
-
     this.gltfCache.set(key, model);
+  }
+
+  /** Load texture atlas first, then kick off both tile and entity model loading */
+  private loadAtlasThenModels(): void {
+    const atlasUrl = import.meta.env.BASE_URL + "models/synty-space-gltf/PolygonSciFiSpace_Texture_01_A.png";
+    new THREE.TextureLoader().load(
+      atlasUrl,
+      (tex) => {
+        tex.flipY = true; // FBX2glTF preserves FBX UV space which expects flipY=true
+        tex.colorSpace = THREE.SRGBColorSpace;
+        this.syntyAtlas = tex;
+        console.log("Synty texture atlas loaded.");
+        this.loadTileModels();
+        this.loadModels();
+      },
+      undefined,
+      () => {
+        console.warn("Failed to load Synty texture atlas — models will use flat colors.");
+        this.loadTileModels();
+        this.loadModels();
+      }
+    );
   }
 
   private loadModels(): void {
