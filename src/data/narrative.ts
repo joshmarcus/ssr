@@ -1541,3 +1541,25 @@ export const CORVUS_WITNESS_COMMENTARY: Record<string, Record<string, string[]>>
     ],
   },
 };
+
+// ── Environmental choice epilogue lines ──────────────────────────
+// Shown in the game-over "YOUR DECISIONS" section alongside mystery choice epilogues.
+// Keyed by env choice ID → chosen key → epilogue sentence.
+export const ENV_CHOICE_EPILOGUES: Record<string, Record<string, string>> = {
+  env_thermal_vent: {
+    vent: "You vented the thermal corridor to the outer hull. The path was clear — but the hull paid the price.",
+    sealed: "You left the thermal vent sealed. The corridor stayed hot, but the station held together.",
+  },
+  env_emergency_reserve: {
+    use_now: "You used the emergency medical reserves for yourself. Practical. The crew had to make do without.",
+    reserve: "You saved the medical pack for the crew. When they needed it, it was there.",
+  },
+  env_atmo_purge: {
+    full: "Full atmospheric purge. An entire section breathed clean. The extra time was worth it.",
+    quick: "Quick purge — one room, immediate. Efficient. The rest of the station kept choking.",
+  },
+  env_power_shunt: {
+    sensors: "You diverted power to sensors. You saw further. Whether what you saw was worth seeing is another question.",
+    structural: "You reinforced the bulkhead. One more sealed door between danger and the crew.",
+  },
+};

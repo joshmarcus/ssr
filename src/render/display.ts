@@ -5,7 +5,7 @@ import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, VIEWPORT_WIDTH, VIEWPORT
 import { getObjective as getObjectiveShared, getRoomExits as getRoomExitsShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
 import { getRunHistory } from "../sim/saveLoad.js";
-import { GAMEOVER_EPILOGUE_VICTORY, GAMEOVER_EPILOGUE_DEFEAT, DEDUCTION_MISS_HINTS, VICTORY_EPILOGUE_VARIANT } from "../data/narrative.js";
+import { GAMEOVER_EPILOGUE_VICTORY, GAMEOVER_EPILOGUE_DEFEAT, DEDUCTION_MISS_HINTS, VICTORY_EPILOGUE_VARIANT, ENV_CHOICE_EPILOGUES } from "../data/narrative.js";
 import { computeBranchedEpilogue } from "../sim/mysteryChoices.js";
 import type { IGameDisplay } from "./displayInterface.js";
 
@@ -635,23 +635,40 @@ export class BrowserDisplay implements IGameDisplay {
         <div style="color:#8ac;font-size:11px;margin-top:4px;font-style:italic">${revealLine}</div>
       </div>` : "";
 
-    // Choice-branched epilogue section
+    // Choice-branched epilogue section (mystery + environmental choices)
     let choiceBranchedHtml = "";
     const choicesForEpilogue = state.mystery?.choices ?? [];
+    const allDecisionLines: string[] = [];
+
+    // Mystery choice epilogues
     if (archetype && choicesForEpilogue.some(c => c.chosen)) {
       const branchedLines = computeBranchedEpilogue(choicesForEpilogue, archetype as IncidentArchetype);
-      if (branchedLines.length > 0) {
-        const branchedDivs = branchedLines.map(l =>
-          `<div style="margin:3px 0;font-size:11px;font-family:monospace;color:#9ab">${this.escapeHtml(l)}</div>`
-        ).join("");
-        choiceBranchedHtml = `
-          <div style="margin:10px 0 4px;border-top:1px solid #333;padding-top:8px">
-            <div style="color:#8ac;font-size:12px;font-weight:bold;text-align:center;margin-bottom:6px;letter-spacing:2px">
-              \u25b8 YOUR DECISIONS \u25c2
-            </div>
-            ${branchedDivs}
-          </div>`;
+      allDecisionLines.push(...branchedLines);
+    }
+
+    // Environmental choice epilogues (read from entity props)
+    for (const [, entity] of state.entities) {
+      const envId = entity.props["envChoiceId"] as string | undefined;
+      const envResult = entity.props["envChoiceResult"] as string | undefined;
+      if (envId && envResult) {
+        const pool = ENV_CHOICE_EPILOGUES[envId];
+        if (pool && pool[envResult]) {
+          allDecisionLines.push(pool[envResult]);
+        }
       }
+    }
+
+    if (allDecisionLines.length > 0) {
+      const branchedDivs = allDecisionLines.map(l =>
+        `<div style="margin:3px 0;font-size:11px;font-family:monospace;color:#9ab">${this.escapeHtml(l)}</div>`
+      ).join("");
+      choiceBranchedHtml = `
+        <div style="margin:10px 0 4px;border-top:1px solid #333;padding-top:8px">
+          <div style="color:#8ac;font-size:12px;font-weight:bold;text-align:center;margin-bottom:6px;letter-spacing:2px">
+            \u25b8 YOUR DECISIONS \u25c2
+          </div>
+          ${branchedDivs}
+        </div>`;
     }
 
     overlay.innerHTML = `
@@ -895,6 +912,31 @@ export class BrowserDisplay implements IGameDisplay {
       });
     }
 
+    // Build set of exhausted room IDs (rooms where all interactable entities are done)
+    const exhaustedRooms = new Set<string>();
+    for (const room of state.rooms) {
+      let hasInteractable = false;
+      let allExhausted = true;
+      for (const [id, entity] of state.entities) {
+        if (id === "player") continue;
+        // Only count entities physically inside this room
+        if (entity.pos.x >= room.x && entity.pos.x < room.x + room.width &&
+            entity.pos.y >= room.y && entity.pos.y < room.y + room.height) {
+          // Skip non-interactable mob types
+          if (entity.type === EntityType.PatrolDrone || entity.type === EntityType.Drone ||
+              entity.type === EntityType.RepairBot) continue;
+          hasInteractable = true;
+          if (!isEntityExhausted(entity)) {
+            allExhausted = false;
+            break;
+          }
+        }
+      }
+      if (hasInteractable && allExhausted) {
+        exhaustedRooms.add(room.id);
+      }
+    }
+
     // Draw tiles, entities, and player (viewport only)
     for (let y = vy; y < vy + vh; y++) {
       for (let x = vx; x < vx + vw; x++) {
@@ -948,6 +990,19 @@ export class BrowserDisplay implements IGameDisplay {
           fg = this.getTileFg(tile);
         }
         let bg: string = COLORS.background;
+
+        // Exhausted room dimming: rooms with all interactions done get subtle "cleared" tint
+        if (exhaustedRooms.size > 0 && (tile.type === TileType.Floor || tile.type === TileType.Corridor)) {
+          for (const room of state.rooms) {
+            if (exhaustedRooms.has(room.id) &&
+                x >= room.x && x < room.x + room.width &&
+                y >= room.y && y < room.y + room.height) {
+              fg = "#1c1c1c";     // dimmer floor glyph
+              bg = "#080a08";     // very subtle dark green "cleared" tint
+              break;
+            }
+          }
+        }
 
         // Smoke rendering: tiles with smoke > 0 show smoke glyph with grey tint
         if (tile.smoke > 0 && tile.walkable) {
@@ -1114,6 +1169,46 @@ export class BrowserDisplay implements IGameDisplay {
         this.renderCenteredText(currentRoom.name + exitStr, 0, "#6cf", COLORS.background);
       } else {
         this.renderCenteredText("-- Corridor --", 0, "#456", COLORS.background);
+      }
+    }
+
+    // ── Off-screen room arrows at viewport edges ──────────────────
+    if (!state.gameOver) {
+      for (const room of state.rooms) {
+        // Skip rooms fully inside viewport
+        if (room.x >= vx && room.x + room.width <= vx + vw &&
+            room.y >= vy && room.y + room.height <= vy + vh) continue;
+        // Room center in world coordinates
+        const roomCX = room.x + Math.floor(room.width / 2);
+        const roomCY = room.y + Math.floor(room.height / 2);
+        // Skip rooms too far from viewport (>12 tiles from edge)
+        const clampedX = Math.max(vx, Math.min(vx + vw - 1, roomCX));
+        const clampedY = Math.max(vy, Math.min(vy + vh - 1, roomCY));
+        if (Math.abs(roomCX - clampedX) + Math.abs(roomCY - clampedY) > 12) continue;
+        // Must have at least one explored tile
+        let hasExplored = false;
+        for (let ry = room.y; ry < room.y + room.height && !hasExplored; ry++) {
+          for (let rx = room.x; rx < room.x + room.width && !hasExplored; rx++) {
+            if (state.tiles[ry]?.[rx]?.explored) hasExplored = true;
+          }
+        }
+        if (!hasExplored) continue;
+        const color = exhaustedRooms.has(room.id) ? "#333" : "#5a8";
+        // Draw arrow at nearest viewport edge (avoid row 0 header and row 1 flash)
+        if (roomCY < vy) {
+          const sx = Math.max(0, Math.min(vw - 1, roomCX - vx));
+          this.display.draw(sx, 2, "\u2191", color, COLORS.background);
+        } else if (roomCY >= vy + vh) {
+          const sx = Math.max(0, Math.min(vw - 1, roomCX - vx));
+          this.display.draw(sx, vh - 1, "\u2193", color, COLORS.background);
+        }
+        if (roomCX < vx) {
+          const sy = Math.max(2, Math.min(vh - 2, roomCY - vy));
+          this.display.draw(0, sy, "\u2190", color, COLORS.background);
+        } else if (roomCX >= vx + vw) {
+          const sy = Math.max(2, Math.min(vh - 2, roomCY - vy));
+          this.display.draw(vw - 1, sy, "\u2192", color, COLORS.background);
+        }
       }
     }
 

@@ -346,10 +346,15 @@ function generateWhyDeduction(
 
   const crewTag = crewTagMember?.lastName.toLowerCase() || "engineer";
 
-  // P0/P2 fix: override tags for archetypes that must not name the villain at Tier 3
+  // P0/P2 fix: override tags for all archetypes to avoid naming crew members at Tier 3.
+  // Crew names should only appear in Tier 5 (deduction_responsibility).
   let requiredTags: string[];
-  if (archetype === IncidentArchetype.HullBreach) {
+  if (archetype === IncidentArchetype.CoolantCascade) {
+    requiredTags = ["coolant", "maintenance"];  // motive tag, not crew name
+  } else if (archetype === IncidentArchetype.HullBreach) {
     requiredTags = ["hull", "forensic"];
+  } else if (archetype === IncidentArchetype.ReactorScram) {
+    requiredTags = ["reactor", "diagnostic"];  // system behavior, not crew name
   } else if (archetype === IncidentArchetype.Sabotage) {
     requiredTags = ["electrical", "biological"];
   } else if (archetype === IncidentArchetype.SignalAnomaly) {
