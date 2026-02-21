@@ -1744,7 +1744,9 @@ export class BrowserDisplay3D implements IGameDisplay {
             baseColor = this.applyFloorSensorColor(tile, baseColor);
           }
 
-          this.dummy.position.set(x, 0, y);
+          // Room floors sit slightly higher, corridors lower — creates depth contrast
+          const floorY = tile.type === TileType.Corridor ? -0.06 : 0;
+          this.dummy.position.set(x, floorY, y);
           this.dummy.scale.set(1, 1, 1);
           this.dummy.updateMatrix();
 
@@ -2212,12 +2214,14 @@ export class BrowserDisplay3D implements IGameDisplay {
         const modelKey = `decor_${room.id}_${i}`;
 
         // Check if we have this model cached
+        // First 2 decorations in larger rooms get 1.5x scale (spanning multiple tiles)
+        const isLargeDecor = i < 2 && room.width >= 4 && room.height >= 4;
+        const decorScale = isLargeDecor ? 1.15 : 0.75;
         const cached = this.gltfCache.get(modelPath);
         if (cached) {
           const clone = cached.clone();
           clone.position.set(pos.x, 0, pos.y);
-          // Decorations at reasonable room-furniture scale
-          clone.scale.multiplyScalar(0.75);
+          clone.scale.multiplyScalar(decorScale);
           this.decorationGroup.add(clone);
         } else {
           // Load model and place when ready
@@ -2225,12 +2229,13 @@ export class BrowserDisplay3D implements IGameDisplay {
           this.gltfLoader.load(url, (gltf) => {
             try {
               const model = gltf.scene.clone();
-              // Normalize size
+              // Normalize size — larger for first decorations in big rooms
               const box = new THREE.Box3().setFromObject(model);
               const size = new THREE.Vector3();
               box.getSize(size);
               const maxDim = Math.max(size.x, size.y, size.z);
-              if (maxDim > 0) model.scale.multiplyScalar(0.65 / maxDim);
+              const baseScale = isLargeDecor ? 1.0 : 0.65;
+              if (maxDim > 0) model.scale.multiplyScalar(baseScale / maxDim);
 
               // Center and sit on floor
               const b2 = new THREE.Box3().setFromObject(model);
@@ -2349,7 +2354,21 @@ export class BrowserDisplay3D implements IGameDisplay {
   private cautionStripeTex: THREE.CanvasTexture | null = null;
 
   /** Place architectural trim: baseboards along room walls, door frame pillars */
+  // Shared trim geometries (created once, reused)
+  private static _bbGeo: THREE.BoxGeometry | null = null;
+  private static _railGeo: THREE.BoxGeometry | null = null;
+  private static _pillarGeo: THREE.BoxGeometry | null = null;
+
   private placeRoomTrim(state: GameState): void {
+    // Create shared geometries once
+    if (!BrowserDisplay3D._bbGeo) {
+      BrowserDisplay3D._bbGeo = new THREE.BoxGeometry(1.02, 0.06, 0.08);
+      BrowserDisplay3D._railGeo = new THREE.BoxGeometry(1.02, 0.04, 0.06);
+      BrowserDisplay3D._pillarGeo = new THREE.BoxGeometry(0.08, 2.1, 0.08);
+    }
+    const bbGeo = BrowserDisplay3D._bbGeo!;
+    const railGeo = BrowserDisplay3D._railGeo!;
+
     for (const room of state.rooms) {
       if (this.trimmedRooms.has(room.id)) continue;
       // Check if room is explored
@@ -2386,8 +2405,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           const inW = x > 0 && state.tiles[y][x - 1].type === TileType.Floor;
           if (!inN && !inS && !inE && !inW) continue;
 
-          // Baseboard: thin strip at base of wall, facing into room
-          const bbGeo = new THREE.BoxGeometry(1.02, 0.06, 0.08);
+          // Baseboard: thin strip at base of wall, facing into room (shared geo)
           const bb = new THREE.Mesh(bbGeo, trimMat);
 
           if (inN) {
@@ -2403,8 +2421,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
           this.trimGroup.add(bb);
 
-          // Top rail: thin strip at top of wall
-          const railGeo = new THREE.BoxGeometry(1.02, 0.04, 0.06);
+          // Top rail: thin strip at top of wall (shared geo)
           const rail = new THREE.Mesh(railGeo, trimMat);
           rail.position.copy(bb.position);
           rail.position.y = 1.98;
@@ -2432,10 +2449,9 @@ export class BrowserDisplay3D implements IGameDisplay {
           const openW = x > 0 && state.tiles[y][x - 1].walkable;
           const isHorizontal = openE || openW;
 
-          // Two pillars on each side of the door
-          const pillarGeo = new THREE.BoxGeometry(0.08, 2.1, 0.08);
-          const pillar1 = new THREE.Mesh(pillarGeo, frameMat);
-          const pillar2 = new THREE.Mesh(pillarGeo, frameMat);
+          // Two pillars on each side of the door (shared geo)
+          const pillar1 = new THREE.Mesh(BrowserDisplay3D._pillarGeo!, frameMat);
+          const pillar2 = new THREE.Mesh(BrowserDisplay3D._pillarGeo!, frameMat);
 
           if (isHorizontal) {
             pillar1.position.set(x, 1.05, y - 0.46);
