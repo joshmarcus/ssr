@@ -35,6 +35,9 @@ import {
   CONTRADICTION_FALSE_LEAD, CONTRADICTION_REFUTATION, CORVUS_CONTRADICTION_NOTICE,
   CREW_FATE_REVEALS,
   DATA_CORE_DWELL_WARNINGS,
+  FIRST_DISCOVERY_BEATS,
+  COOLANT_CASCADE_WARNINGS, HULL_BREACH_CORRUPTION_WARNINGS,
+  SABOTAGE_ORGANISM_WARNINGS, SIGNAL_PULSE_WARNINGS,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
@@ -235,6 +238,14 @@ let dwellTurnsStationary = 0; // consecutive turns in same room without moving
 let dwellRoomId = ""; // room being tracked
 let dwellWarning12Fired = false;
 let dwellWarning20Fired = false;
+let firstDiscoveryBeat = 0; // 0-3: tracks how many discovery beats have fired
+// ── Archetype mid-game mechanic trackers ──────────────────────
+let cascadePhase = 0; // CoolantCascade: heat spread ticks
+let breachCorruptionPhase = 0; // HullBreach: terminal corruption ticks
+let sabotageOrganismPhase = 0; // Sabotage: organism relocation ticks
+let signalPulseCounter = 0; // SignalAnomaly: turns until next pulse
+let sensorBlockedTurns = 0; // SignalAnomaly: turns remaining with sensors blocked
+let lastEvidenceViewCount = 0; // journal count when EVIDENCE tab was last viewed
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
 
 // ── Wait message variety ────────────────────────────────────────
@@ -502,6 +513,30 @@ function checkRoomEntry(): void {
       );
       if (incidentTrace) {
         display.addLog(incidentTrace, "narrative");
+      }
+
+      // First discovery cascade: 3-beat early-game atmosphere (rooms 2-4)
+      if (firstDiscoveryBeat < 3 && state.mystery?.timeline?.archetype) {
+        const arch = state.mystery.timeline.archetype as IncidentArchetype;
+        const beats = FIRST_DISCOVERY_BEATS[arch];
+        if (beats && visitedRoomIds.size >= 2) { // skip room 1 (Arrival Bay)
+          const beatIdx = firstDiscoveryBeat;
+          if (beatIdx === 0) {
+            display.addLog(beats[0], "narrative");
+          } else if (beatIdx === 1) {
+            display.addLog(beats[1], "narrative");
+          } else {
+            // Beat 3 uses crew data — find a relevant crew member for this archetype
+            const crewAll = state.mystery.crew;
+            const central = crewAll.find(c => c.role === CrewRole.Engineer)
+              ?? crewAll.find(c => c.role === CrewRole.Scientist)
+              ?? crewAll[0];
+            if (central) {
+              display.addLog(beats[2](central.lastName), "narrative");
+            }
+          }
+          firstDiscoveryBeat++;
+        }
       }
 
       // Crew memory fragment: atmospheric text for rooms where crew were last known
@@ -965,6 +1000,13 @@ function resetGameState(newSeed: number): void {
   dwellRoomId = "";
   dwellWarning12Fired = false;
   dwellWarning20Fired = false;
+  firstDiscoveryBeat = 0;
+  cascadePhase = 0;
+  breachCorruptionPhase = 0;
+  sabotageOrganismPhase = 0;
+  signalPulseCounter = 0;
+  sensorBlockedTurns = 0;
+  lastEvidenceViewCount = 0;
   pendingCrewDoor = null;
   journalTab = "evidence";
   choiceSelectedIdx = 0;
@@ -1392,6 +1434,109 @@ function handleAction(action: Action): void {
       dwellRoomId = dwellRmId;
       dwellWarning12Fired = false;
       dwellWarning20Fired = false;
+    }
+  }
+
+  // ── CoolantCascade: thermal cascade timer (heat spreads to unexplored rooms) ──
+  if (state.turn !== prevTurn && state.mystery?.timeline?.archetype === IncidentArchetype.CoolantCascade && state.turn >= 50) {
+    cascadePhase++;
+    if (cascadePhase % 50 === 0) {
+      // Inject heat into 3 random walkable tiles in unexplored areas
+      const unexploredWalkable: { x: number; y: number }[] = [];
+      for (let y = 0; y < state.height; y++) {
+        for (let x = 0; x < state.width; x++) {
+          if (state.tiles[y][x].walkable && !state.tiles[y][x].explored && state.tiles[y][x].heat < 40) {
+            unexploredWalkable.push({ x, y });
+          }
+        }
+      }
+      if (unexploredWalkable.length > 0) {
+        for (let i = 0; i < Math.min(3, unexploredWalkable.length); i++) {
+          const idx = ((state.seed * 7 + cascadePhase * 13 + i * 31) >>> 0) % unexploredWalkable.length;
+          const t = unexploredWalkable[idx];
+          state.tiles[t.y][t.x].heat = Math.min(80, state.tiles[t.y][t.x].heat + 15);
+        }
+        const pool = COOLANT_CASCADE_WARNINGS;
+        display.addLog(pool[(cascadePhase / 50) % pool.length], "warning");
+      }
+    }
+  }
+
+  // ── HullBreach: evidence degradation (unread terminals corrupt) ──
+  if (state.turn !== prevTurn && state.mystery?.timeline?.archetype === IncidentArchetype.HullBreach && state.turn >= 60) {
+    breachCorruptionPhase++;
+    if (breachCorruptionPhase % 80 === 0) {
+      // Find an unread terminal far from the player and corrupt it
+      const px = state.player.entity.pos.x;
+      const py = state.player.entity.pos.y;
+      let farthest: { id: string; dist: number } | null = null;
+      for (const [eid, ent] of state.entities) {
+        if (ent.type !== EntityType.LogTerminal) continue;
+        if (ent.props["read"] === true || ent.props["corrupted"] === true) continue;
+        const dist = Math.abs(ent.pos.x - px) + Math.abs(ent.pos.y - py);
+        if (!farthest || dist > farthest.dist) {
+          farthest = { id: eid, dist };
+        }
+      }
+      if (farthest) {
+        const newEntities = new Map(state.entities);
+        const ent = newEntities.get(farthest.id)!;
+        const origText = (ent.props["text"] as string) || "";
+        // Truncate to ~40% and add corruption note
+        const corrupted = origText.slice(0, Math.floor(origText.length * 0.4)) + "\n[DATA CORRUPTED — moisture damage from decompression event]";
+        newEntities.set(farthest.id, { ...ent, props: { ...ent.props, text: corrupted, corrupted: true } });
+        state = { ...state, entities: newEntities };
+        const pool = HULL_BREACH_CORRUPTION_WARNINGS;
+        display.addLog(pool[(breachCorruptionPhase / 80) % pool.length], "warning");
+      }
+    }
+  }
+
+  // ── Sabotage: organism movement (patrol drone relocates) ──
+  if (state.turn !== prevTurn && state.mystery?.timeline?.archetype === IncidentArchetype.Sabotage && state.turn >= 40) {
+    sabotageOrganismPhase++;
+    if (sabotageOrganismPhase % 60 === 0) {
+      // Find a patrol drone and relocate it to a random room
+      for (const [eid, ent] of state.entities) {
+        if (ent.type !== EntityType.PatrolDrone) continue;
+        // Pick a random room that isn't the player's current room
+        const px = state.player.entity.pos.x;
+        const py = state.player.entity.pos.y;
+        const candidates = state.rooms.filter(r => !(px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height));
+        if (candidates.length > 0) {
+          const roomIdx = ((state.seed * 3 + sabotageOrganismPhase * 17) >>> 0) % candidates.length;
+          const room = candidates[roomIdx];
+          const newX = room.x + Math.floor(room.width / 2);
+          const newY = room.y + Math.floor(room.height / 2);
+          const newEntities = new Map(state.entities);
+          newEntities.set(eid, { ...ent, pos: { x: newX, y: newY } });
+          state = { ...state, entities: newEntities };
+          const pool = SABOTAGE_ORGANISM_WARNINGS;
+          display.addLog(pool[(sabotageOrganismPhase / 60) % pool.length], "warning");
+          break; // relocate one drone per tick
+        }
+      }
+    }
+  }
+
+  // ── SignalAnomaly: signal pulse interference (sensor overlay disabled) ──
+  if (state.turn !== prevTurn && state.mystery?.timeline?.archetype === IncidentArchetype.SignalAnomaly && state.turn >= 30) {
+    signalPulseCounter++;
+    if (sensorBlockedTurns > 0) {
+      sensorBlockedTurns--;
+      if (sensorBlockedTurns === 0) {
+        display.addLog("Sensor array recalibrated. Instruments back online.", "system");
+      }
+    }
+    if (signalPulseCounter % 40 === 0 && sensorBlockedTurns === 0) {
+      sensorBlockedTurns = 2;
+      // Force sensor overlay off
+      if (display.activeSensorMode !== null) {
+        display.toggleSensor(display.activeSensorMode);
+      }
+      const pool = SIGNAL_PULSE_WARNINGS;
+      display.addLog(pool[(signalPulseCounter / 40) % pool.length], "critical");
+      display.triggerScreenFlash("stun");
     }
   }
 
@@ -2570,11 +2715,18 @@ function renderInvestigationHub(): void {
 
   // Tab bar
   const tabs: Array<"evidence" | "connections" | "whatweknow"> = ["evidence", "connections", "whatweknow"];
+  const newEvidenceCount = entries.length - lastEvidenceViewCount;
+  const newBadge = newEvidenceCount > 0 && hubSection !== "evidence"
+    ? ` <span style="color:#0f0;font-size:10px">+${newEvidenceCount} new</span>` : "";
   const tabLabels: Record<string, string> = {
-    evidence: `EVIDENCE (${entries.length})`,
+    evidence: `EVIDENCE (${entries.length})${newBadge}`,
     connections: `CONNECTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`,
     whatweknow: "WHAT WE KNOW",
   };
+  // Update evidence view count when viewing evidence tab
+  if (hubSection === "evidence") {
+    lastEvidenceViewCount = entries.length;
+  }
   let tabsHtml = "";
   for (const t of tabs) {
     const cls = t === hubSection ? "journal-tab active" : "journal-tab";
@@ -2866,9 +3018,10 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
   for (let ji = 0; ji < journal.length; ji++) {
     const entry = journal[ji];
     const isLinked = hubLinkedEvidence.includes(entry.id);
-    const checkbox = isLinked ? "[x]" : "[ ]";
+    const checkbox = isLinked ? `<span style="color:#0f0">[+]</span>` : `<span style="color:#555">[ ]</span>`;
     const isSelected = ji === hubEvidenceIdx;
-    const highlight = isSelected && inEvidenceFocus ? "color:#fff;font-weight:bold;background:#1a1a2a;" : isSelected ? "color:#ccc;background:#111;" : "";
+    const linkedStyle = isLinked && !isSelected ? "color:#8c8;" : "";
+    const highlight = isSelected && inEvidenceFocus ? "color:#fff;font-weight:bold;background:#1a1a2a;" : isSelected ? "color:#ccc;background:#111;" : linkedStyle;
     const pointer = isSelected ? "\u25b6 " : "  ";
 
     // Show matching tags inline

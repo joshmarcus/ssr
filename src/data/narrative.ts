@@ -1021,3 +1021,59 @@ export const CREW_FATE_REVEALS: Record<string, ((name: string, role: string, roo
     (name) => `Signs of ${name}: a jacket over the chair, a mug with the logo of some off-world university. Still alive. Still here.`,
   ],
 };
+
+// ── First discovery cascade (early-game 3-beat atmosphere) ──────
+// Fires on rooms 2, 3, 4. Beat 1: structural observation. Beat 2: timeline clue.
+// Beat 3: personal crew artifact (uses crew last name via template function).
+export const FIRST_DISCOVERY_BEATS: Record<string, [string, string, (lastName: string) => string]> = {
+  [IncidentArchetype.CoolantCascade]: [
+    "The ceiling conduits are scorched in a line toward the junction. Whatever heat came through here, it traveled fast.",
+    "A shift roster on the wall shows assignments through day 847. After that — blank. The schedule just stops.",
+    (name) => `A handwritten note taped inside a maintenance panel: "Third request filed. If this junction fails, I was right. — ${name}"`,
+  ],
+  [IncidentArchetype.HullBreach]: [
+    "The door frame is warped — pulled outward by pressure differential. Someone was on the wrong side when it happened.",
+    "Emergency sealant foam on the bulkhead, still expanding 847 days later. The breach was fast and the response was faster.",
+    (name) => `A personal diary left open on the desk. The last entry: "If I don't make it through tonight, tell ${name} I'm sorry for everything."`,
+  ],
+  [IncidentArchetype.ReactorScram]: [
+    "Every screen in this room displays the same thing: the word SELF, repeating in columns. The data core wrote this.",
+    "Power conduits here are scorched in a radial pattern — not from overload, from deliberate shutdown. The core chose this.",
+    (name) => `A researcher's notebook, open to the last page: "${name} understands what the core is doing. I don't think it's a malfunction."`,
+  ],
+  [IncidentArchetype.Sabotage]: [
+    "Scratches along the lower wall — parallel grooves, evenly spaced. Not tool marks. Something alive made these.",
+    "Three junction boxes in a row, their covers torn off. The damage radiates outward from the cargo bay like a wave.",
+    (name) => `A cargo receipt with a handwritten annotation: "APPROVED — ${name}." The biological hazard flag is crossed out in pen.`,
+  ],
+  [IncidentArchetype.SignalAnomaly]: [
+    "The overhead lights pulse in a slow, repeating rhythm. Not a malfunction — a pattern. Something is cycling them.",
+    "A whiteboard covered in prime number sequences, circled and connected with arrows. Someone was trying to decode something.",
+    (name) => `Scrawled on the communications panel in marker: "${name} was right. It answered. God help us, it answered."`,
+  ],
+};
+
+// ── Archetype-specific mid-game mechanics (narrative strings) ───
+export const COOLANT_CASCADE_WARNINGS: string[] = [
+  "THERMAL ALERT — Cascade propagation advancing. Unexplored sections warming.",
+  "Heat signature expanding beyond relay perimeter. The cascade is still spreading.",
+  "CORVUS-7 CENTRAL: Thermal runaway detected in uninspected sections. The fire finds fuel where no one is watching.",
+];
+
+export const HULL_BREACH_CORRUPTION_WARNINGS: string[] = [
+  "STRUCTURAL ALERT — Moisture damage detected in station records. Some terminal data may be degraded.",
+  "CORVUS-7 CENTRAL: Atmospheric intrusion degrading archived files. Read terminals before the pressure differential erases them.",
+  "Data integrity warning: the decompression event is physically destroying stored records.",
+];
+
+export const SABOTAGE_ORGANISM_WARNINGS: string[] = [
+  "Scratching in the ventilation ducts. Moving. The organism has relocated.",
+  "PROXIMITY ALERT — Biological signature has shifted. It's in a different section now.",
+  "CORVUS-7 CENTRAL: Motion detected in maintenance corridor. The entity has moved. Be cautious.",
+];
+
+export const SIGNAL_PULSE_WARNINGS: string[] = [
+  "14.7 kHz PULSE — Sensor interference. Instruments recalibrating...",
+  "Electromagnetic surge from the array. Sensor overlay disrupted. Navigating blind.",
+  "CORVUS-7 CENTRAL: Signal pulse detected. The array is still active. Sensors offline temporarily.",
+];
