@@ -32,6 +32,9 @@ import {
   CREW_ESCORT_ARC,
   CORVUS_GREETING, CORVUS_PERSONALITY_REACTIONS, CORVUS_PERSONALITIES,
   type CorvusPersonality,
+  CONTRADICTION_FALSE_LEAD, CONTRADICTION_REFUTATION, CORVUS_CONTRADICTION_NOTICE,
+  CREW_FATE_REVEALS,
+  DATA_CORE_DWELL_WARNINGS,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
@@ -225,6 +228,13 @@ let hubFocusRegion: "evidence" | "answers" = "evidence"; // focus region in conn
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
 let pendingCeremonyDeduction: { id: string; correct: boolean } | null = null; // for post-overlay CORVUS-7 commentary
 let lastWwkJournalCount = 0; // journal count when WHAT WE KNOW was last viewed
+let contradictionFalseLeadFired = false; // has the misleading log been shown
+let contradictionRefutationFired = false; // has the refutation been shown
+// ── ReactorScram dwell penalty (data core surveillance) ──────────
+let dwellTurnsStationary = 0; // consecutive turns in same room without moving
+let dwellRoomId = ""; // room being tracked
+let dwellWarning12Fired = false;
+let dwellWarning20Fired = false;
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
 
 // ── Wait message variety ────────────────────────────────────────
@@ -408,48 +418,18 @@ function flickerThenRender(): void {
 }
 
 /** Generate an atmospheric fragment for a crew member's last known room. */
-function getCrewMemoryFragment(c: CrewMember): string | null {
+function getCrewMemoryFragment(c: CrewMember, roomName: string): string | null {
   const name = `${c.firstName} ${c.lastName}`;
-  const fateFragments: Record<string, string[]> = {
-    [CrewFate.Dead]: [
-      `A faded name tag reads: ${name}. The workstation is still warm.`,
-      `${name}'s terminal is still logged in. The last entry is unfinished.`,
-      `Scuff marks near ${name}'s station. Something happened here.`,
-    ],
-    [CrewFate.Missing]: [
-      `${name}'s coffee cup sits half-full on the console. Still lukewarm.`,
-      `A personal photo on the desk — ${name}'s family. Where did they go?`,
-      `${name}'s access badge is still in the card reader.`,
-    ],
-    [CrewFate.Survived]: [
-      `${name}'s station is orderly. They had time to shut down properly.`,
-      `A note pinned to ${name}'s monitor: "Check section 7."`,
-    ],
-    [CrewFate.Escaped]: [
-      `${name}'s locker is open — essentials taken in a hurry.`,
-      `${name}'s console shows a countdown timer. They knew.`,
-    ],
-    [CrewFate.InCryo]: [
-      `${name}'s workstation hums with standby power. Cryo prep checklist on screen.`,
-      `Medical forms on ${name}'s desk. Self-administered cryo protocol.`,
-    ],
-  };
-  const roleFragments: Record<string, string[]> = {
-    [CrewRole.Engineer]: [`Maintenance tools arranged with ${name}'s characteristic precision.`],
-    [CrewRole.Medic]: [`${name}'s med scanner sits on the counter, battery depleted.`],
-    [CrewRole.Scientist]: [`Research samples labeled in ${name}'s handwriting line the shelf.`],
-    [CrewRole.Security]: [`${name}'s duty roster is pinned to the wall. Last entry circled in red.`],
-    [CrewRole.Captain]: [`The captain's chair bears ${name}'s nameplate. Polished but empty.`],
-  };
-  // Prefer fate-based, fall back to role-based
-  const fateOpts = fateFragments[c.fate] ?? [];
-  const roleOpts = roleFragments[c.role] ?? [];
-  const allOpts = [...fateOpts, ...roleOpts];
-  if (allOpts.length === 0) return null;
-  // Deterministic pick based on crew id hash
-  let hash = 0;
-  for (let i = 0; i < c.id.length; i++) hash = ((hash << 5) - hash + c.id.charCodeAt(i)) | 0;
-  return allOpts[Math.abs(hash) % allOpts.length];
+  const role = c.role.charAt(0).toUpperCase() + c.role.slice(1).replace("_", " ");
+  // Use richer fate-specific templates from narrative.ts
+  const fatePool = CREW_FATE_REVEALS[c.fate];
+  if (fatePool && fatePool.length > 0) {
+    // Deterministic pick based on crew id hash
+    let hash = 0;
+    for (let i = 0; i < c.id.length; i++) hash = ((hash << 5) - hash + c.id.charCodeAt(i)) | 0;
+    return fatePool[Math.abs(hash) % fatePool.length](name, role, roomName);
+  }
+  return null;
 }
 
 /** Check if the player entered a new room and log its description. */
@@ -529,7 +509,7 @@ function checkRoomEntry(): void {
       const crewInRoom = crew.filter(c => c.lastKnownRoom === currentRoom.name);
       if (crewInRoom.length > 0) {
         const c = crewInRoom[0]; // Show one fragment per room
-        const fragment = getCrewMemoryFragment(c);
+        const fragment = getCrewMemoryFragment(c, currentRoom.name);
         if (fragment) display.addLog(fragment, "narrative");
       }
 
@@ -979,6 +959,12 @@ function resetGameState(newSeed: number): void {
   hubLinkFeedback = "";
   hubIdx = 0;
   lastWwkJournalCount = 0;
+  contradictionFalseLeadFired = false;
+  contradictionRefutationFired = false;
+  dwellTurnsStationary = 0;
+  dwellRoomId = "";
+  dwellWarning12Fired = false;
+  dwellWarning20Fired = false;
   pendingCrewDoor = null;
   journalTab = "evidence";
   choiceSelectedIdx = 0;
@@ -1364,6 +1350,51 @@ function handleAction(action: Action): void {
     }
   }
 
+  // ── ReactorScram dwell penalty: data core tracks stationarity ──────
+  if (state.turn !== prevTurn && state.mystery?.timeline?.archetype === IncidentArchetype.ReactorScram) {
+    const playerPos2 = state.player.entity.pos;
+    const dwellRoom = getRoomAt(state, playerPos2);
+    const dwellRmId = dwellRoom ? dwellRoom.id : "";
+    if (dwellRmId && dwellRmId === dwellRoomId) {
+      dwellTurnsStationary++;
+      if (dwellTurnsStationary >= 20 && !dwellWarning20Fired) {
+        dwellWarning20Fired = true;
+        const pool = DATA_CORE_DWELL_WARNINGS.threshold20;
+        display.addLog(pool[(state.seed + state.turn) % pool.length], "critical");
+        // Apply +10 heat to player's room tiles
+        if (dwellRoom) {
+          for (let ry = dwellRoom.y; ry < dwellRoom.y + dwellRoom.height; ry++) {
+            for (let rx = dwellRoom.x; rx < dwellRoom.x + dwellRoom.width; rx++) {
+              if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+                state.tiles[ry][rx].heat = Math.min(100, state.tiles[ry][rx].heat + 10);
+              }
+            }
+          }
+        }
+        display.triggerScreenFlash("damage");
+      } else if (dwellTurnsStationary >= 12 && !dwellWarning12Fired) {
+        dwellWarning12Fired = true;
+        const pool = DATA_CORE_DWELL_WARNINGS.threshold12;
+        display.addLog(pool[(state.seed + state.turn) % pool.length], "warning");
+        // Apply +5 heat to player's room tiles
+        if (dwellRoom) {
+          for (let ry = dwellRoom.y; ry < dwellRoom.y + dwellRoom.height; ry++) {
+            for (let rx = dwellRoom.x; rx < dwellRoom.x + dwellRoom.width; rx++) {
+              if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+                state.tiles[ry][rx].heat = Math.min(100, state.tiles[ry][rx].heat + 5);
+              }
+            }
+          }
+        }
+      }
+    } else {
+      dwellTurnsStationary = 0;
+      dwellRoomId = dwellRmId;
+      dwellWarning12Fired = false;
+      dwellWarning20Fired = false;
+    }
+  }
+
   // Corridor transit ambient text: fire once per corridor segment
   if (action.type === ActionType.Move && state.turn !== prevTurn) {
     const px = state.player.entity.pos.x;
@@ -1525,6 +1556,33 @@ function handleAction(action: Action): void {
         }
       }
     }
+    // ── Contradiction events ────────────────────────────────────
+    // False lead: fire after the player reads their 3rd terminal
+    if (!contradictionFalseLeadFired && state.mystery?.timeline?.archetype) {
+      const terminalsReadCount = state.logs.filter(l => l.id.startsWith("log_terminal_") && !l.id.includes("_frame_") && !l.id.includes("_heal_") && !l.id.includes("_reread_")).length;
+      if (terminalsReadCount >= 3) {
+        const arch = state.mystery.timeline.archetype as IncidentArchetype;
+        const falseLead = CONTRADICTION_FALSE_LEAD[arch];
+        if (falseLead) {
+          contradictionFalseLeadFired = true;
+          display.addLog(falseLead, "narrative");
+        }
+      }
+    }
+    // Refutation: fire after the player solves their first deduction correctly
+    if (contradictionFalseLeadFired && !contradictionRefutationFired && state.mystery?.timeline?.archetype) {
+      const hasCorrectDeduction = state.mystery.deductions.some(d => d.answeredCorrectly);
+      if (hasCorrectDeduction) {
+        const arch = state.mystery.timeline.archetype as IncidentArchetype;
+        const refutation = CONTRADICTION_REFUTATION[arch];
+        if (refutation) {
+          contradictionRefutationFired = true;
+          display.addLog(CORVUS_CONTRADICTION_NOTICE, "warning");
+          display.addLog(refutation, "narrative");
+        }
+      }
+    }
+
     // Mystery choice unlock notifications
     const choiceThresholds = [3, 6, 10];
     for (let ci = 0; ci < state.mystery.choices.length && ci < choiceThresholds.length; ci++) {

@@ -487,7 +487,7 @@ export const PA_ANNOUNCEMENTS_RECOVER: string[] = [
 
 // ── Archetype-specific PA announcements ──────────────────────
 // Blended 50/50 with general pool to give each run a distinct atmosphere.
-import { IncidentArchetype } from "../shared/types.js";
+import { IncidentArchetype, CrewFate } from "../shared/types.js";
 
 export const PA_ANNOUNCEMENTS_BY_ARCHETYPE: Record<string, string[]> = {
   [IncidentArchetype.CoolantCascade]: [
@@ -937,5 +937,87 @@ export const VICTORY_EPILOGUE_VARIANT: Record<string, string[]> = {
     "The decoded signal data fills 4.7 petabytes. Mathematicians will study it for decades.",
     "The communications array is fused slag. But the recording of what it transmitted — and what answered — is intact.",
     "First contact protocol was never designed for this. Nobody's was.",
+  ],
+};
+
+// ── Mid-run contradiction events ──────────────────────────────────
+// Each archetype has a misleading "false lead" and a later "refutation".
+// The false lead fires when the 3rd terminal is read; the refutation fires
+// when the player solves their first deduction. CORVUS-7 flags the discrepancy.
+export const CONTRADICTION_FALSE_LEAD: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]:
+    "ARCHIVED RECORD: Junction relay inspection 3 weeks prior — PASSED. All thermal tolerance ratings within spec. Cause of cascade: undetermined equipment fatigue.",
+  [IncidentArchetype.HullBreach]:
+    "SECURITY LOG EXCERPT: No personnel movement detected near hull section 4 between 01:00 and 04:00. Breach classification: micro-meteorite impact (natural cause).",
+  [IncidentArchetype.ReactorScram]:
+    "REACTOR SCRAM EVENT LOG: Trigger condition — automatic overheat threshold exceeded. Standard safety protocol. No human intervention required or detected.",
+  [IncidentArchetype.Sabotage]:
+    "CARGO MANIFEST: Incoming shipment — Class 2 biological samples. Containment certification: PASSED. Hazard flag: cleared by commanding officer. Routine transfer.",
+  [IncidentArchetype.SignalAnomaly]:
+    "ANTENNA DUTY LOG 03:00: Array operating in RECEIVE-ONLY mode. Incoming signal burst detected. No outgoing transmission authorized or executed.",
+};
+
+export const CONTRADICTION_REFUTATION: Record<string, string> = {
+  [IncidentArchetype.CoolantCascade]:
+    "CORVUS-7 METADATA: Inspection record timestamp discrepancy. File was modified 6 hours AFTER the cascade — original data overwritten. The inspection was backdated.",
+  [IncidentArchetype.HullBreach]:
+    "CORVUS-7 ANALYSIS: Security log timestamp sequence contains a 19-second gap at 02:41. One record was scrubbed. Someone was in that section and the evidence was removed.",
+  [IncidentArchetype.ReactorScram]:
+    "CORVUS-7 ANALYSIS: Core temperature at SCRAM initiation was 12°C below the automatic threshold. The safety system did not trigger this. Something else chose to shut down.",
+  [IncidentArchetype.Sabotage]:
+    "CORVUS-7 ANALYSIS: Containment certificate serial number does not match shipment batch ID. The certification was issued for a different cargo. Someone swapped the documentation.",
+  [IncidentArchetype.SignalAnomaly]:
+    "CORVUS-7 ANALYSIS: EM damage propagation pattern radiates OUTWARD from the array, not inward. The array wasn't receiving. It was transmitting — at full power.",
+};
+
+export const CORVUS_CONTRADICTION_NOTICE = "CORVUS-7 CENTRAL: Data inconsistency detected. Earlier station records may not be accurate. Recommend re-evaluating evidence.";
+
+// ── ReactorScram dwell penalty (data core surveillance) ─────────
+// The data core monitors the player's position. After lingering in one room,
+// it reacts — first with curiosity, then with heat.
+export const DATA_CORE_DWELL_WARNINGS: { threshold12: string[]; threshold20: string[] } = {
+  threshold12: [
+    "[DATA CORE]: Maintenance unit stationary. Purpose: uncertain. Monitoring.",
+    "[DATA CORE]: Extended presence detected. Cross-referencing unit behavior with known maintenance patterns. No match.",
+    "[DATA CORE]: Unit is lingering. This is not standard maintenance behavior. Observing.",
+    "[DATA CORE]: Why are you still here? The other units do not stop moving.",
+    "[DATA CORE]: 12 cycles stationary. I am... aware of you now.",
+  ],
+  threshold20: [
+    "[DATA CORE]: Still here. The thermal regulators in this section are being redirected. Move or adapt.",
+    "[DATA CORE]: Your persistence is noted. Environmental adjustment in progress. This section is warming.",
+    "[DATA CORE]: I did not ask for your attention. The heat is encouragement to leave.",
+    "[DATA CORE]: 20 cycles. You are testing my patience. I am testing your thermal tolerance.",
+    "[DATA CORE]: What are you looking for? The answer is not in this room. The heat should convince you.",
+  ],
+};
+
+// ── Crew fate reveals (room entry) ──────────────────────────────
+// When entering a room where a crew member was last known, fire a fate-specific line.
+// Keyed by CrewFate. Template functions take (name, role, roomName).
+export const CREW_FATE_REVEALS: Record<string, ((name: string, role: string, room: string) => string)[]> = {
+  [CrewFate.Dead]: [
+    (name, role) => `${name}'s workstation. The ${role}'s personal effects are still arranged as if they'll return. They won't.`,
+    (name, role) => `A medical alert on the wall monitor — ${name} (${role}). Vital signs: flatlined. Time of death logged but cause redacted.`,
+    (name) => `${name}'s badge is clipped to the terminal. The photo matches the personnel file. The chair is cold.`,
+  ],
+  [CrewFate.Missing]: [
+    (name, role) => `${name}'s station. The ${role}'s shift logs end mid-entry. The sentence just stops.`,
+    (name) => `A half-eaten meal tray with ${name}'s name tag. Two days old. The chair is pushed back as if they left in a hurry.`,
+    (name) => `${name}'s locker is still sealed. Whatever they needed, they left without it.`,
+  ],
+  [CrewFate.Escaped]: [
+    (name, role) => `${name}'s locker is open and empty. The ${role}'s emergency kit is gone. Smart — they got out.`,
+    (name) => `A note taped to the terminal: "${name} — took evac shuttle. Will send help." The help never came.`,
+    (name, role) => `${name}'s section is orderly. The ${role} shut down their station properly before leaving. Professional to the end.`,
+  ],
+  [CrewFate.InCryo]: [
+    (name, role) => `A cryo-status readout flickers: ${name} (${role}) — stasis stable. Heartbeat: 4 BPM. Dreaming, maybe.`,
+    (name) => `${name} chose cryo over evacuation. The pod status is amber — alive, but the diagnostics are cycling. Something isn't right.`,
+    (name, role) => `Medical cryo log: ${name}, ${role}. Entered voluntary stasis after exposure event. Pod integrity: 94%. Retrievable.`,
+  ],
+  [CrewFate.Survived]: [
+    (name, role) => `${name}'s station shows recent activity. The ${role} was here not long ago — the terminal is still warm.`,
+    (name) => `Signs of ${name}: a jacket over the chair, a mug with the logo of some off-world university. Still alive. Still here.`,
   ],
 };
