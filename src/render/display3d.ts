@@ -56,6 +56,34 @@ function createFloorGridTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+/** Create a yellow/black diagonal caution stripe texture for hazard floor markings. */
+function createCautionStripeTexture(): THREE.CanvasTexture {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  // Black base
+  ctx.fillStyle = "#111111";
+  ctx.fillRect(0, 0, size, size);
+
+  // Diagonal yellow stripes
+  ctx.strokeStyle = "#ddaa00";
+  ctx.lineWidth = 8;
+  for (let i = -size; i < size * 2; i += 16) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i + size, size);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
 function createToonGradient(): THREE.DataTexture {
   const colors = new Uint8Array([
     40,   // very dark (deep shadow)
@@ -410,6 +438,14 @@ export class BrowserDisplay3D implements IGameDisplay {
   private entityLabels: Map<string, THREE.Sprite> = new Map();
   private entityLabelCanvas: Map<string, HTMLCanvasElement> = new Map();
 
+  // Caution stripe floor markings near hazardous entities
+  private cautionMarkedTiles: Set<string> = new Set();
+  private cautionStripeGroup: THREE.Group = new THREE.Group();
+
+  // Corridor overhead pipe runs
+  private corridorPipeTiles: Set<string> = new Set();
+  private pipeGroup: THREE.Group = new THREE.Group();
+
   // Player movement trail
   private trailPoints: THREE.Points | null = null;
   private trailPositions: Float32Array = new Float32Array(0);
@@ -571,6 +607,10 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Hazard visual effects group ──
     this.scene.add(this.hazardSprites);
+
+    // ── Caution stripe markings and corridor pipes ──
+    this.scene.add(this.cautionStripeGroup);
+    this.scene.add(this.pipeGroup);
 
     // ── Starfield background (distant stars visible through station gaps) ──
     this.createStarfield();
@@ -891,6 +931,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateFog(state);
     this.updateRoomLights(state);
     this.placeRoomDecorations(state);
+    this.placeCautionMarkings(state);
+    this.placeCorridorPipes(state);
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
     this.updateRoomLabels(state);
@@ -2139,6 +2181,175 @@ export class BrowserDisplay3D implements IGameDisplay {
               }
             }, undefined, () => {});
           }
+        }
+      }
+    }
+  }
+
+  // ── Private: caution stripe floor markings ─────────────────────
+
+  private cautionStripeTex: THREE.CanvasTexture | null = null;
+
+  private placeCautionMarkings(state: GameState): void {
+    // Place yellow/black caution stripes on floor tiles adjacent to dangerous entities
+    const dangerTypes = new Set([
+      EntityType.Breach, EntityType.Airlock, EntityType.EscapePod,
+    ]);
+
+    for (const [, entity] of state.entities) {
+      if (!dangerTypes.has(entity.type as EntityType)) continue;
+      const ex = entity.pos.x;
+      const ey = entity.pos.y;
+
+      // Mark a ring of floor tiles around the entity
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const tx = ex + dx;
+          const ty = ey + dy;
+          if (ty < 0 || ty >= state.height || tx < 0 || tx >= state.width) continue;
+          const tile = state.tiles[ty][tx];
+          if (!tile.explored) continue;
+          if (tile.type !== TileType.Floor && tile.type !== TileType.Corridor) continue;
+
+          const key = `${tx},${ty}`;
+          if (this.cautionMarkedTiles.has(key)) continue;
+          this.cautionMarkedTiles.add(key);
+
+          // Create caution stripe overlay plane
+          if (!this.cautionStripeTex) {
+            this.cautionStripeTex = createCautionStripeTexture();
+          }
+          const planeGeo = new THREE.PlaneGeometry(0.9, 0.9);
+          planeGeo.rotateX(-Math.PI / 2);
+          const planeMat = new THREE.MeshBasicMaterial({
+            map: this.cautionStripeTex,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false,
+          });
+          const plane = new THREE.Mesh(planeGeo, planeMat);
+          plane.position.set(tx, 0.01, ty); // just above floor surface
+          this.cautionStripeGroup.add(plane);
+        }
+      }
+    }
+
+    // Also mark floor tiles in rooms with active breaches
+    for (const room of state.rooms) {
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
+      if (!state.tiles[cy][cx].explored) continue;
+
+      // Check for breach tiles
+      let hasBreach = false;
+      for (let ry = room.y; ry < room.y + room.height && !hasBreach; ry++) {
+        for (let rx = room.x; rx < room.x + room.width && !hasBreach; rx++) {
+          if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+            if (state.tiles[ry][rx].pressure < 30) hasBreach = true;
+          }
+        }
+      }
+
+      if (!hasBreach) continue;
+
+      // Mark doorway tiles for this room with caution stripes
+      for (let y = room.y - 1; y <= room.y + room.height; y++) {
+        for (let x = room.x - 1; x <= room.x + room.width; x++) {
+          if (y < 0 || y >= state.height || x < 0 || x >= state.width) continue;
+          const tile = state.tiles[y][x];
+          if (tile.type !== TileType.Door && tile.type !== TileType.LockedDoor) continue;
+          if (!tile.explored) continue;
+
+          const key = `${x},${y}`;
+          if (this.cautionMarkedTiles.has(key)) continue;
+          this.cautionMarkedTiles.add(key);
+
+          if (!this.cautionStripeTex) {
+            this.cautionStripeTex = createCautionStripeTexture();
+          }
+          const planeGeo = new THREE.PlaneGeometry(0.9, 0.9);
+          planeGeo.rotateX(-Math.PI / 2);
+          const planeMat = new THREE.MeshBasicMaterial({
+            map: this.cautionStripeTex,
+            transparent: true,
+            opacity: 0.3,
+            depthWrite: false,
+          });
+          const plane = new THREE.Mesh(planeGeo, planeMat);
+          plane.position.set(x, 0.01, y);
+          this.cautionStripeGroup.add(plane);
+        }
+      }
+    }
+  }
+
+  // ── Private: corridor overhead pipe runs ──────────────────────
+
+  private placeCorridorPipes(state: GameState): void {
+    // Add overhead pipe/conduit meshes along explored corridors
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored) continue;
+        if (tile.type !== TileType.Corridor) continue;
+
+        const key = `${x},${y}`;
+        if (this.corridorPipeTiles.has(key)) continue;
+
+        // Only place pipes every 2nd tile for performance
+        if ((x + y) % 2 !== 0) continue;
+        this.corridorPipeTiles.add(key);
+
+        // Determine corridor direction (horizontal or vertical)
+        const hasEW = (x > 0 && state.tiles[y][x - 1].type === TileType.Corridor) ||
+                      (x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Corridor);
+        const hasNS = (y > 0 && state.tiles[y - 1][x].type === TileType.Corridor) ||
+                      (y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Corridor);
+
+        // Pipe color varies with position hash
+        const pipeHash = ((x * 7 + y * 13) & 0xf);
+        const pipeColor = pipeHash < 5 ? 0x556677 : pipeHash < 10 ? 0x667788 : 0x778899;
+
+        // Main overhead pipe (thin cylinder running along corridor axis)
+        const pipeGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.0, 6);
+        const pipeMat = makeToonMaterial({
+          color: pipeColor,
+          gradientMap: this.toonGradient,
+        });
+
+        const pipe = new THREE.Mesh(pipeGeo, pipeMat);
+        pipe.position.set(x, 1.8, y);
+
+        if (hasEW && !hasNS) {
+          // Horizontal pipe runs east-west
+          pipe.rotation.z = Math.PI / 2;
+          pipe.position.x = x + 0.3; // offset from center
+        } else if (hasNS) {
+          // Vertical pipe runs north-south
+          pipe.rotation.x = Math.PI / 2;
+          pipe.position.z = y + 0.3;
+        } else {
+          // Junction: place diagonally
+          pipe.rotation.z = Math.PI / 4;
+        }
+
+        this.pipeGroup.add(pipe);
+
+        // Secondary thinner pipe offset to the side
+        if (pipeHash > 7) {
+          const pipe2Geo = new THREE.CylinderGeometry(0.025, 0.025, 1.0, 4);
+          const pipe2 = new THREE.Mesh(pipe2Geo, pipeMat);
+          pipe2.position.set(x, 1.6, y);
+
+          if (hasEW && !hasNS) {
+            pipe2.rotation.z = Math.PI / 2;
+            pipe2.position.x = x - 0.2;
+          } else {
+            pipe2.rotation.x = Math.PI / 2;
+            pipe2.position.z = y - 0.2;
+          }
+          this.pipeGroup.add(pipe2);
         }
       }
     }
