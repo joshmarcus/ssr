@@ -7753,6 +7753,31 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Room hazard warning icons on minimap
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    for (const room of state.rooms) {
+      const rcx = room.x + Math.floor(room.width / 2);
+      const rcy = room.y + Math.floor(room.height / 2);
+      if (!(rcy >= 0 && rcy < state.height && rcx >= 0 && rcx < state.width && state.tiles[rcy][rcx].explored)) continue;
+      // Sample center tile for hazard levels
+      const centerTile = state.tiles[rcy]?.[rcx];
+      if (!centerTile) continue;
+      const rx = Math.floor(room.x * scale) + 1;
+      const ry = Math.floor((room.y + room.height) * scale) - 9;
+      const hazards: string[] = [];
+      if (centerTile.heat > 30) hazards.push("\u2622"); // radiation/heat symbol
+      if (centerTile.pressure < 60) hazards.push("\u25b3"); // triangle for vacuum
+      if (centerTile.smoke > 30) hazards.push("\u2601"); // cloud for smoke
+      if (hazards.length > 0) {
+        ctx.fillStyle = centerTile.heat > 50 ? "rgba(255,80,20,0.8)" :
+                        centerTile.pressure < 40 ? "rgba(60,120,255,0.8)" :
+                        "rgba(180,180,100,0.7)";
+        ctx.fillText(hazards.join(""), rx, ry);
+      }
+    }
+
     // Player: bright green dot with facing direction arrow
     const ppx = Math.floor(state.player.entity.pos.x * scale);
     const ppy = Math.floor(state.player.entity.pos.y * scale);
