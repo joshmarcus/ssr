@@ -2133,8 +2133,13 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Door light animations: locked doors pulse red
-    for (const [, light] of this.doorLights) {
+    // Door light animations: locked doors pulse red, distance-based visibility
+    for (const [key, light] of this.doorLights) {
+      // Parse position from key "door_x,y"
+      const parts = key.replace("door_", "").split(",");
+      const dx = parseInt(parts[0]), dy = parseInt(parts[1]);
+      const dist = Math.abs(this.playerCurrentX - dx) + Math.abs(this.playerCurrentZ - dy);
+      light.visible = dist <= BrowserDisplay3D.CORRIDOR_VIEW_RANGE + 3;
       if (light.color.getHex() === 0xff3333) {
         light.intensity = 0.3 + Math.sin(elapsed * 2) * 0.3;
       }
@@ -6242,23 +6247,29 @@ export class BrowserDisplay3D implements IGameDisplay {
         const pw = Math.max(1, Math.ceil(scale));
         const ph = Math.max(1, Math.ceil(scale));
 
+        // Determine if tile is in current view (for minimap emphasis)
+        const inView = this.isTileInView(x, y, state);
+        const dimFactor = inView ? 1.0 : 0.5; // non-view tiles appear dimmer
+
         if (tile.type === TileType.Wall) {
-          ctx.fillStyle = tile.visible ? "#556677" : "#334455";
+          const base = tile.visible ? [0x55, 0x66, 0x77] : [0x33, 0x44, 0x55];
+          ctx.fillStyle = `rgb(${Math.round(base[0] * dimFactor)}, ${Math.round(base[1] * dimFactor)}, ${Math.round(base[2] * dimFactor)})`;
         } else if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
           ctx.fillStyle = tile.type === TileType.LockedDoor ? "#aa3333" : "#997744";
         } else if (tile.walkable) {
           if (tile.heat > 50) {
-            ctx.fillStyle = "#aa3300"; // dangerous heat — bright red-orange
+            ctx.fillStyle = "#aa3300";
           } else if (tile.heat > 25) {
-            ctx.fillStyle = "#774400"; // moderate heat — amber
+            ctx.fillStyle = "#774400";
           } else if (tile.smoke > 40) {
-            ctx.fillStyle = "#444433"; // heavy smoke — murky
+            ctx.fillStyle = "#444433";
           } else if (tile.pressure < 40) {
-            ctx.fillStyle = "#3344aa"; // vacuum — bright blue
+            ctx.fillStyle = "#3344aa";
           } else if (tile.pressure < 70) {
-            ctx.fillStyle = "#223366"; // low pressure — dark blue
+            ctx.fillStyle = "#223366";
           } else {
-            ctx.fillStyle = tile.visible ? "#445544" : "#223322";
+            const base = tile.visible ? [0x44, 0x55, 0x44] : [0x22, 0x33, 0x22];
+            ctx.fillStyle = `rgb(${Math.round(base[0] * dimFactor)}, ${Math.round(base[1] * dimFactor)}, ${Math.round(base[2] * dimFactor)})`;
           }
         } else {
           continue;
@@ -6295,7 +6306,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
     }
 
-    // Room boundary outlines for readability
+    // Room boundary outlines — highlight current room, dim others
     for (const room of state.rooms) {
       const rcx = room.x + Math.floor(room.width / 2);
       const rcy = room.y + Math.floor(room.height / 2);
@@ -6304,17 +6315,28 @@ export class BrowserDisplay3D implements IGameDisplay {
         const ry = Math.floor(room.y * scale);
         const rw = Math.ceil(room.width * scale);
         const rh = Math.ceil(room.height * scale);
+        const isCurrent = this._currentRoom?.id === room.id;
         const tint = ROOM_WALL_TINTS_3D[room.name];
-        if (tint) {
+        if (isCurrent) {
+          // Current room: bright glow outline
+          ctx.strokeStyle = "#44ff88";
+          ctx.lineWidth = 2;
+          ctx.shadowColor = "#44ff88";
+          ctx.shadowBlur = 4;
+        } else if (tint) {
           const tr = (tint >> 16) & 0xff;
           const tg = (tint >> 8) & 0xff;
           const tb = tint & 0xff;
-          ctx.strokeStyle = `rgba(${tr}, ${tg}, ${tb}, 0.6)`;
+          ctx.strokeStyle = `rgba(${tr}, ${tg}, ${tb}, 0.4)`;
+          ctx.lineWidth = 1;
+          ctx.shadowBlur = 0;
         } else {
-          ctx.strokeStyle = "rgba(100, 120, 140, 0.4)";
+          ctx.strokeStyle = "rgba(100, 120, 140, 0.3)";
+          ctx.lineWidth = 1;
+          ctx.shadowBlur = 0;
         }
-        ctx.lineWidth = 1;
         ctx.strokeRect(rx, ry, rw, rh);
+        ctx.shadowBlur = 0;
       }
     }
 
