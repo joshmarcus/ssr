@@ -730,6 +730,41 @@
       0%, 100% { opacity: 0.8; }
       50% { opacity: 0.4; }
     }
+    /* ── Cinematic subtitle bar ───────────────────────────── */
+    #subtitle-bar {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 700px;
+      width: 80%;
+      text-align: center;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #dde;
+      background: rgba(5, 5, 15, 0.75);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      padding: 8px 20px;
+      border: 1px solid rgba(68, 204, 255, 0.15);
+      border-radius: 3px;
+      z-index: 12;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+      text-shadow: 0 0 6px rgba(68, 204, 255, 0.3);
+    }
+    #subtitle-bar.visible { opacity: 1; }
+    #subtitle-bar.fade-out { opacity: 0; transition: opacity 0.8s ease; }
+    #subtitle-bar .sub-source {
+      color: #4cf;
+      font-weight: bold;
+      font-size: 10px;
+      letter-spacing: 2px;
+      display: block;
+      margin-bottom: 2px;
+    }
   </style>
 </head>
 <body>
@@ -738,6 +773,7 @@
   <div id="room-banner"></div>
   <div id="minimap-fullscreen"></div>
   <div id="autoplay-badge">AUTOPLAY</div>
+  <div id="subtitle-bar"></div>
   <div id="gameover-overlay"></div>
   <div id="broadcast-overlay"></div>
   <div id="journal-overlay"></div>

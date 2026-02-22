@@ -1364,6 +1364,33 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (this.logHistory.length > BrowserDisplay3D.MAX_LOG_ENTRIES) {
       this.logHistory.shift();
     }
+    // Cinematic subtitle for narrative and milestone messages
+    if (this.chaseCamActive && (type === "narrative" || type === "milestone")) {
+      this.showSubtitle(msg, type === "milestone" ? "CORVUS-7 CENTRAL" : undefined);
+    }
+  }
+
+  private _subtitleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Show a cinematic subtitle at the bottom of the 3D viewport */
+  private showSubtitle(text: string, source?: string): void {
+    const el = document.getElementById("subtitle-bar");
+    if (!el) return;
+    // Strip HTML tags and [ECHO] prefix for cleaner display
+    const cleanText = text.replace(/<[^>]*>/g, "").replace(/^\[ECHO\]\s*/, "");
+    const sourceHtml = source ? `<span class="sub-source">${source}</span>` : "";
+    el.innerHTML = sourceHtml + cleanText;
+    el.className = "visible";
+    if (this._subtitleTimer) clearTimeout(this._subtitleTimer);
+    // Hold visible for 3.5s, then fade out over 0.8s
+    this._subtitleTimer = setTimeout(() => {
+      el.className = "fade-out";
+      this._subtitleTimer = setTimeout(() => {
+        el.className = "";
+        el.innerHTML = "";
+        this._subtitleTimer = null;
+      }, 800);
+    }, 3500);
   }
 
   getLogHistory(): DisplayLogEntry[] {
