@@ -1107,6 +1107,11 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.roomFlashMessage = "";
         this.roomFlashTimer = null;
       }, 2000);
+    } else if (!roomId && this.lastRoomId) {
+      // Room → corridor exit: brief darkness pulse as "lights left behind"
+      this._roomTransitionFade = 0.35;
+      // Quick corridor FOV tighten — zoom pulse inward
+      this.cameraZoomPulse = -0.5; // negative = zoom in slightly
     }
     this.lastRoomId = roomId;
   }
@@ -1810,12 +1815,19 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.cameraShakeIntensity *= Math.max(0, 1 - this.cameraShakeDecay * delta);
       }
 
-      // Camera zoom pulse on room transition (subtle pull-back and zoom-in)
+      // Camera zoom pulse on room transition (positive = zoom out, negative = zoom in)
       let zoomOffset = 0;
-      if (this.cameraZoomPulse > 0) {
-        // Smooth ease-out bump: brief zoom-out then return
-        zoomOffset = Math.sin(this.cameraZoomPulse * Math.PI) * 1.5;
-        this.cameraZoomPulse = Math.max(0, this.cameraZoomPulse - delta * 2.0);
+      if (Math.abs(this.cameraZoomPulse) > 0.01) {
+        const sign = this.cameraZoomPulse > 0 ? 1 : -1;
+        const mag = Math.abs(this.cameraZoomPulse);
+        // Smooth ease-out bump: brief zoom then return
+        zoomOffset = Math.sin(mag * Math.PI) * 1.5 * sign;
+        // Decay toward zero
+        if (this.cameraZoomPulse > 0) {
+          this.cameraZoomPulse = Math.max(0, this.cameraZoomPulse - delta * 2.0);
+        } else {
+          this.cameraZoomPulse = Math.min(0, this.cameraZoomPulse + delta * 2.5);
+        }
         if (!this.chaseCamActive) {
           // Update orthographic camera frustum
           const aspect = this.container.clientWidth / this.container.clientHeight;
@@ -1959,6 +1971,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         mesh.scale.set(scale, scale, scale);
       } else if (userData.entityType === EntityType.Drone) {
         mesh.position.y = 0.6 + Math.sin(elapsed * 2 + mesh.position.x) * 0.08;
+        // Spin propeller ring (child index 1 = torus ring)
+        const propRing = mesh.children[1];
+        if (propRing) propRing.rotation.z = elapsed * 12;
       } else if (userData.entityType === EntityType.EscapePod) {
         // Slow pulsing glow
         const podScale = 1 + Math.sin(elapsed * 1.2) * 0.04;
@@ -1987,9 +2002,17 @@ export class BrowserDisplay3D implements IGameDisplay {
         const ud = mesh.userData as { baseY?: number };
         mesh.position.y = (ud.baseY ?? 0.1) + Math.sin(elapsed * 2.0 + mesh.position.z * 2) * 0.04;
       } else if (userData.entityType === EntityType.MedKit) {
-        // Pulse scale
-        const s = 1 + Math.sin(elapsed * 2.5) * 0.03;
+        // Heartbeat pulse: double-beat rhythm on cross
+        const heartbeat = Math.pow(Math.abs(Math.sin(elapsed * 2.5)), 8) + Math.pow(Math.abs(Math.sin(elapsed * 2.5 + 0.3)), 12) * 0.6;
+        const s = 1 + heartbeat * 0.05;
         mesh.scale.set(s, s, s);
+        // Pulse red cross glow (children 1,2 are the cross meshes)
+        for (let ci = 1; ci <= 2; ci++) {
+          const cross = mesh.children[ci];
+          if (cross instanceof THREE.Mesh && cross.material instanceof THREE.MeshBasicMaterial) {
+            cross.material.color.setRGB(1.0, 0.13 + heartbeat * 0.2, 0.13 + heartbeat * 0.2);
+          }
+        }
       } else if (userData.entityType === EntityType.LogTerminal || userData.entityType === EntityType.SecurityTerminal) {
         // Subtle screen glow flicker via emissive
         mesh.traverse((child) => {
@@ -2013,14 +2036,30 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Gentle glow pulse
         const ud = mesh.userData as { baseY?: number };
         mesh.position.y = (ud.baseY ?? 0.1) + Math.sin(elapsed * 1.5 + mesh.position.x) * 0.03;
-      } else if (userData.entityType === EntityType.RepairBot || userData.entityType === EntityType.ServiceBot) {
+      } else if (userData.entityType === EntityType.RepairBot) {
         // Hover and wobble
         mesh.position.y = 0.4 + Math.sin(elapsed * 1.8 + mesh.position.z) * 0.06;
         mesh.rotation.y = Math.sin(elapsed * 0.5) * 0.2;
+        // Arm swing — mechanical idle (child index 1 = arm)
+        const arm = mesh.children[1];
+        if (arm) arm.rotation.z = -0.4 + Math.sin(elapsed * 1.2 + mesh.position.x) * 0.2;
+      } else if (userData.entityType === EntityType.ServiceBot) {
+        // Hover and wobble with head swivel
+        mesh.position.y = 0.4 + Math.sin(elapsed * 1.8 + mesh.position.z) * 0.06;
+        mesh.rotation.y = Math.sin(elapsed * 0.5) * 0.2;
+        // Head swivel — scanning left/right (child index 1 = head)
+        const head = mesh.children[1];
+        if (head) head.rotation.y = Math.sin(elapsed * 0.7 + mesh.position.z * 3) * 0.4;
       } else if (userData.entityType === EntityType.PatrolDrone) {
-        // Patrol sweep motion
+        // Patrol sweep motion + propeller spin
         mesh.position.y = 0.7 + Math.sin(elapsed * 2.5) * 0.1;
         mesh.rotation.y = elapsed * 1.5;
+        // If GLTF model loaded, spin any child that looks like a rotor
+        // For procedural fallback, spin torus ring (child 1)
+        const rotor = mesh.children[1];
+        if (rotor && (rotor as THREE.Mesh).geometry instanceof THREE.TorusGeometry) {
+          rotor.rotation.z = elapsed * 15;
+        }
       }
     }
 
