@@ -251,6 +251,7 @@
 - **Sprint V89 — Heat shimmer sprites**: Wide thin orange particles rise rapidly from hot tiles (>25 heat) with horizontal wave distortion. Spawn rate increases with heat intensity. Visual heat haze effect complementing existing hazard sprites
 - **Sprint V90 — DataCore holographic ring**: Tilted torus ring orbits the DataCore entity (magenta, additive blend). Ring tilts with slow oscillation and pulses opacity. Visually marks the key objective as dramatically important
 - **Sprint V91 — Entity interaction feedback**: Entity meshes scale-bump and emissive-boost on interaction (set via flashTile, decays over ~0.3s). Satisfying tactile response when activating relays, terminals, and other interactables
+- **Sprint V92 — Antenna signal pulse**: Sweepo's antenna tip glows brighter and pulses faster when near unexhausted entities (yellow within 2 tiles, green within 6). Acts as a proximity detector — idle dim green, signal strength scales with distance, pulse rate 2-8Hz
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

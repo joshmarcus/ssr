@@ -2054,6 +2054,36 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // Antenna signal pulse: tip glows when near unexhausted interactive entities (child 3)
+      const antennaTip = this.playerMesh.children[3];
+      if (antennaTip instanceof THREE.Mesh) {
+        const atMat = antennaTip.material as THREE.MeshBasicMaterial;
+        // Find nearest unexhausted entity distance
+        let nearestDist = 999;
+        for (const [, emesh] of this.entityMeshes) {
+          if (emesh.userData._exhausted) continue;
+          const adx = emesh.position.x - this.playerCurrentX;
+          const adz = emesh.position.z - this.playerCurrentZ;
+          const adist = Math.abs(adx) + Math.abs(adz);
+          if (adist < nearestDist) nearestDist = adist;
+        }
+        if (nearestDist < 6) {
+          // Signal strength: 1.0 at distance 0, fading to 0 at distance 6
+          const signal = 1 - nearestDist / 6;
+          // Pulse rate increases with proximity (2Hz far → 8Hz close)
+          const rate = 2 + signal * 6;
+          const pulse = 0.3 + signal * 0.7 * (0.5 + Math.sin(elapsed * rate) * 0.5);
+          atMat.color.setHex(nearestDist < 2 ? 0xffff44 : 0x44ff88);
+          atMat.opacity = pulse;
+          antennaTip.scale.setScalar(1 + signal * 0.5);
+        } else {
+          // Idle: dim green
+          atMat.color.setHex(0x00ff44);
+          atMat.opacity = 0.3 + Math.sin(elapsed * 1.5) * 0.1;
+          antennaTip.scale.setScalar(1);
+        }
+      }
+
       // Smoothly move camera and light to follow
       this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
       this.cameraPosZ += (this.cameraTargetZ - this.cameraPosZ) * lerpFactor;
@@ -6454,9 +6484,12 @@ export class BrowserDisplay3D implements IGameDisplay {
     antenna.position.y = 0.55;
     group.add(antenna);
 
-    // Small tip sphere (antenna tip)
+    // Small tip sphere (antenna tip) — MeshBasicMaterial for proximity signal glow
     const tipGeo = new THREE.SphereGeometry(0.04, 6, 4);
-    const tip = new THREE.Mesh(tipGeo, makeToonMaterial({ color: 0x00ff44, gradientMap: this.toonGradient }));
+    const tipMat = new THREE.MeshBasicMaterial({
+      color: 0x00ff44, transparent: true, opacity: 0.6,
+    });
+    const tip = new THREE.Mesh(tipGeo, tipMat);
     tip.position.y = 0.67;
     group.add(tip);
 
