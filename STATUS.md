@@ -194,6 +194,7 @@
 - **Sprint V32 — Ceiling panels**: InstancedMesh ceiling panels above all explored tiles at y=2.05, dark metallic coloring, only visible in chase cam for enclosed corridor atmosphere
 - **Sprint V33 — Entity visibility**: Fill light at eye level for chase cam, player light range 18→22, proximity entity highlight (emissive boost within 2/4 tiles in chase cam)
 - **Sprint V34 — Ground Sweepo + atmosphere**: Sweepo grounded to floor level (y=0.02 vs old 0.4), chase cam lowered to 0.9 for dramatic ground perspective, doors raised with visible gap at bottom for bot pass-through, emergency red wall light strips on hazardous corridors (pulsing emissive), breach spark particles (flickering orange jitter near breach entities)
+- **Sprint V35 — Low-angle corridor immersion**: Tighter chase cam fog (near 3, far 14) for claustrophobic corridors, wall-mounted warm light fixtures at eye level (0.5h) every 6th corridor tile with point lights, floor center guide strips (green emissive navigation lines), direction-aware strip orientation
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
