@@ -409,7 +409,7 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   [EntityType.MedKit]: "models/Items/GLTF/Pickup_Health.gltf",
   [EntityType.CrewItem]: "models/synty-space-gltf/SM_Prop_Detail_Box_01.glb",
   [EntityType.ClosedDoor]: "models/synty-space-gltf/SM_Bld_Wall_Doorframe_01.glb",
-  [EntityType.RepairBot]: "models/quaternius-robot/Robot.glb",
+  [EntityType.RepairBot]: "models/synty-space-gltf/SM_Veh_Drone_Repair_01.glb",
   [EntityType.Drone]: "models/synty-space-gltf/SM_Veh_Drone_Attach_01.glb",
   [EntityType.PatrolDrone]: "models/Characters/GLTF/Enemy_ExtraSmall.gltf",
   [EntityType.EscapePod]: "models/synty-space-gltf/SM_Veh_EscapePod_Large_01.glb",
@@ -425,6 +425,15 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   [EntityType.Breach]: "models/synty-space-gltf/SM_Prop_Wires_01.glb",
   // EvidenceTrace uses procedural ? mesh (no GLTF — more distinctive)
 };
+
+// Crew NPC model variants — different models for visual variety
+const CREW_MODEL_VARIANTS = [
+  "models/synty-space-gltf/SK_Chr_Crew_Male_01.glb",
+  "models/synty-space-gltf/SK_Chr_Crew_Female_01.glb",
+  "models/synty-space-gltf/SK_Chr_CrewCaptain_Male_01.glb",
+  "models/synty-space-gltf/SK_Chr_CrewCaptain_Female_01.glb",
+  "models/synty-space-gltf/SK_Chr_Medic_Male_01.glb",
+];
 
 // ── BrowserDisplay3D ─────────────────────────────────────────────
 export class BrowserDisplay3D implements IGameDisplay {
@@ -544,6 +553,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private roomLights: Map<string, THREE.PointLight> = new Map();
   private corridorLitTiles: Set<string> = new Set();
   private corridorDecorTiles: Set<string> = new Set();
+  // Corridor lights for flicker animation
+  private corridorLightList: THREE.PointLight[] = [];
 
   // Synty texture atlas (loaded at startup, applied to models that lack embedded textures)
   private syntyAtlas: THREE.Texture | null = null;
@@ -1841,6 +1852,23 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else if (this.roomLightBoost > 0.01 && roomId === this.lastRoomId) {
         // Room entry boost: temporarily brighten the current room's light
         light.intensity = 1.2 + this.roomLightBoost;
+      }
+    }
+
+    // Corridor light flicker: subtle atmospheric pulsing
+    for (let i = 0; i < this.corridorLightList.length; i++) {
+      const cl = this.corridorLightList[i];
+      const base = (cl as any)._baseIntensity ?? 0.6;
+      const isHazard = (cl as any)._isHazard;
+      // Each light gets a unique phase offset from its position
+      const phase = elapsed * (isHazard ? 3.5 : 1.2) + cl.position.x * 7.3 + cl.position.z * 11.7;
+      if (isHazard) {
+        // Hazardous corridors: aggressive flicker with occasional dropout
+        const flicker = Math.sin(phase) * Math.sin(phase * 2.7);
+        cl.intensity = flicker > 0.3 ? base * (0.4 + Math.random() * 0.6) : base * 0.1;
+      } else {
+        // Normal corridors: gentle subtle breathing
+        cl.intensity = base * (0.85 + Math.sin(phase) * 0.15);
       }
     }
 
@@ -3892,19 +3920,35 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Corridor lights: dim point lights every 3 tiles along explored corridors
+    // Corridor lights: dim point lights every 7 tiles along explored corridors
+    // Hazard-reactive: red near heat, amber near smoke, blue near low pressure
     for (let y = 0; y < state.height; y++) {
       for (let x = 0; x < state.width; x++) {
         const key = `${x},${y}`;
         if (this.corridorLitTiles.has(key)) continue;
         const tile = state.tiles[y][x];
         if (tile.type !== TileType.Corridor || !tile.explored) continue;
-        // Only every 3rd tile (checkerboard-ish pattern for performance)
-        if ((x + y) % 7 !== 0) continue; // sparser — headlight provides primary illumination
+        // Only every 7th tile (sparser — headlight provides primary illumination)
+        if ((x + y) % 7 !== 0) continue;
         this.corridorLitTiles.add(key);
-        const corridorLight = new THREE.PointLight(0x8899bb, 0.6, 4); // dimmer ambient corridor lighting
+
+        // Check nearby tiles for hazards to tint corridor lights
+        let lightColor = 0x8899bb; // default cool blue
+        let lightIntensity = 0.6;
+        if (tile.heat > 40) {
+          lightColor = 0xff3300; lightIntensity = 0.9; // red for heat
+        } else if (tile.heat > 20 || tile.smoke > 30) {
+          lightColor = 0xff8844; lightIntensity = 0.7; // amber for moderate hazards
+        } else if (tile.pressure < 40) {
+          lightColor = 0x4466cc; lightIntensity = 0.5; // dim blue for low pressure
+        }
+
+        const corridorLight = new THREE.PointLight(lightColor, lightIntensity, 4);
         corridorLight.position.set(x, 1.5, y);
+        (corridorLight as any)._baseIntensity = lightIntensity;
+        (corridorLight as any)._isHazard = tile.heat > 20 || tile.smoke > 30 || tile.pressure < 40;
         this.scene.add(corridorLight);
+        this.corridorLightList.push(corridorLight);
       }
     }
 
@@ -4371,7 +4415,13 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   private createEntityMesh(entity: Entity): THREE.Object3D {
     // Try to use a loaded GLTF model first
-    const gltfModel = this.gltfCache.get(entity.type);
+    // For CrewNPC, pick a variant based on position hash for visual variety
+    let gltfModel = this.gltfCache.get(entity.type);
+    if (entity.type === EntityType.CrewNPC) {
+      const hash = Math.abs(entity.pos.x * 31 + entity.pos.y * 17) % CREW_MODEL_VARIANTS.length;
+      const variantModel = this.gltfCache.get(`CrewNPC_${hash}`);
+      if (variantModel) gltfModel = variantModel;
+    }
     if (gltfModel) {
       // Wrap in a Group so the model's internal centering offsets are preserved
       const group = new THREE.Group();
@@ -5227,7 +5277,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       [EntityType.Airlock]: 0.65,            // large airlock
       [EntityType.CrewItem]: 0.2,            // small personal item
     };
-    const targetSize = ENTITY_SCALE[key] ?? 0.4;
+    // Crew variant keys (CrewNPC_0..4) share CrewNPC scale
+    const isCrewVariant = key.startsWith("CrewNPC_");
+    const lookupKey = isCrewVariant ? EntityType.CrewNPC : key;
+    const targetSize = ENTITY_SCALE[lookupKey] ?? 0.4;
 
     const box = new THREE.Box3().setFromObject(model);
     const size = new THREE.Vector3();
@@ -5250,8 +5303,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     model.position.y -= scaledBox.min.y; // sit on y=0
 
     // Convert materials to toon-shaded, applying Synty atlas where models have UVs but no embedded texture
-    const tintColor = key === "player" ? COLORS_3D.player : ENTITY_COLORS_3D[key];
-    const isSyntyModel = MODEL_PATHS[key]?.includes("synty-space-gltf");
+    const tintColor = key === "player" ? COLORS_3D.player : ENTITY_COLORS_3D[lookupKey];
+    const isSyntyModel = isCrewVariant || MODEL_PATHS[key]?.includes("synty-space-gltf");
     model.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const mats = Array.isArray(child.material) ? child.material : [child.material];
@@ -5303,14 +5356,17 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   private loadModels(): void {
     const entries = Object.entries(MODEL_PATHS).filter(([, p]) => !!p);
-    if (entries.length === 0) return;
+    // Also load crew model variants for visual variety
+    const crewVariantEntries: [string, string][] = CREW_MODEL_VARIANTS.map((path, i) => [`CrewNPC_${i}`, path]);
+    const allEntries = [...entries, ...crewVariantEntries];
+    if (allEntries.length === 0) return;
     let loaded = 0;
 
     const onDone = () => {
       loaded++;
-      if (loaded >= entries.length) {
+      if (loaded >= allEntries.length) {
         this.modelsLoaded = true;
-        this.addLog(`Loaded ${this.gltfCache.size}/${entries.length} 3D models.`, "system");
+        this.addLog(`Loaded ${this.gltfCache.size}/${allEntries.length} 3D models.`, "system");
         this.swapPlayerModel();
         this.rebuildEntityMeshes();
         // Preload decoration models in the background to prevent frame hitches
@@ -5318,7 +5374,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     };
 
-    for (const [key, path] of entries) {
+    for (const [key, path] of allEntries) {
       if (!path) continue;
       const url = import.meta.env.BASE_URL + path;
 
@@ -5442,8 +5498,13 @@ export class BrowserDisplay3D implements IGameDisplay {
         oldMesh.geometry?.dispose();
       }
 
-      // Create new from GLTF
-      const gltfModel = this.gltfCache.get(entityType)!;
+      // Create new from GLTF — use crew variant if available
+      let gltfModel = this.gltfCache.get(entityType)!;
+      if (entityType === EntityType.CrewNPC) {
+        const hash = Math.abs(Math.round(pos.x) * 31 + Math.round(pos.z) * 17) % CREW_MODEL_VARIANTS.length;
+        const variant = this.gltfCache.get(`CrewNPC_${hash}`);
+        if (variant) gltfModel = variant;
+      }
       const clone = gltfModel.clone();
       const baseY = entityType === EntityType.Drone ? 0.6 : 0.3;
       clone.userData = { entityType, baseY };
