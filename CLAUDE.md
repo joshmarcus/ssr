@@ -285,6 +285,19 @@ Minimap utility, environmental warnings, and interaction feedback polish:
 - **Breach danger rings scale to threat**: Additive-blend red rings (V108) with expanding pulse draw the eye to active hazards without blocking gameplay. The cleanup-on-seal pattern (remove from scene when userData._sealed flips) prevents visual artifacts.
 - **Sparkle pool reuse for different effects**: Relay activation sparks (V109) reuse `_discoverySparkles` pool with high `_driftY` values for upward burst. Same lifecycle management (spawn, drift, fade, cleanup) serves both ambient sparkles and event bursts. Pool reuse > new particle system.
 
+## Sprint Learnings (V111-V120 Reflection)
+
+Entity animation completeness, particle systems as feedback, and Sweepo personality:
+
+- **Complete animation coverage matters**: Animating all 4 remaining static entity types (V110: PressureValve, RepairCradle, ClosedDoor, Airlock) eliminated visual deadness. Even tiny motion (0.01 radian door tremor, 0.15 radian arm oscillation) prevents entities from feeling like props.
+- **One-shot spawn flags for periodic particles**: PowerCell sparks (V111), DataCore arcs (V119) use `_sparkSpawned`/`_arcSpawned` boolean on userData to prevent spawning every frame during the brief spark window. Pattern: set true on spawn, reset false when window passes.
+- **Separate animation for distinct behavior**: Splitting SecurityTerminal from LogTerminal (V112) enables lens tracking, awareness pulsing, and idle sweep. Shared code with minor differences is worse than separate blocks when behaviors diverge significantly.
+- **Eye emotion sells personality**: Blink (Y-scale squish), squint (scale 0.7 at low HP), widen (scale 1.3 on interaction) — three simple scale changes give Sweepo expressiveness (V113). The widen timer triggered from flashTile creates cause-and-effect: interact → Sweepo reacts.
+- **Lazily-created lights avoid upfront cost**: MedKit heartbeat light (V114), drone propwash rings (V115) create geometry on first animation frame, not during entity construction. Entities that never enter view never allocate their animated elements.
+- **Visual feedback for core loop is critical**: Cleaning sparkles (V116) are the single most important particle effect because they reward the primary gameplay action. Dirt threshold (>30) ensures sparkles only appear when cleaning is meaningful.
+- **Damage feedback layers**: Emissive body flash + actual sprite sparks (V117) + headlight flicker + HP vignette + eye color + antenna droop = 6 simultaneous damage indicators. Each addresses a different perception channel (body, particles, light, screen edges, eye, posture).
+- **Minimap attention drawing**: Pulsing rings on key entities (V120) use globalAlpha for clean fade without creating permanent canvas state. Ring radius oscillation (±1.5px) is subtle enough to not obscure underlying map data.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
