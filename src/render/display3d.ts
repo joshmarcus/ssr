@@ -2582,6 +2582,24 @@ export class BrowserDisplay3D implements IGameDisplay {
             droneEye.position.z = (edz / eDist) * 0.08;
           }
         }
+        // Propwash: spinning ring on floor beneath drone
+        if (!mesh.userData._propwash) {
+          const pwGeo = new THREE.RingGeometry(0.15, 0.3, 16);
+          pwGeo.rotateX(-Math.PI / 2);
+          const pwMat = new THREE.MeshBasicMaterial({
+            color: 0xaaccff, transparent: true, opacity: 0.08,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const pw = new THREE.Mesh(pwGeo, pwMat);
+          pw.position.set(mesh.position.x, 0.02, mesh.position.z);
+          this.scene.add(pw);
+          mesh.userData._propwash = pw;
+        }
+        const pw = mesh.userData._propwash as THREE.Mesh;
+        pw.rotation.y = elapsed * 6;
+        pw.position.set(mesh.position.x, 0.02, mesh.position.z);
+        const pwPulse = 0.06 + Math.sin(elapsed * 4) * 0.03;
+        (pw.material as THREE.MeshBasicMaterial).opacity = pwPulse;
       } else if (userData.entityType === EntityType.EscapePod) {
         // Slow pulsing glow + emergency beacon flash
         const podScale = 1 + Math.sin(elapsed * 1.2) * 0.04;
@@ -2829,6 +2847,24 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (rotor && (rotor as THREE.Mesh).geometry instanceof THREE.TorusGeometry) {
           rotor.rotation.z = elapsed * 15;
         }
+        // Propwash: spinning ring on floor beneath patrol drone
+        if (!mesh.userData._propwash) {
+          const pwGeo = new THREE.RingGeometry(0.2, 0.4, 16);
+          pwGeo.rotateX(-Math.PI / 2);
+          const pwMat = new THREE.MeshBasicMaterial({
+            color: 0xffaa88, transparent: true, opacity: 0.06,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const pw = new THREE.Mesh(pwGeo, pwMat);
+          pw.position.set(mesh.position.x, 0.02, mesh.position.z);
+          this.scene.add(pw);
+          mesh.userData._propwash = pw;
+        }
+        const pdPw = mesh.userData._propwash as THREE.Mesh;
+        pdPw.rotation.y = elapsed * 8;
+        pdPw.position.set(mesh.position.x, 0.02, mesh.position.z);
+        const pdPulse = 0.05 + Math.sin(elapsed * 5) * 0.03;
+        (pdPw.material as THREE.MeshBasicMaterial).opacity = pdPulse;
       } else if (userData.entityType === EntityType.PressureValve) {
         // Slow valve wheel rotation + pressure-reactive glow
         mesh.rotation.y = elapsed * 0.3;

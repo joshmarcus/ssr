@@ -274,6 +274,7 @@
 - **Sprint V112 — SecurityTerminal surveillance lens**: Lens (child 2) tracks player when within 5 tiles with smooth rotation. Pulse rate increases on proximity (1.5Hz idle → 3Hz close). Color shifts red→deeper red. Idle sweep oscillation when no player nearby. Camera "watches you" personality
 - **Sprint V113 — Sweepo emotion eye**: Eye blinks every ~4s (Y-scale squish to 20%), squints when HP critical, widens on interaction (triggered from flashTile, decays over 0.5s). Gives Sweepo expressive personality beyond color changes
 - **Sprint V114 — MedKit heartbeat light**: Red PointLight pulses in sync with heartbeat rhythm (double-beat pattern). Casts pulsing red glow on surrounding floor/walls. Lazily created on first animation frame, intensity scales with heartbeat value
+- **Sprint V115 — Drone propwash floor rings**: Spinning additive-blend ring beneath Drone (blue-white, 6 rad/s) and PatrolDrone (orange, 8 rad/s). Ring follows entity position, opacity pulses with hover rhythm. Visual downwash suggests antigravity propulsion
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
