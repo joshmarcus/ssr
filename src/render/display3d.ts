@@ -6137,6 +6137,25 @@ export class BrowserDisplay3D implements IGameDisplay {
           });
           // Trigger activation flash at relay position
           this.flashTile(entity.pos.x, entity.pos.y);
+          // Golden sparks shooting upward: celebration burst
+          for (let si = 0; si < 8; si++) {
+            const sparkMat = new THREE.SpriteMaterial({
+              color: 0xffdd44, transparent: true, opacity: 0.9,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const spark = new THREE.Sprite(sparkMat);
+            spark.scale.set(0.08, 0.08, 1);
+            spark.position.set(
+              entity.pos.x + (Math.random() - 0.5) * 0.4,
+              0.5 + Math.random() * 0.3,
+              entity.pos.y + (Math.random() - 0.5) * 0.4,
+            );
+            (spark as any)._life = 0;
+            (spark as any)._maxLife = 0.6 + Math.random() * 0.4;
+            (spark as any)._driftY = 2.0 + Math.random() * 1.5; // fast upward
+            this.scene.add(spark);
+            this._discoverySparkles.push(spark); // shares sparkle animation pool
+          }
         }
       }
 

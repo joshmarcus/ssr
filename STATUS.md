@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V100 completed, V101 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V109 completed, V110 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -268,6 +268,7 @@
 - **Sprint V106 — Following crew glow**: Crew NPCs that are following the player emit a pulsing green emissive glow (0.2 + sin*0.1 intensity). Tracked via entity `following` prop. Visual confirmation that crew are in your rescue party
 - **Sprint V107 — Minimap exploration percentage**: Walkable tile exploration percentage shown at bottom of minimap. Green when 100%, dim grey otherwise. Motivates thorough exploration
 - **Sprint V108 — Breach danger ring**: Unsealed breaches get a large pulsing red ring on the floor (additive blend, 4Hz pulse). Ring removed when breach is sealed. Clear visual warning of active environmental hazard
+- **Sprint V109 — Relay activation sparks**: 8 golden sprites shoot upward when a relay is first activated. Uses discovery sparkle pool with fast upward drift (2-3.5 units/s). Brief celebratory burst rewards successful relay rerouting
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
