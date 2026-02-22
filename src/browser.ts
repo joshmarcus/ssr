@@ -4304,37 +4304,30 @@ function commitHubDeductionAnswer(): void {
     d.id === solved.id ? solved : d
   );
 
-  // Show narrative revelation overlay
-  const overlay = document.getElementById("broadcast-overlay");
   if (correct) {
     display.addLog(`\u2713 CORRECT — ${solved.rewardDescription}`, "milestone");
     display.triggerScreenFlash("milestone");
     audio.playDeductionCorrect();
     applyDeductionReward(solved);
 
-    // Find next unlocked deduction for "UNLOCKED" line
+    // Find next unlocked deduction teaser
     const nextDeduction = deductions.find(d => d.unlockAfter === solved.id && !d.solved);
-    const nextLine = nextDeduction ? `<div style="color:#6cf;margin-top:8px">UNLOCKED: ${esc(nextDeduction.question)}</div>` : "";
+    const nextTeaser = nextDeduction ? nextDeduction.question : undefined;
 
-    if (overlay) {
-      overlay.classList.add("active");
-      overlay.innerHTML = `
-        <div class="revelation-overlay-box correct">
-          <div style="color:#fa0;font-size:18px;font-weight:bold;letter-spacing:3px;margin-bottom:12px">\u2605 REVELATION \u2605</div>
-          <div style="color:#fa0;font-size:14px;margin-bottom:12px">${esc(solved.question)}</div>
-          <div style="color:#0f0;font-size:13px;margin-bottom:12px">\u2713 ${esc(chosen.label)}</div>
-          ${solved.conclusionText ? `<div style="color:#ca8;font-size:13px;line-height:1.6;margin:12px 0;padding:8px 12px;border-left:2px solid #553;text-align:left">${esc(solved.conclusionText)}</div>` : ""}
-          <div style="color:#4a8;font-size:12px;margin-top:8px">REWARD: ${esc(solved.rewardDescription)}</div>
-          ${nextLine}
-          <div style="color:#555;font-size:12px;margin-top:16px;animation:crawl-skip-pulse 1.5s ease-in-out infinite">[Press any key to continue]</div>
-        </div>`;
-      hubRevelationOverlay = true;
+    // Show cinematic overlay (same as commitDeductionAnswer)
+    if (display.showDeductionResult) {
+      display.showDeductionResult({
+        type: "correct",
+        question: deduction.question,
+        chosenAnswer: chosen.label,
+        conclusionText: solved.conclusionText,
+        revelations: solved.tagRevelations,
+        rewardText: solved.rewardDescription,
+        nextDeductionTeaser: nextTeaser,
+      });
     }
 
     pendingCeremonyDeduction = { id: solved.id, correct: true };
-    if (devModeEnabled) {
-      display.addLog(`[DEV] Deduction ${solved.id} solved correctly`, "system");
-    }
   } else {
     // Apply wrong-answer penalties
     if (penalty) {
@@ -4342,41 +4335,62 @@ function commitHubDeductionAnswer(): void {
       state = { ...state, turn: state.turn + penalty.turns };
     }
 
-    audio.playDeductionWrong();
-    pendingCeremonyDeduction = { id: solved.id, correct: false };
+    const isLockout = solved.solved && !correct;
+    const attemptsLeft = isLockout ? 0 : (solved.maxAttempts ?? 2) - (solved.wrongAttempts ?? 0);
+    const correctOpt = isLockout ? deduction.options.find(o => o.correct) : undefined;
 
-    const attemptsLeft = (solved.maxAttempts ?? 2) - (solved.wrongAttempts ?? 0);
-    const lockoutLine = solved.solved
-      ? `<div style="color:#f44;font-size:13px;margin-top:8px">Investigation stalled — this line of inquiry is closed.</div>`
-      : `<div style="color:#fa0;font-size:13px;margin-top:8px">${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.</div>`;
-    const penaltyLine = penalty
-      ? `<div style="color:#f44;font-size:12px;margin-top:4px">-${penalty.hp} HP | +${penalty.turns} turns</div>`
-      : "";
-
-    display.addLog(`\u2717 Incorrect. ${penalty ? `-${penalty.hp} HP, +${penalty.turns} turns.` : ""}`, "warning");
-    if (solved.solved) {
+    if (isLockout) {
       display.addLog("Investigation stalled — insufficient evidence to continue this line of inquiry.", "warning");
+    } else {
+      display.addLog(`\u2717 Incorrect. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`, "warning");
+    }
+    audio.playDeductionWrong();
+
+    // Show cinematic overlay (same as commitDeductionAnswer)
+    if (display.showDeductionResult) {
+      display.showDeductionResult({
+        type: isLockout ? "lockout" : "wrong",
+        question: deduction.question,
+        chosenAnswer: chosen.label,
+        correctAnswer: isLockout && correctOpt ? correctOpt.label : undefined,
+        penaltyHp: penalty?.hp,
+        penaltyTurns: penalty?.turns,
+        attemptsLeft: isLockout ? 0 : attemptsLeft,
+        hintText: !isLockout ? deduction.hintText : undefined,
+      });
     }
 
-    if (overlay) {
-      overlay.classList.add("active");
-      overlay.innerHTML = `
-        <div class="revelation-overlay-box incorrect">
-          <div style="color:#f44;font-size:18px;font-weight:bold;letter-spacing:3px;margin-bottom:12px">\u2717 INCONCLUSIVE</div>
-          <div style="color:#888;font-size:13px;line-height:1.6;margin:12px 0">The evidence doesn't support that conclusion.<br>Read the evidence more carefully and reconsider.</div>
-          ${penaltyLine}
-          ${lockoutLine}
-          <div style="color:#555;font-size:12px;margin-top:16px;animation:crawl-skip-pulse 1.5s ease-in-out infinite">[Press any key to continue]</div>
-        </div>`;
-      hubRevelationOverlay = true;
-    }
+    pendingCeremonyDeduction = { id: solved.id, correct: false };
   }
 
-  if (!hubRevelationOverlay) {
-    // Fallback if no overlay shown
-    hubDetailDeduction = null;
-    renderInvestigationHub();
+  // Check if all deductions are now solved — trigger "Case Closed" cinematic
+  const allSolved = deductions.every(d => d.solved);
+  if (allSolved && display.showCaseClosed && state.mystery) {
+    const mysteryData = state.mystery;
+    const archetype = mysteryData.timeline.archetype;
+    const deductionRecord = deductions.map(d => ({
+      question: d.question,
+      answer: (d.answeredCorrectly ? d.options.find(o => o.correct) : d.options.find(o => !o.correct))?.label ?? "—",
+      correct: d.answeredCorrectly === true,
+    }));
+    const correctCount = deductions.filter(d => d.answeredCorrectly).length;
+    setTimeout(() => {
+      display.showCaseClosed!({
+        archetypeTitle: getCaseClosedTitle(archetype),
+        storySubtitle: getCaseClosedSubtitle(archetype),
+        deductions: deductionRecord,
+        storySummary: getCaseClosedSummary(archetype, mysteryData.crew, mysteryData.timeline),
+        correctCount,
+        totalCount: deductions.length,
+        evidenceCount: journal.length,
+      });
+    }, 1500);
   }
+
+  // Close hub detail view
+  hubDetailDeduction = null;
+  hubRevelationOverlay = false;
+  renderInvestigationHub();
 }
 
 
