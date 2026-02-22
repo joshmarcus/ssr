@@ -212,6 +212,11 @@
 - **Sprint V50 — Phase-reactive lighting**: Evacuation = red alert (red ambient, orange key, red player light, dark fog), Recovery = amber tint, automatic phase transition shifts
 - **Sprint V51 — 3D objective waypoint**: Floating diamond sprite pointing toward nearest objective, sensor-gated targets (Thermal→relays, Atmospheric→crew/breaches), magenta during evacuation
 - **Sprint V52 — Full-height sliding doors**: Doors fill entire wall opening (2.0 height), smooth sideways slide when player approaches within 1 tile, locked doors stay closed, ceiling flush with walls
+- **Sprint V53 — Room-focused rendering**: Only current room + connecting corridors rendered. Brief fade on room entry. Entities, lights, labels filtered. Each room feels like a distinct discovery
+- **Sprint V54 — Corridor darkness + atmosphere**: 35% ambient dimming in corridors, tighter fog (near 2, far 10), headlight 2.8 intensity in corridors. Dark scary corridors vs warm lit rooms
+- **Sprint V55 — Minimap room focus**: Current room highlighted with green glow outline, non-view tiles dimmed 50%, door lights distance-culled
+- **Sprint V56 — Room ambient particles + center glow**: Room-tinted dust particles, wider spread in rooms, dimmer in corridors. Room center PointLight colored per room type
+- **Sprint V57 — Denser room/corridor props**: Room decorations up to 9 (was 7), wall props up to 5 (was 3), corridor wall props 20% (was 12%), player light bloom on room entry
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
