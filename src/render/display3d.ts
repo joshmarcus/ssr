@@ -3007,8 +3007,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Update movement trail
       this.updateTrail(this.playerCurrentX, this.playerCurrentZ, delta);
 
-      // Footstep dust kicks: small puffs when Sweepo moves
-      if (isMoving) {
+      // Inline particle spawning (gated by _particlesEnabled)
+      if (this._particlesEnabled && isMoving) {
         this._dustKickTimer -= delta;
         if (this._dustKickTimer <= 0) {
           this._dustKickTimer = 0.15; // small puffs (throttled for perf)
@@ -3030,7 +3030,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
 
       // Floor trail decals: fading track marks left by Sweepo
-      if (isMoving) {
+      if (this._particlesEnabled && isMoving) {
         const tdx = this.playerCurrentX - this._lastTrailX;
         const tdz = this.playerCurrentZ - this._lastTrailZ;
         const trailDist = Math.sqrt(tdx * tdx + tdz * tdz);
@@ -3059,7 +3059,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
 
       // Cleaning sparkles: green sparkles when moving over dirty tiles
-      if (isMoving && this._playerTileDirt > 30 && this.chaseCamActive) {
+      if (this._particlesEnabled && isMoving && this._playerTileDirt > 30 && this.chaseCamActive) {
         this._cleanSparkleTimer -= delta;
         if (this._cleanSparkleTimer <= 0) {
           this._cleanSparkleTimer = 0.12;
@@ -3084,7 +3084,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
 
       // Corridor breath puff: periodic cold air visualization
-      if (this.chaseCamActive && !this._currentRoom) {
+      if (this._particlesEnabled && this.chaseCamActive && !this._currentRoom) {
         this._breathPuffTimer -= delta;
         if (this._breathPuffTimer <= 0) {
           this._breathPuffTimer = 2.0 + Math.random() * 1.0;
@@ -3109,7 +3109,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
 
     // Vacuum wind particles: drift toward nearest breach on low-pressure tiles
-    if (this._playerTilePressure < 60 && this.chaseCamActive) {
+    if (this._particlesEnabled && this._playerTilePressure < 60 && this.chaseCamActive) {
       this._vacuumWindTimer -= delta;
       if (this._vacuumWindTimer <= 0) {
         this._vacuumWindTimer = 0.15 + Math.random() * 0.2;
@@ -3159,7 +3159,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
 
     // Heat shimmer: rising wavering particles on hot tiles
-    if (this._playerTileHeat > 25 && this.chaseCamActive) {
+    if (this._particlesEnabled && this._playerTileHeat > 25 && this.chaseCamActive) {
       this._heatShimmerTimer -= delta;
       if (this._heatShimmerTimer <= 0) {
         const intensity = Math.min(1, this._playerTileHeat / 80);
@@ -3226,7 +3226,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
 
     // Smoke wisps: drifting grey sprites on smoky tiles near player
-    if (this._playerTileSmoke > 25 && this.chaseCamActive) {
+    if (this._particlesEnabled && this._playerTileSmoke > 25 && this.chaseCamActive) {
       this._smokeWispTimer -= delta;
       if (this._smokeWispTimer <= 0) {
         const smokeIntensity = Math.min(1, this._playerTileSmoke / 80);
@@ -3480,14 +3480,7 @@ export class BrowserDisplay3D implements IGameDisplay {
             cross.material.color.setRGB(1.0, 0.13 + heartbeat * 0.2, 0.13 + heartbeat * 0.2);
           }
         }
-        // Heartbeat PointLight: casts red glow on surroundings
-        if (!mesh.userData._heartbeatLight) {
-          const hbLight = new THREE.PointLight(0xff2244, 0, 3);
-          hbLight.position.set(0, 0.3, 0);
-          mesh.add(hbLight);
-          mesh.userData._heartbeatLight = hbLight;
-        }
-        (mesh.userData._heartbeatLight as THREE.PointLight).intensity = heartbeat * 1.2;
+        // Heartbeat PointLight disabled for performance — emissive cross suffices
       } else if (userData.entityType === EntityType.LogTerminal) {
         // Screen glow flicker + proximity activation + light pulse
         const termDx = this.playerCurrentX - mesh.position.x;
@@ -4262,8 +4255,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       });
     }
 
-    // Particle animations
-    this.animateParticles(elapsed, delta);
+    // Particle animations (gated by F6 toggle)
+    if (this._particlesEnabled) {
+      this.animateParticles(elapsed, delta);
+    }
 
     // Corridor steam vent puffs — atmospheric detail near player
     if (this.chaseCamActive && !this._currentRoom) {
@@ -6794,11 +6789,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         const bucket = this.getCorridorBucket(this.decorationGroup, x, y);
         bucket.add(fixture);
 
-        // Add a dim warm point light at the fixture (tracked for distance culling)
-        const fixtureLight = new THREE.PointLight(0xffddaa, 0.6, 3);
-        fixtureLight.position.copy(fixture.position);
-        bucket.add(fixtureLight);
-        this.corridorFixtureLights.push(fixtureLight);
+        // Fixture PointLight disabled for performance — emissive material suffices
       }
     }
   }
@@ -6903,67 +6894,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Corridor lights: dim point lights every 7 tiles along explored corridors
-    // Hazard-reactive: red near heat, amber near smoke, blue near low pressure
-    for (let y = 0; y < state.height; y++) {
-      for (let x = 0; x < state.width; x++) {
-        const key = `${x},${y}`;
-        if (this.corridorLitTiles.has(key)) continue;
-        const tile = state.tiles[y][x];
-        if (tile.type !== TileType.Corridor || !tile.explored) continue;
-        // Only every 10th tile (sparse — headlight provides primary illumination)
-        if ((x + y) % 10 !== 0) continue;
-        this.corridorLitTiles.add(key);
-
-        // Check nearby tiles for hazards to tint corridor lights
-        let lightColor = 0x8899bb; // default cool blue
-        let lightIntensity = 0.6;
-        if (tile.heat > 40) {
-          lightColor = 0xff3300; lightIntensity = 0.9; // red for heat
-        } else if (tile.heat > 20 || tile.smoke > 30) {
-          lightColor = 0xff8844; lightIntensity = 0.7; // amber for moderate hazards
-        } else if (tile.pressure < 40) {
-          lightColor = 0x4466cc; lightIntensity = 0.5; // dim blue for low pressure
-        }
-
-        const corridorLight = new THREE.PointLight(lightColor, lightIntensity, 4);
-        corridorLight.position.set(x, 1.5, y);
-        (corridorLight as any)._baseIntensity = lightIntensity;
-        (corridorLight as any)._isHazard = tile.heat > 20 || tile.smoke > 30 || tile.pressure < 40;
-        this.scene.add(corridorLight);
-        this.corridorLightList.push(corridorLight);
-
-        // Light shaft: volumetric beam from ceiling light to floor
-        const shaftKey = `shaft_${x},${y}`;
-        if (!this._lightShaftTiles.has(shaftKey)) {
-          this._lightShaftTiles.add(shaftKey);
-          const shaftHeight = 1.8;
-          const shaftGeo = new THREE.CylinderGeometry(0.15, 0.35, shaftHeight, 8, 1, true);
-          const shaftMat = new THREE.MeshBasicMaterial({
-            color: lightColor, transparent: true, opacity: 0.04,
-            side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
-          });
-          const shaft = new THREE.Mesh(shaftGeo, shaftMat);
-          shaft.position.set(x, 0.9, y);
-          shaft.userData = { isLightShaft: true, baseColor: lightColor, isHazard: (corridorLight as any)._isHazard };
-          this.scene.add(shaft);
-          this._lightShaftMeshes.push(shaft);
-
-          // Floor light pool: glowing disc where the light hits the floor
-          const poolGeo = new THREE.CircleGeometry(0.5, 12);
-          const poolMat = new THREE.MeshBasicMaterial({
-            color: lightColor, transparent: true, opacity: 0.08,
-            depthWrite: false, blending: THREE.AdditiveBlending,
-          });
-          const pool = new THREE.Mesh(poolGeo, poolMat);
-          pool.rotation.x = -Math.PI / 2;
-          pool.position.set(x, 0.02, y);
-          pool.userData = { isFloorPool: true, baseColor: lightColor, isHazard: (corridorLight as any)._isHazard };
-          this.scene.add(pool);
-          this._floorPoolMeshes.push(pool);
-        }
-      }
-    }
+    // Corridor lights: DISABLED for performance — ambient + room lights suffice
+    // Light shafts and floor pools also disabled (they added per-corridor meshes)
 
     // Corridor wall decorations: pipes/wires along corridor walls
     const corridorPropModels = [
@@ -7179,12 +7111,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         const wasLocked = this.doorLockState.get(key);
 
         if (!this.doorLights.has(key)) {
-          // First placement
-          const lightColor = isLocked ? 0xff3333 : 0x44cc66;
-          const light = new THREE.PointLight(lightColor, isLocked ? 1.0 : 0.8, 4);
-          light.position.set(x, 1.2, y);
-          this.scene.add(light);
-          this.doorLights.set(key, light);
+          // Door lights disabled for performance — skip creation
           this.doorLockState.set(key, isLocked);
         } else if (wasLocked === true && !isLocked) {
           // Door just unlocked! Update light color and trigger effect
@@ -7893,13 +7820,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       group.userData = { entityType: entity.type, baseY, isGltf: true };
       group.position.set(entity.pos.x, baseY, entity.pos.y);
 
-      // Add glow light for emphasis entities
+      // Entity glow: emissive material only (PointLights disabled for performance)
       const glowDef = BrowserDisplay3D.ENTITY_GLOW_LIGHTS[entity.type];
       if (glowDef) {
-        const glow = new THREE.PointLight(glowDef.color, glowDef.intensity, glowDef.distance);
-        glow.position.set(0, 0.5, 0);
-        group.add(glow);
-        // Apply emissive to the model itself for self-illumination
+        // Apply emissive to the model itself for self-illumination (no PointLight)
         clone.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
             child.material.emissive = new THREE.Color(glowDef.color);
@@ -8097,10 +8021,8 @@ export class BrowserDisplay3D implements IGameDisplay {
         const lens = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6),
           new THREE.MeshBasicMaterial({ color: 0xff0000 }));
         lens.position.set(0, 0.35, 0.12);
-        // Red LED surveillance glow
-        const secLight = new THREE.PointLight(0xff2200, 0.4, 2.5);
-        secLight.position.set(0, 0.35, 0.2);
-        group.add(pole, cam, lens, secLight);
+        // Red LED — emissive only, no PointLight for performance
+        group.add(pole, cam, lens);
         baseY = 0.3;
         break;
       }
@@ -8307,13 +8229,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     group.userData = { entityType: entity.type, baseY, isGltf: false };
     group.position.set(entity.pos.x, baseY, entity.pos.y);
 
-    // Add glow light for emphasis entities (fallback geometry)
-    const glowDefFb = BrowserDisplay3D.ENTITY_GLOW_LIGHTS[entity.type];
-    if (glowDefFb) {
-      const glow = new THREE.PointLight(glowDefFb.color, glowDefFb.intensity, glowDefFb.distance);
-      glow.position.set(0, 0.5, 0);
-      group.add(glow);
-    }
+    // Entity glow PointLights disabled for performance — emissive materials handle glow
 
     // Shadow disc — dark translucent circle for ground shadow
     const shadowDiscFb = new THREE.Mesh(
