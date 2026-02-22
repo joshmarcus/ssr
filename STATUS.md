@@ -195,6 +195,7 @@
 - **Sprint V33 — Entity visibility**: Fill light at eye level for chase cam, player light range 18→22, proximity entity highlight (emissive boost within 2/4 tiles in chase cam)
 - **Sprint V34 — Ground Sweepo + atmosphere**: Sweepo grounded to floor level (y=0.02 vs old 0.4), chase cam lowered to 0.9 for dramatic ground perspective, doors raised with visible gap at bottom for bot pass-through, emergency red wall light strips on hazardous corridors (pulsing emissive), breach spark particles (flickering orange jitter near breach entities)
 - **Sprint V35 — Low-angle corridor immersion**: Tighter chase cam fog (near 3, far 14) for claustrophobic corridors, wall-mounted warm light fixtures at eye level (0.5h) every 6th corridor tile with point lights, floor center guide strips (green emissive navigation lines), direction-aware strip orientation
+- **Sprint V36 — Room entry drama**: Room decoration density increased (up to 7 props in large rooms), room entry light boost ("lights come on" 1.5x intensity surge fading over 0.4s), area-based prop scaling
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
