@@ -1844,6 +1844,18 @@ export class BrowserDisplay3D implements IGameDisplay {
         child.position.z = (ud.baseZ ?? 0) + (Math.random() - 0.5) * jitter;
         const s = flicker ? 0.08 + Math.random() * 0.1 : 0.04;
         child.scale.set(s, s, 1);
+      } else if (ud.hazardType === "drip") {
+        // Dripping condensation: fall down, reset at top
+        child.position.y -= delta * 0.8;
+        const mat = child.material as THREE.SpriteMaterial;
+        const fallDist = (ud.baseY ?? 1.5) - child.position.y;
+        mat.opacity = Math.max(0, 0.5 - fallDist * 0.3);
+        if (child.position.y < 0.05) {
+          // Reset to ceiling with slight random offset
+          child.position.y = ud.baseY ?? 1.5;
+          child.position.x = (ud.baseX ?? 0) + (Math.random() - 0.5) * 0.1;
+          mat.opacity = 0.5;
+        }
       }
     }
 
@@ -4008,6 +4020,56 @@ export class BrowserDisplay3D implements IGameDisplay {
         );
         spark.userData = { hazardType: "spark", baseY: spark.position.y, baseX: spark.position.x, baseZ: spark.position.z };
         this.hazardSprites.add(spark);
+      }
+    }
+
+    // Floor scorch marks near high-heat tiles
+    for (let y = Math.max(0, py - viewRange); y < Math.min(state.height, py + viewRange); y++) {
+      for (let x = Math.max(0, px - viewRange); x < Math.min(state.width, px + viewRange); x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.visible || !tile.walkable) continue;
+        if (tile.heat < 30) continue;
+
+        const scorchKey = `scorch_${x},${y}`;
+        if (this.hazardSpriteKeys.has(scorchKey)) continue;
+        this.hazardSpriteKeys.add(scorchKey);
+
+        // Dark scorch mark decal on the floor
+        const scorchGeo = new THREE.CircleGeometry(0.3 + (tile.heat / 200), 8);
+        scorchGeo.rotateX(-Math.PI / 2);
+        const scorchMat = new THREE.MeshBasicMaterial({
+          color: 0x221100,
+          transparent: true,
+          opacity: Math.min(0.6, tile.heat / 100),
+          depthWrite: false,
+        });
+        const scorch = new THREE.Mesh(scorchGeo, scorchMat);
+        scorch.position.set(x, 0.02, y);
+        this.hazardSprites.add(scorch);
+      }
+    }
+
+    // Drip particles near low-pressure areas (condensation/leaking)
+    for (let y = Math.max(0, py - viewRange); y < Math.min(state.height, py + viewRange); y++) {
+      for (let x = Math.max(0, px - viewRange); x < Math.min(state.width, px + viewRange); x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.visible || !tile.walkable) continue;
+        if (tile.pressure >= 50) continue;
+
+        const dripKey = `drip_${x},${y}`;
+        if (this.hazardSpriteKeys.has(dripKey)) continue;
+        // Only every other qualifying tile
+        if ((x + y) % 2 !== 0) continue;
+        this.hazardSpriteKeys.add(dripKey);
+
+        const drip = this.createHazardSprite(0x6688cc, 0.06, 0.5);
+        drip.position.set(
+          x + (Math.random() - 0.5) * 0.3,
+          1.5 + Math.random() * 0.5,
+          y + (Math.random() - 0.5) * 0.3
+        );
+        drip.userData = { hazardType: "drip", baseY: drip.position.y, baseX: drip.position.x, baseZ: drip.position.z };
+        this.hazardSprites.add(drip);
       }
     }
   }
