@@ -33,4 +33,18 @@ export interface IGameDisplay {
   destroy(): void;
   setHubMode?(open: boolean): void;
   showEvidenceCard?(category: string, title: string, body: string, room: string, crew?: string[]): void;
+  showDeductionResult?(opts: {
+    type: "correct" | "wrong" | "lockout";
+    question: string;
+    chosenAnswer: string;
+    correctAnswer?: string;
+    conclusionText?: string;
+    revelations?: { tag: string; text: string }[];
+    rewardText?: string;
+    penaltyHp?: number;
+    penaltyTurns?: number;
+    attemptsLeft?: number;
+    hintText?: string;
+    nextDeductionTeaser?: string;
+  }): void;
 }

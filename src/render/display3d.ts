@@ -1522,6 +1522,144 @@ export class BrowserDisplay3D implements IGameDisplay {
     window.addEventListener("keydown", this._evidenceCardDismissHandler);
   }
 
+  // ── Deduction result overlay ────────────────────────────────
+  private _deductionResultActive: boolean = false;
+  private _deductionResultDismissHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  /**
+   * Show a cinematic overlay after the player answers a deduction.
+   * type: "correct", "wrong", or "lockout"
+   */
+  showDeductionResult(opts: {
+    type: "correct" | "wrong" | "lockout";
+    question: string;
+    chosenAnswer: string;
+    correctAnswer?: string;
+    conclusionText?: string;
+    revelations?: { tag: string; text: string }[];
+    rewardText?: string;
+    penaltyHp?: number;
+    penaltyTurns?: number;
+    attemptsLeft?: number;
+    hintText?: string;
+    nextDeductionTeaser?: string;
+  }): void {
+    if (this._deductionResultActive) return;
+    this._deductionResultActive = true;
+
+    const el = document.getElementById("deduction-result");
+    if (!el) { this._deductionResultActive = false; return; }
+
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    let verdictLabel: string;
+    let answerHtml: string;
+    let bodyHtml = "";
+
+    if (opts.type === "correct") {
+      verdictLabel = "DEDUCTION CONFIRMED";
+      answerHtml = esc(opts.chosenAnswer);
+
+      // Conclusion text
+      if (opts.conclusionText) {
+        bodyHtml += `<div class="dr-divider"></div>`;
+        bodyHtml += `<div class="dr-conclusion">${esc(opts.conclusionText)}</div>`;
+      }
+
+      // Revelations
+      if (opts.revelations && opts.revelations.length > 0) {
+        bodyHtml += `<div class="dr-divider"></div>`;
+        bodyHtml += `<div class="dr-revelations">`;
+        bodyHtml += `<div class="dr-rev-header">What the Evidence Reveals</div>`;
+        for (const rev of opts.revelations) {
+          bodyHtml += `<div class="dr-rev-item">${esc(rev.text)}</div>`;
+        }
+        bodyHtml += `</div>`;
+      }
+
+      // Reward
+      if (opts.rewardText) {
+        bodyHtml += `<div class="dr-divider"></div>`;
+        bodyHtml += `<div class="dr-reward">`;
+        bodyHtml += `<div class="dr-reward-label">Investigation Reward</div>`;
+        bodyHtml += `<div class="dr-reward-text">${esc(opts.rewardText)}</div>`;
+        bodyHtml += `</div>`;
+      }
+
+      // Next deduction teaser
+      if (opts.nextDeductionTeaser) {
+        bodyHtml += `<div class="dr-next">`;
+        bodyHtml += `<div class="dr-next-text">${esc(opts.nextDeductionTeaser)}</div>`;
+        bodyHtml += `</div>`;
+      }
+    } else if (opts.type === "lockout") {
+      verdictLabel = "INVESTIGATION STALLED";
+      answerHtml = esc(opts.chosenAnswer);
+
+      bodyHtml += `<div class="dr-divider"></div>`;
+      bodyHtml += `<div class="dr-penalty">`;
+      bodyHtml += `<div class="dr-penalty-text">Insufficient evidence to continue this line of inquiry</div>`;
+      if (opts.penaltyHp || opts.penaltyTurns) {
+        bodyHtml += `<div class="dr-penalty-detail">-${opts.penaltyHp ?? 0} HP | +${opts.penaltyTurns ?? 0} turns</div>`;
+      }
+      bodyHtml += `</div>`;
+
+      if (opts.correctAnswer) {
+        bodyHtml += `<div class="dr-divider"></div>`;
+        bodyHtml += `<div class="dr-conclusion" style="color:#a86">The answer was: ${esc(opts.correctAnswer)}</div>`;
+      }
+    } else {
+      // Wrong but still has attempts
+      verdictLabel = "INCORRECT";
+      answerHtml = esc(opts.chosenAnswer);
+
+      bodyHtml += `<div class="dr-divider"></div>`;
+      bodyHtml += `<div class="dr-penalty">`;
+      bodyHtml += `<div class="dr-penalty-text">${opts.attemptsLeft ?? 0} attempt${(opts.attemptsLeft ?? 0) !== 1 ? "s" : ""} remaining</div>`;
+      if (opts.penaltyHp || opts.penaltyTurns) {
+        bodyHtml += `<div class="dr-penalty-detail">-${opts.penaltyHp ?? 0} HP | +${opts.penaltyTurns ?? 0} turns penalty</div>`;
+      }
+      bodyHtml += `</div>`;
+
+      if (opts.hintText) {
+        bodyHtml += `<div class="dr-divider"></div>`;
+        bodyHtml += `<div class="dr-conclusion" style="color:#6af">${esc(opts.hintText)}</div>`;
+      }
+    }
+
+    el.innerHTML = `<div class="dr-inner">
+      <div class="dr-verdict">
+        <div class="dr-verdict-label">${verdictLabel}</div>
+        <div class="dr-question">${esc(opts.question)}</div>
+      </div>
+      <div class="dr-answer">${answerHtml}</div>
+      ${bodyHtml}
+      <div class="dr-dismiss">PRESS [SPACE] TO CONTINUE</div>
+    </div>`;
+    el.className = `visible ${opts.type}`;
+
+    // Dismiss handler
+    if (this._deductionResultDismissHandler) {
+      window.removeEventListener("keydown", this._deductionResultDismissHandler);
+    }
+    this._deductionResultDismissHandler = (e: KeyboardEvent) => {
+      if (e.key === " " || e.key === "Escape" || e.key === "Enter") {
+        e.preventDefault();
+        el.className = `fade-out ${opts.type}`;
+        setTimeout(() => {
+          el.className = "";
+          el.innerHTML = "";
+          this._deductionResultActive = false;
+        }, 500);
+        if (this._deductionResultDismissHandler) {
+          window.removeEventListener("keydown", this._deductionResultDismissHandler);
+          this._deductionResultDismissHandler = null;
+        }
+      }
+    };
+    window.addEventListener("keydown", this._deductionResultDismissHandler);
+  }
+
   getLogHistory(): DisplayLogEntry[] {
     return this.logHistory;
   }

@@ -3103,26 +3103,78 @@ function commitDeductionAnswer(): void {
     );
   }
 
+  // Determine the correct answer label for lockout reveal
+  const correctOption = activeDeduction.options.find(o => o.correct);
+  const correctAnswerLabel = correctOption?.label ?? "";
+
+  // Find next deduction teaser
+  let nextTeaser: string | undefined;
+  if (correct && state.mystery) {
+    const updatedDeductions = state.mystery.deductions;
+    const nextUnlocked = updatedDeductions.find(d => {
+      if (d.solved) return false;
+      if (d.unlockAfter && !updatedDeductions.find(dd => dd.id === d.unlockAfter && dd.solved)) return false;
+      return journal.length >= (d.evidenceThreshold ?? 1);
+    });
+    if (nextUnlocked) {
+      nextTeaser = `New line of inquiry available: "${nextUnlocked.question}"`;
+    } else {
+      // Check if a locked deduction is next in the chain
+      const nextInChain = updatedDeductions.find(d => !d.solved && d.unlockAfter === solved.id);
+      if (nextInChain) {
+        nextTeaser = `Gather more evidence to unlock: "${nextInChain.question}"`;
+      }
+    }
+  }
+
   if (correct) {
-    display.addLog(`✓ CORRECT — ${solved.rewardDescription}`, "milestone");
+    display.addLog(`DEDUCTION CONFIRMED — ${solved.rewardDescription}`, "milestone");
     display.triggerScreenFlash("milestone");
     audio.playDeductionCorrect();
-    // Apply reward
     applyDeductionReward(solved);
+
+    // Show cinematic overlay
+    if (display.showDeductionResult) {
+      display.showDeductionResult({
+        type: "correct",
+        question: activeDeduction.question,
+        chosenAnswer: chosen.label,
+        conclusionText: solved.conclusionText,
+        revelations: solved.tagRevelations,
+        rewardText: solved.rewardDescription,
+        nextDeductionTeaser: nextTeaser,
+      });
+    }
   } else {
     // Apply wrong-answer penalties
     if (penalty) {
       state.player = { ...state.player, hp: Math.max(0, state.player.hp - penalty.hp) };
       state = { ...state, turn: state.turn + penalty.turns };
-      display.addLog(`✗ Incorrect. -${penalty.hp} HP, +${penalty.turns} turns penalty.`, "warning");
     }
-    if (solved.solved) {
+
+    const isLockout = solved.solved && !correct;
+    const attemptsLeft = isLockout ? 0 : (solved.maxAttempts ?? 2) - (solved.wrongAttempts ?? 0);
+
+    if (isLockout) {
       display.addLog("Investigation stalled — insufficient evidence to continue this line of inquiry.", "warning");
     } else {
-      const attemptsLeft = (solved.maxAttempts ?? 2) - (solved.wrongAttempts ?? 0);
-      display.addLog(`${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`, "warning");
+      display.addLog(`Incorrect. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`, "warning");
     }
     audio.playDeductionWrong();
+
+    // Show cinematic overlay
+    if (display.showDeductionResult) {
+      display.showDeductionResult({
+        type: isLockout ? "lockout" : "wrong",
+        question: activeDeduction.question,
+        chosenAnswer: chosen.label,
+        correctAnswer: isLockout ? correctAnswerLabel : undefined,
+        penaltyHp: penalty?.hp,
+        penaltyTurns: penalty?.turns,
+        attemptsLeft: isLockout ? 0 : attemptsLeft,
+        hintText: !isLockout ? activeDeduction.hintText : undefined,
+      });
+    }
   }
 
   activeDeduction = null;
