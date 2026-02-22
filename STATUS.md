@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V157 completed, V158 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V158 completed, V159 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -317,6 +317,7 @@
 - **Sprint V155 — Door opening light shaft**: Brief additive-blend sprite beam appears when a door first slides open. Warm white light, 1.2s fade, 2-unit tall. Creates momentary "light flooding through" dramatic reveal
 - **Sprint V156 — Room enclosure fix**: Foundational 3D visual fix — ceiling panels above all tile types (not just walkable), void-fill geometry ring around player, large ground/ceiling planes, starfield hidden in chase cam, tighter fog. Rooms now feel like enclosed interior spaces instead of floating scaffolds in space
 - **Sprint V157 — Camera angle + lighting**: Lower chase cam (1.0 rooms/0.65 corridors), higher look-at target, brighter headlight and room center glow, wider room fog for more visibility. Rooms feel brighter and more forward-looking
+- **Sprint V158 — Entity glow boost**: Entity self-illumination increased (procedural emissive 0.3→0.5, GLTF glow 0.3→0.45, non-glow 0.08→0.15). 6 new entity types in ENTITY_GLOW_LIGHTS (Console, SecurityTerminal, RepairCradle, MedKit, PowerCell, FuseBox). Existing glow intensities +25-30%. Ground rings enlarged and brightened (0.25→0.35 opacity, 0.38→0.42 radius)
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

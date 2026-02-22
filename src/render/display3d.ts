@@ -5839,8 +5839,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private placeRoomCeiling(state: GameState): void {
     // Create shared geometries once
     if (!BrowserDisplay3D._beamGeoH) {
-      BrowserDisplay3D._beamGeoH = new THREE.BoxGeometry(1.04, 0.06, 0.08); // horizontal beam (X-axis)
-      BrowserDisplay3D._beamGeoV = new THREE.BoxGeometry(0.08, 0.06, 1.04); // vertical beam (Z-axis)
+      BrowserDisplay3D._beamGeoH = new THREE.BoxGeometry(1.04, 0.04, 0.06); // horizontal beam (X-axis) — thinner profile
+      BrowserDisplay3D._beamGeoV = new THREE.BoxGeometry(0.06, 0.04, 1.04); // vertical beam (Z-axis) — thinner profile
     }
 
     const ceilingY = 2.0; // ceiling height (matches wall top)
@@ -5858,19 +5858,21 @@ export class BrowserDisplay3D implements IGameDisplay {
       const ceilSubGroup = this.getRoomSubGroup(this.ceilingGroup, this.roomCeilGroups, room);
 
       const tint = ROOM_WALL_TINTS_3D[room.name] ?? COLORS_3D.wall;
-      // Beams: dark metallic grey with subtle room color influence (industrial look)
-      const br = Math.min(0x80, Math.round(((tint >> 16) & 0xff) * 0.25 + 0x40));
-      const bg = Math.min(0x80, Math.round(((tint >> 8) & 0xff) * 0.25 + 0x40));
-      const bb = Math.min(0x80, Math.round((tint & 0xff) * 0.25 + 0x48));
+      // Beams: very dark metallic with minimal room tint — structural, not decorative
+      const br = Math.min(0x38, Math.round(((tint >> 16) & 0xff) * 0.08 + 0x18));
+      const bg = Math.min(0x38, Math.round(((tint >> 8) & 0xff) * 0.08 + 0x18));
+      const bb = Math.min(0x3c, Math.round((tint & 0xff) * 0.08 + 0x20));
       const beamColor = (br << 16) | (bg << 8) | bb;
       const beamMat = makeToonMaterial({
         color: beamColor,
         gradientMap: this.toonGradient,
+        emissive: beamColor,
+        emissiveIntensity: 0.08, // faint self-illumination so edges catch light
       });
 
-      // Place horizontal beams (running east-west) every 3 tiles
+      // Place horizontal beams (running east-west) every 4 tiles
       for (let ry = room.y; ry < room.y + room.height; ry++) {
-        if ((ry - room.y) % 3 !== 0) continue; // every 3rd row
+        if ((ry - room.y) % 4 !== 0) continue; // every 4th row
         for (let rx = room.x; rx < room.x + room.width; rx++) {
           if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
           if (state.tiles[ry][rx].type !== TileType.Floor) continue;
@@ -5880,9 +5882,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
-      // Place vertical beams (running north-south) every 3 tiles for cross-bracing
+      // Place vertical beams (running north-south) every 4 tiles for cross-bracing
       for (let rx = room.x; rx < room.x + room.width; rx++) {
-        if ((rx - room.x) % 3 !== 0) continue; // every 3rd column
+        if ((rx - room.x) % 4 !== 0) continue; // every 4th column
         for (let ry = room.y; ry < room.y + room.height; ry++) {
           if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
           if (state.tiles[ry][rx].type !== TileType.Floor) continue;
