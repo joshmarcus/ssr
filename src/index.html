@@ -827,6 +827,129 @@
       font-size: 10px;
       margin-left: 12px;
     }
+    /* ── Evidence card overlay ──────────────────────────────── */
+    #evidence-card {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      background: rgba(2, 4, 10, 0.85);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    #evidence-card.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #evidence-card.fade-out {
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      pointer-events: none;
+    }
+    #evidence-card .card-inner {
+      max-width: 560px;
+      width: 85%;
+      background: linear-gradient(165deg, rgba(8, 14, 22, 0.95) 0%, rgba(4, 8, 16, 0.98) 100%);
+      border: 1px solid rgba(68, 204, 255, 0.2);
+      border-radius: 4px;
+      padding: 0;
+      font-family: monospace;
+      box-shadow: 0 0 30px rgba(68, 204, 255, 0.08), inset 0 0 40px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+    #evidence-card .card-inner::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(68, 204, 255, 0.4), transparent);
+    }
+    #evidence-card .card-header {
+      padding: 14px 20px 10px;
+      border-bottom: 1px solid rgba(68, 204, 255, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #evidence-card .card-category {
+      color: #4cf;
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+    #evidence-card .card-new {
+      color: #ffa;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      animation: evidence-pulse 1.5s ease infinite;
+    }
+    @keyframes evidence-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    #evidence-card .card-title {
+      padding: 10px 20px 6px;
+      color: #eef;
+      font-size: 15px;
+      font-weight: bold;
+      line-height: 1.3;
+      text-shadow: 0 0 8px rgba(68, 204, 255, 0.2);
+    }
+    #evidence-card .card-body {
+      padding: 8px 20px 14px;
+      color: #bbc;
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #evidence-card .card-meta {
+      padding: 10px 20px;
+      border-top: 1px solid rgba(68, 204, 255, 0.08);
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    #evidence-card .card-meta-item {
+      font-size: 10px;
+      color: #667;
+      letter-spacing: 0.5px;
+    }
+    #evidence-card .card-meta-item span {
+      color: #8ac;
+    }
+    #evidence-card .card-footer {
+      padding: 8px 20px 10px;
+      text-align: center;
+      border-top: 1px solid rgba(68, 204, 255, 0.06);
+    }
+    #evidence-card .card-dismiss {
+      color: #445;
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+    /* Scanline effect on card */
+    #evidence-card .card-inner::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+      );
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -836,6 +959,7 @@
   <div id="minimap-fullscreen"></div>
   <div id="autoplay-badge">AUTOPLAY</div>
   <div id="subtitle-bar"></div>
+  <div id="evidence-card"></div>
   <div id="gameover-overlay"></div>
   <div id="broadcast-overlay"></div>
   <div id="journal-overlay"></div>

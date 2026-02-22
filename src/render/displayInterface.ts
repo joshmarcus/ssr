@@ -32,4 +32,5 @@ export interface IGameDisplay {
   copyRunSummary(): Promise<boolean>;
   destroy(): void;
   setHubMode?(open: boolean): void;
+  showEvidenceCard?(category: string, title: string, body: string, room: string, crew?: string[]): void;
 }

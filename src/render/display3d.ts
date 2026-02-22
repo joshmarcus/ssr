@@ -1448,6 +1448,80 @@ export class BrowserDisplay3D implements IGameDisplay {
     window.addEventListener("keydown", this._subtitleDismissHandler);
   }
 
+  // ── Evidence card overlay ────────────────────────────────────
+  private _evidenceCardQueue: { category: string; title: string; body: string; room: string; crew: string[] }[] = [];
+  private _evidenceCardActive: boolean = false;
+  private _evidenceCardDismissHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  /** Queue an evidence card for display */
+  showEvidenceCard(category: string, title: string, body: string, room: string, crew: string[] = []): void {
+    this._evidenceCardQueue.push({ category, title, body, room, crew });
+    if (!this._evidenceCardActive) {
+      this.showNextEvidenceCard();
+    }
+  }
+
+  private showNextEvidenceCard(): void {
+    const next = this._evidenceCardQueue.shift();
+    if (!next) {
+      this._evidenceCardActive = false;
+      return;
+    }
+    this._evidenceCardActive = true;
+    const el = document.getElementById("evidence-card");
+    if (!el) return;
+
+    const categoryLabel = next.category === "trace" ? "PHYSICAL EVIDENCE"
+      : next.category === "log" ? "STATION LOG"
+      : next.category === "crew_item" ? "PERSONAL ITEM"
+      : next.category === "testimony" ? "CREW TESTIMONY"
+      : "EVIDENCE";
+
+    const cleanBody = next.body.replace(/<[^>]*>/g, "");
+    let metaHtml = "";
+    if (next.room) {
+      metaHtml += `<div class="card-meta-item">LOCATION <span>${next.room}</span></div>`;
+    }
+    if (next.crew.length > 0) {
+      metaHtml += `<div class="card-meta-item">MENTIONS <span>${next.crew.join(", ")}</span></div>`;
+    }
+
+    el.innerHTML = `<div class="card-inner">
+      <div class="card-header">
+        <div class="card-category">${categoryLabel}</div>
+        <div class="card-new">NEW EVIDENCE</div>
+      </div>
+      <div class="card-title">${next.title}</div>
+      <div class="card-body">${cleanBody}</div>
+      ${metaHtml ? `<div class="card-meta">${metaHtml}</div>` : ""}
+      <div class="card-footer">
+        <span class="card-dismiss">PRESS [SPACE] TO CONTINUE</span>
+      </div>
+    </div>`;
+    el.className = "visible";
+
+    // Remove previous handler
+    if (this._evidenceCardDismissHandler) {
+      window.removeEventListener("keydown", this._evidenceCardDismissHandler);
+    }
+    this._evidenceCardDismissHandler = (e: KeyboardEvent) => {
+      if (e.key === " " || e.key === "Escape") {
+        e.preventDefault();
+        el.className = "fade-out";
+        setTimeout(() => {
+          el.className = "";
+          el.innerHTML = "";
+          this.showNextEvidenceCard();
+        }, 500);
+        if (this._evidenceCardDismissHandler) {
+          window.removeEventListener("keydown", this._evidenceCardDismissHandler);
+          this._evidenceCardDismissHandler = null;
+        }
+      }
+    };
+    window.addEventListener("keydown", this._evidenceCardDismissHandler);
+  }
+
   getLogHistory(): DisplayLogEntry[] {
     return this.logHistory;
   }

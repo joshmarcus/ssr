@@ -2011,6 +2011,28 @@ function handleAction(action: Action): void {
     if (state.mystery.journal.length > lastJournalLength) {
       const journal = state.mystery.journal;
       const newEntries = journal.slice(lastJournalLength);
+
+      // Show evidence cards for important new journal entries (traces, crew items, key logs)
+      const importantCategories = new Set(["trace", "item", "crew"]);
+      for (const entry of newEntries) {
+        // Only show cards for traces, crew items, and logs that mention crew
+        const isImportant = importantCategories.has(entry.category) ||
+          (entry.category === "log" && entry.crewMentioned.length > 0);
+        if (isImportant && display.showEvidenceCard) {
+          const crewNames = entry.crewMentioned
+            .map(id => state.mystery!.crew.find(c => c.id === id))
+            .filter(Boolean)
+            .map(c => `${c!.firstName} ${c!.lastName}`);
+          display.showEvidenceCard(
+            entry.category,
+            entry.summary,
+            entry.detail,
+            entry.roomFound,
+            crewNames,
+          );
+        }
+      }
+
       const newTags = new Set(newEntries.flatMap(j => j.tags));
       const prevConnectionCount = lastJournalLength > 0
         ? (state.mystery.connections.length - newEntries.length) // approximate
