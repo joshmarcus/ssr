@@ -751,6 +751,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   private starfieldPoints: THREE.Points | null = null;
   private _nebulaMesh: THREE.Mesh | null = null;
 
+  // Evidence directional arrow: brief arrow on room entry pointing to nearest undiscovered evidence
+  private _evidenceArrow: THREE.Sprite | null = null;
+  private _evidenceArrowLife: number = 0;
+  private _evidenceArrowMaxLife: number = 2.5;
+
   // Hazard visual effects (sprites at hazardous tile positions)
   private hazardSprites: THREE.Group = new THREE.Group();
   private hazardSpriteKeys: Set<string> = new Set();
@@ -1417,6 +1422,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // Evidence directional arrow: point toward nearest undiscovered evidence in this room
+      this.spawnEvidenceArrow(room!);
+
       // Show room name banner on the 3D viewport
       const banner = document.getElementById("room-banner");
       if (banner) {
@@ -1639,6 +1647,108 @@ export class BrowserDisplay3D implements IGameDisplay {
         setTimeout(() => { canvas.style.opacity = "0"; }, 80);
       }, duration + 50);
     }
+  }
+
+  /** Spawn a directional arrow sprite pointing toward nearest undiscovered evidence in a room */
+  private spawnEvidenceArrow(room: Room): void {
+    // Find nearest undiscovered evidence entity in this room
+    let bestDist = Infinity;
+    let bestX = 0;
+    let bestZ = 0;
+    let found = false;
+
+    for (const [, emesh] of this.entityMeshes) {
+      if (emesh.userData._exhausted) continue;
+      const et = emesh.userData.entityType;
+      if (et !== EntityType.LogTerminal && et !== EntityType.EvidenceTrace &&
+          et !== EntityType.Console && et !== EntityType.SecurityTerminal) continue;
+      const ex = emesh.position.x;
+      const ez = emesh.position.z;
+      // Check if entity is in this room
+      if (ex < room.x || ex >= room.x + room.width ||
+          ez < room.y || ez >= room.y + room.height) continue;
+      const dx = ex - this.playerCurrentX;
+      const dz = ez - this.playerCurrentZ;
+      const dist = dx * dx + dz * dz;
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestX = ex;
+        bestZ = ez;
+        found = true;
+      }
+    }
+
+    // Also check undiscovered scene echoes
+    if (this._lastState?.mystery?.sceneEchoes) {
+      for (const echo of this._lastState.mystery.sceneEchoes) {
+        if (echo.discovered) continue;
+        if (echo.roomName !== room.name) continue;
+        const dx = echo.pos.x - this.playerCurrentX;
+        const dz = echo.pos.y - this.playerCurrentZ;
+        const dist = dx * dx + dz * dz;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestX = echo.pos.x;
+          bestZ = echo.pos.y;
+          found = true;
+        }
+      }
+    }
+
+    if (!found) {
+      // No undiscovered evidence in this room — hide arrow
+      if (this._evidenceArrow) this._evidenceArrow.visible = false;
+      return;
+    }
+
+    // Create arrow sprite if needed
+    if (!this._evidenceArrow) {
+      // Canvas arrow texture
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext("2d")!;
+      ctx.clearRect(0, 0, 64, 64);
+      // Draw chevron arrow pointing right (we'll rotate the sprite)
+      ctx.fillStyle = "#44ddff";
+      ctx.beginPath();
+      ctx.moveTo(48, 32);
+      ctx.lineTo(16, 12);
+      ctx.lineTo(24, 32);
+      ctx.lineTo(16, 52);
+      ctx.closePath();
+      ctx.fill();
+      // Glow
+      ctx.shadowColor = "#44ddff";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      this._evidenceArrow = new THREE.Sprite(mat);
+      this._evidenceArrow.scale.set(0.4, 0.4, 1);
+      this.scene.add(this._evidenceArrow);
+    }
+
+    // Position arrow 1 unit ahead of player toward evidence, at eye height
+    const dx = bestX - this.playerCurrentX;
+    const dz = bestZ - this.playerCurrentZ;
+    const angle = Math.atan2(dx, dz);
+    const arrowDist = 1.2;
+    this._evidenceArrow.position.set(
+      this.playerCurrentX + Math.sin(angle) * arrowDist,
+      1.0,
+      this.playerCurrentZ + Math.cos(angle) * arrowDist,
+    );
+    this._evidenceArrow.material.rotation = -angle + Math.PI / 2;
+    this._evidenceArrow.visible = true;
+    this._evidenceArrowLife = 0;
   }
 
   /** Brief tinted screen flash on room entry — each room type gets a distinct visual feel */
@@ -3928,6 +4038,23 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._roomTransitionFade = 0;
     }
 
+    // Evidence directional arrow: bob + fade out over time
+    if (this._evidenceArrow && this._evidenceArrow.visible) {
+      this._evidenceArrowLife += delta;
+      if (this._evidenceArrowLife >= this._evidenceArrowMaxLife) {
+        this._evidenceArrow.visible = false;
+      } else {
+        const t = this._evidenceArrowLife / this._evidenceArrowMaxLife;
+        // Pulse forward/back + fade opacity
+        const pulse = Math.sin(elapsed * 4) * 0.1;
+        const baseY = 1.0 + Math.sin(elapsed * 2) * 0.08;
+        this._evidenceArrow.position.y = baseY;
+        const scale = 0.4 + pulse;
+        this._evidenceArrow.scale.set(scale, scale, 1);
+        (this._evidenceArrow.material as THREE.SpriteMaterial).opacity = 0.8 * (1 - t * t);
+      }
+    }
+
     // Room center glow: warm light, hazard-reactive
     if (this._currentRoom) {
       if (!this._roomCenterGlow) {
@@ -3962,8 +4089,46 @@ export class BrowserDisplay3D implements IGameDisplay {
         glowIntensity = 3.0;
       }
 
+      // Evidence proximity flicker: room lights subtly flicker when undiscovered evidence is nearby
+      let evidenceFlicker = 0;
+      if (this._lastState) {
+        const room = this._currentRoom;
+        let hasUndiscovered = false;
+        for (const [, emesh] of this.entityMeshes) {
+          if (emesh.userData._exhausted) continue;
+          const et = emesh.userData.entityType;
+          if (et === EntityType.LogTerminal || et === EntityType.EvidenceTrace ||
+              et === EntityType.Console || et === EntityType.SecurityTerminal) {
+            // Check if entity is in this room
+            const ex = emesh.position.x;
+            const ez = emesh.position.z;
+            if (ex >= room.x && ex < room.x + room.width &&
+                ez >= room.y && ez < room.y + room.height) {
+              hasUndiscovered = true;
+              break;
+            }
+          }
+        }
+        // Also check undiscovered scene echoes in this room
+        if (!hasUndiscovered && this._lastState.mystery?.sceneEchoes) {
+          for (const echo of this._lastState.mystery.sceneEchoes) {
+            if (!echo.discovered && echo.roomName === room.name) {
+              hasUndiscovered = true;
+              break;
+            }
+          }
+        }
+        if (hasUndiscovered) {
+          // Irregular fluorescent-tube flicker: two frequencies + random dropout
+          const f1 = Math.sin(elapsed * 7.3 + room.x * 2.1) * 0.15;
+          const f2 = Math.sin(elapsed * 13.7 + room.y * 3.4) * 0.08;
+          const dropout = Math.sin(elapsed * 3.1) > 0.85 ? -0.4 : 0;
+          evidenceFlicker = f1 + f2 + dropout;
+        }
+      }
+
       this._roomCenterGlow.color.setHex(glowColor);
-      const targetIntensity = glowIntensity + this.roomLightBoost * 0.5;
+      const targetIntensity = glowIntensity + this.roomLightBoost * 0.5 + evidenceFlicker;
       this._roomCenterGlow.intensity += (targetIntensity - this._roomCenterGlow.intensity) * 0.1;
       this._roomCenterGlow.position.set(cx, 1.5, cz);
       this._roomCenterGlow.visible = true;
