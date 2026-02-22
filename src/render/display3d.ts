@@ -2643,6 +2643,19 @@ export class BrowserDisplay3D implements IGameDisplay {
       mat.opacity *= (1 - dist / 8);
     }
 
+    // Wall status LED blink animation
+    for (let i = 0; i < this._wallLEDs.length; i++) {
+      const led = this._wallLEDs[i];
+      if (!led.parent?.visible) continue; // skip if in culled room group
+      const phase = (led as any)._ledPhase;
+      // Slow blink with occasional rapid flash
+      const blinkCycle = (elapsed + phase) % 4.0;
+      let opacity = 0.1; // dim baseline
+      if (blinkCycle < 0.15) opacity = 0.6; // brief bright flash
+      else if (blinkCycle > 2.0 && blinkCycle < 2.1) opacity = 0.4; // secondary blink
+      (led.material as THREE.SpriteMaterial).opacity = opacity;
+    }
+
     // Room hazard fog pulse animation
     for (const [, hazeMesh] of this.roomHazeMeshes) {
       const mat = hazeMesh.material as THREE.MeshBasicMaterial;
@@ -3914,6 +3927,27 @@ export class BrowserDisplay3D implements IGameDisplay {
         wallSlots.sort((a, b) => ((a.x * 19 + a.y * 11 + wallSeed) & 0xff) - ((b.x * 19 + b.y * 11 + wallSeed) & 0xff));
         const maxWallProps = Math.min(wallProps.length, wallSlots.length, 5); // room-focused = more budget
 
+        // Wall status LEDs: place small blinking dots on unused wall slots
+        const ledStartIdx = Math.min(maxWallProps, wallSlots.length);
+        const maxLeds = Math.min(4, wallSlots.length - ledStartIdx);
+        for (let li = 0; li < maxLeds; li++) {
+          const lSlot = wallSlots[ledStartIdx + li];
+          const ledColor = ROOM_WALL_TINTS_3D[room.name] ?? 0x44ff88;
+          const ledMat = new THREE.SpriteMaterial({
+            color: ledColor, transparent: true, opacity: 0.5,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const led = new THREE.Sprite(ledMat);
+          led.scale.set(0.04, 0.04, 1);
+          // Place at mid-wall height, slight offset toward room interior
+          const offX = Math.sin(lSlot.rot) * 0.05;
+          const offZ = Math.cos(lSlot.rot) * 0.05;
+          led.position.set(lSlot.x + offX, 0.9 + (li % 3) * 0.2, lSlot.y + offZ);
+          (led as any)._ledPhase = lSlot.x * 3.7 + lSlot.y * 5.3 + li * 1.1;
+          decoGroup.add(led);
+          this._wallLEDs.push(led);
+        }
+
         for (let i = 0; i < maxWallProps; i++) {
           const slot = wallSlots[i];
           const propPath = wallProps[i % wallProps.length];
@@ -3966,6 +4000,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
   }
+
+  // Wall status LED sprites (animated in animate loop)
+  private _wallLEDs: THREE.Sprite[] = [];
 
   // ── Private: caution stripe floor markings ─────────────────────
 
