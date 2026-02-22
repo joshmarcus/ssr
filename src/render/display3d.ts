@@ -1985,6 +1985,15 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.playerMesh.rotation.x += (targetTiltX - this.playerMesh.rotation.x) * 0.15;
       this.playerMesh.rotation.z += (targetTiltZ - this.playerMesh.rotation.z) * 0.15;
 
+      // Cleaning brush spin (children 6 & 7) — spin when moving
+      const brushL = this.playerMesh.children[6];
+      const brushR = this.playerMesh.children[7];
+      if (brushL && brushR) {
+        const brushSpeed = isMoving ? elapsed * 15 : elapsed * 0.5; // fast when moving, slow idle
+        brushL.rotation.z = brushSpeed;
+        brushR.rotation.z = -brushSpeed; // counter-rotate
+      }
+
       // Damage state visualization on Sweepo model
       if (this._playerHpPercent < 1.0) {
         // Antenna droop when damaged (child 2 = antenna cylinder)
@@ -6614,6 +6623,18 @@ export class BrowserDisplay3D implements IGameDisplay {
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
     eye.position.set(0, 0.1, 0.27); // front of body
     group.add(eye);
+
+    // Cleaning brushes: two small cylinders on the underside (child 6 & 7)
+    const brushGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.2, 8);
+    const brushMat = makeToonMaterial({ color: 0x666699, gradientMap: this.toonGradient });
+    const brushL = new THREE.Mesh(brushGeo, brushMat);
+    brushL.position.set(-0.15, -0.22, 0.15);
+    brushL.rotation.x = Math.PI / 2; // orient horizontally
+    group.add(brushL);
+    const brushR = new THREE.Mesh(brushGeo, brushMat);
+    brushR.position.set(0.15, -0.22, 0.15);
+    brushR.rotation.x = Math.PI / 2;
+    group.add(brushR);
 
     // Headlight: forward-facing spotlight for corridor exploration
     this.headlightTarget = new THREE.Object3D();
