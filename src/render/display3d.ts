@@ -964,7 +964,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     const voidCeilGeo = new THREE.PlaneGeometry(80, 80);
     voidCeilGeo.rotateX(Math.PI / 2);
     this._voidCeiling = new THREE.Mesh(voidCeilGeo, voidMat.clone());
-    this._voidCeiling.position.set(0, 2.12, 0); // just above ceiling tiles
+    this._voidCeiling.position.set(0, 2.07, 0); // just above ceiling tiles
     this._voidCeiling.renderOrder = -10;
     this.scene.add(this._voidCeiling);
 
@@ -999,6 +999,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.add(this.corridorFloorMesh);
 
     const wallGeo = new THREE.BoxGeometry(1, 2.0, 1);
+    wallGeo.translate(0, 1.0, 0); // base at y=0, top at y=2.0 (matches GLTF convention)
     const wallPanelTex = createWallPanelTexture();
     const wallMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: wallPanelTex, emissive: 0x181818, emissiveIntensity: 0.06 });
     this.wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, this.maxTiles);
@@ -1011,6 +1012,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Corner walls (placeholder geo, replaced when model loads)
     const cornerGeo = new THREE.BoxGeometry(1, 2.0, 1);
+    cornerGeo.translate(0, 1.0, 0); // base at y=0, top at y=2.0
     const cornerMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.wallCornerMesh = new THREE.InstancedMesh(cornerGeo, cornerMat, this.maxTiles);
     this.wallCornerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1021,6 +1023,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.add(this.wallCornerMesh);
 
     const doorGeo = new THREE.BoxGeometry(0.42, 2.0, 0.15); // half-width panel — two halves per door
+    doorGeo.translate(0, 1.0, 0); // base at y=0, top at y=2.0 (matches GLTF convention)
     const doorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.doorMesh = new THREE.InstancedMesh(doorGeo, doorMat, 400); // 2 halves per door
     this.doorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -2882,7 +2885,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._fillLight.position.set(this.playerCurrentX, 1.2, this.playerCurrentZ);
       // Move void enclosure planes to follow player
       this._voidGround.position.set(this.playerCurrentX, -0.12, this.playerCurrentZ);
-      this._voidCeiling.position.set(this.playerCurrentX, 2.12, this.playerCurrentZ);
+      this._voidCeiling.position.set(this.playerCurrentX, 2.07, this.playerCurrentZ);
       // Fill light only active in chase cam (in ortho, the overhead light is sufficient)
       this._fillLight.intensity = this.chaseCamActive ? 1.2 : 0;
 
@@ -4571,7 +4574,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           const openW = x > 0 && state.tiles[y][x - 1].type !== TileType.Wall;
 
           // Always place ceiling panel above wall tiles (prevents seeing starfield through ceiling gaps)
-          this.dummy.position.set(x, 2.05, y);
+          this.dummy.position.set(x, 2.0, y);
           this.dummy.rotation.set(0, 0, 0);
           this.dummy.scale.set(1, 1, 1);
           this.dummy.updateMatrix();
@@ -4587,7 +4590,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           tempColor.setHex(baseColor);
           if (!tile.visible) tempColor.multiplyScalar(0.4);
 
-          this.dummy.position.set(x, 1.0, y); // center of 2-unit box → spans y=0 to y=2.0 (flush with ceiling)
+          this.dummy.position.set(x, 0, y); // base at y=0 (geometry pre-translated to span 0→2.0)
           this.dummy.scale.set(1, 1, 1);
 
           // Rotate wall so its detailed face points toward open space:
@@ -4659,10 +4662,10 @@ export class BrowserDisplay3D implements IGameDisplay {
             const halfOffset = sign * (0.21 + slideAmount); // 0.21 = half of 0.42 panel width
 
             if (isHorizontal) {
-              this.dummy.position.set(x, 1.0, y + halfOffset);
+              this.dummy.position.set(x, 0, y + halfOffset);
               this.dummy.rotation.set(0, Math.PI / 2, 0);
             } else {
-              this.dummy.position.set(x + halfOffset, 1.0, y);
+              this.dummy.position.set(x + halfOffset, 0, y);
               this.dummy.rotation.set(0, 0, 0);
             }
             this.dummy.scale.set(1, 1, 1);
@@ -4815,7 +4818,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
 
           // Ceiling panel above this walkable tile
-          this.dummy.position.set(x, 2.05, y);
+          this.dummy.position.set(x, 2.0, y);
           this.dummy.rotation.set(0, 0, 0);
           this.dummy.scale.set(1, 1, 1);
           this.dummy.updateMatrix();
@@ -4848,7 +4851,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           const vTile = state.tiles[vy][vx];
           if (vTile.explored && this.isTileInView(vx, vy, state)) continue;
           // Void ceiling — always place
-          this.dummy.position.set(vx, 2.05, vy);
+          this.dummy.position.set(vx, 2.0, vy);
           this.dummy.rotation.set(0, 0, 0);
           this.dummy.scale.set(1, 1, 1);
           this.dummy.updateMatrix();
@@ -4865,7 +4868,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           floorIdx++;
           // Void walls at the outer edge (forms a dark enclosure wall ring)
           if (dist >= totalRange - 1) {
-            this.dummy.position.set(vx, 1.0, vy); // y=1.0 matches wall box center (spans 0→2.0)
+            this.dummy.position.set(vx, 0, vy); // base at y=0 (geometry pre-translated)
             this.dummy.rotation.set(0, 0, 0);
             this.dummy.scale.set(1, 1, 1);
             this.dummy.updateMatrix();
@@ -6040,7 +6043,7 @@ export class BrowserDisplay3D implements IGameDisplay {
             isHorizontal ? 1.0 : 0.12
           );
           const lintel = new THREE.Mesh(lintelGeo, frameMat);
-          lintel.position.set(x, 2.05, y);
+          lintel.position.set(x, 2.0, y);
           trimSubGroup.add(lintel);
 
           // Floor threshold glow strip — bright line at door base
@@ -8666,6 +8669,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       try {
         const { geometry, material } = this.extractFirstMeshGeo(gltf.scene, 1.0);
         if (geometry) {
+          // Stretch wall model to 2.0 height (floor to ceiling)
+          geometry.computeBoundingBox();
+          const wallH = geometry.boundingBox!.max.y;
+          if (wallH > 0) geometry.scale(1, 2.0 / wallH, 1);
           this.wallModelGeo = geometry;
           this.wallModelMat = material;
           this.rebuildWallMesh();
@@ -8680,6 +8687,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       try {
         const { geometry, material } = this.extractFirstMeshGeo(gltf.scene, 1.0);
         if (geometry) {
+          // Stretch corner to 2.0 height (floor to ceiling)
+          geometry.computeBoundingBox();
+          const cornerH = geometry.boundingBox!.max.y;
+          if (cornerH > 0) geometry.scale(1, 2.0 / cornerH, 1);
           this.wallCornerModelGeo = geometry;
           this.wallCornerModelMat = material;
           this.rebuildWallCornerMesh();
@@ -8708,6 +8719,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       try {
         const { geometry, material } = this.extractFirstMeshGeo(gltf.scene, 1.0);
         if (geometry) {
+          // Stretch door to 2.0 height (floor to ceiling)
+          geometry.computeBoundingBox();
+          const doorH = geometry.boundingBox!.max.y;
+          if (doorH > 0) geometry.scale(1, 2.0 / doorH, 1);
           this.doorModelGeo = geometry;
           this.doorModelMat = material;
           this.rebuildDoorMesh();
