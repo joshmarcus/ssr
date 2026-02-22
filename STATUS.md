@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 80 (V190 completed, V191+ next — continued visual/mystery polish)
-- **Test status**: 290 tests passing across 24 test files (0 failing)
+- **Phase**: Sprint 81 (V201 completed — mystery deduction redesign)
+- **Test status**: 292 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
 - **Archetypes**: 6 active (Mutiny added — "The Divide")
@@ -34,20 +34,19 @@
   - Sabotage — "The Stowaway" (B+)
   - SignalAnomaly — "First Contact" (A)
   - Mutiny — "The Divide" (NEW)
-- 5-6 chained deductions with evidence linking, per-deduction hint text, and revelation cascade
-- **Revelation system**: linking evidence yields narrative sentences explaining HOW clues illuminate questions
-  - Tag-specific revelations appear in a Revelation Board as evidence is linked
-  - Gold synthesis paragraph crystallizes "what must be true" when all evidence is assembled
-  - Post-answer narrative overlay (correct: revelation + reward + next unlock, incorrect: inconclusive)
+- 5-6 chained deductions with evidence-count thresholds, per-deduction hint text, and revelation cascade
+- **"Read & Deduce" system (V201)**: Players read evidence, understand the story, and answer with real consequences
+  - Deductions unlock by evidence count (2/4/6/8/10/12 entries per tier), not invisible tags
+  - Wrong answers cost 3 HP + 10 turns; 2 wrong attempts = permanent lockout
+  - All revelations shown freely as "What the evidence suggests" reading aids
+  - Synthesis shown freely as "ANALYSIS" block — no tag-gating
+  - Tags remain internal for procgen/narrative threading (hidden from player, visible in dev mode F5)
+  - Post-answer narrative overlay (correct: revelation + reward + next unlock, incorrect: penalty + attempts remaining)
   - ~100 authored revelation/synthesis/conclusion strings across 5 archetypes x 5-6 deduction tiers
 - Narrative threads grouping evidence
-- **Investigation Hub [r/v]**: unified 3-section overlay replacing old Evidence Browser + Broadcast Report
-  - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, tags, thread)
-  - CONNECTIONS: **split-pane deduction detail** with evidence list (left 40%) + full evidence text (right 60%)
-    - Dual-focus navigation: Tab switches between evidence linking and answer selection
-    - Revelation Board: accumulated narrative sentences as evidence is linked
-    - Synthesis block (gold): appears when all required tags covered
-    - Linked evidence persists when navigating away
+- **Investigation Hub [r/v]**: unified 3-section overlay
+  - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, thread)
+  - CONNECTIONS: deduction list with evidence-count progress → detail view with evidence log + answer selection
   - WHAT WE KNOW: auto-generated narrative prose summarizing investigation progress
 - Crew relationships displayed in evidence detail and connection linking views
 - Evidence minimap: proportional ASCII room map showing where evidence was found
