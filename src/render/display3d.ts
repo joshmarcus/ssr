@@ -571,6 +571,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private relayPowerLineCount: number = 0;
   // Energy dots traveling along relay power lines
   private _relayEnergyDots: { sprite: THREE.Sprite; curve: THREE.QuadraticBezierCurve3; t: number }[] = [];
+  private _relayPulseWaves: { sprite: THREE.Sprite; curve: THREE.QuadraticBezierCurve3; t: number; forward: boolean }[] = [];
+  private _pendingRelayPulses: { x: number; z: number }[] = [];
   // Global scene lights for phase-reactive lighting
   private ambientLight: THREE.AmbientLight | null = null;
   private keyLight: THREE.DirectionalLight | null = null;
@@ -3621,6 +3623,27 @@ export class BrowserDisplay3D implements IGameDisplay {
       (ed.sprite.material as THREE.SpriteMaterial).opacity = pulse;
     }
 
+    // Relay pulse waves: one-shot fast pulses along power lines
+    for (let i = this._relayPulseWaves.length - 1; i >= 0; i--) {
+      const pw = this._relayPulseWaves[i];
+      const speed = delta * 1.8; // ~4.5x faster than energy dots
+      pw.t += pw.forward ? speed : -speed;
+      const done = pw.forward ? pw.t >= 1.0 : pw.t <= 0.0;
+      if (done) {
+        this.scene.remove(pw.sprite);
+        (pw.sprite.material as THREE.SpriteMaterial).dispose();
+        this._relayPulseWaves.splice(i, 1);
+        continue;
+      }
+      const pos = pw.curve.getPoint(Math.max(0, Math.min(1, pw.t)));
+      pw.sprite.position.copy(pos);
+      // Bright core fading toward end
+      const progress = pw.forward ? pw.t : 1 - pw.t;
+      const fadeOut = 1 - progress * progress; // quadratic fade
+      (pw.sprite.material as THREE.SpriteMaterial).opacity = fadeOut;
+      pw.sprite.scale.setScalar(0.18 + progress * 0.12); // grows slightly as it travels
+    }
+
     // Particle animations
     this.animateParticles(elapsed, delta);
 
@@ -6317,6 +6340,11 @@ export class BrowserDisplay3D implements IGameDisplay {
       (dot.sprite.material as THREE.SpriteMaterial).dispose();
     }
     this._relayEnergyDots = [];
+    for (const pw of this._relayPulseWaves) {
+      this.scene.remove(pw.sprite);
+      (pw.sprite.material as THREE.SpriteMaterial).dispose();
+    }
+    this._relayPulseWaves = [];
 
     if (activatedPositions.length < 2) return;
 
@@ -6359,6 +6387,32 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.scene.add(dot);
         this._relayEnergyDots.push({ sprite: dot, curve, t: Math.random() });
       }
+    }
+
+    // Spawn pulse waves from any just-activated relays
+    if (this._pendingRelayPulses.length > 0) {
+      for (const pulse of this._pendingRelayPulses) {
+        // Find all curves that touch this relay position
+        for (const dot of this._relayEnergyDots) {
+          const start = dot.curve.getPoint(0);
+          const end = dot.curve.getPoint(1);
+          const atStart = Math.abs(start.x - pulse.x) < 0.5 && Math.abs(start.z - pulse.z) < 0.5;
+          const atEnd = Math.abs(end.x - pulse.x) < 0.5 && Math.abs(end.z - pulse.z) < 0.5;
+          if (atStart || atEnd) {
+            const pMat = new THREE.SpriteMaterial({
+              color: 0xffffff, transparent: true, opacity: 1.0,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const pSpr = new THREE.Sprite(pMat);
+            pSpr.scale.set(0.18, 0.18, 1);
+            const startPos = atStart ? dot.curve.getPoint(0) : dot.curve.getPoint(1);
+            pSpr.position.copy(startPos);
+            this.scene.add(pSpr);
+            this._relayPulseWaves.push({ sprite: pSpr, curve: dot.curve, t: atStart ? 0 : 1, forward: atStart });
+          }
+        }
+      }
+      this._pendingRelayPulses = [];
     }
   }
 
@@ -6592,6 +6646,8 @@ export class BrowserDisplay3D implements IGameDisplay {
           });
           // Trigger activation flash at relay position
           this.flashTile(entity.pos.x, entity.pos.y);
+          // Queue pulse wave along all connected power lines
+          this._pendingRelayPulses.push({ x: entity.pos.x, z: entity.pos.y });
           // Golden sparks shooting upward: celebration burst
           for (let si = 0; si < 8; si++) {
             const sparkMat = new THREE.SpriteMaterial({
