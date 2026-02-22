@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V158 completed, V159 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V162 completed, V163 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -318,6 +318,10 @@
 - **Sprint V156 — Room enclosure fix**: Foundational 3D visual fix — ceiling panels above all tile types (not just walkable), void-fill geometry ring around player, large ground/ceiling planes, starfield hidden in chase cam, tighter fog. Rooms now feel like enclosed interior spaces instead of floating scaffolds in space
 - **Sprint V157 — Camera angle + lighting**: Lower chase cam (1.0 rooms/0.65 corridors), higher look-at target, brighter headlight and room center glow, wider room fog for more visibility. Rooms feel brighter and more forward-looking
 - **Sprint V158 — Entity glow boost**: Entity self-illumination increased (procedural emissive 0.3→0.5, GLTF glow 0.3→0.45, non-glow 0.08→0.15). 6 new entity types in ENTITY_GLOW_LIGHTS (Console, SecurityTerminal, RepairCradle, MedKit, PowerCell, FuseBox). Existing glow intensities +25-30%. Ground rings enlarged and brightened (0.25→0.35 opacity, 0.38→0.42 radius)
+- **Sprint V159 — Subtler ceiling beams**: Cross-braces darkened (base 0x40→0x18), thinned (0.06→0.04 height), spaced wider (every 4 tiles vs 3), faint emissive 0.08. Read as structural scaffolding
+- **Sprint V160 — Mid-wall accent strip**: Eye-level emissive trim at y=0.85 (0.45 emissive intensity). Walls now have 4 trim levels visible from chase cam
+- **Sprint V161 — Dramatic lighting contrast**: Ambient 3.2→1.8, key 2.8→1.8, fill 1.6→0.6, rim 1.0→0.5. Headlight boosted to 3.5/4.5 as hero light. Room center glow 2.0→3.0. Moody atmospheric rooms
+- **Sprint V162 — Enhanced surface textures**: Wall panels with edge gradients, darker grooves, beveled highlights, visible rivets. Floor grid with cross seams, tile boundary grooves, center rivets
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

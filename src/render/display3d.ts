@@ -166,38 +166,63 @@ function createCorridorGrateTexture(): THREE.CanvasTexture {
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
 
-  // Slightly darker base for corridors
-  ctx.fillStyle = "#d8d8d8";
+  // Darker base for corridors — industrial feel
+  ctx.fillStyle = "#c8c8c8";
   ctx.fillRect(0, 0, size, size);
 
-  // Grate cross pattern
-  ctx.strokeStyle = "#bbbbbb";
+  // Darker outer groove for visible grate borders
+  ctx.strokeStyle = "#888888";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0.5, 0.5, size - 1, size - 1);
+  // Inner highlight edge
+  ctx.strokeStyle = "#dcdcdc";
   ctx.lineWidth = 1;
+  ctx.strokeRect(2.5, 2.5, size - 5, size - 5);
+
+  // Grate cross pattern — darker for industrial look
+  ctx.strokeStyle = "#999999";
+  ctx.lineWidth = 1.5;
   for (let i = 0; i < 4; i++) {
     const y = 8 + i * 16;
     ctx.beginPath();
-    ctx.moveTo(2, y);
-    ctx.lineTo(size - 2, y);
+    ctx.moveTo(3, y);
+    ctx.lineTo(size - 3, y);
     ctx.stroke();
+    // Highlight below each grate line
+    ctx.strokeStyle = "#e0e0e0";
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(3, y + 1.5);
+    ctx.lineTo(size - 3, y + 1.5);
+    ctx.stroke();
+    ctx.strokeStyle = "#999999";
+    ctx.lineWidth = 1.5;
   }
   for (let i = 0; i < 4; i++) {
     const x = 8 + i * 16;
     ctx.beginPath();
-    ctx.moveTo(x, 2);
-    ctx.lineTo(x, size - 2);
+    ctx.moveTo(x, 3);
+    ctx.lineTo(x, size - 3);
     ctx.stroke();
   }
 
-  // Outer border
-  ctx.strokeStyle = "#c0c0c0";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(0, 0, size, size);
-
-  // Center drain dot
-  ctx.fillStyle = "#999999";
+  // Center drain dot with depth
+  ctx.fillStyle = "#666666";
   ctx.beginPath();
-  ctx.arc(size / 2, size / 2, 3, 0, Math.PI * 2);
+  ctx.arc(size / 2, size / 2, 3.5, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = "#aaaaaa";
+  ctx.beginPath();
+  ctx.arc(size / 2 - 0.5, size / 2 - 0.5, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Corner bolts
+  ctx.fillStyle = "#777777";
+  for (const [bx, by] of [[4, 4], [size - 5, 4], [4, size - 5], [size - 5, size - 5]]) {
+    ctx.beginPath();
+    ctx.arc(bx, by, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
@@ -235,8 +260,8 @@ function createCautionStripeTexture(): THREE.CanvasTexture {
 
 function createToonGradient(): THREE.DataTexture {
   const colors = new Uint8Array([
-    60,   // shadow (brighter for cel-shaded look)
-    150,  // mid shadow
+    80,   // shadow (raised to prevent pure-black with reduced ambient)
+    155,  // mid shadow
     220,  // lit
     255,  // highlight
   ]);
@@ -280,7 +305,7 @@ const COLORS_3D = {
   door: 0xeeaa55,
   lockedDoor: 0xff5555,
   corridor: 0xbbbbbb,   // bright corridors
-  background: 0x060610,
+  background: 0x050812,
   player: 0x00ff00,
   fogFull: 0x0a0a1a,    // dark navy instead of pure black
   fogMemory: 0x2a2a44,  // visible blue-grey memory tint
