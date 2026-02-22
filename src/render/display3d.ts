@@ -2489,6 +2489,28 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // CRT scanline overlay: subtle horizontal lines for terminal aesthetic
+      {
+        let scanlines = document.getElementById("crt-scanlines-3d");
+        if (this.chaseCamActive) {
+          if (!scanlines) {
+            scanlines = document.createElement("div");
+            scanlines.id = "crt-scanlines-3d";
+            scanlines.style.cssText =
+              "position:fixed;inset:0;pointer-events:none;z-index:84;" +
+              "background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);" +
+              "mix-blend-mode:multiply;";
+            document.body.appendChild(scanlines);
+          }
+          // Slowly scrolling scanlines for subtle CRT feel
+          const scrollY = (elapsed * 8) % 4;
+          scanlines.style.backgroundPositionY = `${scrollY}px`;
+          scanlines.style.display = "block";
+        } else if (scanlines) {
+          scanlines.style.display = "none";
+        }
+      }
+
       // Smoothly move camera and light to follow
       this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
       this.cameraPosZ += (this.cameraTargetZ - this.cameraPosZ) * lerpFactor;

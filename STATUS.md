@@ -304,6 +304,7 @@
 - **Sprint V142 — Run history on game over screen**: Previous runs (up to 5) displayed on game over overlay with WIN/LOSS result, performance rating, turns, archetype shorthand, and seed. Includes Mutiny archetype ("THE DIVIDE"). Brings 2D run history parity to 3D
 - **Sprint V143 — Per-entity-type legend glyphs**: Legend uses unique emoji glyphs per entity type matching 2D renderer instead of generic colored squares. Improves at-a-glance entity identification
 - **Sprint V144 — Signal glitch on damage/stun**: RGB block corruption + horizontal scan line tears overlay on damage (0.3 severity) and stun (0.7 severity). Pixelated 64x48 canvas with random color channel blocks and white tear lines. Double-pulse on stun. Reinforces "low-bitrate terminal link" theme
+- **Sprint V145 — CRT scanline overlay**: Subtle slowly-scrolling horizontal scanlines (4px period, 3% black opacity) via CSS repeating-linear-gradient. Active only in chase cam mode. Reinforces "viewing through terminal monitor" aesthetic
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
