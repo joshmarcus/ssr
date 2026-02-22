@@ -238,6 +238,7 @@
 - **Sprint V76 — Corridor light shafts + floor pools**: Volumetric cylinder beams descend from corridor ceiling lights (additive blending, tapered cone shape). Glowing floor discs mark light pools on corridor floors. Both animate with breathing opacity, hazard-reactive flicker for damaged corridors, distance-based fade for performance
 - **Sprint V77 — Footstep dust kicks**: Sweepo kicks up small dust puffs behind it when moving (warm brown additive sprites). Puffs spawn every 0.08s, drift upward, expand, and fade with quadratic falloff. Ground-level visual feedback for the cleaning bot
 - **Sprint V78 — Headlight ground spot**: Elliptical glow on the floor 2.5 tiles ahead of Sweepo in facing direction, elongated along movement axis. Color-synced with headlight, brighter in corridors (0.08 opacity) than rooms (0.03). Creates visible pool of light for flashlight-exploration feel
+- **Sprint V79 — Discovery sparkle**: 12 room-tinted sparkle particles spawn on first-time room entry, twinkle (15Hz opacity oscillation) while drifting upward and fading. Exploration reward feedback that highlights newly discovered spaces
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

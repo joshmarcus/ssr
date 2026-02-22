@@ -597,6 +597,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _dustKickTimer: number = 0;
   // Headlight ground spot (elliptical glow ahead of Sweepo)
   private _headlightSpot: THREE.Mesh | null = null;
+  // Discovery sparkle: rooms visited this session for first-entry effects
+  private _visitedRooms3D: Set<string> = new Set();
+  private _discoverySparkles: THREE.Sprite[] = [];
   private starfieldPoints: THREE.Points | null = null;
 
   // Hazard visual effects (sprites at hazardous tile positions)
@@ -1154,6 +1157,32 @@ export class BrowserDisplay3D implements IGameDisplay {
 
       // Room-type visual signature: brief tinted flash on entry
       this.triggerRoomSignature(room!.name);
+
+      // Discovery sparkle: first-time room entry spawns sparkle particles
+      if (!this._visitedRooms3D.has(roomId)) {
+        this._visitedRooms3D.add(roomId);
+        const cx = room!.x + room!.width / 2;
+        const cy = room!.y + room!.height / 2;
+        const tint = ROOM_WALL_TINTS_3D[room!.name] ?? 0xeeffff;
+        for (let si = 0; si < 12; si++) {
+          const angle = (si / 12) * Math.PI * 2;
+          const radius = 0.5 + Math.random() * (Math.min(room!.width, room!.height) / 2);
+          const sx = cx + Math.cos(angle) * radius;
+          const sz = cy + Math.sin(angle) * radius;
+          const sparkMat = new THREE.SpriteMaterial({
+            color: tint, transparent: true, opacity: 0.6,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const spark = new THREE.Sprite(sparkMat);
+          spark.scale.set(0.08, 0.08, 1);
+          spark.position.set(sx, 0.3 + Math.random() * 0.8, sz);
+          (spark as any)._life = 0;
+          (spark as any)._maxLife = 0.6 + Math.random() * 0.6;
+          (spark as any)._driftY = 0.3 + Math.random() * 0.5;
+          this.scene.add(spark);
+          this._discoverySparkles.push(spark);
+        }
+      }
 
       // Show room name banner on the 3D viewport
       const banner = document.getElementById("room-banner");
@@ -2757,6 +2786,27 @@ export class BrowserDisplay3D implements IGameDisplay {
       s.position.y += delta * 0.4; // drift upward
       s.scale.set(0.12 + t * 0.2, 0.12 + t * 0.2, 1); // expand
       (s.material as THREE.SpriteMaterial).opacity = 0.3 * (1 - t); // fade
+    }
+
+    // Animate discovery sparkles
+    for (let i = this._discoverySparkles.length - 1; i >= 0; i--) {
+      const sp = this._discoverySparkles[i];
+      (sp as any)._life += delta;
+      const life = (sp as any)._life;
+      const maxLife = (sp as any)._maxLife;
+      if (life >= maxLife) {
+        this.scene.remove(sp);
+        (sp.material as THREE.SpriteMaterial).dispose();
+        this._discoverySparkles.splice(i, 1);
+        continue;
+      }
+      const t = life / maxLife;
+      sp.position.y += delta * (sp as any)._driftY;
+      // Twinkle: rapid opacity oscillation that fades out
+      const twinkle = Math.sin(life * 15) * 0.5 + 0.5;
+      (sp.material as THREE.SpriteMaterial).opacity = 0.6 * (1 - t) * twinkle;
+      const s = 0.08 + t * 0.04;
+      sp.scale.set(s, s, 1);
     }
 
     // Animate footstep dust kicks
