@@ -597,6 +597,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _dustKickTimer: number = 0;
   // Headlight ground spot (elliptical glow ahead of Sweepo)
   private _headlightSpot: THREE.Mesh | null = null;
+  // Corridor breath puff (cold air visualization)
+  private _breathPuffSprites: THREE.Sprite[] = [];
+  private _breathPuffTimer: number = 0;
   // Discovery sparkle: rooms visited this session for first-entry effects
   private _visitedRooms3D: Set<string> = new Set();
   private _discoverySparkles: THREE.Sprite[] = [];
@@ -2196,6 +2199,30 @@ export class BrowserDisplay3D implements IGameDisplay {
           this._dustKickSprites.push(dust);
         }
       }
+
+      // Corridor breath puff: periodic cold air visualization
+      if (this.chaseCamActive && !this._currentRoom) {
+        this._breathPuffTimer -= delta;
+        if (this._breathPuffTimer <= 0) {
+          this._breathPuffTimer = 2.0 + Math.random() * 1.0;
+          const facing = this.playerMesh ? this.playerMesh.rotation.y : this.playerFacing;
+          const puffX = this.playerCurrentX + Math.sin(facing) * 0.35;
+          const puffZ = this.playerCurrentZ + Math.cos(facing) * 0.35;
+          const puffMat = new THREE.SpriteMaterial({
+            color: 0xccddee, transparent: true, opacity: 0.15,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const puff = new THREE.Sprite(puffMat);
+          puff.scale.set(0.05, 0.05, 1);
+          puff.position.set(puffX, 0.15, puffZ);
+          (puff as any)._life = 0;
+          (puff as any)._maxLife = 0.6;
+          (puff as any)._dirX = Math.sin(facing) * 0.3;
+          (puff as any)._dirZ = Math.cos(facing) * 0.3;
+          this.scene.add(puff);
+          this._breathPuffSprites.push(puff);
+        }
+      }
     }
 
     // Entity animations
@@ -2859,6 +2886,27 @@ export class BrowserDisplay3D implements IGameDisplay {
       const s = 0.06 + t * 0.12; // expand from 0.06 to 0.18
       d.scale.set(s, s, 1);
       (d.material as THREE.SpriteMaterial).opacity = 0.2 * (1 - t * t); // quadratic fade
+    }
+
+    // Animate corridor breath puffs
+    for (let i = this._breathPuffSprites.length - 1; i >= 0; i--) {
+      const bp = this._breathPuffSprites[i];
+      (bp as any)._life += delta;
+      const life = (bp as any)._life;
+      const maxLife = (bp as any)._maxLife;
+      if (life >= maxLife) {
+        this.scene.remove(bp);
+        (bp.material as THREE.SpriteMaterial).dispose();
+        this._breathPuffSprites.splice(i, 1);
+        continue;
+      }
+      const t = life / maxLife;
+      bp.position.x += (bp as any)._dirX * delta;
+      bp.position.z += (bp as any)._dirZ * delta;
+      bp.position.y += delta * 0.1;
+      const s = 0.05 + t * 0.15; // expand
+      bp.scale.set(s, s, 1);
+      (bp.material as THREE.SpriteMaterial).opacity = 0.15 * (1 - t); // linear fade
     }
 
     // Distance culling: update every 5 frames to amortize cost
