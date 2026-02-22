@@ -7330,7 +7330,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Player: bright green dot with white border, larger
+    // Player: bright green dot with facing direction arrow
     const ppx = Math.floor(state.player.entity.pos.x * scale);
     const ppy = Math.floor(state.player.entity.pos.y * scale);
     ctx.fillStyle = "#44ff88";
@@ -7338,6 +7338,28 @@ export class BrowserDisplay3D implements IGameDisplay {
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1;
     ctx.strokeRect(ppx - 3, ppy - 3, 7, 7);
+
+    // Facing direction arrow on minimap
+    const facing = this.playerFacing;
+    const arrowLen = 6;
+    // playerFacing: 0 = +Z (down on minimap), PI/2 = -X (left), etc.
+    const adx = Math.sin(facing) * arrowLen;
+    const ady = Math.cos(facing) * arrowLen;
+    ctx.strokeStyle = "#88ffaa";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ppx, ppy);
+    ctx.lineTo(ppx + adx, ppy + ady);
+    ctx.stroke();
+    // Arrowhead
+    const headLen = 3;
+    const headAngle = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(ppx + adx, ppy + ady);
+    ctx.lineTo(ppx + adx - Math.sin(facing + headAngle) * headLen, ppy + ady - Math.cos(facing + headAngle) * headLen);
+    ctx.moveTo(ppx + adx, ppy + ady);
+    ctx.lineTo(ppx + adx - Math.sin(facing - headAngle) * headLen, ppy + ady - Math.cos(facing - headAngle) * headLen);
+    ctx.stroke();
 
     // Render compass
     this.renderCompass();

@@ -245,6 +245,7 @@
 - **Sprint V83 — Entity shadow discs**: Dark translucent circles beneath all entities (GLTF and procedural) for ground shadow. 15% opacity, placed at floor level. Grounds entities in the scene and adds visual depth
 - **Sprint V84 — Relay energy dots**: Bright yellow sprites travel along relay power line curves between activated relays. Each dot follows the bezier arc at 0.4 speed with pulsing opacity. Satisfying puzzle-progress feedback
 - **Sprint V85 — Minimap entity icons**: Distinct shapes per entity type on minimap — diamond (DataCore), circle (EscapePod), triangle (CrewNPC), plus sign (Relay), squares for others. Improved map readability and entity identification at a glance
+- **Sprint V86 — Minimap facing arrow**: Player dot on minimap shows facing direction with an arrow line + arrowhead. Combined with compass, gives full spatial orientation awareness during chase cam exploration
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
