@@ -592,6 +592,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private ceilingRooms: Set<string> = new Set();
   // Room atmospheric haze (colored fog planes per room)
   private hazeRooms: Set<string> = new Set();
+  private roomHazeMeshes: Map<string, THREE.Mesh> = new Map();
   // Corridor floor strip lights
   private corridorStripTiles: Set<string> = new Set();
   private static _stripLightGeo: THREE.BoxGeometry | null = null;
@@ -1869,6 +1870,22 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else {
         // Normal corridors: gentle subtle breathing
         cl.intensity = base * (0.85 + Math.sin(phase) * 0.15);
+      }
+    }
+
+    // Room hazard fog pulse animation
+    for (const [, hazeMesh] of this.roomHazeMeshes) {
+      const mat = hazeMesh.material as THREE.MeshBasicMaterial;
+      const c = mat.color.getHex();
+      if (c === 0xff3300) {
+        // Heat fog: slow throb
+        mat.opacity *= 0.85 + Math.sin(elapsed * 1.5 + hazeMesh.position.x * 2) * 0.15;
+      } else if (c === 0x444444) {
+        // Smoke fog: gentle swirl via Y-position drift
+        hazeMesh.position.y = 0.4 + Math.sin(elapsed * 0.8 + hazeMesh.position.z) * 0.05;
+      } else if (c === 0x4488cc) {
+        // Frost: subtle shimmer
+        mat.opacity *= 0.9 + Math.sin(elapsed * 2.5 + hazeMesh.position.x * 3) * 0.1;
       }
     }
 
@@ -3265,37 +3282,77 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
   }
 
-  /** Place a subtle colored haze plane per room for atmospheric depth */
+  /** Place a subtle colored haze plane per room — dynamically colored by hazard state */
   private placeRoomHaze(state: GameState): void {
     for (const room of state.rooms) {
-      if (this.hazeRooms.has(room.id)) continue;
-
       const cx = room.x + Math.floor(room.width / 2);
       const cy = room.y + Math.floor(room.height / 2);
       if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
       if (!state.tiles[cy][cx].explored) continue;
-      this.hazeRooms.add(room.id);
+
+      if (!this.hazeRooms.has(room.id)) {
+        // First time: create haze plane
+        this.hazeRooms.add(room.id);
+
+        const hazeGeo = new THREE.PlaneGeometry(room.width * 0.9, room.height * 0.9);
+        hazeGeo.rotateX(-Math.PI / 2);
+        const hazeMat = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.04,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        const haze = new THREE.Mesh(hazeGeo, hazeMat);
+        haze.position.set(
+          room.x + room.width / 2 - 0.5,
+          0.3,
+          room.y + room.height / 2 - 0.5
+        );
+        haze.userData = { roomId: room.id };
+        this.getRoomSubGroup(this.ceilingGroup, this.roomCeilGroups, room).add(haze);
+        this.roomHazeMeshes.set(room.id, haze);
+      }
+
+      // Update haze color/opacity based on current hazard state
+      const hazeMesh = this.roomHazeMeshes.get(room.id);
+      if (!hazeMesh) continue;
+      const mat = hazeMesh.material as THREE.MeshBasicMaterial;
+
+      // Measure room hazards
+      let maxHeat = 0, maxSmoke = 0, minPressure = 100;
+      for (let ry = room.y; ry < room.y + room.height; ry++) {
+        for (let rx = room.x; rx < room.x + room.width; rx++) {
+          if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
+          const t = state.tiles[ry][rx];
+          if (t.heat > maxHeat) maxHeat = t.heat;
+          if (t.smoke > maxSmoke) maxSmoke = t.smoke;
+          if (t.pressure < minPressure) minPressure = t.pressure;
+        }
+      }
 
       const tint = ROOM_WALL_TINTS_3D[room.name] ?? COLORS_3D.wall;
-      const hazeColor = tint;
-
-      // Semi-transparent plane at knee height covering the room
-      const hazeGeo = new THREE.PlaneGeometry(room.width * 0.9, room.height * 0.9);
-      hazeGeo.rotateX(-Math.PI / 2);
-      const hazeMat = new THREE.MeshBasicMaterial({
-        color: hazeColor,
-        transparent: true,
-        opacity: 0.04, // very subtle
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      const haze = new THREE.Mesh(hazeGeo, hazeMat);
-      haze.position.set(
-        room.x + room.width / 2 - 0.5,
-        0.3,
-        room.y + room.height / 2 - 0.5
-      );
-      this.getRoomSubGroup(this.ceilingGroup, this.roomCeilGroups, room).add(haze);
+      if (maxHeat > 40) {
+        // Hot room: red-orange fog, opacity scales with heat
+        mat.color.setHex(0xff3300);
+        mat.opacity = Math.min(0.25, 0.06 + (maxHeat - 40) * 0.003);
+        hazeMesh.position.y = 0.25; // lower — heat sinks
+      } else if (maxSmoke > 30) {
+        // Smoky room: dark grey fog
+        mat.color.setHex(0x444444);
+        mat.opacity = Math.min(0.2, 0.05 + (maxSmoke - 30) * 0.003);
+        hazeMesh.position.y = 0.4; // higher — smoke rises
+      } else if (minPressure < 40) {
+        // Low pressure: blue frost mist
+        mat.color.setHex(0x4488cc);
+        mat.opacity = Math.min(0.15, 0.04 + (40 - minPressure) * 0.002);
+        hazeMesh.position.y = 0.15; // floor level — frost
+      } else {
+        // Normal room: subtle room-colored haze
+        mat.color.setHex(tint);
+        mat.opacity = 0.04;
+        hazeMesh.position.y = 0.3;
+      }
     }
   }
 
