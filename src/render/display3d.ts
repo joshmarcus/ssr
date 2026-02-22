@@ -4007,6 +4007,16 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Corridor fixture light distance culling (every 3rd frame for perf)
+    if (this._ambientParticleFrame % 3 === 0) {
+      for (let i = 0; i < this.corridorFixtureLights.length; i++) {
+        const fl = this.corridorFixtureLights[i];
+        const fdx = fl.position.x - this.playerCurrentX;
+        const fdz = fl.position.z - this.playerCurrentZ;
+        fl.visible = (Math.abs(fdx) + Math.abs(fdz)) <= 10;
+      }
+    }
+
     // Light shaft animation: pulse opacity, distance-based visibility
     for (let i = 0; i < this._lightShaftMeshes.length; i++) {
       const shaft = this._lightShaftMeshes[i];
@@ -6715,6 +6725,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   // ── Private: wall-mounted light fixtures at eye level ──────────
 
   private corridorFixtureTiles: Set<string> = new Set();
+  private corridorFixtureLights: THREE.PointLight[] = []; // tracked for distance culling
 
   private placeCorridorFixtures(state: GameState): void {
     for (let y = 0; y < state.height; y++) {
@@ -6725,8 +6736,8 @@ export class BrowserDisplay3D implements IGameDisplay {
         const key = `fix_${x},${y}`;
         if (this.corridorFixtureTiles.has(key)) continue;
 
-        // Place every 6th corridor tile (sparse for performance)
-        if ((x * 5 + y * 11) % 6 !== 0) continue;
+        // Place every 9th corridor tile (sparse for performance)
+        if ((x * 5 + y * 11) % 9 !== 0) continue;
         this.corridorFixtureTiles.add(key);
 
         // Find adjacent walls to mount fixtures on
@@ -6763,10 +6774,11 @@ export class BrowserDisplay3D implements IGameDisplay {
         const bucket = this.getCorridorBucket(this.decorationGroup, x, y);
         bucket.add(fixture);
 
-        // Add a dim warm point light at the fixture
+        // Add a dim warm point light at the fixture (tracked for distance culling)
         const fixtureLight = new THREE.PointLight(0xffddaa, 0.6, 3);
         fixtureLight.position.copy(fixture.position);
         bucket.add(fixtureLight);
+        this.corridorFixtureLights.push(fixtureLight);
       }
     }
   }
@@ -6879,8 +6891,8 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (this.corridorLitTiles.has(key)) continue;
         const tile = state.tiles[y][x];
         if (tile.type !== TileType.Corridor || !tile.explored) continue;
-        // Only every 7th tile (sparser — headlight provides primary illumination)
-        if ((x + y) % 7 !== 0) continue;
+        // Only every 10th tile (sparse — headlight provides primary illumination)
+        if ((x + y) % 10 !== 0) continue;
         this.corridorLitTiles.add(key);
 
         // Check nearby tiles for hazards to tint corridor lights
@@ -8392,8 +8404,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.headlight.position.set(0, 0.15, 0.2); // front of Sweepo
     this.headlight.target = this.headlightTarget;
     this.headlight.castShadow = true;
-    this.headlight.shadow.mapSize.width = 512;
-    this.headlight.shadow.mapSize.height = 512;
+    this.headlight.shadow.mapSize.width = 256;
+    this.headlight.shadow.mapSize.height = 256;
     this.headlight.shadow.camera.near = 0.2;
     this.headlight.shadow.camera.far = 8;
     group.add(this.headlight);
