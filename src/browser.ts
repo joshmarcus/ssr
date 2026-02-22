@@ -2104,6 +2104,12 @@ function handleAction(action: Action): void {
   }
 
   renderAll();
+
+  // Update camera-relative input mode from 3D renderer
+  if (display && 'getPlayerFacing' in display) {
+    inputHandler.facingAngle = (display as any).getPlayerFacing();
+    inputHandler.cameraRelativeMode = (display as any).isChaseCam();
+  }
 }
 
 /** Show a brief interaction hint for adjacent interactable entities. */

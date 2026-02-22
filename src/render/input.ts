@@ -5,19 +5,29 @@ import { ActionType, Direction } from "../shared/types.js";
  * Keyboard input handler for browser play.
  * Maps key events to Action objects.
  *
- * Arrow keys -> Move in corresponding direction
- * 'i'        -> Interact
- * 's'        -> Scan (toggle thermal overlay)
- * '.'        -> Wait
+ * When cameraRelativeMode is true (chase cam), arrow keys and WASD
+ * map to forward/backward/turn-left/turn-right relative to player facing.
+ * Vi keys (hjkl) and numpad always use absolute compass directions.
  */
 
 type ActionCallback = (action: Action) => void;
 type ScanCallback = () => void;
 
+// Direction ring for camera-relative mapping (CW from North)
+const DIRS_RING: Direction[] = [
+  Direction.North, Direction.NorthEast, Direction.East, Direction.SouthEast,
+  Direction.South, Direction.SouthWest, Direction.West, Direction.NorthWest,
+];
+
 export class InputHandler {
   private callback: ActionCallback;
   private scanCallback: ScanCallback;
   private boundHandler: (e: KeyboardEvent) => void;
+
+  /** When true, arrow keys and WASD use camera-relative directions */
+  cameraRelativeMode: boolean = false;
+  /** Current player facing angle in radians (set by display3d) */
+  facingAngle: number = 0;
 
   constructor(callback: ActionCallback, scanCallback: ScanCallback) {
     this.callback = callback;
@@ -28,6 +38,24 @@ export class InputHandler {
 
   destroy(): void {
     window.removeEventListener("keydown", this.boundHandler);
+  }
+
+  /**
+   * Convert a relative direction (forward/back/left/right) to an absolute
+   * Direction based on the current player facing angle.
+   */
+  private resolveRelativeDirection(relDir: "forward" | "backward" | "left" | "right"): Direction {
+    // Normalize facing angle to (-π, π]
+    let angle = this.facingAngle;
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle <= -Math.PI) angle += Math.PI * 2;
+    // Quantize to nearest octant (0=N, 1=NE, 2=E, ... 7=NW)
+    // facingAngle: π=N, 3π/4=NE, π/2=E, π/4=SE, 0=S, -π/4=SW, -π/2=W, -3π/4=NW
+    let octant = Math.round((Math.PI - angle) / (Math.PI / 4));
+    if (octant < 0) octant += 8;
+    octant = octant % 8;
+    const offsets = { forward: 0, right: 2, backward: 4, left: 6 };
+    return DIRS_RING[(octant + offsets[relDir]) % 8];
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
@@ -43,6 +71,20 @@ export class InputHandler {
   }
 
   private mapKeyToAction(key: string): Action | null {
+    // Camera-relative directional keys (arrow keys + WASD) when chase cam active
+    if (this.cameraRelativeMode) {
+      switch (key) {
+        case "ArrowUp": case "w": case "W":
+          return { type: ActionType.Move, direction: this.resolveRelativeDirection("forward") };
+        case "ArrowDown": case "s": case "S":
+          return { type: ActionType.Move, direction: this.resolveRelativeDirection("backward") };
+        case "ArrowLeft": case "a": case "A":
+          return { type: ActionType.Move, direction: this.resolveRelativeDirection("left") };
+        case "ArrowRight": case "d": case "D":
+          return { type: ActionType.Move, direction: this.resolveRelativeDirection("right") };
+      }
+    }
+
     switch (key) {
       // Cardinal: Arrow keys + WASD + vi keys (hjkl) + numpad
       case "ArrowUp":

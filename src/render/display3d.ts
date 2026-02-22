@@ -4,6 +4,7 @@ import { OutlineEffect } from "three/addons/effects/OutlineEffect.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import type { GameState, Entity, Room } from "../shared/types.js";
 import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
@@ -616,6 +617,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _corridorDimFactor: number = 1.0; // ambient light dimming (1.0 = full, 0.35 = corridor)
   private _roomTintBlend: number = 0; // 0 = base ambient color, ~0.3 = room-tinted
   private _roomTintTarget: THREE.Color = new THREE.Color(0xccddff);
+  // Reusable temp color to avoid per-frame allocations
+  private _tempColor: THREE.Color = new THREE.Color();
   private _roomCenterGlow: THREE.PointLight | null = null; // warm glow at current room center
   private cameraFrustumSize: number = CAMERA_FRUSTUM_SIZE_DEFAULT; // current zoom level (mouse wheel adjustable)
   private cameraElevation: number = 0.5; // 0 = top-down, 1 = side-on. Default = mid-angle
@@ -745,6 +748,16 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Hazard visual effects (sprites at hazardous tile positions)
   private hazardSprites: THREE.Group = new THREE.Group();
   private hazardSpriteKeys: Set<string> = new Set();
+
+  // Cached DOM overlay elements (avoid per-frame getElementById)
+  private _elStunOverlay: HTMLElement | null = null;
+  private _elRebootText: HTMLElement | null = null;
+  private _elHpVignette: HTMLElement | null = null;
+  private _elSensorTint: HTMLElement | null = null;
+  private _elFilmGrade: HTMLElement | null = null;
+  private _elRoomTint: HTMLElement | null = null;
+  private _elScanlines: HTMLElement | null = null;
+  private _elEvacVignette: HTMLElement | null = null;
 
   // Door frame accent lights
   private doorLights: Map<string, THREE.PointLight> = new Map();
@@ -899,6 +912,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       0.92    // threshold — only brightest emissive surfaces bloom
     );
     this.bloomComposer.addPass(this.bloomPass);
+    this.bloomComposer.addPass(new OutputPass());
 
     // ── Lights (cel-shaded bright — vibrant toon look, well-lit scene) ──
     const ambient = new THREE.AmbientLight(0xccddff, 1.8);
@@ -1795,6 +1809,16 @@ export class BrowserDisplay3D implements IGameDisplay {
     return false; // 3D renderer delegates to 2D for game-over
   }
 
+  /** Get current player facing angle in radians (for camera-relative input) */
+  getPlayerFacing(): number {
+    return this.playerFacing;
+  }
+
+  /** Whether the chase (1st/3rd person) camera is active */
+  isChaseCam(): boolean {
+    return this.chaseCamActive;
+  }
+
   destroy(): void {
     cancelAnimationFrame(this.animFrameId);
     window.removeEventListener("resize", this.resizeHandler);
@@ -2455,45 +2479,46 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (this._playerStunned) {
         this.playerMesh.rotation.x += (Math.random() - 0.5) * 0.06;
         this.playerMesh.rotation.z += (Math.random() - 0.5) * 0.06;
-        // Screen static noise overlay
-        let stunOverlay = document.getElementById("stun-static-overlay");
-        if (!stunOverlay) {
-          stunOverlay = document.createElement("div");
-          stunOverlay.id = "stun-static-overlay";
-          stunOverlay.style.cssText =
-            "position:fixed;inset:0;pointer-events:none;z-index:88;opacity:0.12;mix-blend-mode:screen;";
-          document.body.appendChild(stunOverlay);
+        // Screen static noise overlay (cached DOM ref)
+        if (!this._elStunOverlay) {
+          this._elStunOverlay = document.getElementById("stun-static-overlay");
+          if (!this._elStunOverlay) {
+            this._elStunOverlay = document.createElement("div");
+            this._elStunOverlay.id = "stun-static-overlay";
+            this._elStunOverlay.style.cssText =
+              "position:fixed;inset:0;pointer-events:none;z-index:88;opacity:0.12;mix-blend-mode:screen;";
+            document.body.appendChild(this._elStunOverlay);
+          }
         }
-        stunOverlay.style.display = "block";
-        // Randomize background position for noise effect each frame
+        this._elStunOverlay.style.display = "block";
         const rx = Math.random() * 200;
         const ry = Math.random() * 200;
-        stunOverlay.style.backgroundImage =
+        this._elStunOverlay.style.backgroundImage =
           `repeating-linear-gradient(${Math.random()*360}deg,rgba(255,255,255,${0.1+Math.random()*0.3}) 0px,transparent 1px,transparent 2px)`;
-        stunOverlay.style.backgroundPosition = `${rx}px ${ry}px`;
-        stunOverlay.style.backgroundSize = "3px 3px";
+        this._elStunOverlay.style.backgroundPosition = `${rx}px ${ry}px`;
+        this._elStunOverlay.style.backgroundSize = "3px 3px";
 
-        // REBOOTING text overlay
-        let rebootText = document.getElementById("stun-reboot-text");
-        if (!rebootText) {
-          rebootText = document.createElement("div");
-          rebootText.id = "stun-reboot-text";
-          rebootText.style.cssText =
-            "position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:89;" +
-            "font-family:monospace;font-size:16px;color:#4488ff;text-align:center;text-shadow:0 0 8px #44f;";
-          document.body.appendChild(rebootText);
+        // REBOOTING text overlay (cached DOM ref)
+        if (!this._elRebootText) {
+          this._elRebootText = document.getElementById("stun-reboot-text");
+          if (!this._elRebootText) {
+            this._elRebootText = document.createElement("div");
+            this._elRebootText.id = "stun-reboot-text";
+            this._elRebootText.style.cssText =
+              "position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:89;" +
+              "font-family:monospace;font-size:16px;color:#4488ff;text-align:center;text-shadow:0 0 8px #44f;";
+            document.body.appendChild(this._elRebootText);
+          }
         }
         const bootLines = ["SYSTEM REBOOT", "RECALIBRATING...", "SIGNAL LOST", "RECONNECTING..."];
         const lineIdx = Math.floor(elapsed * 2) % bootLines.length;
         const dots = ".".repeat(Math.floor(elapsed * 4) % 4);
-        rebootText.textContent = bootLines[lineIdx] + dots;
-        rebootText.style.display = "block";
-        rebootText.style.opacity = String(0.4 + Math.sin(elapsed * 5) * 0.3);
+        this._elRebootText.textContent = bootLines[lineIdx] + dots;
+        this._elRebootText.style.display = "block";
+        this._elRebootText.style.opacity = String(0.4 + Math.sin(elapsed * 5) * 0.3);
       } else {
-        const stunOverlay = document.getElementById("stun-static-overlay");
-        if (stunOverlay) stunOverlay.style.display = "none";
-        const rebootText = document.getElementById("stun-reboot-text");
-        if (rebootText) rebootText.style.display = "none";
+        if (this._elStunOverlay) this._elStunOverlay.style.display = "none";
+        if (this._elRebootText) this._elRebootText.style.display = "none";
       }
 
       // Eye glow: state-reactive color + gentle pulse + emotion (child 5)
@@ -2578,116 +2603,124 @@ export class BrowserDisplay3D implements IGameDisplay {
 
       // Low HP warning vignette: pulsing red screen edges when damaged
       {
-        let hpVig = document.getElementById("hp-warning-vignette");
         if (this._playerHpPercent < 0.4 && !this._playerStunned) {
-          if (!hpVig) {
-            hpVig = document.createElement("div");
-            hpVig.id = "hp-warning-vignette";
-            hpVig.style.cssText =
-              "position:fixed;inset:0;pointer-events:none;z-index:87;";
-            document.body.appendChild(hpVig);
+          if (!this._elHpVignette) {
+            this._elHpVignette = document.getElementById("hp-warning-vignette");
+            if (!this._elHpVignette) {
+              this._elHpVignette = document.createElement("div");
+              this._elHpVignette.id = "hp-warning-vignette";
+              this._elHpVignette.style.cssText =
+                "position:fixed;inset:0;pointer-events:none;z-index:87;";
+              document.body.appendChild(this._elHpVignette);
+            }
           }
-          const severity = 1 - this._playerHpPercent / 0.4; // 0 at 40%, 1 at 0%
+          const severity = 1 - this._playerHpPercent / 0.4;
           const pulse = 0.5 + Math.sin(elapsed * 2.5) * 0.5;
           const alpha = (0.08 + severity * 0.12) * (0.6 + pulse * 0.4);
-          hpVig.style.display = "block";
-          hpVig.style.boxShadow = `inset 0 0 ${60 + severity * 40}px ${20 + severity * 20}px rgba(255,30,0,${alpha.toFixed(3)})`;
-        } else if (hpVig) {
-          hpVig.style.display = "none";
+          this._elHpVignette.style.display = "block";
+          this._elHpVignette.style.boxShadow = `inset 0 0 ${60 + severity * 40}px ${20 + severity * 20}px rgba(255,30,0,${alpha.toFixed(3)})`;
+        } else if (this._elHpVignette) {
+          this._elHpVignette.style.display = "none";
         }
       }
 
       // Sensor mode visor tint: subtle full-screen color wash while sensor overlay is active
       {
-        let sensorTint = document.getElementById("sensor-visor-tint");
         if (this.sensorMode) {
-          if (!sensorTint) {
-            sensorTint = document.createElement("div");
-            sensorTint.id = "sensor-visor-tint";
-            sensorTint.style.cssText =
-              "position:fixed;inset:0;pointer-events:none;z-index:86;mix-blend-mode:multiply;";
-            document.body.appendChild(sensorTint);
+          if (!this._elSensorTint) {
+            this._elSensorTint = document.getElementById("sensor-visor-tint");
+            if (!this._elSensorTint) {
+              this._elSensorTint = document.createElement("div");
+              this._elSensorTint.id = "sensor-visor-tint";
+              this._elSensorTint.style.cssText =
+                "position:fixed;inset:0;pointer-events:none;z-index:86;mix-blend-mode:multiply;";
+              document.body.appendChild(this._elSensorTint);
+            }
           }
           const sensorTints: Record<string, string> = {
             [SensorType.Thermal]: "rgba(255,200,180,0.06)",
             [SensorType.Atmospheric]: "rgba(180,220,255,0.06)",
             [SensorType.Cleanliness]: "rgba(200,255,180,0.06)",
           };
-          sensorTint.style.display = "block";
-          sensorTint.style.backgroundColor = sensorTints[this.sensorMode] ?? "transparent";
-          // Subtle breathing at sensor-specific rate
+          this._elSensorTint.style.display = "block";
+          this._elSensorTint.style.backgroundColor = sensorTints[this.sensorMode] ?? "transparent";
           const breathe = 0.8 + Math.sin(elapsed * 1.5) * 0.2;
-          sensorTint.style.opacity = breathe.toFixed(2);
-        } else if (sensorTint) {
-          sensorTint.style.display = "none";
+          this._elSensorTint.style.opacity = breathe.toFixed(2);
+        } else if (this._elSensorTint) {
+          this._elSensorTint.style.display = "none";
         }
       }
 
       // Global film color grade: cool-blue desaturation for cinematic sci-fi look
       {
-        let filmGrade = document.getElementById("film-color-grade");
         if (this.chaseCamActive) {
-          if (!filmGrade) {
-            filmGrade = document.createElement("div");
-            filmGrade.id = "film-color-grade";
-            filmGrade.style.cssText =
-              "position:fixed;inset:0;pointer-events:none;z-index:83;" +
-              "background:linear-gradient(180deg,rgba(10,20,40,0.06) 0%,rgba(5,10,25,0.03) 50%,rgba(10,20,40,0.06) 100%);" +
-              "mix-blend-mode:color;";
-            document.body.appendChild(filmGrade);
+          if (!this._elFilmGrade) {
+            this._elFilmGrade = document.getElementById("film-color-grade");
+            if (!this._elFilmGrade) {
+              this._elFilmGrade = document.createElement("div");
+              this._elFilmGrade.id = "film-color-grade";
+              this._elFilmGrade.style.cssText =
+                "position:fixed;inset:0;pointer-events:none;z-index:83;" +
+                "background:linear-gradient(180deg,rgba(10,20,40,0.06) 0%,rgba(5,10,25,0.03) 50%,rgba(10,20,40,0.06) 100%);" +
+                "mix-blend-mode:color;";
+              document.body.appendChild(this._elFilmGrade);
+            }
           }
-          filmGrade.style.display = "block";
-        } else if (filmGrade) {
-          filmGrade.style.display = "none";
+          this._elFilmGrade.style.display = "block";
+        } else if (this._elFilmGrade) {
+          this._elFilmGrade.style.display = "none";
         }
       }
 
       // Room atmosphere color grade: persistent subtle tint while in a room
       {
-        let roomTint = document.getElementById("room-atmosphere-tint");
         if (this._currentRoom && this.chaseCamActive) {
           const tintHex = ROOM_WALL_TINTS_3D[this._currentRoom.name];
           if (tintHex) {
-            if (!roomTint) {
-              roomTint = document.createElement("div");
-              roomTint.id = "room-atmosphere-tint";
-              roomTint.style.cssText =
-                "position:fixed;inset:0;pointer-events:none;z-index:85;mix-blend-mode:soft-light;";
-              document.body.appendChild(roomTint);
+            if (!this._elRoomTint) {
+              this._elRoomTint = document.getElementById("room-atmosphere-tint");
+              if (!this._elRoomTint) {
+                this._elRoomTint = document.createElement("div");
+                this._elRoomTint.id = "room-atmosphere-tint";
+                this._elRoomTint.style.cssText =
+                  "position:fixed;inset:0;pointer-events:none;z-index:85;mix-blend-mode:soft-light;";
+                document.body.appendChild(this._elRoomTint);
+              }
             }
             const tr = (tintHex >> 16) & 0xff;
             const tg = (tintHex >> 8) & 0xff;
             const tb = tintHex & 0xff;
-            roomTint.style.display = "block";
-            roomTint.style.backgroundColor = `rgba(${tr},${tg},${tb},0.04)`;
-            roomTint.style.opacity = "1";
-          } else if (roomTint) {
-            roomTint.style.display = "none";
+            this._elRoomTint.style.display = "block";
+            this._elRoomTint.style.backgroundColor = `rgba(${tr},${tg},${tb},0.04)`;
+            this._elRoomTint.style.opacity = "1";
+          } else if (this._elRoomTint) {
+            this._elRoomTint.style.display = "none";
           }
-        } else if (roomTint) {
-          roomTint.style.display = "none";
+        } else if (this._elRoomTint) {
+          this._elRoomTint.style.display = "none";
         }
       }
 
       // CRT scanline overlay: subtle horizontal lines for terminal aesthetic
       {
-        let scanlines = document.getElementById("crt-scanlines-3d");
         if (this.chaseCamActive) {
-          if (!scanlines) {
-            scanlines = document.createElement("div");
-            scanlines.id = "crt-scanlines-3d";
-            scanlines.style.cssText =
-              "position:fixed;inset:0;pointer-events:none;z-index:84;" +
-              "background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);" +
-              "mix-blend-mode:multiply;";
-            document.body.appendChild(scanlines);
+          if (!this._elScanlines) {
+            this._elScanlines = document.getElementById("crt-scanlines-3d");
+            if (!this._elScanlines) {
+              this._elScanlines = document.createElement("div");
+              this._elScanlines.id = "crt-scanlines-3d";
+              this._elScanlines.style.cssText =
+                "position:fixed;inset:0;pointer-events:none;z-index:84;" +
+                "background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);" +
+                "mix-blend-mode:multiply;";
+              document.body.appendChild(this._elScanlines);
+            }
           }
-          // Slowly scrolling scanlines for subtle CRT feel
           const scrollY = (elapsed * 8) % 4;
-          scanlines.style.backgroundPositionY = `${scrollY}px`;
-          scanlines.style.display = "block";
-        } else if (scanlines) {
-          scanlines.style.display = "none";
+          this._elScanlines.style.backgroundPositionY = `${scrollY}px`;
+          this._elScanlines.style.display = "block";
+        } else if (this._elScanlines) {
+          this._elScanlines.style.display = "none";
         }
       }
 
@@ -2887,13 +2920,14 @@ export class BrowserDisplay3D implements IGameDisplay {
           this._roomTintBlend += (targetBlend - this._roomTintBlend) * 0.06;
           if (this._currentRoom) {
             const roomHex = ROOM_LIGHT_COLORS[this._currentRoom.name] ?? 0xccddff;
-            this._roomTintTarget.lerp(new THREE.Color(roomHex), 0.08);
+            this._tempColor.setHex(roomHex);
+            this._roomTintTarget.lerp(this._tempColor, 0.08);
           }
           if (this._roomTintBlend > 0.01) {
             const baseColor = phase === ObjectivePhase.Recover ? 0xddc8a0 : 0xccddff;
-            const bc = new THREE.Color(baseColor);
-            bc.lerp(this._roomTintTarget, this._roomTintBlend);
-            this.ambientLight.color.copy(bc);
+            this._tempColor.setHex(baseColor);
+            this._tempColor.lerp(this._roomTintTarget, this._roomTintBlend);
+            this.ambientLight.color.copy(this._tempColor);
           }
         }
 
@@ -2918,24 +2952,24 @@ export class BrowserDisplay3D implements IGameDisplay {
             ceilMat.emissive.setHex(0xff1100);
             ceilMat.emissiveIntensity = klaxon * 0.15;
           }
-          // Evacuation screen-edge urgency pulse
-          let evacVig = document.getElementById("evac-urgency-vignette");
-          if (!evacVig) {
-            evacVig = document.createElement("div");
-            evacVig.id = "evac-urgency-vignette";
-            evacVig.style.cssText =
-              "position:fixed;inset:0;pointer-events:none;z-index:86;";
-            document.body.appendChild(evacVig);
+          // Evacuation screen-edge urgency pulse (cached DOM ref)
+          if (!this._elEvacVignette) {
+            this._elEvacVignette = document.getElementById("evac-urgency-vignette");
+            if (!this._elEvacVignette) {
+              this._elEvacVignette = document.createElement("div");
+              this._elEvacVignette.id = "evac-urgency-vignette";
+              this._elEvacVignette.style.cssText =
+                "position:fixed;inset:0;pointer-events:none;z-index:86;";
+              document.body.appendChild(this._elEvacVignette);
+            }
           }
-          evacVig.style.display = "block";
+          this._elEvacVignette.style.display = "block";
           const evacuAlpha = (0.04 + klaxon * 0.08).toFixed(3);
-          evacVig.style.boxShadow = `inset 0 0 80px 30px rgba(255,20,0,${evacuAlpha})`;
+          this._elEvacVignette.style.boxShadow = `inset 0 0 80px 30px rgba(255,20,0,${evacuAlpha})`;
         } else if (this.ceilingMesh.visible) {
-          // Non-evacuation: ensure ceiling emissive is off + hide evac vignette
           const ceilMat = this.ceilingMesh.material as THREE.MeshStandardMaterial;
           if (ceilMat.emissiveIntensity > 0) ceilMat.emissiveIntensity = 0;
-          const evacVig = document.getElementById("evac-urgency-vignette");
-          if (evacVig) evacVig.style.display = "none";
+          if (this._elEvacVignette) this._elEvacVignette.style.display = "none";
         }
       }
 
@@ -3953,19 +3987,22 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Corridor light flicker: subtle atmospheric pulsing
+    // Corridor light flicker: subtle atmospheric pulsing (distance-culled)
     for (let i = 0; i < this.corridorLightList.length; i++) {
       const cl = this.corridorLightList[i];
+      // Distance cull: skip lights far from player
+      const cdx = cl.position.x - this.playerCurrentX;
+      const cdz = cl.position.z - this.playerCurrentZ;
+      const cDist = Math.abs(cdx) + Math.abs(cdz);
+      if (cDist > 10) { cl.visible = false; continue; }
+      cl.visible = true;
       const base = (cl as any)._baseIntensity ?? 0.6;
       const isHazard = (cl as any)._isHazard;
-      // Each light gets a unique phase offset from its position
       const phase = elapsed * (isHazard ? 3.5 : 1.2) + cl.position.x * 7.3 + cl.position.z * 11.7;
       if (isHazard) {
-        // Hazardous corridors: aggressive flicker with occasional dropout
         const flicker = Math.sin(phase) * Math.sin(phase * 2.7);
         cl.intensity = flicker > 0.3 ? base * (0.4 + Math.random() * 0.6) : base * 0.1;
       } else {
-        // Normal corridors: gentle subtle breathing
         cl.intensity = base * (0.85 + Math.sin(phase) * 0.15);
       }
     }
@@ -4534,7 +4571,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           tempColor.setHex(baseColor);
           if (!tile.visible) tempColor.multiplyScalar(0.4);
 
-          this.dummy.position.set(x, 0, y);
+          this.dummy.position.set(x, 1.0, y); // center of 2-unit box → spans y=0 to y=2.0 (flush with ceiling)
           this.dummy.scale.set(1, 1, 1);
 
           // Rotate wall so its detailed face points toward open space:
