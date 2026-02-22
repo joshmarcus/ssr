@@ -965,33 +965,67 @@ export class BrowserDisplay3D implements IGameDisplay {
       [SensorType.Cleanliness]: 0x88cc44,
     };
     const waveColor = sensorColors[this.sensorMode ?? ""] ?? 0x44ff88;
+    const px = this.playerCurrentX, pz = this.playerCurrentZ;
 
+    // Primary scan ring
     const ringGeo = new THREE.RingGeometry(0.1, 0.3, 32);
     ringGeo.rotateX(-Math.PI / 2);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: waveColor,
-      transparent: true,
-      opacity: 0.6,
-      side: THREE.DoubleSide,
-      depthWrite: false,
+      color: waveColor, transparent: true, opacity: 0.6,
+      side: THREE.DoubleSide, depthWrite: false,
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.set(this.playerCurrentX, 0.1, this.playerCurrentZ);
+    ring.position.set(px, 0.1, pz);
     this.scene.add(ring);
 
+    // Secondary trailing ring (thinner, delayed)
+    const ring2Geo = new THREE.RingGeometry(0.05, 0.15, 32);
+    ring2Geo.rotateX(-Math.PI / 2);
+    const ring2Mat = new THREE.MeshBasicMaterial({
+      color: waveColor, transparent: true, opacity: 0.4,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+    ring2.position.set(px, 0.15, pz);
+    this.scene.add(ring2);
+
+    // Vertical column flash at player position
+    const colGeo = new THREE.CylinderGeometry(0.15, 0.15, 2.5, 8, 1, true);
+    const colMat = new THREE.MeshBasicMaterial({
+      color: waveColor, transparent: true, opacity: 0.3,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const col = new THREE.Mesh(colGeo, colMat);
+    col.position.set(px, 1.25, pz);
+    this.scene.add(col);
+
     const startTime = this.clock.getElapsedTime();
-    const duration = 1.0;
+    const duration = 1.2;
     const animateWave = () => {
       const t = (this.clock.getElapsedTime() - startTime) / duration;
       if (t >= 1) {
         this.scene.remove(ring);
-        ringGeo.dispose();
-        ringMat.dispose();
+        this.scene.remove(ring2);
+        this.scene.remove(col);
+        ringGeo.dispose(); ringMat.dispose();
+        ring2Geo.dispose(); ring2Mat.dispose();
+        colGeo.dispose(); colMat.dispose();
         return;
       }
-      const scale = 1 + t * 15;
-      ring.scale.set(scale, 1, scale);
-      ringMat.opacity = 0.6 * (1 - t * t); // quadratic fade
+      // Primary ring expands fast
+      const scale1 = 1 + t * 15;
+      ring.scale.set(scale1, 1, scale1);
+      ringMat.opacity = 0.6 * (1 - t * t);
+
+      // Secondary ring trails behind (delayed by 0.15)
+      const t2 = Math.max(0, t - 0.15);
+      const scale2 = 1 + t2 * 12;
+      ring2.scale.set(scale2, 1, scale2);
+      ring2Mat.opacity = 0.4 * (1 - t2 * t2);
+
+      // Column fades out quickly
+      colMat.opacity = 0.3 * Math.max(0, 1 - t * 3);
+
       requestAnimationFrame(animateWave);
     };
     requestAnimationFrame(animateWave);
@@ -1043,7 +1077,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   flashTile(x: number, y: number, _color?: string): void {
-    // 3D interaction flash: expanding glowing ring at the tile position
+    // 3D interaction flash: expanding ring + particle burst
     const ringGeo = new THREE.TorusGeometry(0.2, 0.03, 6, 16);
     ringGeo.rotateX(Math.PI / 2);
     const ringMat = new THREE.MeshBasicMaterial({
@@ -1055,20 +1089,62 @@ export class BrowserDisplay3D implements IGameDisplay {
     ring.position.set(x, 0.1, y);
     this.scene.add(ring);
 
-    // Animate: expand and fade over 600ms
+    // Spawn particle burst: 10 small bright dots shooting outward
+    const particles: THREE.Mesh[] = [];
+    const particleVelocities: { vx: number; vz: number; vy: number }[] = [];
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
+      const speed = 1.5 + Math.random() * 1.5;
+      const pGeo = new THREE.SphereGeometry(0.03, 4, 4);
+      const pMat = new THREE.MeshBasicMaterial({
+        color: 0x66ffaa,
+        transparent: true,
+        opacity: 1.0,
+      });
+      const p = new THREE.Mesh(pGeo, pMat);
+      p.position.set(x, 0.15, y);
+      this.scene.add(p);
+      particles.push(p);
+      particleVelocities.push({
+        vx: Math.cos(angle) * speed,
+        vz: Math.sin(angle) * speed,
+        vy: 0.5 + Math.random() * 1.0,
+      });
+    }
+
+    // Animate: expand ring and scatter particles over 700ms
     const startTime = this.clock.getElapsedTime();
-    const duration = 0.6;
+    const duration = 0.7;
     const animateRing = () => {
       const t = (this.clock.getElapsedTime() - startTime) / duration;
       if (t >= 1) {
         this.scene.remove(ring);
         ringGeo.dispose();
         ringMat.dispose();
+        for (const p of particles) {
+          this.scene.remove(p);
+          (p.geometry as THREE.BufferGeometry).dispose();
+          (p.material as THREE.MeshBasicMaterial).dispose();
+        }
         return;
       }
+      // Ring expansion
       const scale = 1 + t * 3;
       ring.scale.set(scale, 1, scale);
       ringMat.opacity = 0.8 * (1 - t);
+
+      // Particle scatter with gravity
+      const dt = 0.016; // ~60fps step
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        const v = particleVelocities[i];
+        p.position.x += v.vx * dt;
+        p.position.z += v.vz * dt;
+        p.position.y += v.vy * dt;
+        v.vy -= 3.0 * dt; // gravity
+        (p.material as THREE.MeshBasicMaterial).opacity = 1 - t;
+      }
+
       requestAnimationFrame(animateRing);
     };
     requestAnimationFrame(animateRing);
