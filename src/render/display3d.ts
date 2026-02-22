@@ -1418,19 +1418,28 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
     fadeOverlay.style.opacity = String(this._roomTransitionFade);
 
-    // Hazard screen border: red/amber edge glow when player is in danger
+    // Hazard screen border: colored edge glow when player is in danger
     const hazBorder = document.getElementById("hazard-border");
     if (hazBorder) {
       const px = state.player.entity.pos.x;
       const py = state.player.entity.pos.y;
       const playerTile = state.tiles[py]?.[px];
       if (playerTile) {
-        const inDanger = playerTile.heat > 30 || playerTile.smoke > 40 || playerTile.pressure < 40;
-        const inWarning = playerTile.heat > 15 || playerTile.smoke > 20 || playerTile.pressure < 60;
-        if (inDanger) {
-          hazBorder.className = "active";
-        } else if (inWarning) {
+        const heatDanger = playerTile.heat > 30;
+        const smokeDanger = playerTile.smoke > 40;
+        const vacuumDanger = playerTile.pressure < 40;
+        const heatWarning = playerTile.heat > 15;
+        const smokeWarning = playerTile.smoke > 20;
+        const vacuumWarning = playerTile.pressure < 60;
+
+        if (heatDanger || smokeDanger) {
+          hazBorder.className = "active"; // red glow for heat/smoke
+        } else if (vacuumDanger) {
+          hazBorder.className = "active frost"; // blue glow for vacuum
+        } else if (heatWarning || smokeWarning) {
           hazBorder.className = "active amber";
+        } else if (vacuumWarning) {
+          hazBorder.className = "active frost";
         } else {
           hazBorder.className = "";
         }
@@ -1992,12 +2001,26 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.playerLight.intensity = baseIntensity + bloom;
     }
 
-    // Headlight: subtle intensity flutter (like a slightly unstable power connection)
-    // Brighter in corridors where ambient is dimmed — headlight is primary illumination
+    // Headlight: intensity flutter, hazard-reactive color, corridor brightness
     if (this.headlight) {
       const inRoom = this._currentRoom !== null;
-      const baseIntensity = inRoom ? 1.8 : 2.8; // brighter headlight in corridors
+      const baseIntensity = inRoom ? 1.8 : 2.8;
       this.headlight.intensity = baseIntensity + Math.sin(elapsed * 3.7) * 0.2 + Math.sin(elapsed * 7.3) * 0.1;
+
+      // Headlight color reacts to room hazards
+      if (this._currentRoom) {
+        const hazeMesh = this.roomHazeMeshes.get(this._currentRoom.id);
+        const hazeColor = hazeMesh ? (hazeMesh.material as THREE.MeshBasicMaterial).color.getHex() : 0;
+        if (hazeColor === 0xff3300) {
+          this.headlight.color.setHex(0xffcc88); // warm orange in hot rooms
+        } else if (hazeColor === 0x4488cc) {
+          this.headlight.color.setHex(0x88ccff); // cold blue in vacuum
+        } else {
+          this.headlight.color.setHex(0xeeffff); // default cool white
+        }
+      } else {
+        this.headlight.color.setHex(0xeeffff);
+      }
     }
 
     // Interaction indicator: bob, spin, and ring pulse
@@ -2033,19 +2056,43 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._roomTransitionFade = 0;
     }
 
-    // Room center glow: warm light at the center of the current room
+    // Room center glow: warm light, hazard-reactive
     if (this._currentRoom) {
       if (!this._roomCenterGlow) {
         this._roomCenterGlow = new THREE.PointLight(0xffeedd, 0, 10);
         this._roomCenterGlow.position.set(0, 1.5, 0);
         this.scene.add(this._roomCenterGlow);
       }
-      const roomTint = ROOM_LIGHT_COLORS[this._currentRoom.name] ?? 0xffeedd;
-      this._roomCenterGlow.color.setHex(roomTint);
-      const targetIntensity = 1.2 + this.roomLightBoost * 0.5;
-      this._roomCenterGlow.intensity += (targetIntensity - this._roomCenterGlow.intensity) * 0.1;
       const cx = this._currentRoom.x + this._currentRoom.width / 2;
       const cz = this._currentRoom.y + this._currentRoom.height / 2;
+
+      // Check room hazard state for dramatic lighting
+      const hazeMesh = this.roomHazeMeshes.get(this._currentRoom.id);
+      const hazeColor = hazeMesh ? (hazeMesh.material as THREE.MeshBasicMaterial).color.getHex() : 0;
+      let glowColor: number;
+      let glowIntensity: number;
+
+      if (hazeColor === 0xff3300) {
+        // Hot room: pulsing red-orange glow, brighter
+        glowColor = 0xff4400;
+        glowIntensity = 1.5 + Math.sin(elapsed * 2.0) * 0.5;
+      } else if (hazeColor === 0x444444) {
+        // Smoky room: dim, flickering amber
+        glowColor = 0xaa6600;
+        glowIntensity = 0.6 + Math.random() * 0.3; // unstable flicker
+      } else if (hazeColor === 0x4488cc) {
+        // Vacuum room: cold blue, steady but dim
+        glowColor = 0x4488cc;
+        glowIntensity = 0.8;
+      } else {
+        // Normal room: warm room-tinted glow
+        glowColor = ROOM_LIGHT_COLORS[this._currentRoom.name] ?? 0xffeedd;
+        glowIntensity = 1.2;
+      }
+
+      this._roomCenterGlow.color.setHex(glowColor);
+      const targetIntensity = glowIntensity + this.roomLightBoost * 0.5;
+      this._roomCenterGlow.intensity += (targetIntensity - this._roomCenterGlow.intensity) * 0.1;
       this._roomCenterGlow.position.set(cx, 1.5, cz);
       this._roomCenterGlow.visible = true;
     } else if (this._roomCenterGlow) {
