@@ -302,6 +302,7 @@
 - **Sprint V140 — Turn limit warning in 3D sidebar**: Color-coded turn remaining warning appears at 70%+ turn usage (amber→orange→red at 70%/80%/90% thresholds). Matches 2D parity for time pressure awareness
 - **Sprint V141 — Atmospheric air flow arrows**: Cyan arrow sprites on low-pressure tiles (10-70) point toward lowest adjacent pressure when atmospheric sensor is active. Arrows pulse and bob gently. Pool of up to 60 sprites repositioned each frame. Brings 2D air flow arrow parity to 3D
 - **Sprint V142 — Run history on game over screen**: Previous runs (up to 5) displayed on game over overlay with WIN/LOSS result, performance rating, turns, archetype shorthand, and seed. Includes Mutiny archetype ("THE DIVIDE"). Brings 2D run history parity to 3D
+- **Sprint V143 — Per-entity-type legend glyphs**: Legend uses unique emoji glyphs per entity type matching 2D renderer instead of generic colored squares. Improves at-a-glance entity identification
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

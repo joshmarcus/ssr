@@ -2063,31 +2063,31 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (dist <= 3) visibleEntityTypes.add(entity.type);
     }
 
-    // Legend items: use colored squares + entity names instead of glyphs (we're in 3D)
-    const allLegendItems: { key: string; color: string; label: string }[] = [
-      { key: EntityType.SensorPickup, color: "#0ff", label: "Sensor" },
-      { key: EntityType.Relay, color: "#ff0", label: "Relay" },
-      { key: EntityType.DataCore, color: "#f0f", label: "Data Core" },
-      { key: EntityType.LogTerminal, color: "#6cf", label: "Terminal" },
-      { key: EntityType.ServiceBot, color: "#fa0", label: "Service Bot" },
-      { key: EntityType.CrewItem, color: "#ca8", label: "Crew Item" },
-      { key: EntityType.Drone, color: "#8a8", label: "Drone" },
-      { key: EntityType.MedKit, color: "#f88", label: "Med Kit" },
-      { key: EntityType.RepairBot, color: "#fa8", label: "Repair Bot" },
-      { key: EntityType.RepairCradle, color: "#4df", label: "Repair Cradle" },
-      { key: EntityType.Breach, color: "#f44", label: "Breach" },
-      { key: EntityType.SecurityTerminal, color: "#4af", label: "Security" },
-      { key: EntityType.PatrolDrone, color: "#f22", label: "Patrol" },
-      { key: EntityType.PressureValve, color: "#4ba", label: "Valve" },
-      { key: EntityType.FuseBox, color: "#d80", label: "Fuse Box" },
-      { key: EntityType.PowerCell, color: "#fd4", label: "Power Cell" },
-      { key: EntityType.EscapePod, color: "#4fa", label: "Escape Pod" },
-      { key: EntityType.CrewNPC, color: "#fe6", label: "Crew" },
-      { key: EntityType.EvidenceTrace, color: "#ca8", label: "Evidence" },
-      { key: EntityType.Console, color: "#6ac", label: "Console" },
-      { key: EntityType.ToolPickup, color: "#fa4", label: "Tool" },
-      { key: EntityType.UtilityPickup, color: "#4da", label: "Utility" },
-      { key: EntityType.Airlock, color: "#88c", label: "Airlock" },
+    // Legend items: use per-entity-type emoji glyphs matching 2D renderer
+    const allLegendItems: { key: string; color: string; label: string; glyph: string }[] = [
+      { key: EntityType.SensorPickup, color: "#0ff", label: "Sensor", glyph: "\ud83d\udce1" },
+      { key: EntityType.Relay, color: "#ff0", label: "Relay", glyph: "\u26a1" },
+      { key: EntityType.DataCore, color: "#f0f", label: "Data Core", glyph: "\ud83d\udc8e" },
+      { key: EntityType.LogTerminal, color: "#6cf", label: "Terminal", glyph: "\ud83d\udcbb" },
+      { key: EntityType.ServiceBot, color: "#fa0", label: "Service Bot", glyph: "\ud83d\udd0b" },
+      { key: EntityType.CrewItem, color: "#ca8", label: "Crew Item", glyph: "\ud83d\uddc3\ufe0f" },
+      { key: EntityType.Drone, color: "#8a8", label: "Drone", glyph: "\ud83d\udd35" },
+      { key: EntityType.MedKit, color: "#f88", label: "Med Kit", glyph: "\ud83d\udc8a" },
+      { key: EntityType.RepairBot, color: "#fa8", label: "Repair Bot", glyph: "\ud83d\udd27" },
+      { key: EntityType.RepairCradle, color: "#4df", label: "Repair Cradle", glyph: "\u2695\ufe0f" },
+      { key: EntityType.Breach, color: "#f44", label: "Breach", glyph: "\ud83d\udca8" },
+      { key: EntityType.SecurityTerminal, color: "#4af", label: "Security", glyph: "\ud83d\udcf7" },
+      { key: EntityType.PatrolDrone, color: "#f22", label: "Patrol", glyph: "\ud83d\udef8" },
+      { key: EntityType.PressureValve, color: "#4ba", label: "Valve", glyph: "\u2699\ufe0f" },
+      { key: EntityType.FuseBox, color: "#d80", label: "Fuse Box", glyph: "\ud83d\udd0c" },
+      { key: EntityType.PowerCell, color: "#fd4", label: "Power Cell", glyph: "\ud83d\udd0b" },
+      { key: EntityType.EscapePod, color: "#4fa", label: "Escape Pod", glyph: "\ud83d\ude80" },
+      { key: EntityType.CrewNPC, color: "#fe6", label: "Crew", glyph: "\ud83d\ude4b" },
+      { key: EntityType.EvidenceTrace, color: "#ca8", label: "Evidence", glyph: "\ud83d\udc63" },
+      { key: EntityType.Console, color: "#6ac", label: "Console", glyph: "\ud83d\udcbb" },
+      { key: EntityType.ToolPickup, color: "#fa4", label: "Tool", glyph: "\ud83d\udd27" },
+      { key: EntityType.UtilityPickup, color: "#4da", label: "Utility", glyph: "\u2b22" },
+      { key: EntityType.Airlock, color: "#88c", label: "Airlock", glyph: "\u229f" },
     ];
 
     const activeLegend = allLegendItems.filter(l => visibleEntityTypes.has(l.key));
@@ -2108,7 +2108,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
         const color = allExhausted ? "#555" : l.color;
         const labelStyle = allExhausted ? ' style="color:#555"' : "";
-        return `<span class="legend-item"><span class="legend-glyph" style="color:${color}">\u25a0</span><span class="legend-label"${labelStyle}>${l.label}</span></span>`;
+        return `<span class="legend-item"><span class="legend-glyph" style="color:${color}">${l.glyph}</span><span class="legend-label"${labelStyle}>${l.label}</span></span>`;
       }).join("");
     } else {
       mapLegendEl.innerHTML = `<span class="legend-label">No notable objects nearby.</span>`;
