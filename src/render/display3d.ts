@@ -580,6 +580,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _flyToPlayerAnims: { mesh: THREE.Object3D; startX: number; startZ: number; startY: number; t: number }[] = [];
   // Unsealed breach positions for vacuum suction effect on nearby particles
   private _breachPositions: { x: number; z: number }[] = [];
+  // Atmospheric air flow arrow sprites (pool, repositioned each frame when atmo sensor active)
+  private _airFlowArrows: THREE.Sprite[] = [];
+  private _airFlowArrowTex: THREE.CanvasTexture | null = null;
   // Global scene lights for phase-reactive lighting
   private ambientLight: THREE.AmbientLight | null = null;
   private keyLight: THREE.DirectionalLight | null = null;
@@ -1616,6 +1619,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
 
     this.updateTiles(state);
+    this.updateAirFlowArrows(state);
     this.updateEntities(state);
     this.updatePlayer(state);
 
@@ -3982,6 +3986,14 @@ export class BrowserDisplay3D implements IGameDisplay {
       (bp.material as THREE.SpriteMaterial).opacity = 0.15 * (1 - t); // linear fade
     }
 
+    // Air flow arrow pulsing animation
+    for (const arrow of this._airFlowArrows) {
+      if (!arrow.visible) continue;
+      const pulse = 0.35 + Math.sin(elapsed * 3 + arrow.position.x * 2 + arrow.position.z * 3) * 0.08;
+      arrow.scale.set(pulse, pulse, 1);
+      arrow.position.y = 0.15 + Math.sin(elapsed * 2 + arrow.position.x) * 0.03;
+    }
+
     // Distance culling: update every 5 frames to amortize cost
     this._cullFrame++;
     if (this._cullFrame % 5 === 0) {
@@ -4284,6 +4296,123 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (this.wallCornerMesh.instanceColor) this.wallCornerMesh.instanceColor.needsUpdate = true;
     if (this.doorMesh.instanceColor) this.doorMesh.instanceColor.needsUpdate = true;
     if (this.ceilingMesh.instanceColor) this.ceilingMesh.instanceColor.needsUpdate = true;
+  }
+
+  /** Create or return a canvas-drawn arrow texture for air flow visualization */
+  private getAirFlowArrowTexture(): THREE.CanvasTexture {
+    if (this._airFlowArrowTex) return this._airFlowArrowTex;
+    const size = 64;
+    const c = document.createElement("canvas");
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext("2d")!;
+    // Draw upward-pointing arrow (will be rotated per-sprite via rotation)
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = "#44ccff";
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(32, 4);    // tip
+    ctx.lineTo(48, 28);   // right wing
+    ctx.lineTo(36, 24);   // right notch
+    ctx.lineTo(36, 56);   // right base
+    ctx.lineTo(28, 56);   // left base
+    ctx.lineTo(28, 24);   // left notch
+    ctx.lineTo(16, 28);   // left wing
+    ctx.closePath();
+    ctx.fill();
+    // Glow outline
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = "#88eeff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    this._airFlowArrowTex = tex;
+    return tex;
+  }
+
+  /** Update air flow arrow sprites — show on low-pressure tiles when atmospheric sensor active */
+  private updateAirFlowArrows(state: GameState): void {
+    const isAtmo = this.sensorMode === SensorType.Atmospheric;
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+
+    // Hide all if sensor not active
+    if (!isAtmo) {
+      for (const arrow of this._airFlowArrows) arrow.visible = false;
+      return;
+    }
+
+    // Collect tiles needing arrows (pressure 10-70, within 12 tiles of player, visible)
+    const arrowData: { x: number; y: number; angle: number; intensity: number }[] = [];
+    const range = 12;
+    const minY = Math.max(0, py - range);
+    const maxY = Math.min(state.height - 1, py + range);
+    const minX = Math.max(0, px - range);
+    const maxX = Math.min(state.width - 1, px + range);
+
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.walkable || !tile.visible || tile.pressure >= 70 || tile.pressure < 10) continue;
+
+        // Find adjacent tile with lowest pressure
+        let lowestP = tile.pressure;
+        let flowDx = 0;
+        let flowDy = 0;
+        const dirs = [
+          { dx: 0, dy: -1 },
+          { dx: 0, dy: 1 },
+          { dx: 1, dy: 0 },
+          { dx: -1, dy: 0 },
+        ];
+        for (const d of dirs) {
+          const nx = x + d.dx;
+          const ny = y + d.dy;
+          if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height) {
+            if (state.tiles[ny][nx].walkable && state.tiles[ny][nx].pressure < lowestP) {
+              lowestP = state.tiles[ny][nx].pressure;
+              flowDx = d.dx;
+              flowDy = d.dy;
+            }
+          }
+        }
+        if (flowDx === 0 && flowDy === 0) continue; // no gradient
+
+        // Angle: 0 = +Z (south in 3D), arrows point toward low pressure
+        const angle = Math.atan2(flowDx, flowDy);
+        const intensity = Math.max(0, 1 - tile.pressure / 70);
+        arrowData.push({ x, y, angle, intensity });
+
+        if (arrowData.length >= 60) break; // cap for performance
+      }
+      if (arrowData.length >= 60) break;
+    }
+
+    // Ensure pool is large enough
+    const tex = this.getAirFlowArrowTexture();
+    while (this._airFlowArrows.length < arrowData.length) {
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, blending: THREE.AdditiveBlending });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.4, 0.4, 1);
+      sprite.visible = false;
+      this.scene.add(sprite);
+      this._airFlowArrows.push(sprite);
+    }
+
+    // Position active arrows
+    for (let i = 0; i < this._airFlowArrows.length; i++) {
+      const arrow = this._airFlowArrows[i];
+      if (i < arrowData.length) {
+        const d = arrowData[i];
+        arrow.position.set(d.x, 0.15, d.y);
+        arrow.material.rotation = -d.angle; // sprite rotation
+        (arrow.material as THREE.SpriteMaterial).opacity = 0.3 + d.intensity * 0.5;
+        arrow.visible = true;
+      } else {
+        arrow.visible = false;
+      }
+    }
   }
 
   private applyFloorSensorColor(tile: { heat: number; smoke: number; dirt: number; pressure: number; walkable: boolean }, baseColor: number): number {

@@ -300,6 +300,7 @@
 - **Sprint V138 — Game over camera orbit**: Camera slowly orbits the player after victory or defeat (4-unit radius, 2-unit height, 0.3 rad/s). Creates cinematic end-of-game moment instead of static camera. Initial angle matches player facing direction
 - **Sprint V139 — Objective scanner compass**: Sensor-gated directional hints to key objectives (relays via thermal, crew/breaches via atmospheric, pods during evacuation, nearest unexplored room). Shows up to 2 targets sorted by priority with distance and cardinal direction. Brings 2D parity for critical navigation info
 - **Sprint V140 — Turn limit warning in 3D sidebar**: Color-coded turn remaining warning appears at 70%+ turn usage (amber→orange→red at 70%/80%/90% thresholds). Matches 2D parity for time pressure awareness
+- **Sprint V141 — Atmospheric air flow arrows**: Cyan arrow sprites on low-pressure tiles (10-70) point toward lowest adjacent pressure when atmospheric sensor is active. Arrows pulse and bob gently. Pool of up to 60 sprites repositioned each frame. Brings 2D air flow arrow parity to 3D
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
