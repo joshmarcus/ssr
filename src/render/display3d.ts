@@ -2683,6 +2683,16 @@ export class BrowserDisplay3D implements IGameDisplay {
         } else {
           mesh.rotation.y = Math.sin(elapsed * 0.8 + mesh.position.x * 2) * 0.15;
         }
+        // Breathing: subtle Y-scale oscillation with unique phase per crew
+        const breathPhase = elapsed * 1.0 + mesh.position.x * 3.7 + mesh.position.z * 5.3;
+        const breathScale = 1 + Math.sin(breathPhase) * 0.015;
+        mesh.scale.set(1, breathScale, 1);
+        // Weight shift: slight lateral lean when idle (not facing player)
+        if (crewDist >= 4) {
+          mesh.rotation.z = Math.sin(elapsed * 0.4 + mesh.position.z * 2) * 0.03;
+        } else {
+          mesh.rotation.z = 0;
+        }
         // Following crew: green glow aura emissive boost
         if (userData._following) {
           mesh.traverse((child) => {
