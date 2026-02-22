@@ -521,6 +521,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private chaseCamPosZ: number = 0;
   private chaseCamLookX: number = 0;
   private chaseCamLookZ: number = 0;
+  private _wallAvoidBlend: number = 0;
   // Hub mode (Investigation Board open — camera orbit + dimming)
   private _hubMode: boolean = false;
   private _hubModeBlend: number = 0;
@@ -1619,6 +1620,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Camera shake state
   private cameraShakeIntensity: number = 0;
   private cameraShakeDecay: number = 0;
+  private _shakePhase: number = 0;
 
   triggerScreenFlash(type: "damage" | "milestone" | "stun"): void {
     const flash = document.getElementById("damage-flash");
@@ -2381,30 +2383,31 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
 
       // Legend items
+      // Sigils use simple text/Unicode symbols (not emoji) for consistency with 3D models
       const allLegendItems: { key: string; color: string; label: string; glyph: string }[] = [
-        { key: EntityType.SensorPickup, color: "#0ff", label: "Sensor", glyph: "\ud83d\udce1" },
-        { key: EntityType.Relay, color: "#ff0", label: "Relay", glyph: "\u26a1" },
-        { key: EntityType.DataCore, color: "#f0f", label: "Data Core", glyph: "\ud83d\udc8e" },
-        { key: EntityType.LogTerminal, color: "#6cf", label: "Terminal", glyph: "\ud83d\udcbb" },
-        { key: EntityType.ServiceBot, color: "#fa0", label: "Service Bot", glyph: "\ud83d\udd0b" },
-        { key: EntityType.CrewItem, color: "#ca8", label: "Crew Item", glyph: "\ud83d\uddc3\ufe0f" },
-        { key: EntityType.Drone, color: "#8a8", label: "Drone", glyph: "\ud83d\udd35" },
-        { key: EntityType.MedKit, color: "#f88", label: "Med Kit", glyph: "\ud83d\udc8a" },
-        { key: EntityType.RepairBot, color: "#fa8", label: "Repair Bot", glyph: "\ud83d\udd27" },
-        { key: EntityType.RepairCradle, color: "#4df", label: "Repair Cradle", glyph: "\u2695\ufe0f" },
-        { key: EntityType.Breach, color: "#f44", label: "Breach", glyph: "\ud83d\udca8" },
-        { key: EntityType.SecurityTerminal, color: "#4af", label: "Security", glyph: "\ud83d\udcf7" },
-        { key: EntityType.PatrolDrone, color: "#f22", label: "Patrol", glyph: "\ud83d\udef8" },
-        { key: EntityType.PressureValve, color: "#4ba", label: "Valve", glyph: "\u2699\ufe0f" },
-        { key: EntityType.FuseBox, color: "#d80", label: "Fuse Box", glyph: "\ud83d\udd0c" },
-        { key: EntityType.PowerCell, color: "#fd4", label: "Power Cell", glyph: "\ud83d\udd0b" },
-        { key: EntityType.EscapePod, color: "#4fa", label: "Escape Pod", glyph: "\ud83d\ude80" },
-        { key: EntityType.CrewNPC, color: "#fe6", label: "Crew", glyph: "\ud83d\ude4b" },
-        { key: EntityType.EvidenceTrace, color: "#ca8", label: "Evidence", glyph: "\ud83d\udc63" },
-        { key: EntityType.Console, color: "#6ac", label: "Console", glyph: "\ud83d\udcbb" },
-        { key: EntityType.ToolPickup, color: "#fa4", label: "Tool", glyph: "\ud83d\udd27" },
-        { key: EntityType.UtilityPickup, color: "#4da", label: "Utility", glyph: "\u2b22" },
-        { key: EntityType.Airlock, color: "#88c", label: "Airlock", glyph: "\u229f" },
+        { key: EntityType.SensorPickup, color: "#0ff", label: "Sensor", glyph: "S" },
+        { key: EntityType.Relay, color: "#ff0", label: "Relay", glyph: "R" },
+        { key: EntityType.DataCore, color: "#f0f", label: "Data Core", glyph: "D" },
+        { key: EntityType.LogTerminal, color: "#6cf", label: "Terminal", glyph: "T" },
+        { key: EntityType.ServiceBot, color: "#fa0", label: "Service Bot", glyph: "b" },
+        { key: EntityType.CrewItem, color: "#ca8", label: "Crew Item", glyph: "*" },
+        { key: EntityType.Drone, color: "#8a8", label: "Drone", glyph: "d" },
+        { key: EntityType.MedKit, color: "#f88", label: "Med Kit", glyph: "+" },
+        { key: EntityType.RepairBot, color: "#fa8", label: "Repair Bot", glyph: "r" },
+        { key: EntityType.RepairCradle, color: "#4df", label: "Repair Cradle", glyph: "C" },
+        { key: EntityType.Breach, color: "#f44", label: "Breach", glyph: "!" },
+        { key: EntityType.SecurityTerminal, color: "#4af", label: "Security", glyph: "X" },
+        { key: EntityType.PatrolDrone, color: "#f22", label: "Patrol", glyph: "P" },
+        { key: EntityType.PressureValve, color: "#4ba", label: "Valve", glyph: "V" },
+        { key: EntityType.FuseBox, color: "#d80", label: "Fuse Box", glyph: "F" },
+        { key: EntityType.PowerCell, color: "#fd4", label: "Power Cell", glyph: "B" },
+        { key: EntityType.EscapePod, color: "#4fa", label: "Escape Pod", glyph: "E" },
+        { key: EntityType.CrewNPC, color: "#fe6", label: "Crew", glyph: "@" },
+        { key: EntityType.EvidenceTrace, color: "#ca8", label: "Evidence", glyph: "?" },
+        { key: EntityType.Console, color: "#6ac", label: "Console", glyph: "c" },
+        { key: EntityType.ToolPickup, color: "#fa4", label: "Tool", glyph: "t" },
+        { key: EntityType.UtilityPickup, color: "#4da", label: "Utility", glyph: "u" },
+        { key: EntityType.Airlock, color: "#88c", label: "Airlock", glyph: "A" },
       ];
 
       const activeLegend = allLegendItems.filter(l => visibleEntityTypes.has(l.key));
@@ -2905,8 +2908,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Camera shake
       let shakeX = 0, shakeZ = 0;
       if (this.cameraShakeIntensity > 0.001) {
-        shakeX = (Math.random() - 0.5) * 2 * this.cameraShakeIntensity;
-        shakeZ = (Math.random() - 0.5) * 2 * this.cameraShakeIntensity;
+        // Coherent sine-based shake instead of random noise for smoother feel
+        this._shakePhase += delta * 18;
+        shakeX = Math.sin(this._shakePhase) * this.cameraShakeIntensity;
+        shakeZ = Math.sin(this._shakePhase * 0.73) * this.cameraShakeIntensity;
         this.cameraShakeIntensity *= Math.max(0, 1 - this.cameraShakeDecay * delta);
       }
 
@@ -2951,15 +2956,21 @@ export class BrowserDisplay3D implements IGameDisplay {
         const targetLookX = this.playerCurrentX + Math.sin(facing) * lookDist;
         const targetLookZ = this.playerCurrentZ + Math.cos(facing) * lookDist;
 
-        // Wall collision avoidance: step back toward player if camera lands in a wall
+        // Wall collision avoidance: smoothly pull camera toward player if in a wall
         if (this._tileWalkable.length > 0) {
           const tx = Math.round(targetCamX);
           const tz = Math.round(targetCamZ);
           if (tx >= 0 && tx < this._tileWidth && tz >= 0 && tz < this._tileHeight &&
               !this._tileWalkable[tz][tx]) {
-            // Pull camera closer to player (50% of distance) to avoid wall
-            targetCamX = this.playerCurrentX + (targetCamX - this.playerCurrentX) * 0.35;
-            targetCamZ = this.playerCurrentZ + (targetCamZ - this.playerCurrentZ) * 0.35;
+            // Smooth pull: lerp the collision blend toward 0.35 to avoid snapping
+            this._wallAvoidBlend = Math.min(this._wallAvoidBlend + delta * 3.0, 0.65);
+          } else {
+            this._wallAvoidBlend = Math.max(this._wallAvoidBlend - delta * 2.0, 0);
+          }
+          if (this._wallAvoidBlend > 0.01) {
+            const blend = 1.0 - this._wallAvoidBlend;
+            targetCamX = this.playerCurrentX + (targetCamX - this.playerCurrentX) * blend;
+            targetCamZ = this.playerCurrentZ + (targetCamZ - this.playerCurrentZ) * blend;
           }
         }
 
@@ -2970,7 +2981,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         const timeScale = this._relayTimeStretch > 0 ? 0.3 : 1.0; // 30% speed during stretch
 
         // Smooth interpolation (slower than player movement for cinematic lag)
-        const camLerp = Math.min(1, 5 * delta * timeScale);
+        const camLerp = Math.min(1, 3.5 * delta * timeScale);
         this.chaseCamPosX += (targetCamX - this.chaseCamPosX) * camLerp;
         this.chaseCamPosZ += (targetCamZ - this.chaseCamPosZ) * camLerp;
         this.chaseCamPosY += (chaseHeight - this.chaseCamPosY) * camLerp;
@@ -3047,9 +3058,6 @@ export class BrowserDisplay3D implements IGameDisplay {
             this.chaseCamPosZ + shakeZ + idleSwayZ
           );
           this.chaseCamera.lookAt(this.chaseCamLookX, lookY, this.chaseCamLookZ);
-
-          // Smoothly return camera roll to zero (hazard Z-tilt removed — felt wrong)
-          this.chaseCamera.rotation.z += (0 - this.chaseCamera.rotation.z) * Math.min(1, 5 * delta);
         }
       } else {
         // Orthographic top-down/isometric camera
@@ -4862,13 +4870,13 @@ export class BrowserDisplay3D implements IGameDisplay {
           const px = state.player.entity.pos.x;
           const py = state.player.entity.pos.y;
           const playerDist = Math.abs(x - px) + Math.abs(y - py);
-          const shouldOpen = !isLocked && playerDist <= 1;
+          const shouldOpen = !isLocked && playerDist <= 2;
 
           // Smooth slide: track door open state
           const doorKey = `${x},${y}`;
           const prevSlide = this._doorSlideState.get(doorKey) ?? 0;
           const targetSlide = shouldOpen ? 0.45 : 0; // each half slides 0.45 units
-          const slideAmount = prevSlide + (targetSlide - prevSlide) * 0.15; // smooth lerp
+          const slideAmount = prevSlide + (targetSlide - prevSlide) * 0.25; // smooth lerp (faster for visible swoosh)
           this._doorSlideState.set(doorKey, slideAmount);
 
           // Door hiss effect: spawn particles when door begins opening
@@ -9149,22 +9157,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     }, undefined, () => {});
 
     // Load door model
-    this.gltfLoader.load(base + DOOR_MODEL_PATH, (gltf) => {
-      try {
-        const { geometry, material } = this.extractFirstMeshGeo(gltf.scene, 1.0);
-        if (geometry) {
-          // Stretch door to 2.0 height (floor to ceiling)
-          geometry.computeBoundingBox();
-          const doorH = geometry.boundingBox!.max.y;
-          if (doorH > 0) geometry.scale(1, 2.0 / doorH, 1);
-          this.doorModelGeo = geometry;
-          this.doorModelMat = material;
-          this.rebuildDoorMesh();
-        }
-      } catch (e) {
-        console.warn("Failed to load door model:", e);
-      }
-    }, undefined, () => {});
+    // NOTE: Door GLTF model (SM_Bld_Wall_Doorframe_01) is a full doorframe, not a sliding panel.
+    // Keep using procedural BoxGeometry for the two sliding half-panels so doors visually open/close.
+    // The doorframe model is still used for ClosedDoor entities (decorative locked doors).
   }
 
   /** Extract the first mesh's geometry from a GLTF scene, normalized to fit in a 1x1 tile */
@@ -9305,11 +9300,11 @@ export class BrowserDisplay3D implements IGameDisplay {
       [EntityType.PressureValve]: 0.45,      // pipe valve
       [EntityType.EvidenceTrace]: 0.2,       // small clue marker
       [EntityType.EscapePod]: 0.75,          // large escape capsule
-      [EntityType.CrewNPC]: 0.55,            // humanoid crew member
+      [EntityType.CrewNPC]: 0.8,             // full-size human character
+      [EntityType.Airlock]: 0.7,             // gate door
+      [EntityType.ClosedDoor]: 0.6,          // door frame
+      [EntityType.CrewItem]: 0.25,           // small personal item
       [EntityType.Breach]: 0.5,              // hull damage area
-      [EntityType.ClosedDoor]: 0.6,          // door panel
-      [EntityType.Airlock]: 0.65,            // large airlock
-      [EntityType.CrewItem]: 0.2,            // small personal item
     };
     // Crew variant keys (CrewNPC_0..4) share CrewNPC scale
     const isCrewVariant = key.startsWith("CrewNPC_");
@@ -9512,6 +9507,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
     const clone = model.clone();
+    // Rotate model 180° so the cleaning brushes face the chase camera (behind the player)
+    clone.rotation.y = Math.PI;
     this.playerMesh.add(clone);
   }
 
