@@ -3483,8 +3483,23 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (this._hubModeBlend > 0.01) {
           targetFar *= (1.0 - 0.2 * this._hubModeBlend);
         }
+        // Station stress: fog closes in as station deteriorates (visibility reduction)
+        if (this._stationStress > 0.2) {
+          const stressFog = (this._stationStress - 0.2) * 0.5; // 0-0.4 reduction factor
+          targetFar *= (1.0 - stressFog);
+          targetNear *= (1.0 - stressFog * 0.3);
+        }
         fog.near += (targetNear - fog.near) * 0.08;
         fog.far += (targetFar - fog.far) * 0.08;
+        // Fog color: shift from dark blue-black toward warm brown at high stress
+        if (this._stationStress > 0.2) {
+          const sf = Math.min(1, (this._stationStress - 0.2) / 0.8);
+          // Base: 0x060610 → Stress: 0x120808
+          const fr = Math.round(0x06 + (0x12 - 0x06) * sf);
+          const fg2 = Math.round(0x06 + (0x08 - 0x06) * sf);
+          const fb = Math.round(0x10 + (0x08 - 0x10) * sf);
+          fog.color.setRGB(fr / 255, fg2 / 255, fb / 255);
+        }
       }
 
       // Corridor dimming: subtle ambient reduction in corridors (not dramatic)
@@ -11199,6 +11214,21 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else {
         dustMat.color.setHex(0x889999); // dimmer, greyer in corridors
         dustMat.opacity = 0.3; // less visible in dark corridors
+      }
+      // Station stress: dust shifts warmer and denser as station deteriorates
+      if (this._stationStress > 0.2) {
+        const sf = Math.min(1, (this._stationStress - 0.2) / 0.6);
+        // Blend current dust color toward warm amber
+        const curR = dustMat.color.r * 255;
+        const curG = dustMat.color.g * 255;
+        const curB = dustMat.color.b * 255;
+        dustMat.color.setRGB(
+          Math.min(1, (curR + sf * 40) / 255),
+          Math.min(1, (curG - sf * 10) / 255),
+          Math.max(0, (curB - sf * 30) / 255),
+        );
+        dustMat.opacity = Math.min(0.7, dustMat.opacity + sf * 0.2);
+        dustMat.size = 0.08 + sf * 0.03; // slightly larger particles
       }
     }
 
