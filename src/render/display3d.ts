@@ -9863,6 +9863,52 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Scene echo markers on minimap — ghost silhouettes as pulsing phase-colored dots
+    if (state.mystery?.sceneEchoes) {
+      const hasThermal = state.player.sensors.includes(SensorType.Thermal);
+      for (const echo of state.mystery.sceneEchoes) {
+        // Only show discovered echoes or those visible with current sensors
+        if (!echo.discovered && echo.sensorRequired === SensorType.Thermal && !hasThermal) continue;
+        const tile = state.tiles[echo.pos.y]?.[echo.pos.x];
+        if (!tile?.explored) continue;
+
+        const ex = Math.floor(echo.pos.x * scale);
+        const ey = Math.floor(echo.pos.y * scale);
+        const phaseHex = BrowserDisplay3D.PHASE_COLORS[echo.phase] ?? 0x8888ff;
+        const r = (phaseHex >> 16) & 0xff;
+        const g = (phaseHex >> 8) & 0xff;
+        const b = phaseHex & 0xff;
+
+        if (echo.echoType === SceneEchoType.GhostSilhouette) {
+          // Pulsing ghost icon (small person outline)
+          const pulse = 0.4 + Math.sin(now * 1.5 + echo.pos.x * 2) * 0.3;
+          ctx.globalAlpha = echo.discovered ? pulse : pulse * 0.5;
+          ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+          // Person silhouette: head circle + body triangle
+          ctx.beginPath();
+          ctx.arc(ex, ey - 2, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(ex, ey - 0.5);
+          ctx.lineTo(ex + 2, ey + 3);
+          ctx.lineTo(ex - 2, ey + 3);
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        } else if (echo.echoType === SceneEchoType.DamageMark) {
+          // Small X mark
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.5)`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(ex - 2, ey - 2);
+          ctx.lineTo(ex + 2, ey + 2);
+          ctx.moveTo(ex + 2, ey - 2);
+          ctx.lineTo(ex - 2, ey + 2);
+          ctx.stroke();
+        }
+      }
+    }
+
     // Room boundary outlines — highlight current room, dim others
     for (const room of state.rooms) {
       const rcx = room.x + Math.floor(room.width / 2);
