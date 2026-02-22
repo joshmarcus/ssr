@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 93 (V215 completed — Dynamic events + stress-reactive lighting)
+- **Phase**: Sprint 97 (V219 completed — Corridor light shafts + deduction 3D feedback)
 - **Test status**: 292 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -142,6 +142,39 @@
 - **Ambient light warming**: Global ambient shifts from cool blue-white toward warm amber proportionally to stress
 - **Station stress CSS overlay**: Subtle red edge vignette via radial gradient at high deterioration
 - **Hazard border at moderate stress**: Amber screen border activates even without local hazards when station-wide stress > 30%
+
+## Sprint 94-97 Changes (V216-V219)
+
+### V216 — Stress-Reactive Fog, Dust, and Environmental Atmosphere
+- **Fog distance closing**: Fog near/far reduces by up to 40% at max station stress, creating claustrophobic visibility
+- **Fog color shift**: Fog color shifts from dark blue-black (0x060610) toward warm brown (0x120808) with deterioration
+- **Dust particle tinting**: Ambient dust gains warm amber tone, increased opacity (up to 0.7), and larger size at high stress
+- **Cohesive station deterioration**: All atmospheric systems (fog, dust, lighting) respond to single stress value
+
+### V217 — Corridor Junction Beacons + Interaction Camera Punch + Smooth Entity Proximity
+- **Corridor junction beacons**: Glowing floor discs at corridor T-junctions and crossroads for navigation waypoints
+- **Beacon stress reactivity**: Junction beacons shift from pale blue to amber/red with station stress
+- **Interaction camera punch**: Brief FOV zoom-in when interacting with entities for tactile feedback
+- **Smooth entity proximity**: Quadratic falloff over 6 tiles (was binary 2/4 thresholds) for entity glow ramp
+- **Ground ring breathing**: Entity ground rings scale-pulse when player is within 2 tiles
+
+### V218 — Evidence Discovery Burst + Enhanced Floor Trail
+- **Evidence discovery burst**: 8 golden sparkle particles + camera zoom-in + golden radial screen flash on evidence card
+- **Floor trail upgrade**: Trails use green additive blend, 15-20s lifetime, fresh trails glow 50% brighter
+
+### V219 — Corridor Light Shafts + Deduction 3D Feedback
+- **Corridor light shafts**: Volumetric cylinder beams from ceiling every 5th corridor tile — first visual corridor lighting implementation
+- **Floor light pools**: Glowing floor discs under each shaft creating "islands of light" in dark corridors
+- **Hazard-reactive shafts**: Orange for heat, blue for vacuum, grey for smoke; erratic flicker near hazards
+- **Stress-reactive shaft color**: Shifts from blue-white to amber with station deterioration
+- **Power flux integration**: Light shafts dim during power fluctuation events
+- **Deduction 3D feedback**: Correct → milestone flash + 12 green sparkles + zoom; Wrong → damage flash + shake; Lockout → stun effect + heavy shake
+- **Distance culling**: Light shafts fade and hide beyond 8 tile range for performance
+
+### Technical Notes
+- Discovered 4 empty corridor light arrays (corridorLightList, corridorFixtureLights, _lightShaftMeshes, _floorPoolMeshes) — V215 corridor light animation was dead code; fixed by populating light shaft and floor pool arrays in V219
+- All corridor lighting now operates through emissive materials and light shaft meshes (no PointLights for performance)
+- 292 tests passing, TypeScript clean
 
 ## Sprint 73 Changes (In Progress)
 
