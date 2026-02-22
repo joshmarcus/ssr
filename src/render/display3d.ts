@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OutlineEffect } from "three/addons/effects/OutlineEffect.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import type { GameState, Entity, Room } from "../shared/types.js";
 import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
@@ -634,9 +637,12 @@ export class BrowserDisplay3D implements IGameDisplay {
   // F2 chase cam toggle handler
   private boundKeyHandler: (e: KeyboardEvent) => void;
 
-  // Cel-shaded rendering
+  // Cel-shaded rendering + bloom
   private outlineEffect: OutlineEffect;
   private toonGradient: THREE.DataTexture;
+  private bloomComposer: EffectComposer | null = null;
+  private bloomPass: UnrealBloomPass | null = null;
+  private bloomEnabled: boolean = true;
 
   // Room lights (colored point lights at room centers)
   private roomLights: Map<string, THREE.PointLight> = new Map();
@@ -882,6 +888,17 @@ export class BrowserDisplay3D implements IGameDisplay {
       defaultColor: [0, 0, 0],
       defaultAlpha: 0.8,
     });
+
+    // ── Bloom post-processing ──
+    this.bloomComposer = new EffectComposer(this.renderer);
+    this.bloomComposer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      0.15,   // strength — very subtle glow halos
+      0.3,    // radius — tight spread
+      0.92    // threshold — only brightest emissive surfaces bloom
+    );
+    this.bloomComposer.addPass(this.bloomPass);
 
     // ── Lights (cel-shaded bright — vibrant toon look, well-lit scene) ──
     const ambient = new THREE.AmbientLight(0xccddff, 1.8);
@@ -1136,7 +1153,15 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.handleResize();
       } else if (e.key === "F4") {
         e.preventDefault();
-        this.outlineEnabled = !this.outlineEnabled;
+        // Cycle: bloom → outline → plain → bloom
+        if (this.bloomEnabled) {
+          this.bloomEnabled = false;
+          this.outlineEnabled = true;
+        } else if (this.outlineEnabled) {
+          this.outlineEnabled = false;
+        } else {
+          this.bloomEnabled = true;
+        }
       }
     };
     window.addEventListener("keydown", this.boundKeyHandler);
@@ -4437,8 +4462,13 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.updateDistanceCulling();
     }
 
-    // Render: use outline effect or plain renderer
-    if (this.outlineEnabled) {
+    // Render: bloom composer (default), outline effect, or plain renderer
+    if (this.bloomEnabled && this.bloomComposer) {
+      // Update the render pass camera to match the current active camera
+      const renderPass = this.bloomComposer.passes[0] as RenderPass;
+      if (renderPass) renderPass.camera = this.camera;
+      this.bloomComposer.render();
+    } else if (this.outlineEnabled) {
       this.outlineEffect.render(this.scene, this.camera);
     } else {
       this.renderer.render(this.scene, this.camera);
@@ -8495,6 +8525,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     this.renderer.setSize(availW, availH);
     this.outlineEffect.setSize(availW, availH);
+    if (this.bloomComposer) this.bloomComposer.setSize(availW, availH);
     this.updateCameraFrustum();
   }
 
