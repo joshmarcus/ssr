@@ -7849,15 +7849,24 @@ export class BrowserDisplay3D implements IGameDisplay {
       shadowDisc.position.y = -baseY + 0.01;
       group.add(shadowDisc);
 
-      // Ground ring — glowing circle on the floor beneath the entity
+      // Ground ring — glowing circle on the floor beneath the entity (additive for bloom)
       const ringColor = ENTITY_COLORS_3D[entity.type] ?? 0xffffff;
       const groundRing = new THREE.Mesh(
-        new THREE.RingGeometry(0.28, 0.38, 20),
-        new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })
+        new THREE.RingGeometry(0.28, 0.42, 20),
+        new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
       );
       groundRing.rotation.x = -Math.PI / 2;
-      groundRing.position.y = -baseY + 0.02; // sit at floor level
+      groundRing.position.y = -baseY + 0.02;
       group.add(groundRing);
+
+      // Ground glow pool — larger diffuse disc for bloom-friendly light pool
+      const glowPool = new THREE.Mesh(
+        new THREE.CircleGeometry(0.55, 16),
+        new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending })
+      );
+      glowPool.rotation.x = -Math.PI / 2;
+      glowPool.position.y = -baseY + 0.015;
+      group.add(glowPool);
 
       return group;
     }
@@ -8185,10 +8194,10 @@ export class BrowserDisplay3D implements IGameDisplay {
         qSprite.position.y = 0.4;
         group.add(qSprite);
 
-        // Glow ring on ground
+        // Glow ring on ground (additive for bloom)
         const glowRing = new THREE.Mesh(
           new THREE.RingGeometry(0.2, 0.35, 16),
-          new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+          new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
         );
         glowRing.rotation.x = -Math.PI / 2;
         glowRing.position.y = 0.02;
@@ -8236,14 +8245,23 @@ export class BrowserDisplay3D implements IGameDisplay {
     shadowDiscFb.position.y = -baseY + 0.01;
     group.add(shadowDiscFb);
 
-    // Ground ring — glowing circle on the floor beneath the entity
+    // Ground ring — glowing circle on the floor beneath the entity (additive for bloom)
     const groundRing = new THREE.Mesh(
       new THREE.RingGeometry(0.28, 0.42, 20),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
     );
     groundRing.rotation.x = -Math.PI / 2;
-    groundRing.position.y = -baseY + 0.02; // sit at floor level
+    groundRing.position.y = -baseY + 0.02;
     group.add(groundRing);
+
+    // Ground glow pool — larger diffuse disc for bloom-friendly light pool
+    const glowPoolFb = new THREE.Mesh(
+      new THREE.CircleGeometry(0.55, 16),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending })
+    );
+    glowPoolFb.rotation.x = -Math.PI / 2;
+    glowPoolFb.position.y = -baseY + 0.015;
+    group.add(glowPoolFb);
 
     return group;
   }
