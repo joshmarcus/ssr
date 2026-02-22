@@ -614,6 +614,63 @@ export const LOG_TEMPLATES: LogTemplate[] = [
     text: "{captain}: Crew tensions elevated. The isolation is getting to everyone. {medic_last} reports increased sick bay visits — mostly stress. I need to address the {engineer_last}/{scientist_last} situation before it affects operations.",
     source: "{captain_last}",
   },
+  // ── Predictive / foreshadowing ("manuscript page" style) ──────
+  {
+    id: "predict_sounds",
+    category: "foreshadowing",
+    title: "Personal Audio Log",
+    text: "Something's wrong in {room}. I keep hearing sounds through the bulkhead — rhythmic, metallic. Like someone tapping from the other side. I asked {engineer_last} but they won't go near it. Nobody will.",
+    source: "{security_last}",
+  },
+  {
+    id: "predict_locked",
+    category: "foreshadowing",
+    title: "Access Denied — Note",
+    text: "They've sealed {room}. Official reason: 'scheduled maintenance.' But I saw {scientist_last} coming out of there at 0300, and the maintenance logs show nothing scheduled. What are they hiding?",
+    source: "{comms_last}",
+  },
+  {
+    id: "predict_readings",
+    category: "foreshadowing",
+    title: "Anomalous Sensor Data",
+    text: "Automated telemetry from {room} is off the charts. Thermal fluctuations, pressure instability, and something the sensors can't identify. {engineer_last} says it's probably a calibration error. I don't think so.",
+    source: "{scientist_last}",
+  },
+  {
+    id: "predict_last_seen",
+    category: "foreshadowing",
+    title: "Crew Location Update",
+    text: "Last confirmed sighting of {medic} was heading toward {room}. That was {weeks} ago. I've pinged their comm badge six times. No response. {captain_last} says not to worry.",
+    source: "{security_last}",
+  },
+  {
+    id: "predict_warning",
+    category: "foreshadowing",
+    title: "Handwritten Note",
+    text: "DO NOT enter {room} under any circumstances. I don't care what {captain_last} says. I've seen what's in there and it's not safe. If you're reading this, turn around. — {engineer}",
+    source: "{engineer_last}",
+  },
+  {
+    id: "predict_evidence",
+    category: "foreshadowing",
+    title: "Investigation Notes",
+    text: "There's evidence in {room} that contradicts the official report. {scientist_last} knows. Check the secondary console — the logs haven't been wiped from the local backup. Someone was sloppy.",
+    source: "{security_last}",
+  },
+  {
+    id: "predict_contamination",
+    category: "foreshadowing",
+    title: "Environmental Alert — Filed",
+    text: "{room}: atmospheric readings show contamination levels rising. Recommend sealing the section until decon team can assess. Filed three requests with {captain_last}. All denied. Logging for the record.",
+    source: "{life_support_last}",
+  },
+  {
+    id: "predict_secret",
+    category: "foreshadowing",
+    title: "Encrypted Personal Log",
+    text: "If anything happens to me, check {room}. I left everything there — the recordings, the manifests, all of it. {comms_last} helped me set up a dead drop. The truth has to come out.",
+    source: "{scientist_last}",
+  },
 ];
 
 /**

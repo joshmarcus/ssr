@@ -205,6 +205,8 @@ const escortArcSteps = new Map<string, number>(); // track escort dialogue arc s
 const corridorAmbientFired = new Set<string>(); // track corridor segments that have triggered ambient text
 let lastCorridorAmbientTurn = 0; // cooldown: don't fire corridor ambient more than once per 20 turns
 let lastJournalLength = 0; // track journal size for insight notifications
+const foreshadowedRooms = new Map<string, string>(); // room name → log excerpt (for manuscript echo)
+const echoedRooms = new Set<string>(); // rooms where we've already shown the echo
 let journalOpen = false;
 let journalTab: "evidence" | "deductions" = "evidence";
 let activeChoice: MysteryChoice | null = null;
@@ -771,6 +773,13 @@ function checkRoomEntry(): void {
         display.addLog(desc, "narrative");
       }
 
+      // Manuscript echo: if this room was foreshadowed in a log the player already read
+      if (foreshadowedRooms.has(currentRoom.name) && !echoedRooms.has(currentRoom.name)) {
+        echoedRooms.add(currentRoom.name);
+        const excerpt = foreshadowedRooms.get(currentRoom.name)!;
+        display.addLog(`ECHO — You remember reading about this place: "${excerpt.slice(0, 80)}..."`, "milestone");
+      }
+
       // Archetype-specific environmental incident trace
       const incidentTrace = getIncidentTrace(
         currentRoom.name,
@@ -1300,6 +1309,8 @@ function resetGameState(newSeed: number): void {
   corridorAmbientFired.clear();
   lastCorridorAmbientTurn = 0;
   lastJournalLength = 0;
+  foreshadowedRooms.clear();
+  echoedRooms.clear();
   mapOpen = false;
   helpOpen = false;
   incidentCardOpen = false;
@@ -1493,6 +1504,21 @@ function handleAction(action: Action): void {
       audio.speak(simLog.text);
     }
     if (hasPA) audio.playPA();
+
+    // Scan new log terminal entries for room name references (foreshadowing detection)
+    for (let i = prevLogs; i < state.logs.length; i++) {
+      const simLog = state.logs[i];
+      if (simLog.id.startsWith("log_terminal_") && !simLog.id.includes("reread")) {
+        for (const room of state.rooms) {
+          if (simLog.text.includes(room.name) && !visitedRoomIds.has(room.id)) {
+            if (!foreshadowedRooms.has(room.name)) {
+              foreshadowedRooms.set(room.name, simLog.text);
+            }
+          }
+        }
+      }
+    }
+
     // Interaction produced logs -- play interact sound + colored tile flash
     if (resolvedAction.type === ActionType.Interact) {
       audio.playInteract();

@@ -226,6 +226,24 @@ export function generateLogs(
     if (templateIdx >= categoryTemplates.length * 2) break;
   }
 
+  // Replace some logs with foreshadowing entries (manuscript page style) — these reference rooms
+  // the player hasn't visited yet, creating anticipation
+  const foreshadowTemplates = getTemplatesByCategories(["foreshadowing"]);
+  if (foreshadowTemplates.length > 0 && roomNames.length > 2 && logs.length >= 3) {
+    const numForeshadow = Math.min(3, Math.floor(roomNames.length / 4));
+    for (let fi = 0; fi < numForeshadow && fi < foreshadowTemplates.length; fi++) {
+      const tmpl = foreshadowTemplates[fi % foreshadowTemplates.length];
+      const filledText = fillTemplate(tmpl.text, roleLookup, roomNames);
+      const filledTitle = fillTemplate(tmpl.title, roleLookup, roomNames);
+      const filledSource = fillTemplate(tmpl.source, roleLookup, roomNames);
+      // Replace a non-timeline log (from the template-filled section) with a foreshadowing one
+      const replaceIdx = timeline.events.length + fi; // skip timeline logs, replace template logs
+      if (replaceIdx < logs.length) {
+        logs[replaceIdx] = { title: filledTitle, text: filledText, source: filledSource };
+      }
+    }
+  }
+
   return logs;
 }
 
