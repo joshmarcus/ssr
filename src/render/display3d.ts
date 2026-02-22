@@ -3794,6 +3794,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
       const t = life / maxLife;
       sp.position.y += delta * (sp as any)._driftY;
+      // Horizontal drift (used by airlock wind streaks)
+      if ((sp as any)._driftX) sp.position.x += delta * (sp as any)._driftX;
+      if ((sp as any)._driftZ) sp.position.z += delta * (sp as any)._driftZ;
       // Breach vacuum suction: pull nearby sprites toward unsealed breaches
       for (let bi = 0; bi < this._breachPositions.length; bi++) {
         const bp = this._breachPositions[bi];
@@ -6746,6 +6749,39 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (entity.type === EntityType.PressureValve) {
         const pvTile = state.tiles[entity.pos.y]?.[entity.pos.x];
         mesh.userData._tilePressure = pvTile?.pressure ?? 100;
+      }
+
+      // Track airlock open state — spawn wind streaks on open transition
+      if (entity.type === EntityType.Airlock) {
+        const isOpen = entity.props["open"] === true;
+        const wasOpen = mesh.userData._airlockOpen;
+        mesh.userData._airlockOpen = isOpen;
+        if (isOpen && !wasOpen) {
+          // Airlock just opened — spawn radial wind streak sprites
+          for (let ws = 0; ws < 12; ws++) {
+            const angle = (ws / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+            const wsMat = new THREE.SpriteMaterial({
+              color: 0xaaccff, transparent: true, opacity: 0.6,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const wsSpr = new THREE.Sprite(wsMat);
+            wsSpr.scale.set(0.04, 0.2, 1); // elongated streak
+            wsSpr.position.set(
+              entity.pos.x + Math.cos(angle) * 0.3,
+              0.3 + Math.random() * 0.5,
+              entity.pos.y + Math.sin(angle) * 0.3,
+            );
+            (wsSpr as any)._life = 0;
+            (wsSpr as any)._maxLife = 0.8 + Math.random() * 0.6;
+            (wsSpr as any)._driftY = 0.2 + Math.random() * 0.3;
+            // Also drift outward radially
+            (wsSpr as any)._driftX = Math.cos(angle) * (2 + Math.random());
+            (wsSpr as any)._driftZ = Math.sin(angle) * (2 + Math.random());
+            this.scene.add(wsSpr);
+            this._discoverySparkles.push(wsSpr);
+          }
+          this.flashTile(entity.pos.x, entity.pos.y);
+        }
       }
 
       // Track breach sealed state

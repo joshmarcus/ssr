@@ -291,6 +291,7 @@
 - **Sprint V129 — Relay chain pulse wave**: One-shot bright pulse sprite travels along power line curves when a relay activates. Pulse originates from the activated relay and races outward along all connected curves (4.5x energy dot speed). White additive sprite with quadratic opacity fade and slight scale growth. Cleaned up on arrival. Creates a satisfying "power ripple" visual on relay activation
 - **Sprint V130 — Entity collection fly-to-player**: Pickup entities (Tool, Utility, Sensor, MedKit, PowerCell, CrewItem) fly toward Sweepo when collected instead of vanishing. Ease-in acceleration with upward arc, spin, shrink, and opacity fade (~0.4s). Adds tactile satisfaction to item collection
 - **Sprint V131 — Breach vacuum suction**: Nearby particle sprites (sparkles, dust kicks, breath puffs) get gravitationally pulled toward unsealed breach positions within 4 tiles. Inverse-square falloff creates realistic vacuum draw. Makes breaches feel physically dangerous — visible atmosphere being sucked out
+- **Sprint V132 — Airlock depressurization wind streaks**: 12 radial elongated streak sprites burst outward when an airlock opens. Blue-white additive blending with horizontal drift. Sparkle pool gains optional `_driftX`/`_driftZ` for radial particle movement. Combined with breach suction creates dramatic venting moments
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
