@@ -452,6 +452,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private wallMesh: THREE.InstancedMesh;
   private wallCornerMesh: THREE.InstancedMesh;
   private doorMesh: THREE.InstancedMesh;
+  private ceilingMesh: THREE.InstancedMesh;    // ceiling panels above explored tiles
   private fogFullMesh: THREE.InstancedMesh;
   private fogMemoryMesh: THREE.InstancedMesh;
 
@@ -756,6 +757,20 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.doorMesh.count = 0;
     this.scene.add(this.doorMesh);
 
+    // Ceiling panels — dark metallic planes at wall-top height above explored floor/corridor tiles
+    const ceilGeo = new THREE.PlaneGeometry(1.0, 1.0);
+    ceilGeo.rotateX(Math.PI / 2); // face downward
+    const ceilMat = makeToonMaterial({
+      color: 0x334455,
+      gradientMap: this.toonGradient,
+    });
+    this.ceilingMesh = new THREE.InstancedMesh(ceilGeo, ceilMat, this.maxTiles);
+    this.ceilingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.ceilingMesh.frustumCulled = false;
+    this.ceilingMesh.count = 0;
+    this.scene.add(this.ceilingMesh);
+    this.ceilingMesh.visible = this.chaseCamActive; // only show ceiling in chase cam
+
     // Fog-of-war overlays — dark navy with slight translucency
     const fogGeo = new THREE.PlaneGeometry(1, 1);
     fogGeo.rotateX(-Math.PI / 2);
@@ -849,6 +864,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         e.preventDefault();
         this.chaseCamActive = !this.chaseCamActive;
         this.camera = this.chaseCamActive ? this.chaseCamera : this.orthoCamera;
+        this.ceilingMesh.visible = this.chaseCamActive;
         if (this.chaseCamActive) {
           // Initialize chase cam position to current player position to avoid snap
           const facing = this.playerFacing;
@@ -1782,6 +1798,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     let corridorIdx = 0;
     let wallIdx = 0;
     let doorIdx = 0;
+    let ceilIdx = 0;
 
     const tempColor = new THREE.Color();
 
@@ -1854,6 +1871,16 @@ export class BrowserDisplay3D implements IGameDisplay {
             this.doorMesh.setColorAt(doorIdx, tempColor);
             doorIdx++;
           }
+          // Ceiling above door
+          this.dummy.position.set(x, 2.05, y);
+          this.dummy.rotation.set(0, 0, 0);
+          this.dummy.scale.set(1, 1, 1);
+          this.dummy.updateMatrix();
+          this.ceilingMesh.setMatrixAt(ceilIdx, this.dummy.matrix);
+          tempColor.setRGB(0.12, 0.15, 0.18);
+          if (!tile.visible) tempColor.multiplyScalar(0.5);
+          this.ceilingMesh.setColorAt(ceilIdx, tempColor);
+          ceilIdx++;
         }
 
         // Floor/corridor
@@ -1984,6 +2011,19 @@ export class BrowserDisplay3D implements IGameDisplay {
             this.floorMesh.setColorAt(floorIdx, tempColor);
             floorIdx++;
           }
+
+          // Ceiling panel above this walkable tile
+          this.dummy.position.set(x, 2.05, y);
+          this.dummy.updateMatrix();
+          this.ceilingMesh.setMatrixAt(ceilIdx, this.dummy.matrix);
+          // Ceiling color: slightly darker version of floor for consistency
+          const ceilR = Math.max(0, ((baseColor >> 16) & 0xff) >> 2);
+          const ceilG = Math.max(0, ((baseColor >> 8) & 0xff) >> 2);
+          const ceilB = Math.max(0, (baseColor & 0xff) >> 2);
+          tempColor.setRGB(ceilR / 255, ceilG / 255, ceilB / 255);
+          if (!tile.visible) tempColor.multiplyScalar(0.5);
+          this.ceilingMesh.setColorAt(ceilIdx, tempColor);
+          ceilIdx++;
         }
       }
     }
@@ -1994,17 +2034,20 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.wallMesh.count = wallIdx;
     this.wallCornerMesh.count = 0;
     this.doorMesh.count = doorIdx;
+    this.ceilingMesh.count = ceilIdx;
 
     this.floorMesh.instanceMatrix.needsUpdate = true;
     this.corridorFloorMesh.instanceMatrix.needsUpdate = true;
     this.wallMesh.instanceMatrix.needsUpdate = true;
     this.wallCornerMesh.instanceMatrix.needsUpdate = true;
+    this.ceilingMesh.instanceMatrix.needsUpdate = true;
     this.doorMesh.instanceMatrix.needsUpdate = true;
     if (this.floorMesh.instanceColor) this.floorMesh.instanceColor.needsUpdate = true;
     if (this.corridorFloorMesh.instanceColor) this.corridorFloorMesh.instanceColor.needsUpdate = true;
     if (this.wallMesh.instanceColor) this.wallMesh.instanceColor.needsUpdate = true;
     if (this.wallCornerMesh.instanceColor) this.wallCornerMesh.instanceColor.needsUpdate = true;
     if (this.doorMesh.instanceColor) this.doorMesh.instanceColor.needsUpdate = true;
+    if (this.ceilingMesh.instanceColor) this.ceilingMesh.instanceColor.needsUpdate = true;
   }
 
   private applyFloorSensorColor(tile: { heat: number; smoke: number; dirt: number; pressure: number; walkable: boolean }, baseColor: number): number {
