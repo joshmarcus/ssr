@@ -611,6 +611,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _heatShimmerSprites: THREE.Sprite[] = [];
   private _heatShimmerTimer: number = 0;
   private _playerTileHeat: number = 0;
+  // Pipe steam leak sprites (small puffs from corridor pipes)
+  private _pipeLeakSprites: THREE.Sprite[] = [];
+  private _pipeLeakTimer: number = 0;
   // DataCore holographic ring
   private _dataCoreHoloRing: THREE.Mesh | null = null;
   // Discovery sparkle: rooms visited this session for first-entry effects
@@ -3057,6 +3060,62 @@ export class BrowserDisplay3D implements IGameDisplay {
       s.position.y += delta * 0.4; // drift upward
       s.scale.set(0.12 + t * 0.2, 0.12 + t * 0.2, 1); // expand
       (s.material as THREE.SpriteMaterial).opacity = 0.3 * (1 - t); // fade
+    }
+
+    // Pipe steam leaks — small drips from overhead corridor pipes
+    if (this.chaseCamActive && !this._currentRoom) {
+      this._pipeLeakTimer -= delta;
+      if (this._pipeLeakTimer <= 0) {
+        this._pipeLeakTimer = 3.0 + Math.random() * 5.0; // every 3-8 seconds
+        // Find a nearby pipe tile to leak from
+        const px = Math.round(this.playerCurrentX);
+        const pz = Math.round(this.playerCurrentZ);
+        let bestKey = "";
+        let bestDist = 999;
+        for (const key of this.corridorPipeTiles) {
+          const [kx, ky] = key.split(",").map(Number);
+          const d = Math.abs(kx - px) + Math.abs(ky - pz);
+          if (d < bestDist && d > 0 && d < 6) {
+            bestDist = d;
+            bestKey = key;
+          }
+        }
+        if (bestKey) {
+          const [lx, ly] = bestKey.split(",").map(Number);
+          const leakMat = new THREE.SpriteMaterial({
+            color: 0x99bbdd, transparent: true, opacity: 0.25,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const leak = new THREE.Sprite(leakMat);
+          leak.scale.set(0.06, 0.06, 1);
+          leak.position.set(lx + (Math.random() - 0.5) * 0.3, 1.7, ly + (Math.random() - 0.5) * 0.3);
+          (leak as any)._life = 0;
+          (leak as any)._maxLife = 0.6 + Math.random() * 0.4;
+          (leak as any)._driftX = (Math.random() - 0.5) * 0.3;
+          (leak as any)._driftZ = (Math.random() - 0.5) * 0.3;
+          this.scene.add(leak);
+          this._pipeLeakSprites.push(leak);
+        }
+      }
+    }
+    // Animate pipe leak sprites
+    for (let i = this._pipeLeakSprites.length - 1; i >= 0; i--) {
+      const lk = this._pipeLeakSprites[i];
+      (lk as any)._life += delta;
+      const life = (lk as any)._life;
+      const maxLife = (lk as any)._maxLife;
+      if (life >= maxLife) {
+        this.scene.remove(lk);
+        (lk.material as THREE.SpriteMaterial).dispose();
+        this._pipeLeakSprites.splice(i, 1);
+        continue;
+      }
+      const t = life / maxLife;
+      lk.position.y -= delta * 1.2; // fall downward
+      lk.position.x += (lk as any)._driftX * delta;
+      lk.position.z += (lk as any)._driftZ * delta;
+      lk.scale.set(0.06 + t * 0.08, 0.06 + t * 0.15, 1); // stretch vertically as it falls
+      (lk.material as THREE.SpriteMaterial).opacity = 0.25 * (1 - t * t); // quadratic fade
     }
 
     // Animate discovery sparkles
