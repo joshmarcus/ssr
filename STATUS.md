@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V153 completed, V154 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V156 completed, V157 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -315,6 +315,7 @@
 - **Sprint V153 — Evacuation urgency vignette**: Pulsing red screen-edge vignette during evacuation phase, synced with existing klaxon ambient light pulse. Creates visceral urgency during the final rescue phase
 - **Sprint V154 — Breach seal celebration**: 10 cyan inward-rushing particles + milestone screen flash when a breach is sealed. Particles drift toward breach center simulating air rushing back. Satisfying feedback for major repair event
 - **Sprint V155 — Door opening light shaft**: Brief additive-blend sprite beam appears when a door first slides open. Warm white light, 1.2s fade, 2-unit tall. Creates momentary "light flooding through" dramatic reveal
+- **Sprint V156 — Room enclosure fix**: Foundational 3D visual fix — ceiling panels above all tile types (not just walkable), void-fill geometry ring around player, large ground/ceiling planes, starfield hidden in chase cam, tighter fog. Rooms now feel like enclosed interior spaces instead of floating scaffolds in space
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
