@@ -3472,17 +3472,24 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Heartbeat PointLight disabled for performance — emissive cross suffices
       } else if (userData.entityType === EntityType.LogTerminal) {
         // Screen glow flicker + proximity activation + light pulse
+        // Unread terminals pulse brighter cyan to draw attention
+        const isUnread = !(userData as any)._exhausted;
         const termDx = this.playerCurrentX - mesh.position.x;
         const termDz = this.playerCurrentZ - mesh.position.z;
         const termDist = Math.sqrt(termDx * termDx + termDz * termDz);
         const termBoost = termDist < 2 ? 0.35 : termDist < 3.5 ? 0.15 : 0;
         const termFlicker = Math.sin(elapsed * 4 + mesh.position.x * 2) * 0.1;
+        // Unread terminals get a strong breathing pulse to attract attention
+        const unreadPulse = isUnread ? 0.2 + Math.sin(elapsed * 2.5) * 0.15 : 0;
         mesh.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-            child.material.emissiveIntensity = 0.15 + termBoost + termFlicker;
+            child.material.emissiveIntensity = 0.15 + termBoost + termFlicker + unreadPulse;
+            if (isUnread) {
+              child.material.emissive.setHex(0x44ccff); // brighter cyan for unread
+            }
           }
           if (child instanceof THREE.PointLight) {
-            child.intensity = 0.5 + termBoost * 0.8 + termFlicker * 0.3;
+            child.intensity = 0.5 + termBoost * 0.8 + termFlicker * 0.3 + unreadPulse * 0.5;
           }
         });
       } else if (userData.entityType === EntityType.SecurityTerminal) {
@@ -7919,7 +7926,11 @@ export class BrowserDisplay3D implements IGameDisplay {
     return mesh;
   }
 
-  /** Animate scene echoes: pulse, fade, visibility control */
+  // Track echo discovery state for revelation effects
+  private _echoDiscoveryTimes: Map<string, number> = new Map();
+  private _echoRevealedIds: Set<string> = new Set();
+
+  /** Animate scene echoes: pulse, fade, visibility, discovery + revelation effects */
   private animateSceneEchoes(elapsed: number, delta: number, state: GameState | null): void {
     if (!state?.mystery) return;
     const echoes = state.mystery.sceneEchoes;
@@ -7927,6 +7938,8 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     const playerSensors = state.player.sensors;
     const hasThermal = playerSensors.includes(SensorType.Thermal);
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
 
     for (const echo of echoes) {
       const mesh = this.sceneEchoMeshes.get(echo.id);
@@ -7950,24 +7963,72 @@ export class BrowserDisplay3D implements IGameDisplay {
 
       mesh.visible = true;
 
+      // Discovery detection: player within 2 tiles of an undiscovered echo
+      const dist = Math.abs(echo.pos.x - px) + Math.abs(echo.pos.y - py);
+      if (!echo.discovered && dist <= 2 && !this._echoDiscoveryTimes.has(echo.id)) {
+        echo.discovered = true;
+        this._echoDiscoveryTimes.set(echo.id, elapsed);
+        // Log discovery
+        this.addLog(`[ECHO] ${echo.description}`, "narrative");
+      }
+
+      // Discovery revelation effect: brief full-opacity flash
+      const discoveryTime = this._echoDiscoveryTimes.get(echo.id);
+      const isRevealing = discoveryTime !== undefined && (elapsed - discoveryTime) < 2.5;
+
       // Animate based on type
       if (echo.echoType === SceneEchoType.GhostSilhouette) {
-        // Ghost pulse: slow breathing opacity
-        const baseOpacity = 0.2 + Math.sin(elapsed * 1.2 + echo.pos.x * 3) * 0.08;
+        let targetOpacity: number;
+        if (isRevealing) {
+          // Revelation: flash to full opacity, then fade back
+          const revealT = elapsed - discoveryTime!;
+          if (revealT < 0.5) {
+            targetOpacity = 0.3 + revealT * 1.4; // ramp up to 1.0
+          } else if (revealT < 1.5) {
+            targetOpacity = 1.0; // hold full
+          } else {
+            targetOpacity = 1.0 - (revealT - 1.5); // fade back
+          }
+          targetOpacity = Math.max(0.2, Math.min(1.0, targetOpacity));
+        } else {
+          // Normal breathing pulse
+          targetOpacity = echo.discovered ? 0.3 : 0.2;
+          targetOpacity += Math.sin(elapsed * 1.2 + echo.pos.x * 3) * 0.08;
+        }
         mesh.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
-            child.material.opacity = baseOpacity;
+            child.material.opacity = targetOpacity;
           }
         });
         // Gentle hover bob
         mesh.position.y = Math.sin(elapsed * 0.8 + echo.pos.y * 2) * 0.03;
         // Slow rotation drift
         mesh.rotation.y = elapsed * 0.2 + echo.pos.x;
+      } else if (echo.echoType === SceneEchoType.DamageMark) {
+        // Discovered damage marks glow slightly brighter
+        if (isRevealing && mesh instanceof THREE.Mesh) {
+          const revealT = elapsed - discoveryTime!;
+          const mat = mesh.material as THREE.MeshBasicMaterial;
+          mat.opacity = 0.6 + Math.sin(revealT * 4) * 0.3;
+        }
       } else if (echo.echoType === SceneEchoType.SystemTrace) {
         // Flicker
         const flicker = Math.sin(elapsed * 8 + echo.pos.x * 5) > 0.3;
         mesh.visible = mesh.visible && flicker;
         mesh.rotation.y = elapsed * 2;
+      }
+    }
+
+    // Insight revelation effect: when an insight is revealed, all related ghosts flash
+    for (const insight of state.mystery.insights) {
+      if (insight.revealed && !this._echoRevealedIds.has(insight.id)) {
+        this._echoRevealedIds.add(insight.id);
+        // Find all ghost echoes with matching crew and trigger their revelation
+        for (const echo of echoes) {
+          if (echo.echoType === SceneEchoType.GhostSilhouette && !this._echoDiscoveryTimes.has(echo.id)) {
+            this._echoDiscoveryTimes.set(echo.id, elapsed);
+          }
+        }
       }
     }
   }
