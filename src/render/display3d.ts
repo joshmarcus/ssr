@@ -2598,10 +2598,33 @@ export class BrowserDisplay3D implements IGameDisplay {
             hazBorder.className = "active amber";
           } else if (vacuumWarning) {
             hazBorder.className = "active frost";
+          } else if (this._stationStress > 0.3) {
+            // Station-wide stress: subtle amber border even without local hazards
+            hazBorder.className = "active amber";
+            hazBorder.style.opacity = String(Math.min(0.6, this._stationStress * 0.5));
           } else {
             hazBorder.className = "";
+            hazBorder.style.opacity = "";
           }
         }
+      }
+    }
+
+    // Station stress CSS overlay: warm tint that intensifies with deterioration
+    let stressOverlay = document.getElementById("station-stress-overlay");
+    if (!stressOverlay && this._stationStress > 0.1) {
+      stressOverlay = document.createElement("div");
+      stressOverlay.id = "station-stress-overlay";
+      stressOverlay.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:3;mix-blend-mode:soft-light;transition:opacity 0.5s";
+      document.body.appendChild(stressOverlay);
+    }
+    if (stressOverlay) {
+      if (this._stationStress > 0.1) {
+        const opacity = Math.min(0.08, this._stationStress * 0.06);
+        stressOverlay.style.background = `radial-gradient(ellipse at center, transparent 40%, rgba(180,60,20,${opacity}) 100%)`;
+        stressOverlay.style.opacity = "1";
+      } else {
+        stressOverlay.style.opacity = "0";
       }
     }
   }
@@ -4647,6 +4670,17 @@ export class BrowserDisplay3D implements IGameDisplay {
         cl.intensity = flicker > 0.3 ? base * (0.4 + Math.random() * 0.6) : base * 0.1;
       } else {
         cl.intensity = base * (0.85 + Math.sin(phase) * 0.15);
+        // Station stress: corridor lights shift toward amber/red as station deteriorates
+        if (this._stationStress > 0.1) {
+          const stressFactor = Math.min(1, this._stationStress);
+          // Blend from blue-white (0x88aadd) toward amber (0xff8844)
+          const baseR = 0x88, baseG = 0xaa, baseB = 0xdd;
+          const stressR = 0xff, stressG = 0x88, stressB = 0x44;
+          const r2 = Math.round(baseR + (stressR - baseR) * stressFactor * 0.6);
+          const g2 = Math.round(baseG + (stressG - baseG) * stressFactor * 0.6);
+          const b2 = Math.round(baseB + (stressB - baseB) * stressFactor * 0.6);
+          cl.color.setRGB(r2 / 255, g2 / 255, b2 / 255);
+        }
       }
     }
 
@@ -4680,6 +4714,15 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (this.ambientLight) {
       const baseAmb = 1.8;
       this.ambientLight.intensity = baseAmb * powerDimFactor;
+      // Station stress: ambient shifts warm as station deteriorates
+      if (this._stationStress > 0.15) {
+        const sf = Math.min(1, this._stationStress);
+        // Blend from cool blue-white (0xccddff) toward warm amber (0xffccaa)
+        const r3 = Math.round(0xcc + (0xff - 0xcc) * sf * 0.4);
+        const g3 = Math.round(0xdd + (0xcc - 0xdd) * sf * 0.4);
+        const b3 = Math.round(0xff + (0xaa - 0xff) * sf * 0.4);
+        this.ambientLight.color.setRGB(r3 / 255, g3 / 255, b3 / 255);
+      }
     }
     if (this.keyLight) {
       const baseKey = 1.8;
