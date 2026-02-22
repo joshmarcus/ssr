@@ -2229,6 +2229,33 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // Room atmosphere color grade: persistent subtle tint while in a room
+      {
+        let roomTint = document.getElementById("room-atmosphere-tint");
+        if (this._currentRoom && this.chaseCamActive) {
+          const tintHex = ROOM_WALL_TINTS_3D[this._currentRoom.name];
+          if (tintHex) {
+            if (!roomTint) {
+              roomTint = document.createElement("div");
+              roomTint.id = "room-atmosphere-tint";
+              roomTint.style.cssText =
+                "position:fixed;inset:0;pointer-events:none;z-index:85;mix-blend-mode:soft-light;";
+              document.body.appendChild(roomTint);
+            }
+            const tr = (tintHex >> 16) & 0xff;
+            const tg = (tintHex >> 8) & 0xff;
+            const tb = tintHex & 0xff;
+            roomTint.style.display = "block";
+            roomTint.style.backgroundColor = `rgba(${tr},${tg},${tb},0.04)`;
+            roomTint.style.opacity = "1";
+          } else if (roomTint) {
+            roomTint.style.display = "none";
+          }
+        } else if (roomTint) {
+          roomTint.style.display = "none";
+        }
+      }
+
       // Smoothly move camera and light to follow
       this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
       this.cameraPosZ += (this.cameraTargetZ - this.cameraPosZ) * lerpFactor;
