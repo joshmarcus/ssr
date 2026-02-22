@@ -236,6 +236,7 @@
 - **Sprint V74 — Scan grid ripple**: Sensor scan wave now leaves glowing grid squares on the floor as it passes. Squares flash briefly in sensor color (40% coverage, additive blend) creating a tech-data-readout effect
 - **Sprint V75 — Compass heading indicator**: Canvas-rendered compass HUD below minimap showing N/E/S/W cardinal directions, rotating with player facing, active direction highlighted in green, forward pointer triangle
 - **Sprint V76 — Corridor light shafts + floor pools**: Volumetric cylinder beams descend from corridor ceiling lights (additive blending, tapered cone shape). Glowing floor discs mark light pools on corridor floors. Both animate with breathing opacity, hazard-reactive flicker for damaged corridors, distance-based fade for performance
+- **Sprint V77 — Footstep dust kicks**: Sweepo kicks up small dust puffs behind it when moving (warm brown additive sprites). Puffs spawn every 0.08s, drift upward, expand, and fade with quadratic falloff. Ground-level visual feedback for the cleaning bot
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

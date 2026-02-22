@@ -592,6 +592,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _lightShaftTiles: Set<string> = new Set();
   // Floor light pools under corridor lights
   private _floorPoolMeshes: THREE.Mesh[] = [];
+  // Footstep dust kick sprites
+  private _dustKickSprites: THREE.Sprite[] = [];
+  private _dustKickTimer: number = 0;
   private starfieldPoints: THREE.Points | null = null;
 
   // Hazard visual effects (sprites at hazardous tile positions)
@@ -2120,6 +2123,28 @@ export class BrowserDisplay3D implements IGameDisplay {
 
       // Update movement trail
       this.updateTrail(this.playerCurrentX, this.playerCurrentZ, delta);
+
+      // Footstep dust kicks: small puffs when Sweepo moves
+      if (isMoving) {
+        this._dustKickTimer -= delta;
+        if (this._dustKickTimer <= 0) {
+          this._dustKickTimer = 0.08; // frequent small puffs
+          // Spawn behind player (opposite of movement direction)
+          const backX = this.playerCurrentX - velX * 0.5 + (Math.random() - 0.5) * 0.2;
+          const backZ = this.playerCurrentZ - velZ * 0.5 + (Math.random() - 0.5) * 0.2;
+          const dustMat = new THREE.SpriteMaterial({
+            color: 0xaa9977, transparent: true, opacity: 0.2,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const dust = new THREE.Sprite(dustMat);
+          dust.scale.set(0.06, 0.06, 1);
+          dust.position.set(backX, 0.04, backZ);
+          (dust as any)._life = 0;
+          (dust as any)._maxLife = 0.4 + Math.random() * 0.3;
+          this.scene.add(dust);
+          this._dustKickSprites.push(dust);
+        }
+      }
     }
 
     // Entity animations
@@ -2711,6 +2736,25 @@ export class BrowserDisplay3D implements IGameDisplay {
       s.position.y += delta * 0.4; // drift upward
       s.scale.set(0.12 + t * 0.2, 0.12 + t * 0.2, 1); // expand
       (s.material as THREE.SpriteMaterial).opacity = 0.3 * (1 - t); // fade
+    }
+
+    // Animate footstep dust kicks
+    for (let i = this._dustKickSprites.length - 1; i >= 0; i--) {
+      const d = this._dustKickSprites[i];
+      (d as any)._life += delta;
+      const life = (d as any)._life;
+      const maxLife = (d as any)._maxLife;
+      if (life >= maxLife) {
+        this.scene.remove(d);
+        (d.material as THREE.SpriteMaterial).dispose();
+        this._dustKickSprites.splice(i, 1);
+        continue;
+      }
+      const t = life / maxLife;
+      d.position.y += delta * 0.15; // gentle rise
+      const s = 0.06 + t * 0.12; // expand from 0.06 to 0.18
+      d.scale.set(s, s, 1);
+      (d.material as THREE.SpriteMaterial).opacity = 0.2 * (1 - t * t); // quadratic fade
     }
 
     // Distance culling: update every 5 frames to amortize cost
