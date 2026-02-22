@@ -2030,9 +2030,12 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
       } else {
-        // Healthy: reset antenna, glow
+        // Healthy: idle antenna sway (gentle scanning motion)
         const antenna = this.playerMesh.children[2];
-        if (antenna) antenna.rotation.z = 0;
+        if (antenna) {
+          const sway = isMoving ? 0 : Math.sin(elapsed * 1.2) * 0.12 + Math.sin(elapsed * 0.7) * 0.05;
+          antenna.rotation.z = sway;
+        }
         const groundGlow = this.playerMesh.children[4];
         if (groundGlow instanceof THREE.Mesh) {
           const glowMat = groundGlow.material as THREE.MeshBasicMaterial;

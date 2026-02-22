@@ -261,6 +261,7 @@
 - **Sprint V99 — Sensor visor tint**: Subtle full-screen color wash when sensor overlay is active (warm for Thermal, cool for Atmospheric, green for Cleanliness). 6% opacity with breathing animation. Creates "scanning visor" immersion
 - **Sprint V100 — Headlight damage flicker**: Sweepo's headlight flickers irregularly when HP <60%. Multi-frequency sine pattern creates naturalistic failing-electronics feel. Severity scales with damage — slight stutter at 50% HP, dramatic cuts at critical. Combined with HP vignette and body sparks for full "systems failing" atmosphere
 - **Sprint V101 — Minimap hazard warnings**: Room hazard icons on minimap — heat symbol for hot rooms, triangle for low pressure, cloud for smoke. Color-coded (red/blue/yellow) at room bottom-left. Helps players plan routes around danger zones
+- **Sprint V102 — Idle antenna sway**: Sweepo's antenna gently sways side-to-side when idle (dual-frequency oscillation: 1.2Hz + 0.7Hz). Stops when moving. Adds lifelike scanning personality to the bot
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
