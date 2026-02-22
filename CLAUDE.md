@@ -259,6 +259,19 @@ Layered atmospheric effects and ground-level visual feedback:
 - **Child index stability**: When adding meshes to Sweepo's group, always append (don't insert) to avoid breaking existing damage visualization that references specific child indices.
 - **Compass HUD below minimap**: Canvas-rendered compass works better than Three.js overlay because it stays pixel-sharp. Cardinal labels rotating with `playerFacing` gives instant directional awareness.
 
+## Sprint Learnings (V91-V100 Reflection)
+
+Screen-space overlays, Sweepo detail, and minimap utility:
+
+- **Antenna as gameplay signal**: Converting Sweepo's antenna tip to MeshBasicMaterial enables real-time proximity detection feedback. Pulse rate 2-8Hz scales with distance to nearest unexhausted entity — players learn to "follow the signal" intuitively.
+- **CSS overlays are cheap state indicators**: Stun static (randomized gradient noise), HP vignette (inset box-shadow), sensor visor tint (mix-blend-mode:multiply) — all use DOM elements with z-index layering. Create/show/hide pattern avoids DOM churn.
+- **Multiple damage indicators compound**: Headlight flicker (multi-frequency sine), HP vignette (pulsing red edges), body sparks, eye color shift, antenna droop — each individually subtle, together they create escalating dread as HP drops. The headlight flicker is most impactful because it affects what the player can see.
+- **Pipe leaks from known positions**: Reusing `corridorPipeTiles` Set to spawn drip particles at actual pipe locations ensures visual coherence. "Find nearest pipe tile" search is O(n) on the Set but runs infrequently (every 3-8s).
+- **Minimap information density**: Room names (abbreviated first word), entity shape icons, room checkmarks, and facing arrows all fit on a small canvas without clutter. Each uses a different visual channel (text, shape, symbol, line) to avoid collision.
+- **Cleaning brushes sell identity**: Two small counter-rotating cylinders under Sweepo (children 6-7) that spin fast when moving and slow when idle. Tiny detail that reinforces "this is a cleaning bot" every time the player moves.
+- **Sensor visor tint is barely visible but important**: 6% opacity color wash with mix-blend-mode:multiply is almost subliminal, but players notice when it's removed. The breathing animation (1.5Hz) prevents it from feeling static.
+- **Append-only child strategy proven**: Through V91-V100, Sweepo group grew to 8+ children (body, head, antenna, tip, glow, eye, brushL, brushR) with zero index breakage. Always add new meshes at the end.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
