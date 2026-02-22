@@ -305,6 +305,7 @@
 - **Sprint V143 — Per-entity-type legend glyphs**: Legend uses unique emoji glyphs per entity type matching 2D renderer instead of generic colored squares. Improves at-a-glance entity identification
 - **Sprint V144 — Signal glitch on damage/stun**: RGB block corruption + horizontal scan line tears overlay on damage (0.3 severity) and stun (0.7 severity). Pixelated 64x48 canvas with random color channel blocks and white tear lines. Double-pulse on stun. Reinforces "low-bitrate terminal link" theme
 - **Sprint V145 — CRT scanline overlay**: Subtle slowly-scrolling horizontal scanlines (4px period, 3% black opacity) via CSS repeating-linear-gradient. Active only in chase cam mode. Reinforces "viewing through terminal monitor" aesthetic
+- **Sprint V146 — Room ambient particles**: Room-type-specific floating motes add life to spaces. 10 room types get unique particle configs (color, drift speed, lifetime). Engine Core: fast orange sparks. Data Core: slow purple motes. Med Bay: gentle white specks. Max 15 concurrent particles, spawned via sparkle pool
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

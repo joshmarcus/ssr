@@ -639,6 +639,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _pipeLeakTimer: number = 0;
   // Sweepo eye emotion: widen timer on discovery/interaction
   private _eyeWidenTimer: number = 0;
+  // Room ambient particle tracking
+  private _ambientParticleCount: number = 0;
+  private _ambientParticleFrame: number = 0;
   // Floating interact indicator sprite
   private _interactIndicator: THREE.Sprite | null = null;
   // Corridor forward scout light
@@ -4007,6 +4010,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       const life = (sp as any)._life;
       const maxLife = (sp as any)._maxLife;
       if (life >= maxLife) {
+        if ((sp as any)._isAmbient) this._ambientParticleCount--;
         this.scene.remove(sp);
         (sp.material as THREE.SpriteMaterial).dispose();
         this._discoverySparkles.splice(i, 1);
@@ -4014,7 +4018,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
       const t = life / maxLife;
       sp.position.y += delta * (sp as any)._driftY;
-      // Horizontal drift (used by airlock wind streaks)
+      // Horizontal drift (used by airlock wind streaks and ambient particles)
       if ((sp as any)._driftX) sp.position.x += delta * (sp as any)._driftX;
       if ((sp as any)._driftZ) sp.position.z += delta * (sp as any)._driftZ;
       // Breach vacuum suction: pull nearby sprites toward unsealed breaches
@@ -4099,6 +4103,47 @@ export class BrowserDisplay3D implements IGameDisplay {
       bp.scale.set(s, s, 1);
       (bp.material as THREE.SpriteMaterial).opacity = 0.15 * (1 - t); // linear fade
     }
+
+    // Room ambient particles: subtle floating motes per room type
+    this._ambientParticleFrame++;
+    if (this._currentRoom && this.chaseCamActive && this._ambientParticleFrame % 8 === 0 && this._ambientParticleCount < 15) {
+      const roomName = this._currentRoom.name;
+      // Room-specific particle configs: color, drift speed, lifetime
+      const ambientConfigs: Record<string, { color: number; driftY: number; life: number }> = {
+        "Engineering Storage": { color: 0xeecc88, driftY: 0.15, life: 3.0 },
+        "Engine Core": { color: 0xffaa44, driftY: 0.25, life: 2.0 },
+        "Power Relay Junction": { color: 0xffee66, driftY: 0.3, life: 1.8 },
+        "Data Core": { color: 0xbb88ff, driftY: 0.1, life: 3.5 },
+        "Research Lab": { color: 0x88eebb, driftY: 0.12, life: 3.0 },
+        "Robotics Bay": { color: 0x88ccdd, driftY: 0.08, life: 4.0 },
+        "Med Bay": { color: 0xddddff, driftY: 0.06, life: 4.0 },
+        "Bridge": { color: 0xaabbee, driftY: 0.05, life: 4.5 },
+        "Cargo Hold": { color: 0xccaa77, driftY: 0.18, life: 2.5 },
+        "Server Annex": { color: 0xcc88ff, driftY: 0.15, life: 2.5 },
+      };
+      const cfg = ambientConfigs[roomName];
+      if (cfg) {
+        const rx = this._currentRoom.x + Math.random() * this._currentRoom.width;
+        const rz = this._currentRoom.y + Math.random() * this._currentRoom.height;
+        const mat = new THREE.SpriteMaterial({
+          color: cfg.color, transparent: true, opacity: 0.25,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const mote = new THREE.Sprite(mat);
+        mote.scale.set(0.04, 0.04, 1);
+        mote.position.set(rx, 0.2 + Math.random() * 1.0, rz);
+        (mote as any)._life = 0;
+        (mote as any)._maxLife = cfg.life + Math.random() * 1.5;
+        (mote as any)._driftY = cfg.driftY * (0.5 + Math.random() * 0.5);
+        (mote as any)._driftX = (Math.random() - 0.5) * 0.1;
+        (mote as any)._driftZ = (Math.random() - 0.5) * 0.1;
+        (mote as any)._isAmbient = true;
+        this.scene.add(mote);
+        this._discoverySparkles.push(mote);
+        this._ambientParticleCount++;
+      }
+    }
+    // Decrement ambient count as particles die (tracked via _isAmbient flag in sparkle removal)
 
     // Air flow arrow pulsing animation
     for (const arrow of this._airFlowArrows) {
