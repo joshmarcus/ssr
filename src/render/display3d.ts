@@ -729,6 +729,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private trimBBInstanced: THREE.InstancedMesh | null = null;
   private trimGlowInstanced: THREE.InstancedMesh | null = null;
   private trimRailInstanced: THREE.InstancedMesh | null = null;
+  private trimMidInstanced: THREE.InstancedMesh | null = null;
   private trimInstanceIdx: number = 0;
   // InstancedMesh for corridor strip lights (bright / dim)
   private stripBrightInstanced: THREE.InstancedMesh | null = null;
@@ -5261,6 +5262,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       BrowserDisplay3D._railGeo = new THREE.BoxGeometry(1.02, 0.04, 0.06);
       BrowserDisplay3D._pillarGeo = new THREE.BoxGeometry(0.08, 2.1, 0.08);
       BrowserDisplay3D._edgeGlowGeo = new THREE.BoxGeometry(1.0, 0.02, 0.02);
+      BrowserDisplay3D._midAccentGeo = new THREE.BoxGeometry(0.92, 0.03, 0.015); // narrower than wall, thin profile
     }
     const max = BrowserDisplay3D.MAX_TRIM_INSTANCES;
 
@@ -5305,6 +5307,20 @@ export class BrowserDisplay3D implements IGameDisplay {
       new Float32Array(max * 3), 3
     );
     this.scene.add(this.trimRailInstanced);
+
+    // Mid-wall accent: emissive eye-level strip visible from chase cam
+    const midMat = makeToonMaterial({
+      color: 0xffffff,
+      gradientMap: this.toonGradient,
+      emissive: 0xcccccc,
+      emissiveIntensity: 0.45,
+    });
+    this.trimMidInstanced = new THREE.InstancedMesh(BrowserDisplay3D._midAccentGeo!, midMat, max);
+    this.trimMidInstanced.count = 0;
+    this.trimMidInstanced.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(max * 3), 3
+    );
+    this.scene.add(this.trimMidInstanced);
   }
 
   /** Initialize InstancedMesh for corridor strip lights (bright + dim) */
@@ -5684,6 +5700,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private static _railGeo: THREE.BoxGeometry | null = null;
   private static _pillarGeo: THREE.BoxGeometry | null = null;
   private static _edgeGlowGeo: THREE.BoxGeometry | null = null;
+  private static _midAccentGeo: THREE.BoxGeometry | null = null;
 
   private placeRoomTrim(state: GameState): void {
     const dummy = this.dummy;
@@ -5755,6 +5772,13 @@ export class BrowserDisplay3D implements IGameDisplay {
           tempColor.setHex(trimColor);
           this.trimRailInstanced!.setColorAt(idx, tempColor);
 
+          // Mid-wall accent strip at eye level (highly visible from chase cam)
+          dummy.position.y = 0.85;
+          dummy.updateMatrix();
+          this.trimMidInstanced!.setMatrixAt(idx, dummy.matrix);
+          tempColor.setHex(glowColor);
+          this.trimMidInstanced!.setColorAt(idx, tempColor);
+
           this.trimInstanceIdx++;
         }
       }
@@ -5769,6 +5793,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.trimRailInstanced!.count = this.trimInstanceIdx;
       this.trimRailInstanced!.instanceMatrix.needsUpdate = true;
       this.trimRailInstanced!.instanceColor!.needsUpdate = true;
+      this.trimMidInstanced!.count = this.trimInstanceIdx;
+      this.trimMidInstanced!.instanceMatrix.needsUpdate = true;
+      this.trimMidInstanced!.instanceColor!.needsUpdate = true;
 
       // Door frames: vertical pillars on each side of door tiles in this room
       for (let y = room.y - 1; y <= room.y + room.height; y++) {
