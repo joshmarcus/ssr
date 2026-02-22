@@ -209,6 +209,7 @@
 - **Sprint V47 — Entity exhaustion dimming**: Exhausted entities dim to 50% color, 0 emissive, 70% opacity for clear "already done" visual feedback
 - **Sprint V48 — Relay power visualization**: Activated relays spin 3x faster with yellow glow, curved energy lines between activated relays, sealed breaches dim to muted green
 - **Sprint V49 — Ambient station life**: Edge glow pulse, room light generator hum, relay power line opacity pulse, starfield breathing + rotation
+- **Sprint V50 — Phase-reactive lighting**: Evacuation = red alert (red ambient, orange key, red player light, dark fog), Recovery = amber tint, automatic phase transition shifts
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
