@@ -6,6 +6,7 @@ import {
   generateDeductions, getUnlockedDeductions, solveDeduction,
   validateEvidenceLink, linkEvidence, generateEvidenceTags,
 } from "../src/sim/deduction.js";
+// Note: validateEvidenceLink and linkEvidence still exist for internal/procgen use
 import { IncidentArchetype, DeductionCategory } from "../src/shared/types.js";
 import type { JournalEntry } from "../src/shared/types.js";
 
@@ -95,29 +96,31 @@ describe("deduction system", () => {
     }
   });
 
-  it("getUnlockedDeductions respects chain and tags", () => {
+  it("getUnlockedDeductions respects chain and evidence count", () => {
     const crew = generateCrew(10, 184201, ROOM_NAMES);
     const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
     const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
 
-    // With no journal entries — only first deduction could be unlocked IF its tags are covered
+    // First deduction needs evidenceThreshold=2, so 0 entries = locked
     const emptyJournal: JournalEntry[] = [];
     const atEmpty = getUnlockedDeductions(deductions, emptyJournal);
-    // First deduction needs at least one tag, so nothing unlocked with empty journal
     expect(atEmpty.length).toBe(0);
 
-    // With a journal entry covering the first deduction's tags
-    const firstTags = deductions[0].requiredTags;
-    const journal = [fakeJournal("j1", firstTags)];
-    const atOne = getUnlockedDeductions(deductions, journal);
-    expect(atOne.length).toBe(1);
-    expect(atOne[0].id).toBe(deductions[0].id);
+    // With 1 journal entry — still not enough (threshold is 2)
+    const journal1 = [fakeJournal("j1", ["coolant"])];
+    const atOne = getUnlockedDeductions(deductions, journal1);
+    expect(atOne.length).toBe(0);
 
-    // Second deduction is locked because first isn't solved yet
-    const secondTags = deductions[1].requiredTags;
-    const bigJournal = [fakeJournal("j1", firstTags), fakeJournal("j2", secondTags)];
-    const atTwo = getUnlockedDeductions(deductions, bigJournal);
-    expect(atTwo.length).toBe(1); // still only first
+    // With 2 entries — first deduction unlocks (threshold=2)
+    const journal2 = [fakeJournal("j1", ["coolant"]), fakeJournal("j2", ["thermal"])];
+    const atTwo = getUnlockedDeductions(deductions, journal2);
+    expect(atTwo.length).toBe(1);
+    expect(atTwo[0].id).toBe(deductions[0].id);
+
+    // Second deduction is locked because first isn't solved yet (even with enough evidence)
+    const journal5 = Array.from({ length: 5 }, (_, i) => fakeJournal(`j${i}`, ["coolant"]));
+    const atFive = getUnlockedDeductions(deductions, journal5);
+    expect(atFive.length).toBe(1); // still only first (chain prerequisite)
   });
 
   it("getUnlockedDeductions unlocks next after solving predecessor", () => {
@@ -125,11 +128,10 @@ describe("deduction system", () => {
     const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
     let deductions = generateDeductions(crew, timeline, ROOM_NAMES);
 
-    // Cover all tags needed
-    const allTags = deductions.flatMap(d => d.requiredTags);
-    const journal = [fakeJournal("j_all", [...new Set(allTags)])];
+    // Enough evidence to unlock all tiers (12+ entries)
+    const journal = Array.from({ length: 12 }, (_, i) => fakeJournal(`j${i}`, ["coolant"]));
 
-    // Before solving: only first is unlocked
+    // Before solving: only first is unlocked (chain prerequisite)
     expect(getUnlockedDeductions(deductions, journal).length).toBe(1);
 
     // Solve first deduction
@@ -160,7 +162,7 @@ describe("deduction system", () => {
     expect(coveredTags).toEqual(d.requiredTags);
   });
 
-  it("solveDeduction requires valid evidence link", () => {
+  it("solveDeduction works without evidence linking", () => {
     const crew = generateCrew(10, 184201, ROOM_NAMES);
     const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
     const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
@@ -168,27 +170,35 @@ describe("deduction system", () => {
 
     const correctOpt = d.options.find(o => o.correct)!;
 
-    // Without linked evidence — should fail
-    const { correct: c1, validLink: vl1 } = solveDeduction(d, correctOpt.key, []);
-    expect(vl1).toBe(false);
-    expect(c1).toBe(false);
-
-    // With linked evidence covering tags
-    const journal = [fakeJournal("j1", d.requiredTags)];
-    const linked = linkEvidence(d, ["j1"]);
-    const { deduction: solved, correct, validLink } = solveDeduction(linked, correctOpt.key, journal);
-    expect(validLink).toBe(true);
+    // Correct answer — no evidence linking needed
+    const { deduction: solved, correct } = solveDeduction(d, correctOpt.key, []);
     expect(correct).toBe(true);
     expect(solved.solved).toBe(true);
     expect(solved.answeredCorrectly).toBe(true);
 
-    // Wrong answer with valid link
+    // Wrong answer — increments wrongAttempts, NOT immediately solved
     const wrongOpt = d.options.find(o => !o.correct)!;
-    const { deduction: wrong, correct: isCorrect, validLink: vl3 } = solveDeduction(linked, wrongOpt.key, journal);
-    expect(vl3).toBe(true);
+    const { deduction: wrong, correct: isCorrect, penalty } = solveDeduction(d, wrongOpt.key, []);
     expect(isCorrect).toBe(false);
-    expect(wrong.solved).toBe(true);
-    expect(wrong.answeredCorrectly).toBe(false);
+    expect(wrong.wrongAttempts).toBe(1);
+    expect(wrong.solved).toBe(false); // not locked out yet (1 of 2 attempts)
+    expect(penalty).toBeDefined();
+    expect(penalty!.hp).toBe(3);
+    expect(penalty!.turns).toBe(10);
+  });
+
+  it("solveDeduction locks out after max wrong attempts", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+    const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
+    const d = { ...deductions[0], wrongAttempts: 1, maxAttempts: 2 };
+
+    const wrongOpt = d.options.find(o => !o.correct)!;
+    const { deduction: locked, correct } = solveDeduction(d, wrongOpt.key, []);
+    expect(correct).toBe(false);
+    expect(locked.wrongAttempts).toBe(2);
+    expect(locked.solved).toBe(true); // locked out
+    expect(locked.answeredCorrectly).toBe(false);
   });
 
   it("generateEvidenceTags produces system tags from content", () => {

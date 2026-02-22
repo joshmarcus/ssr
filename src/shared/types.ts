@@ -281,7 +281,7 @@ export interface Deduction {
   category: DeductionCategory;
   question: string;
   options: { label: string; key: string; correct: boolean }[];
-  requiredTags: string[];      // tags that linked evidence must collectively cover
+  requiredTags: string[];      // tags for internal procgen/narrative use (hidden from player)
   unlockAfter?: string;        // deduction ID that must be solved first (chain)
   linkedEvidence: string[];    // journal entry IDs the player has linked
   solved: boolean;
@@ -289,9 +289,12 @@ export interface Deduction {
   rewardType: "clearance" | "room_reveal" | "drone_disable" | "sensor_hint";
   rewardDescription: string;
   hintText?: string;           // archetype-specific hint shown in CONNECTIONS section
-  tagRevelations?: { tag: string; text: string }[];  // narrative sentence per required tag
-  synthesisText?: string;    // "what must be true" paragraph (shown when all tags covered)
+  tagRevelations?: { tag: string; text: string }[];  // narrative reading aids ("what the evidence suggests")
+  synthesisText?: string;    // "what must be true" paragraph (shown as analysis)
   conclusionText?: string;   // shown after correct answer
+  evidenceThreshold?: number;  // min journal entries to unlock this deduction
+  wrongAttempts: number;       // count of wrong answers given
+  maxAttempts: number;         // max wrong answers before lockout (default 2)
 }
 
 // ── Scene Echoes (environmental storytelling) ────────────────

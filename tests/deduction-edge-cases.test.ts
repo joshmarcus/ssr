@@ -55,6 +55,9 @@ function makeTestState(phase: ObjectivePhase = ObjectivePhase.Recover) {
       answeredCorrectly: false,
       rewardType: "clearance",
       rewardDescription: "Security access upgraded",
+      evidenceThreshold: 1,
+      wrongAttempts: 0,
+      maxAttempts: 2,
     },
     {
       id: "ded_second",
@@ -72,6 +75,9 @@ function makeTestState(phase: ObjectivePhase = ObjectivePhase.Recover) {
       unlockAfter: "ded_first",
       rewardType: "room_reveal",
       rewardDescription: "New area revealed",
+      evidenceThreshold: 2,
+      wrongAttempts: 0,
+      maxAttempts: 2,
     },
   ];
 
@@ -149,11 +155,10 @@ describe("SubmitDeduction edge cases", () => {
 
   it("rejects submission for locked deduction (chain prerequisite not met)", () => {
     const state = makeTestState();
-    // ded_second requires ded_first to be solved first, and needs sabotage+motive tags
-    // Add the required journal entries for ded_second
+    // ded_second requires ded_first to be solved first
+    // Add enough entries to meet evidence threshold but chain is still locked
     state.mystery!.journal.push(
       { id: "j_sab", turnDiscovered: 10, category: "log", summary: "Sabotage evidence", detail: "", crewMentioned: [], roomFound: "Bridge", tags: ["sabotage"] },
-      { id: "j_mot", turnDiscovered: 11, category: "log", summary: "Motive", detail: "", crewMentioned: [], roomFound: "Bridge", tags: ["motive"] },
     );
 
     const next = step(state, {
@@ -185,7 +190,7 @@ describe("SubmitDeduction edge cases", () => {
     expect(correctLog).toBeDefined();
   });
 
-  it("marks wrong answer as solved but not correct", () => {
+  it("marks wrong answer as NOT solved (first attempt), applies penalty", () => {
     const state = makeTestState();
 
     const next = step(state, {
@@ -194,20 +199,42 @@ describe("SubmitDeduction edge cases", () => {
       answerKey: "wrong_b",
     });
 
-    const solved = next.mystery!.deductions.find(d => d.id === "ded_first")!;
-    expect(solved.solved).toBe(true);
-    expect(solved.answeredCorrectly).toBe(false);
+    const ded = next.mystery!.deductions.find(d => d.id === "ded_first")!;
+    expect(ded.solved).toBe(false); // not locked out yet
+    expect(ded.wrongAttempts).toBe(1);
+
+    // Penalty applied: -3 HP, +10 turns
+    expect(next.player.hp).toBe(state.player.hp - 3);
 
     const incorrectLog = next.logs.find(l => l.text.includes("incorrect"));
     expect(incorrectLog).toBeDefined();
   });
 
+  it("locks out deduction after max wrong attempts", () => {
+    const state = makeTestState();
+    // Set first deduction to 1 wrong attempt already
+    state.mystery!.deductions[0].wrongAttempts = 1;
+
+    const next = step(state, {
+      type: ActionType.SubmitDeduction,
+      deductionId: "ded_first",
+      answerKey: "wrong_b",
+    });
+
+    const ded = next.mystery!.deductions.find(d => d.id === "ded_first")!;
+    expect(ded.solved).toBe(true); // locked out
+    expect(ded.answeredCorrectly).toBe(false);
+    expect(ded.wrongAttempts).toBe(2);
+
+    const stalledLog = next.logs.find(l => l.text.includes("stalled"));
+    expect(stalledLog).toBeDefined();
+  });
+
   it("unlocks second deduction after first is solved", () => {
     const state = makeTestState();
-    // Add tags needed for ded_second
+    // Add enough journal entries to meet ded_second threshold (evidenceThreshold=2)
     state.mystery!.journal.push(
       { id: "j_sab", turnDiscovered: 10, category: "log", summary: "Sabotage evidence", detail: "", crewMentioned: [], roomFound: "Bridge", tags: ["sabotage"] },
-      { id: "j_mot", turnDiscovered: 11, category: "log", summary: "Motive", detail: "", crewMentioned: [], roomFound: "Bridge", tags: ["motive"] },
     );
 
     // Solve first deduction
@@ -217,7 +244,7 @@ describe("SubmitDeduction edge cases", () => {
       answerKey: "correct_a",
     });
 
-    // Now submit second deduction — should be accepted
+    // Now submit second deduction — should be accepted (2 journal entries >= threshold of 2)
     next = step(next, {
       type: ActionType.SubmitDeduction,
       deductionId: "ded_second",

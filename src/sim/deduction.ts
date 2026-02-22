@@ -181,12 +181,15 @@ function generateWhatDeduction(
     category: DeductionCategory.What,
     question: "Based on the evidence, what happened aboard CORVUS-7?",
     options,
-    requiredTags: [archTags[0]],  // just one system tag — easy entry point
+    requiredTags: [archTags[0]],  // internal use — procgen solvability
     linkedEvidence: [],
     solved: false,
     rewardType: "room_reveal",
     rewardDescription: "Reveals the location of an unexplored room on the map",
     hintText: getWhatHintText(timeline.archetype),
+    evidenceThreshold: 2,   // Tier 1: 2+ evidence entries
+    wrongAttempts: 0,
+    maxAttempts: 2,
   };
 }
 
@@ -279,6 +282,9 @@ function generateSequenceDeduction(
     rewardType: "sensor_hint",
     rewardDescription: "Reveals the location of the next sensor upgrade",
     hintText: "Look for emergency logs and alarm records that describe the triggering event.",
+    evidenceThreshold: 4,   // Tier 2: 4+ evidence entries
+    wrongAttempts: 0,
+    maxAttempts: 2,
   };
 }
 
@@ -411,6 +417,9 @@ function generateWhyDeduction(
     rewardType: "drone_disable",
     rewardDescription: "Disables a patrol drone, clearing a safe route",
     hintText: getWhyHintText(archetype),
+    evidenceThreshold: 6,   // Tier 3: 6+ evidence entries
+    wrongAttempts: 0,
+    maxAttempts: 2,
   };
 }
 
@@ -446,6 +455,9 @@ function generateHeroDeduction(
     rewardType: "clearance",
     rewardDescription: "Grants clearance to open a locked door elsewhere in the station",
     hintText: config.heroHint,
+    evidenceThreshold: 8,   // Tier 4: 8+ evidence entries
+    wrongAttempts: 0,
+    maxAttempts: 2,
   };
 }
 
@@ -500,6 +512,9 @@ function generateResponsibilityDeduction(
     rewardType: "room_reveal",
     rewardDescription: "Reveals a hidden section of the station",
     hintText: config.villainHint,
+    evidenceThreshold: 10,  // Tier 5: 10+ evidence entries
+    wrongAttempts: 0,
+    maxAttempts: 2,
   };
 }
 
@@ -571,6 +586,9 @@ function generateHiddenAgendaDeduction(
     rewardType: "sensor_hint",
     rewardDescription: "Reveals the location of hidden evidence",
     hintText,
+    evidenceThreshold: 12,  // Tier 6: 12+ evidence entries
+    wrongAttempts: 0,
+    maxAttempts: 2,
   };
 }
 
@@ -652,26 +670,22 @@ function shuffleArray<T>(arr: T[]): void {
 /**
  * Check if a deduction is available for the player to attempt.
  * A deduction is unlocked when:
- * 1. It's not already solved
+ * 1. It's not already solved (including locked-out deductions)
  * 2. Its prerequisite deduction (unlockAfter) is solved
- * 3. The player's journal contains entries that collectively cover the requiredTags
+ * 3. The player has enough journal entries (evidence count threshold)
  */
 export function getUnlockedDeductions(
   deductions: Deduction[],
   journal: JournalEntry[],
 ): Deduction[] {
   const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
-  const allTags = new Set(journal.flatMap(j => j.tags));
 
   return deductions.filter(d => {
     if (d.solved) return false;
     // Check chain prerequisite
     if (d.unlockAfter && !solvedIds.has(d.unlockAfter)) return false;
-    // Check that journal has entries covering all required tags
-    for (const tag of d.requiredTags) {
-      if (!allTags.has(tag)) return false;
-    }
-    return true;
+    // Check evidence count threshold
+    return journal.length >= (d.evidenceThreshold ?? 1);
   });
 }
 
@@ -721,30 +735,43 @@ export function linkEvidence(
 
 /**
  * Attempt to solve a deduction.
- * Requires linkedEvidence to be valid (cover all requiredTags).
- * Returns the updated deduction and whether the answer was correct.
+ * No evidence-link validation required — player reads evidence and answers directly.
+ * Wrong answers increment wrongAttempts; lockout at maxAttempts.
+ * Returns the updated deduction, whether correct, and any penalty.
  */
 export function solveDeduction(
   deduction: Deduction,
   answerKey: string,
-  journal: JournalEntry[],
-): { deduction: Deduction; correct: boolean; validLink: boolean } {
-  // Validate evidence link first
-  const { valid } = validateEvidenceLink(deduction, deduction.linkedEvidence, journal);
-  if (!valid) {
-    return { deduction, correct: false, validLink: false };
-  }
-
+  _journal: JournalEntry[],
+): { deduction: Deduction; correct: boolean; penalty?: { hp: number; turns: number } } {
   const chosen = deduction.options.find(o => o.key === answerKey);
   const correct = chosen?.correct || false;
+
+  if (correct) {
+    return {
+      deduction: {
+        ...deduction,
+        solved: true,
+        answeredCorrectly: true,
+      },
+      correct: true,
+    };
+  }
+
+  // Wrong answer
+  const newAttempts = (deduction.wrongAttempts ?? 0) + 1;
+  const maxAttempts = deduction.maxAttempts ?? 2;
+  const lockedOut = newAttempts >= maxAttempts;
+
   return {
     deduction: {
       ...deduction,
-      solved: true,
-      answeredCorrectly: correct,
+      wrongAttempts: newAttempts,
+      solved: lockedOut,
+      answeredCorrectly: lockedOut ? false : deduction.answeredCorrectly,
     },
-    correct,
-    validLink: true,
+    correct: false,
+    penalty: { hp: 3, turns: 10 },
   };
 }
 

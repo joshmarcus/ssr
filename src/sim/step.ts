@@ -9,7 +9,7 @@ import { getRoomCleanliness, getRoomCleanlinessByIndex, getRoomWithIndex, getRoo
 import { tickHazards, tickDeterioration, tickPA, applyHazardDamage, getDamageMultiplier } from "./hazards.js";
 import { checkWinCondition, checkLossCondition, checkTurnLimit } from "./objectives.js";
 import { updateVision } from "./vision.js";
-import { generateEvidenceTags, getUnlockedDeductions, solveDeduction, linkEvidence } from "./deduction.js";
+import { generateEvidenceTags, getUnlockedDeductions, solveDeduction } from "./deduction.js";
 import { assignThread } from "./threads.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
@@ -4927,25 +4927,9 @@ export function step(state: GameState, action: Action): GameState {
         break;
       }
 
-      // Auto-link evidence: find journal entries whose tags cover the required tags
+      // Solve directly — no evidence linking required
       const journal = next.mystery.journal;
-      const autoLinked: string[] = [];
-      const neededTags = new Set(deduction.requiredTags);
-      for (const entry of journal) {
-        if (neededTags.size === 0) break;
-        let covers = false;
-        for (const tag of entry.tags) {
-          if (neededTags.has(tag)) {
-            covers = true;
-            neededTags.delete(tag);
-          }
-        }
-        if (covers) autoLinked.push(entry.id);
-      }
-
-      // Link evidence and solve
-      const linked = linkEvidence(deduction, autoLinked);
-      const { deduction: solved, correct } = solveDeduction(linked, action.answerKey, journal);
+      const { deduction: solved, correct, penalty } = solveDeduction(deduction, action.answerKey, journal);
 
       // Update the deduction in mystery state
       next = {
@@ -4958,10 +4942,31 @@ export function step(state: GameState, action: Action): GameState {
         },
       };
 
+      // Apply wrong-answer penalties
+      if (!correct && penalty) {
+        next = {
+          ...next,
+          player: {
+            ...next.player,
+            hp: Math.max(0, next.player.hp - penalty.hp),
+          },
+          turn: next.turn + penalty.turns,
+        };
+        if (next.player.hp <= 0) {
+          next = { ...next, player: { ...next.player, alive: false }, gameOver: true };
+        }
+      }
+
       // Log result
-      const resultText = correct
-        ? `Deduction correct: "${deduction.question}" — ${deduction.rewardDescription}`
-        : `Deduction answered (incorrect): "${deduction.question}"`;
+      const attemptsLeft = (solved.maxAttempts ?? 2) - (solved.wrongAttempts ?? 0);
+      let resultText: string;
+      if (correct) {
+        resultText = `Deduction correct: "${deduction.question}" — ${deduction.rewardDescription}`;
+      } else if (solved.solved) {
+        resultText = `Investigation stalled — insufficient evidence to continue this line of inquiry: "${deduction.question}"`;
+      } else {
+        resultText = `Deduction incorrect: "${deduction.question}" — ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining. -${penalty?.hp ?? 0} HP, +${penalty?.turns ?? 0} turns.`;
+      }
       next.logs = [...next.logs, {
         id: `log_deduction_result_${deduction.id}_${next.turn}`,
         timestamp: next.turn,

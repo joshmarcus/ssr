@@ -228,7 +228,6 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
 
   const allDeductions = state.mystery?.deductions ?? [];
   const journal = state.mystery?.journal ?? [];
-  const allJournalTags = new Set(journal.flatMap(j => j.tags));
   const deductions = allDeductions.map(d => ({
     id: d.id,
     category: d.category,
@@ -236,8 +235,10 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
     options: d.options.map(o => ({ key: o.key, label: o.label })),
     solved: d.solved,
     answeredCorrectly: d.answeredCorrectly,
-    requiredTags: d.requiredTags,
-    missingTags: d.requiredTags.filter(t => !allJournalTags.has(t)),
+    evidenceCount: journal.length,
+    evidenceThreshold: d.evidenceThreshold ?? 1,
+    wrongAttempts: d.wrongAttempts ?? 0,
+    maxAttempts: d.maxAttempts ?? 2,
   }));
   const answered = allDeductions.filter(d => d.solved).length;
   const correct = allDeductions.filter(d => d.answeredCorrectly).length;
@@ -412,9 +413,12 @@ function renderObservationAsText(obs: HarnessObservation): string {
     for (const d of obs.deductions) {
       const status = d.solved
         ? (d.answeredCorrectly ? "[CORRECT]" : "[WRONG]")
-        : d.missingTags.length === 0 ? "[UNLOCKED]" : "[LOCKED]";
-      lines.push(`  ${d.id} ${status} ${d.question}`);
-      if (!d.solved && d.missingTags.length === 0) {
+        : d.evidenceCount >= d.evidenceThreshold ? "[UNLOCKED]" : `[LOCKED ${d.evidenceCount}/${d.evidenceThreshold}]`;
+      const attemptInfo = !d.solved && d.wrongAttempts > 0
+        ? ` (${d.maxAttempts - d.wrongAttempts} attempts left)`
+        : "";
+      lines.push(`  ${d.id} ${status}${attemptInfo} ${d.question}`);
+      if (!d.solved && d.evidenceCount >= d.evidenceThreshold) {
         for (const o of d.options) {
           lines.push(`    SUBMIT_DEDUCTION {"deductionId":"${d.id}","answerKey":"${o.key}"} — ${o.label}`);
         }
