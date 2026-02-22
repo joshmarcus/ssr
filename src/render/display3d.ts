@@ -612,8 +612,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _heatShimmerTimer: number = 0;
   private _playerTileHeat: number = 0;
   private _playerTileDirt: number = 0;
+  private _playerTileSmoke: number = 0;
   // Cleaning sparkle sprites (green sparkles when moving over dirty tiles)
   private _cleanSparkleTimer: number = 0;
+  // Smoke wisp sprites (drifting grey wisps on smoky tiles)
+  private _smokeWispTimer: number = 0;
   // Damage spark timer (orange sparks shooting from body at low HP)
   private _damageSparkTimer: number = 0;
   // Headlight damage flicker ratio (1.0 = normal, <1.0 when flickering)
@@ -2557,6 +2560,33 @@ export class BrowserDisplay3D implements IGameDisplay {
       (hs.material as THREE.SpriteMaterial).opacity *= (1 - t * 0.5);
       const sx = 0.15 + t * 0.1;
       hs.scale.set(sx, 0.03 + t * 0.02, 1);
+    }
+
+    // Smoke wisps: drifting grey sprites on smoky tiles near player
+    if (this._playerTileSmoke > 25 && this.chaseCamActive) {
+      this._smokeWispTimer -= delta;
+      if (this._smokeWispTimer <= 0) {
+        const smokeIntensity = Math.min(1, this._playerTileSmoke / 80);
+        this._smokeWispTimer = 0.3 - smokeIntensity * 0.2;
+        const swMat = new THREE.SpriteMaterial({
+          color: 0x888899, transparent: true, opacity: 0.08 + smokeIntensity * 0.06,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const sw = new THREE.Sprite(swMat);
+        sw.scale.set(0.2 + Math.random() * 0.15, 0.1 + Math.random() * 0.08, 1);
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 0.3 + Math.random() * 1.5;
+        sw.position.set(
+          this.playerCurrentX + Math.cos(angle) * dist,
+          0.2 + Math.random() * 0.8,
+          this.playerCurrentZ + Math.sin(angle) * dist,
+        );
+        (sw as any)._life = 0;
+        (sw as any)._maxLife = 1.0 + Math.random() * 1.0;
+        (sw as any)._driftY = 0.15 + Math.random() * 0.1;
+        this.scene.add(sw);
+        this._discoverySparkles.push(sw);
+      }
     }
 
     // Entity animations
@@ -7151,6 +7181,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this._playerTilePressure = playerTile?.pressure ?? 100;
     this._playerTileHeat = playerTile?.heat ?? 0;
     this._playerTileDirt = playerTile?.dirt ?? 0;
+    this._playerTileSmoke = playerTile?.smoke ?? 0;
     if (this._playerTilePressure < 60) {
       // Find nearest breach entity for wind direction
       let bestDist = Infinity;

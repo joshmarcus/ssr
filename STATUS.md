@@ -281,6 +281,7 @@
 - **Sprint V119 — DataCore energy arcs**: 3 magenta spark sprites radiate outward every ~2.5s from the DataCore. Elongated vertically (0.06x0.12), short-lived (0.2-0.35s). One-shot flag prevents multi-frame spawning. Adds crackling energy feel to the primary objective
 - **Sprint V120 — Minimap entity pulse rings**: Key unexhausted entities (DataCore, EscapePod, CrewNPC) get a pulsing ring on the minimap. Ring radius oscillates, opacity fades in/out at 2.5Hz. Draws player attention to important objectives without cluttering the map
 - **Sprint V121 — Floating interact indicator**: Glowing green-teal sprite hovers above nearest unexhausted entity within 1.8 tiles. Bobs vertically (3Hz) and pulses opacity (4Hz). Single reusable sprite moves between targets. Clear visual cue for interactable entities
+- **Sprint V122 — Smoke wisps near player**: Drifting grey sprites spawn around player on smoky tiles (smoke>25). Larger and slower than heat shimmer, with long lifetimes (1-2s). Frequency scales with smoke intensity. Completes the hazard particle trifecta (heat shimmer + vacuum wind + smoke)
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
