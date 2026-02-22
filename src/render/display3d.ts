@@ -1984,9 +1984,12 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Player light subtle breathing pulse
+    // Player light: breathing pulse + room entry bloom
     if (this.playerLight) {
-      this.playerLight.intensity = 2.5 + Math.sin(elapsed * 1.5) * 0.3;
+      const baseIntensity = 2.5 + Math.sin(elapsed * 1.5) * 0.3;
+      // Room entry bloom: briefly flash brighter when entering a room
+      const bloom = this.roomLightBoost > 0.1 ? this.roomLightBoost * 2.0 : 0;
+      this.playerLight.intensity = baseIntensity + bloom;
     }
 
     // Headlight: subtle intensity flutter (like a slightly unstable power connection)
@@ -3179,7 +3182,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Place up to 7 decorations at deterministic positions (seeded by room id)
       // Larger rooms get more props for visual density at ground level
       const roomArea = room.width * room.height;
-      const maxDecor = Math.min(roomArea >= 20 ? 7 : roomArea >= 12 ? 6 : 5, emptyFloors.length);
+      const maxDecor = Math.min(roomArea >= 20 ? 9 : roomArea >= 12 ? 7 : 5, emptyFloors.length);
       // Simple deterministic shuffle based on room position
       const seed = room.x * 31 + room.y * 17;
       emptyFloors.sort((a, b) => ((a.x * 13 + a.y * 7 + seed) & 0xff) - ((b.x * 13 + b.y * 7 + seed) & 0xff));
@@ -3270,7 +3273,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Deterministic selection of wall slots
         const wallSeed = room.x * 37 + room.y * 23;
         wallSlots.sort((a, b) => ((a.x * 19 + a.y * 11 + wallSeed) & 0xff) - ((b.x * 19 + b.y * 11 + wallSeed) & 0xff));
-        const maxWallProps = Math.min(wallProps.length, wallSlots.length, 3);
+        const maxWallProps = Math.min(wallProps.length, wallSlots.length, 5); // room-focused = more budget
 
         for (let i = 0; i < maxWallProps; i++) {
           const slot = wallSlots[i];
@@ -4020,9 +4023,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         const adjW = x > 0 && state.tiles[y][x - 1].type === TileType.Corridor;
         if (!adjN && !adjS && !adjE && !adjW) continue;
 
-        // Place prop every ~8th qualifying wall (deterministic by position)
+        // Place prop on qualifying walls (~20% chance — room-focused rendering limits visible count)
         const hash = (x * 23 + y * 47) & 0xff;
-        if (hash > 32) continue; // ~12% chance — sparse for perf
+        if (hash > 51) continue; // ~20% chance
         this.corridorWallPropTiles.add(key);
 
         // Pick model deterministically
