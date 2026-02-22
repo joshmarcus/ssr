@@ -9117,6 +9117,30 @@ export class BrowserDisplay3D implements IGameDisplay {
     ctx.fillText(`T${state.turn}`, 3, h - 2);
     ctx.globalAlpha = 1;
 
+    // Sensor mode minimap border: colored frame when sensor is active
+    if (this.sensorMode) {
+      const sensorBorderColors: Record<string, string> = {
+        [SensorType.Thermal]: "rgba(255,68,34,0.6)",
+        [SensorType.Atmospheric]: "rgba(68,170,255,0.6)",
+        [SensorType.Cleanliness]: "rgba(136,204,68,0.6)",
+      };
+      const borderColor = sensorBorderColors[this.sensorMode] ?? "rgba(68,255,136,0.6)";
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, w - 2, h - 2);
+      // Sensor mode label at top-right
+      ctx.font = "bold 8px monospace";
+      ctx.textAlign = "right";
+      const sensorLabels: Record<string, string> = {
+        [SensorType.Thermal]: "THM",
+        [SensorType.Atmospheric]: "ATM",
+        [SensorType.Cleanliness]: "CLN",
+      };
+      ctx.fillStyle = borderColor;
+      ctx.fillText(sensorLabels[this.sensorMode] ?? "SEN", w - 3, 10);
+      ctx.textAlign = "left";
+    }
+
     // Render compass
     this.renderCompass();
   }

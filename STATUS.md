@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V140 completed, V141 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V150 completed, V151 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -309,6 +309,7 @@
 - **Sprint V147 — Floor trail decals**: Semi-transparent track marks left on the floor as Sweepo moves. Oriented to movement direction, fade over 12-16 seconds with quadratic decay. Max 50 active decals with FIFO removal. Creates visual breadcrumb trail in 3D space
 - **Sprint V148 — Hazard proximity camera tilt**: Camera subtly rolls toward nearby threats (breaches for vacuum, heat shimmer wobble). Uses breach positions for directional bias, converts world-space to screen-space via player facing. Max ±0.06 rad tilt, smoothly interpolated. Creates subconscious directional awareness of danger
 - **Sprint V149 — Relay activation celebration**: Camera zoom-in punch (-1.5 zoom), milestone screen flash, and 0.4s time-stretch (camera lerp slowed to 30%) on relay activation. Combined with existing golden sparks and pulse waves for epic moment
+- **Sprint V150 — Minimap sensor border**: Colored frame and 3-letter sensor label (THM/ATM/CLN) drawn on minimap when sensor mode is active. Red for thermal, blue for atmospheric, green for cleanliness. Reinforces sensor state at a glance
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
