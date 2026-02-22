@@ -2639,6 +2639,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeCorridorJunctionBeacons(state);
     this.placeCorridorLightShafts(state);
     this.placeWallDamageDecals(state);
+    this.placeSpaceViewports(state);
     this.placeCorridorWallProps(state);
     this.placeEmergencyWallStrips(state);
     this.placeCorridorFixtures(state);
@@ -4814,6 +4815,12 @@ export class BrowserDisplay3D implements IGameDisplay {
         const bB = Math.round(0xff + (0x44 - 0xff) * sf * 0.7) / 255;
         bMat.color.setRGB(bR, bG, bB);
       }
+    }
+
+    // ── Viewport star twinkling ──────────────────────────────────
+    for (const vs of this._viewportStarSprites) {
+      const twinkle = 0.5 + 0.5 * Math.sin(elapsed * 2.5 + vs.phase);
+      (vs.sprite.material as THREE.SpriteMaterial).opacity = vs.baseOpacity * twinkle;
     }
 
     // ── Station events: power fluctuations + hull groans ──────────
@@ -7909,6 +7916,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // ── Private: wall damage decals (environmental storytelling) ──
 
   private _wallDamageTiles: Set<string> = new Set();
+  private _viewportRooms: Set<string> = new Set();
+  private _viewportStarSprites: { sprite: THREE.Sprite; baseOpacity: number; phase: number }[] = [];
 
   private placeWallDamageDecals(state: GameState): void {
     for (let y = 1; y < state.height - 1; y++) {
@@ -7980,6 +7989,127 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
         if (!added) bucket.add(decal);
+      }
+    }
+  }
+
+  // ── Private: space viewports on room walls ────────────────────
+  /** Place dark "window" panels on room walls with twinkling star dots */
+  private placeSpaceViewports(state: GameState): void {
+    for (const room of state.rooms) {
+      if (this._viewportRooms.has(room.id)) continue;
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
+      if (!state.tiles[cy][cx].explored) continue;
+      this._viewportRooms.add(room.id);
+
+      const rGroup = this.roomDecoGroups.get(room.id) ?? this.decorationGroup;
+      const tint = ROOM_WALL_TINTS_3D[room.name] ?? 0xaabbcc;
+
+      // Find eligible wall positions (walls adjacent to floor tiles inside the room)
+      const candidates: { wx: number; wz: number; rotY: number }[] = [];
+      for (let y = room.y; y < room.y + room.height; y++) {
+        for (let x = room.x; x < room.x + room.width; x++) {
+          if (y < 0 || y >= state.height || x < 0 || x >= state.width) continue;
+          if (state.tiles[y][x].type !== TileType.Floor) continue;
+          // Check adjacent walls
+          if (y > 0 && state.tiles[y - 1][x].type === TileType.Wall)
+            candidates.push({ wx: x, wz: y - 0.48, rotY: 0 });
+          if (y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Wall)
+            candidates.push({ wx: x, wz: y + 0.48, rotY: Math.PI });
+          if (x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Wall)
+            candidates.push({ wx: x + 0.48, wz: y, rotY: -Math.PI / 2 });
+          if (x > 0 && state.tiles[y][x - 1].type === TileType.Wall)
+            candidates.push({ wx: x - 0.48, wz: y, rotY: Math.PI / 2 });
+        }
+      }
+
+      if (candidates.length === 0) continue;
+
+      // Place 1-3 viewports per room (deterministic based on room position)
+      const hash = room.x * 31 + room.y * 17;
+      const count = 1 + (hash % 3); // 1-3 viewports
+      for (let i = 0; i < count && i < candidates.length; i++) {
+        const idx = (hash * (i + 1) * 7) % candidates.length;
+        const pos = candidates[idx];
+
+        // Dark viewport panel (PlaneGeometry facing into room)
+        const vpW = 0.7;
+        const vpH = 0.4;
+        const vpGeo = new THREE.PlaneGeometry(vpW, vpH);
+        const vpMat = new THREE.MeshBasicMaterial({
+          color: 0x010206,
+          transparent: true,
+          opacity: 0.97,
+          depthWrite: false,
+        });
+        const vpMesh = new THREE.Mesh(vpGeo, vpMat);
+        vpMesh.position.set(pos.wx, 1.05, pos.wz); // slightly below eye level for chase cam
+        vpMesh.rotation.y = pos.rotY;
+        rGroup.add(vpMesh);
+
+        // Glowing edge frame — brighter, slightly emissive for visibility
+        const frameGeo = new THREE.PlaneGeometry(vpW + 0.08, vpH + 0.08);
+        const fr = ((tint >> 16) & 0xff) / 255;
+        const fg = ((tint >> 8) & 0xff) / 255;
+        const fb = (tint & 0xff) / 255;
+        const frameMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(fr * 0.5, fg * 0.5, fb * 0.5),
+          transparent: true,
+          opacity: 0.7,
+          depthWrite: false,
+        });
+        const frameMesh = new THREE.Mesh(frameGeo, frameMat);
+        frameMesh.position.set(pos.wx, 1.05, pos.wz);
+        frameMesh.rotation.y = pos.rotY;
+        // Push frame slightly behind viewport to avoid z-fighting
+        const backOff = 0.003;
+        frameMesh.position.x -= Math.sin(pos.rotY) * backOff;
+        frameMesh.position.z -= Math.cos(pos.rotY) * backOff;
+        rGroup.add(frameMesh);
+
+        // Outer glow halo — soft additive blend for "lit viewport" look
+        const haloGeo = new THREE.PlaneGeometry(vpW + 0.25, vpH + 0.25);
+        const haloMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(fr * 0.15 + 0.02, fg * 0.15 + 0.02, fb * 0.2 + 0.05),
+          transparent: true,
+          opacity: 0.2,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        });
+        const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+        haloMesh.position.set(pos.wx, 1.05, pos.wz);
+        haloMesh.rotation.y = pos.rotY;
+        haloMesh.position.x -= Math.sin(pos.rotY) * backOff * 2;
+        haloMesh.position.z -= Math.cos(pos.rotY) * backOff * 2;
+        rGroup.add(haloMesh);
+
+        // Star dots inside the viewport — tiny sprites just in front of the dark panel
+        const starCount = 3 + (hash + i) % 4; // 3-6 stars per viewport
+        for (let s = 0; s < starCount; s++) {
+          const starPhase = ((hash + i * 13 + s * 37) % 100) / 100 * Math.PI * 2;
+          const sx = (((hash + s * 11) % 100) / 100 - 0.5) * vpW * 0.8;
+          const sy = (((hash + s * 23 + i * 7) % 100) / 100 - 0.5) * vpH * 0.7;
+          const brightness = 0.5 + ((hash + s * 19) % 50) / 100;
+          const starMat = new THREE.SpriteMaterial({
+            color: 0xeeeeff,
+            transparent: true,
+            opacity: brightness,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          });
+          const star = new THREE.Sprite(starMat);
+          star.scale.set(0.02, 0.02, 1);
+
+          // Position star in viewport's local space
+          const fwd = 0.01; // slightly in front of dark panel
+          const worldX = pos.wx + Math.sin(pos.rotY) * fwd + Math.cos(pos.rotY) * sx;
+          const worldZ = pos.wz + Math.cos(pos.rotY) * fwd - Math.sin(pos.rotY) * sx;
+          star.position.set(worldX, 1.1 + sy, worldZ);
+          rGroup.add(star);
+          this._viewportStarSprites.push({ sprite: star, baseOpacity: brightness, phase: starPhase });
+        }
       }
     }
   }
