@@ -214,6 +214,21 @@ Key patterns and gotchas discovered during visual sprints:
 - **Grep tool sometimes fails on large files**: Use bash grep as fallback when the Grep tool returns no results on display3d.ts.
 - **Always check tile bounds**: Any code accessing `state.tiles[y][x]` must bounds-check first. Off-by-one errors crash the renderer silently.
 
+## Sprint Learnings (V44-V61 Reflection)
+
+Room-focused rendering paradigm shift and atmosphere refinement:
+
+- **Room-focused rendering is transformative**: Showing only the current room + nearby corridors makes every room feel like a distinct discovery. The infrastructure (room sub-groups, distance culling, room transition detection) was already there — just needed tighter parameters.
+- **Corridor darkness sells the atmosphere**: Reducing ambient to 35% in corridors with a brighter headlight creates genuine tension. The contrast between dark corridors and lit rooms is the game's strongest visual element.
+- **Fog is the most powerful atmosphere tool**: Dynamic fog parameters (near/far) varying by room vs corridor create more visual impact than adding geometry. Chase cam fog near=2/far=10 in corridors is claustrophobic perfection.
+- **Hazard-reactive everything**: Room center glow, headlight color, fog color, screen border, dust particles — everything should react to the current hazard state. Creates visceral danger feedback.
+- **Player animation adds life**: Forward tilt, turn lean, and movement bob on Sweepo are tiny changes (~20 lines) but make the character feel alive and weighty.
+- **Idle camera sway prevents deadness**: Even 0.04-unit lateral drift at 0.5Hz makes a static scene feel like it's "breathing". Never have a truly static camera.
+- **Property declarations before use**: Always add class property declarations before writing code that references them. Missing `_doorSlideState` declaration caused a TypeScript error.
+- **Performance budget per-room**: Room-focused rendering means you can increase decoration density (7→9), wall props (3→5), corridor props (12%→20%) since only one room renders at a time.
+- **Transition effects need CSS overlay**: The room transition fade uses a simple fixed-position div with opacity animation. Simpler and faster than a Three.js post-processing pass.
+- **Map state to visual, don't store visual state**: Room haze meshes store hazard color but should derive it from game state each frame. Storing visual state leads to stale data when game state changes.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)

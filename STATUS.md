@@ -217,6 +217,10 @@
 - **Sprint V55 — Minimap room focus**: Current room highlighted with green glow outline, non-view tiles dimmed 50%, door lights distance-culled
 - **Sprint V56 — Room ambient particles + center glow**: Room-tinted dust particles, wider spread in rooms, dimmer in corridors. Room center PointLight colored per room type
 - **Sprint V57 — Denser room/corridor props**: Room decorations up to 9 (was 7), wall props up to 5 (was 3), corridor wall props 20% (was 12%), player light bloom on room entry
+- **Sprint V58 — Hazard-reactive room lighting**: Room center glow pulses red/amber/blue per hazard type, headlight color shifts to match, new frost CSS screen border for vacuum hazards
+- **Sprint V59 — Enhanced entity proximity feedback**: Ground rings pulse/scale when player approaches (1.2x at 2 tiles, bright opacity), emissive boost increased
+- **Sprint V60 — Sweepo movement animation**: Forward tilt on movement, sideways lean into turns, movement bob (8Hz), smooth lerped animation
+- **Sprint V61 — Idle camera sway**: Gentle breathing sway when player is idle (vertical + lateral drift), distinct from active head-bob
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
