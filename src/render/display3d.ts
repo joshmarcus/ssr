@@ -2980,7 +2980,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (isMoving) {
         this._dustKickTimer -= delta;
         if (this._dustKickTimer <= 0) {
-          this._dustKickTimer = 0.08; // frequent small puffs
+          this._dustKickTimer = 0.15; // small puffs (throttled for perf)
           // Spawn behind player (opposite of movement direction)
           const backX = this.playerCurrentX - velX * 0.5 + (Math.random() - 0.5) * 0.2;
           const backZ = this.playerCurrentZ - velZ * 0.5 + (Math.random() - 0.5) * 0.2;
@@ -3715,8 +3715,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Proximity entity highlight: boost emissive + pulse ground ring for nearby entities
-    if (this.chaseCamActive && this.playerMesh) {
+    // Proximity entity highlight: boost emissive + pulse ground ring for nearby entities (throttled: every 4th frame)
+    if (this.chaseCamActive && this.playerMesh && this._ambientParticleFrame % 4 === 0) {
       for (const [, mesh] of this.entityMeshes) {
         const dx = mesh.position.x - this.playerCurrentX;
         const dz = mesh.position.z - this.playerCurrentZ;
@@ -3747,7 +3747,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Entity interaction pulse: scale bump + brightness on interact
+    // Entity interaction pulse: scale bump + brightness on interact (throttled: every 2nd frame)
+    if (this._ambientParticleFrame % 2 === 0)
     for (const [, mesh] of this.entityMeshes) {
       const pulse = (mesh as any)._interactPulse;
       if (pulse > 0.01) {
@@ -4365,16 +4366,21 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Horizontal drift (used by airlock wind streaks and ambient particles)
       if ((sp as any)._driftX) sp.position.x += delta * (sp as any)._driftX;
       if ((sp as any)._driftZ) sp.position.z += delta * (sp as any)._driftZ;
-      // Breach vacuum suction: pull nearby sprites toward unsealed breaches
-      for (let bi = 0; bi < this._breachPositions.length; bi++) {
-        const bp = this._breachPositions[bi];
-        const bdx = bp.x - sp.position.x;
-        const bdz = bp.z - sp.position.z;
-        const bDist = Math.sqrt(bdx * bdx + bdz * bdz);
-        if (bDist < 4 && bDist > 0.1) {
-          const pull = delta * 2.0 / (bDist * bDist + 0.5); // inverse-square falloff
-          sp.position.x += bdx * pull;
-          sp.position.z += bdz * pull;
+      // Breach vacuum suction: pull nearby sprites toward unsealed breaches (skip if no breaches or particle far from player)
+      if (this._breachPositions.length > 0) {
+        const pDist = Math.abs(sp.position.x - this.playerCurrentX) + Math.abs(sp.position.z - this.playerCurrentZ);
+        if (pDist < 8) { // only apply suction near player (where particles are visible)
+          for (let bi = 0; bi < this._breachPositions.length; bi++) {
+            const bp = this._breachPositions[bi];
+            const bdx = bp.x - sp.position.x;
+            const bdz = bp.z - sp.position.z;
+            const bDist = Math.sqrt(bdx * bdx + bdz * bdz);
+            if (bDist < 4 && bDist > 0.1) {
+              const pull = delta * 2.0 / (bDist * bDist + 0.5);
+              sp.position.x += bdx * pull;
+              sp.position.z += bdz * pull;
+            }
+          }
         }
       }
       // Twinkle: rapid opacity oscillation that fades out
