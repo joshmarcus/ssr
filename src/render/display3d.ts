@@ -1093,6 +1093,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Room transition fade — brief darken then brighten
       this._roomTransitionFade = 0.6;
 
+      // Room-type visual signature: brief tinted flash on entry
+      this.triggerRoomSignature(room!.name);
+
       // Show room name banner on the 3D viewport
       const banner = document.getElementById("room-banner");
       if (banner) {
@@ -1231,6 +1234,47 @@ export class BrowserDisplay3D implements IGameDisplay {
     setTimeout(() => {
       aberration!.style.opacity = "0";
     }, duration * 1000);
+  }
+
+  /** Brief tinted screen flash on room entry — each room type gets a distinct visual feel */
+  private triggerRoomSignature(roomName: string): void {
+    // Map room names to signature colors/styles
+    const signatures: Record<string, { color: string; intensity: number; duration: number }> = {
+      "Data Core": { color: "rgba(140,60,255,0.12)", intensity: 1, duration: 400 },
+      "Med Bay": { color: "rgba(255,255,255,0.1)", intensity: 1, duration: 300 },
+      "Armory": { color: "rgba(200,40,40,0.08)", intensity: 1, duration: 350 },
+      "Research Lab": { color: "rgba(40,255,120,0.08)", intensity: 1, duration: 350 },
+      "Escape Pod Bay": { color: "rgba(40,255,160,0.1)", intensity: 1, duration: 400 },
+      "Auxiliary Power": { color: "rgba(255,160,40,0.08)", intensity: 1, duration: 300 },
+      "Power Relay Junction": { color: "rgba(255,200,80,0.08)", intensity: 1, duration: 300 },
+      "Life Support": { color: "rgba(40,140,255,0.08)", intensity: 1, duration: 400 },
+      "Communications Hub": { color: "rgba(40,100,255,0.1)", intensity: 1, duration: 350 },
+      "Robotics Bay": { color: "rgba(100,160,200,0.06)", intensity: 1, duration: 300 },
+      "Cargo Hold": { color: "rgba(160,120,60,0.06)", intensity: 1, duration: 300 },
+      "Crew Quarters": { color: "rgba(200,160,80,0.06)", intensity: 1, duration: 350 },
+      "Server Annex": { color: "rgba(120,60,200,0.1)", intensity: 1, duration: 400 },
+    };
+    const sig = signatures[roomName];
+    if (!sig) return;
+
+    let overlay = document.getElementById("room-signature-flash");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "room-signature-flash";
+      overlay.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:89;opacity:0;transition:none;";
+      document.body.appendChild(overlay);
+    }
+    overlay.style.background = sig.color;
+    overlay.style.opacity = "1";
+    // Fade out over duration
+    requestAnimationFrame(() => {
+      overlay!.style.transition = `opacity ${sig.duration}ms ease-out`;
+      overlay!.style.opacity = "0";
+    });
+    // Reset transition for next use
+    setTimeout(() => {
+      overlay!.style.transition = "none";
+    }, sig.duration + 50);
   }
 
   showGameOverOverlay(state: GameState): void {
