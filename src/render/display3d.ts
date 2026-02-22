@@ -1423,6 +1423,22 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Room-type visual signature: brief tinted flash on entry
       this.triggerRoomSignature(room!.name);
 
+      // Room entry entity highlight sweep: briefly pulse each unexhausted entity in sequence
+      let highlightDelay = 300; // ms before first pulse (after room fade clears)
+      for (const [, emesh] of this.entityMeshes) {
+        if (emesh.userData._exhausted) continue;
+        if (!emesh.visible) continue;
+        const ex = emesh.position.x;
+        const ez = emesh.position.z;
+        if (ex >= room!.x && ex < room!.x + room!.width &&
+            ez >= room!.y && ez < room!.y + room!.height) {
+          setTimeout(() => {
+            (emesh as any)._interactPulse = 0.8;
+          }, highlightDelay);
+          highlightDelay += 150; // 150ms stagger between entities
+        }
+      }
+
       // Discovery sparkle: first-time room entry spawns sparkle particles
       if (!this._visitedRooms3D.has(roomId)) {
         this._visitedRooms3D.add(roomId);
