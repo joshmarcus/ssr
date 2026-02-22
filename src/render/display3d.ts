@@ -2747,6 +2747,60 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (rotor && (rotor as THREE.Mesh).geometry instanceof THREE.TorusGeometry) {
           rotor.rotation.z = elapsed * 15;
         }
+      } else if (userData.entityType === EntityType.PressureValve) {
+        // Slow valve wheel rotation + pressure-reactive glow
+        mesh.rotation.y = elapsed * 0.3;
+        // Use stored tile pressure from updateEntities
+        const vPressure = (mesh.userData._tilePressure as number) ?? 100;
+        const vCritical = vPressure < 40;
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            if (vCritical) {
+              child.material.emissive.setHex(0xff4422);
+              child.material.emissiveIntensity = 0.3 + Math.sin(elapsed * 4) * 0.2;
+            } else {
+              child.material.emissive.setHex(0x44bbaa);
+              child.material.emissiveIntensity = 0.05 + Math.sin(elapsed * 1.2) * 0.03;
+            }
+          }
+        });
+      } else if (userData.entityType === EntityType.RepairCradle) {
+        // Mechanical arm oscillation — gentle clamping motion
+        const arm1 = mesh.children[1];
+        const arm2 = mesh.children[2];
+        if (arm1) arm1.rotation.z = -0.3 + Math.sin(elapsed * 0.8) * 0.15;
+        if (arm2) arm2.rotation.z = 0.3 - Math.sin(elapsed * 0.8 + 1.0) * 0.15;
+        // Subtle platform hum glow
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.emissive.setHex(0xaaff66);
+            child.material.emissiveIntensity = 0.04 + Math.sin(elapsed * 2.0) * 0.02;
+          }
+        });
+      } else if (userData.entityType === EntityType.ClosedDoor) {
+        // Locked door tremor when player is near
+        const cdDx = this.playerCurrentX - mesh.position.x;
+        const cdDz = this.playerCurrentZ - mesh.position.z;
+        const cdDist = Math.abs(cdDx) + Math.abs(cdDz);
+        if (cdDist < 3 && this.chaseCamActive) {
+          mesh.rotation.z = (Math.random() - 0.5) * 0.01;
+          mesh.rotation.x = (Math.random() - 0.5) * 0.01;
+        } else {
+          mesh.rotation.z = 0;
+          mesh.rotation.x = 0;
+        }
+      } else if (userData.entityType === EntityType.Airlock) {
+        // Airlock status light sweep — subtle pulsing teal glow
+        const alDx = this.playerCurrentX - mesh.position.x;
+        const alDz = this.playerCurrentZ - mesh.position.z;
+        const alDist = Math.abs(alDx) + Math.abs(alDz);
+        const alProx = alDist < 3 ? 0.3 : alDist < 5 ? 0.1 : 0;
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.emissive.setHex(0x8888cc);
+            child.material.emissiveIntensity = 0.05 + alProx + Math.sin(elapsed * 1.5) * 0.03;
+          }
+        });
       }
     }
 
@@ -6157,6 +6211,12 @@ export class BrowserDisplay3D implements IGameDisplay {
             this._discoverySparkles.push(spark); // shares sparkle animation pool
           }
         }
+      }
+
+      // Track PressureValve tile pressure for animation
+      if (entity.type === EntityType.PressureValve) {
+        const pvTile = state.tiles[entity.pos.y]?.[entity.pos.x];
+        mesh.userData._tilePressure = pvTile?.pressure ?? 100;
       }
 
       // Track breach sealed state
