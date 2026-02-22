@@ -1372,12 +1372,14 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (type === "damage") {
       this.cameraShakeIntensity = 0.15;
       this.cameraShakeDecay = 3.0;
-      // Chromatic aberration effect via CSS
+      // Chromatic aberration + signal glitch effect
       this.triggerChromaticAberration(0.3);
+      this.triggerSignalGlitch(0.3);
     } else if (type === "stun") {
       this.cameraShakeIntensity = 0.25;
       this.cameraShakeDecay = 2.0;
       this.triggerChromaticAberration(0.5);
+      this.triggerSignalGlitch(0.7);
     }
   }
 
@@ -1399,6 +1401,61 @@ export class BrowserDisplay3D implements IGameDisplay {
     setTimeout(() => {
       aberration!.style.opacity = "0";
     }, duration * 1000);
+  }
+
+  /** Signal glitch effect — RGB shift + block distortion on damage/stun.
+   *  Reinforces "low-bitrate terminal link" theme. */
+  private triggerSignalGlitch(severity: number): void {
+    let glitch = document.getElementById("signal-glitch-3d");
+    if (!glitch) {
+      glitch = document.createElement("canvas");
+      glitch.id = "signal-glitch-3d";
+      glitch.style.cssText =
+        "position:fixed;inset:0;pointer-events:none;z-index:92;opacity:0;" +
+        "transition:opacity 0.05s;image-rendering:pixelated;";
+      document.body.appendChild(glitch);
+    }
+    const canvas = glitch as HTMLCanvasElement;
+    canvas.width = 64;
+    canvas.height = 48;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, 64, 48);
+
+    // Random block corruption
+    const blockCount = Math.floor(8 + severity * 12);
+    for (let i = 0; i < blockCount; i++) {
+      const bx = Math.floor(Math.random() * 60);
+      const by = Math.floor(Math.random() * 44);
+      const bw = 2 + Math.floor(Math.random() * 6);
+      const bh = 1 + Math.floor(Math.random() * 3);
+      // Random RGB channel dominance
+      const ch = Math.floor(Math.random() * 3);
+      const r = ch === 0 ? 200 + Math.floor(Math.random() * 55) : Math.floor(Math.random() * 40);
+      const g = ch === 1 ? 200 + Math.floor(Math.random() * 55) : Math.floor(Math.random() * 40);
+      const b = ch === 2 ? 200 + Math.floor(Math.random() * 55) : Math.floor(Math.random() * 40);
+      ctx.fillStyle = `rgba(${r},${g},${b},${0.3 + severity * 0.4})`;
+      ctx.fillRect(bx, by, bw, bh);
+    }
+
+    // Horizontal scan line tears
+    const tearCount = Math.floor(2 + severity * 4);
+    for (let i = 0; i < tearCount; i++) {
+      const ty = Math.floor(Math.random() * 48);
+      const offset = Math.floor((Math.random() - 0.5) * 8);
+      ctx.fillStyle = `rgba(255,255,255,${0.1 + severity * 0.15})`;
+      ctx.fillRect(Math.max(0, offset), ty, 64, 1);
+    }
+
+    canvas.style.opacity = String(0.5 + severity * 0.3);
+    const duration = 150 + severity * 200;
+    setTimeout(() => { canvas.style.opacity = "0"; }, duration);
+    // Second pulse for stun
+    if (severity > 0.3) {
+      setTimeout(() => {
+        canvas.style.opacity = String(0.2 + severity * 0.1);
+        setTimeout(() => { canvas.style.opacity = "0"; }, 80);
+      }, duration + 50);
+    }
   }
 
   /** Brief tinted screen flash on room entry — each room type gets a distinct visual feel */
