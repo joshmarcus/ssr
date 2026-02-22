@@ -2994,6 +2994,21 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Entity animations
     for (const [id, mesh] of this.entityMeshes) {
+      // Spawn bounce-in animation
+      if (mesh.userData._spawnT !== undefined && mesh.userData._spawnT < 1) {
+        mesh.userData._spawnT = Math.min(1, mesh.userData._spawnT + delta * 3.5);
+        const t = mesh.userData._spawnT as number;
+        // Overshoot bounce: ease-out back curve
+        const bounce = t < 0.7
+          ? (t / 0.7) * 1.15  // overshoot to 115%
+          : 1.15 - (t - 0.7) / 0.3 * 0.15; // settle back to 100%
+        mesh.scale.setScalar(Math.max(0.01, bounce));
+        if (t >= 1) {
+          mesh.scale.setScalar(1);
+          delete mesh.userData._spawnT;
+        }
+      }
+
       const userData = mesh.userData as { entityType?: string; _activated?: boolean; _following?: boolean };
       if (userData.entityType === EntityType.Relay) {
         // Activated relays spin faster and glow brighter
@@ -7174,6 +7189,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         });
         this.entityMeshes.set(id, mesh);
         this.entityGroup.add(mesh);
+        // Spawn animation: start at scale 0, bounce to full size
+        mesh.scale.set(0.01, 0.01, 0.01);
+        mesh.userData._spawnT = 0;
       }
 
       mesh.visible = true;
