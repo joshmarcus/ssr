@@ -575,6 +575,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _pendingRelayPulses: { x: number; z: number }[] = [];
   // Entity collection fly-to-player animations
   private _flyToPlayerAnims: { mesh: THREE.Object3D; startX: number; startZ: number; startY: number; t: number }[] = [];
+  // Unsealed breach positions for vacuum suction effect on nearby particles
+  private _breachPositions: { x: number; z: number }[] = [];
   // Global scene lights for phase-reactive lighting
   private ambientLight: THREE.AmbientLight | null = null;
   private keyLight: THREE.DirectionalLight | null = null;
@@ -3792,6 +3794,18 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
       const t = life / maxLife;
       sp.position.y += delta * (sp as any)._driftY;
+      // Breach vacuum suction: pull nearby sprites toward unsealed breaches
+      for (let bi = 0; bi < this._breachPositions.length; bi++) {
+        const bp = this._breachPositions[bi];
+        const bdx = bp.x - sp.position.x;
+        const bdz = bp.z - sp.position.z;
+        const bDist = Math.sqrt(bdx * bdx + bdz * bdz);
+        if (bDist < 4 && bDist > 0.1) {
+          const pull = delta * 2.0 / (bDist * bDist + 0.5); // inverse-square falloff
+          sp.position.x += bdx * pull;
+          sp.position.z += bdz * pull;
+        }
+      }
       // Twinkle: rapid opacity oscillation that fades out
       const twinkle = Math.sin(life * 15) * 0.5 + 0.5;
       (sp.material as THREE.SpriteMaterial).opacity = 0.6 * (1 - t) * twinkle;
@@ -3813,6 +3827,18 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
       const t = life / maxLife;
       d.position.y += delta * 0.15; // gentle rise
+      // Breach vacuum suction on dust kicks
+      for (let bi = 0; bi < this._breachPositions.length; bi++) {
+        const bp = this._breachPositions[bi];
+        const bdx = bp.x - d.position.x;
+        const bdz = bp.z - d.position.z;
+        const bDist = Math.sqrt(bdx * bdx + bdz * bdz);
+        if (bDist < 4 && bDist > 0.1) {
+          const pull = delta * 1.5 / (bDist * bDist + 0.5);
+          d.position.x += bdx * pull;
+          d.position.z += bdz * pull;
+        }
+      }
       const s = 0.06 + t * 0.12; // expand from 0.06 to 0.18
       d.scale.set(s, s, 1);
       (d.material as THREE.SpriteMaterial).opacity = 0.2 * (1 - t * t); // quadratic fade
@@ -3834,6 +3860,18 @@ export class BrowserDisplay3D implements IGameDisplay {
       bp.position.x += (bp as any)._dirX * delta;
       bp.position.z += (bp as any)._dirZ * delta;
       bp.position.y += delta * 0.1;
+      // Breach vacuum suction on breath puffs
+      for (let bi = 0; bi < this._breachPositions.length; bi++) {
+        const br = this._breachPositions[bi];
+        const bdx = br.x - bp.position.x;
+        const bdz = br.z - bp.position.z;
+        const bDist = Math.sqrt(bdx * bdx + bdz * bdz);
+        if (bDist < 4 && bDist > 0.1) {
+          const pull = delta * 1.5 / (bDist * bDist + 0.5);
+          bp.position.x += bdx * pull;
+          bp.position.z += bdz * pull;
+        }
+      }
       const s = 0.05 + t * 0.15; // expand
       bp.scale.set(s, s, 1);
       (bp.material as THREE.SpriteMaterial).opacity = 0.15 * (1 - t); // linear fade
@@ -6756,6 +6794,14 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Update relay power lines: visible energy connections between activated relays
     this.updateRelayPowerLines(state);
+
+    // Collect unsealed breach positions for vacuum suction effect
+    this._breachPositions = [];
+    for (const [, entity] of state.entities) {
+      if (entity.type === EntityType.Breach && entity.props["sealed"] !== true) {
+        this._breachPositions.push({ x: entity.pos.x, z: entity.pos.y });
+      }
+    }
 
     // Update interaction indicator — show above nearest interactable entity
     if (this.interactionIndicator) {
