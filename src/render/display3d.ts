@@ -1224,6 +1224,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeCorridorStripLights(state);
     this.placeCorridorWallProps(state);
     this.placeEmergencyWallStrips(state);
+    this.placeCorridorFixtures(state);
+    this.placeCorridorGuideStrips(state);
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
     this.updateRoomLabels(state);
@@ -1637,8 +1639,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Adjust fog based on camera mode: tighter for chase cam = moodier corridors
       const fog = this.scene.fog as THREE.Fog;
       if (fog) {
-        const targetNear = this.chaseCamActive ? 6 : 20;
-        const targetFar = this.chaseCamActive ? 18 : 40;
+        const targetNear = this.chaseCamActive ? 3 : 20;  // tighter fog at ground level
+        const targetFar = this.chaseCamActive ? 14 : 40; // claustrophobic corridor feel
         fog.near += (targetNear - fog.near) * 0.05;
         fog.far += (targetFar - fog.far) * 0.05;
       }
@@ -3649,6 +3651,108 @@ export class BrowserDisplay3D implements IGameDisplay {
             }
           }, undefined, () => {});
         }
+      }
+    }
+  }
+
+  // ── Private: wall-mounted light fixtures at eye level ──────────
+
+  private corridorFixtureTiles: Set<string> = new Set();
+
+  private placeCorridorFixtures(state: GameState): void {
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored || tile.type !== TileType.Corridor) continue;
+
+        const key = `fix_${x},${y}`;
+        if (this.corridorFixtureTiles.has(key)) continue;
+
+        // Place every 6th corridor tile (sparse for performance)
+        if ((x * 5 + y * 11) % 6 !== 0) continue;
+        this.corridorFixtureTiles.add(key);
+
+        // Find adjacent walls to mount fixtures on
+        const wallN = y > 0 && state.tiles[y - 1][x].type === TileType.Wall;
+        const wallS = y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Wall;
+        const wallE = x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Wall;
+        const wallW = x > 0 && state.tiles[y][x - 1].type === TileType.Wall;
+
+        if (!wallN && !wallS && !wallE && !wallW) continue;
+
+        // Create a small emissive fixture (procedural — warm light box)
+        const fixtureGeo = new THREE.BoxGeometry(0.12, 0.06, 0.04);
+        const fixtureMat = makeToonMaterial({
+          color: 0xffeedd,
+          gradientMap: this.toonGradient,
+          emissive: 0xffddaa,
+          emissiveIntensity: 0.8,
+        });
+        const fixture = new THREE.Mesh(fixtureGeo, fixtureMat);
+
+        // Position on the first available wall at eye level
+        if (wallN) {
+          fixture.position.set(x, 0.5, y - 0.48);
+        } else if (wallS) {
+          fixture.position.set(x, 0.5, y + 0.48);
+        } else if (wallE) {
+          fixture.position.set(x + 0.48, 0.5, y);
+          fixture.rotation.y = Math.PI / 2;
+        } else {
+          fixture.position.set(x - 0.48, 0.5, y);
+          fixture.rotation.y = Math.PI / 2;
+        }
+
+        const bucket = this.getCorridorBucket(this.decorationGroup, x, y);
+        bucket.add(fixture);
+
+        // Add a dim warm point light at the fixture
+        const fixtureLight = new THREE.PointLight(0xffddaa, 0.6, 3);
+        fixtureLight.position.copy(fixture.position);
+        bucket.add(fixtureLight);
+      }
+    }
+  }
+
+  // ── Private: floor center guide strips ────────────────────────
+
+  private corridorGuideTiles: Set<string> = new Set();
+
+  private placeCorridorGuideStrips(state: GameState): void {
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored || tile.type !== TileType.Corridor) continue;
+
+        const key = `guide_${x},${y}`;
+        if (this.corridorGuideTiles.has(key)) continue;
+        this.corridorGuideTiles.add(key);
+
+        // Determine corridor direction
+        const hasE = x < state.width - 1 && (state.tiles[y][x + 1].type === TileType.Corridor || state.tiles[y][x + 1].walkable);
+        const hasW = x > 0 && (state.tiles[y][x - 1].type === TileType.Corridor || state.tiles[y][x - 1].walkable);
+        const hasN = y > 0 && (state.tiles[y - 1][x].type === TileType.Corridor || state.tiles[y - 1][x].walkable);
+        const hasS = y < state.height - 1 && (state.tiles[y + 1][x].type === TileType.Corridor || state.tiles[y + 1][x].walkable);
+
+        const isHorizontal = (hasE || hasW) && !hasN && !hasS;
+        const isVertical = (hasN || hasS) && !hasE && !hasW;
+
+        // Thin green guide strip on the floor center
+        const stripGeo = new THREE.BoxGeometry(
+          isVertical ? 0.03 : 0.9,
+          0.005,
+          isHorizontal ? 0.03 : 0.9
+        );
+        const stripMat = new THREE.MeshBasicMaterial({
+          color: 0x22ff66,
+          transparent: true,
+          opacity: 0.25,
+        });
+        const strip = new THREE.Mesh(stripGeo, stripMat);
+        strip.position.set(x, 0.01, y);
+
+        const bucket = this.getCorridorBucket(this.decorationGroup, x, y);
+        bucket.add(strip);
       }
     }
   }
