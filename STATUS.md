@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 97 (V219 completed — Corridor light shafts + deduction 3D feedback)
+- **Phase**: Sprint 100 (V221 completed — Wall damage decals + sprint reflection)
 - **Test status**: 292 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -171,9 +171,20 @@
 - **Deduction 3D feedback**: Correct → milestone flash + 12 green sparkles + zoom; Wrong → damage flash + shake; Lockout → stun effect + heavy shake
 - **Distance culling**: Light shafts fade and hide beyond 8 tile range for performance
 
+### V220 — Room-Proximity Corridor Tinting + Minimap Exploration Percentage
+- **Room-proximity corridor tinting**: Light shafts within 3 tiles of rooms blend 50% toward room's wall tint color — players sense "warm light = Power room ahead" without explicit UI
+- **Minimap exploration percentage**: Bottom-right corner shows walkable-explored ratio, color-coded (green ≥80%, yellow ≥50%, grey <50%)
+
+### V221 — Wall Damage Decals for Environmental Storytelling
+- **Scorch marks**: Dark burn sprites on walls near high-heat tiles (>50 heat)
+- **Frost patterns**: Blue-white crystals on walls near low-pressure tiles (<40 pressure)
+- **Smoke stains**: Grey-brown stains on walls near high-smoke tiles (>40 smoke)
+- **Room-aware grouping**: Decals added to room groups for proper culling on room transitions
+
 ### Technical Notes
 - Discovered 4 empty corridor light arrays (corridorLightList, corridorFixtureLights, _lightShaftMeshes, _floorPoolMeshes) — V215 corridor light animation was dead code; fixed by populating light shaft and floor pool arrays in V219
 - All corridor lighting now operates through emissive materials and light shaft meshes (no PointLights for performance)
+- Sprint 100 reflection added to CLAUDE.md (V171-V221 learnings)
 - 292 tests passing, TypeScript clean
 
 ## Sprint 73 Changes (In Progress)

@@ -367,6 +367,35 @@ Dramatic lighting, material properties, and atmospheric room identity:
 - **Screenshot consistency masks incremental changes**: V167-V170 screenshots look nearly identical because the same room from the same seed produces similar results. Need to use different seeds or more turns for variety. Corridor screenshots are hard to capture because auto-explore prioritizes rooms.
 - **Toon gradient shadow level affects overall mood**: Raising toon shadow from 60→80 brightened shadow areas slightly, reducing the harshest shadows while keeping the cel-shaded look. This was more impactful than any single light adjustment.
 
+## Sprint Learnings (V171-V200 Reflection)
+
+3D-only commitment, HUD overlays, and rendering architecture evolution:
+
+- **Committing to 3D-only was liberating**: V196's removal of the 2D renderer toggle eliminated the need to maintain parity between two display systems. Every visual feature since then has been designed purely for the 3D chase cam, which is the game's identity.
+- **HUD overlays replace sidebar panels**: V200's move from sidebar text panels to 3D-space HUD overlays (HP bar, sensor status, action bar) integrates information into the game world rather than framing it. CSS-based overlays with transparency keep information visible without obscuring the 3D scene.
+- **Tank controls feel right for a bot**: Forward/backward relative to facing direction (V199) matches the "piloting a remote bot" fantasy. Combined with the chase cam, it creates a natural "driving" feel that WASD cardinal movement never achieved.
+- **GitHub Pages model deployment simplifies asset pipeline**: V200's move to host models externally means the game bundle stays small while still accessing 300+ GLTF models. Cache-friendly CDN delivery vs bundling megabytes of binary assets.
+- **Holographic overlays as visual language**: V197-V198's holographic Investigation Hub and Case Board established the visual vocabulary — translucent panels, scan-line effects, color-coded sections. This style carries through all subsequent UI work.
+- **Model integration is selective, not comprehensive**: Of 300+ available models, only ~40 are actively used. The right density is "enough to sell the room type" not "fill every surface." Corridor props at 12-20% coverage feel right.
+
+## Sprint Learnings (V201-V221 Reflection)
+
+Mystery mechanics rework, corridor atmosphere, and environmental storytelling:
+
+- **Tags as invisible plumbing works**: V201's "Read & Deduce" rework kept tags for procgen/narrative threading but completely hid them from players. The result: players read evidence text and think about the story instead of collecting abstract tokens. Evidence-count thresholds (2/4/6/8/10/12) create natural pacing without exposing the machinery.
+- **Wrong-answer consequences create tension**: 3 HP + 10 turns per wrong answer, with 2-attempt lockout, means players actually read before guessing. The playtest bot still solves 5/5 using keyword overlap from journal text, proving the system is fair.
+- **Dead code detection via empty arrays**: V219 discovered that 4 corridor light arrays (`corridorLightList`, `corridorFixtureLights`, `_lightShaftMeshes`, `_floorPoolMeshes`) were declared but never populated — V215's entire corridor light animation was iterating over zero elements. Lesson: always verify that initialization code actually runs, not just that animation code references the arrays.
+- **Volumetric light shafts transform corridors**: CylinderGeometry (0.15→0.25 radius, 1.8 height) with additive blending at 3-4% opacity, placed every 5th corridor tile, creates visible "islands of light" in dark corridors. Combined with floor pool discs (CircleGeometry 0.35) for ground illumination. This was the single biggest corridor visual improvement.
+- **Station stress as unified visual parameter**: `_stationStress` (0.0-1.0 from hazard tile ratio) drives fog density, dust count, light shaft color, junction beacon tint, and ambient warmth. One value controlling many effects creates coherent atmosphere escalation.
+- **Evidence discovery as reward moment**: Multi-layered feedback (8 golden sparkles + camera zoom-in + radial CSS golden flash) makes finding evidence feel significant. The camera zoom pulse (`cameraZoomPulse = -0.6`) is the most impactful element.
+- **Room-proximity corridor tinting as navigation aid**: Light shafts within 3 tiles of a room blend 50% toward that room's wall tint color. Players unconsciously learn "warm light means Power room ahead" without any explicit UI. Manhattan distance to nearest room edge is the right metric.
+- **Wall damage decals for environmental storytelling**: Scorch marks (heat>50), frost patterns (pressure<40), and smoke stains (smoke>40) on wall surfaces near hazards tell the story of station damage without requiring sensor activation. Room-aware grouping ensures proper culling.
+- **Smooth entity proximity over binary thresholds**: Quadratic falloff `(1 - dist/6)^2 * 0.6` over 6 tiles replaces binary threshold system (dist<2 → 0.5, dist<4 → 0.2). The smooth ramp feels more natural and avoids visible "pop-in" edges.
+- **Junction beacons as corridor landmarks**: Glowing floor sprites at T-junctions and crossroads (3+ corridor connections) provide wayfinding in otherwise uniform corridors. Stress-reactive color shift (blue→amber) maintains atmosphere coherence.
+- **Minimap exploration percentage as motivation**: Simple walkable-explored ratio in the corner, color-coded (green ≥80%, yellow ≥50%, grey <50%), gives players a clear sense of progress. Three canvas draw calls for massive gameplay feedback.
+- **Interaction camera micro-zoom**: Brief FOV punch (`cameraZoomPulse = -0.3`) on flashTile creates a subtle "focus" effect during entity interaction. Small detail, but makes every interaction feel responsive.
+- **Floor trail enhancement**: Additive blending on trail sprites (was standard alpha) creates a luminous breadcrumb effect. Extended lifetime (15-20 frames vs 12-16) and fresh glow boost (1.5x for first 10% of life) make recent steps stand out.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
