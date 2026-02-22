@@ -1841,10 +1841,13 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.chaseCamLookX += (targetLookX - this.chaseCamLookX) * camLerp;
         this.chaseCamLookZ += (targetLookZ - this.chaseCamLookZ) * camLerp;
 
-        // Subtle head-bob when moving (based on player velocity)
+        // Head-bob when moving, gentle sway when idle
         const moveSpeed = Math.abs(this.playerTargetX - this.playerCurrentX) +
                           Math.abs(this.playerTargetZ - this.playerCurrentZ);
-        const headBob = moveSpeed > 0.01 ? Math.sin(elapsed * 8) * 0.03 : 0;
+        const isIdle = moveSpeed < 0.01;
+        const headBob = isIdle
+          ? Math.sin(elapsed * 0.7) * 0.015  // gentle idle sway
+          : Math.sin(elapsed * 8) * 0.03;    // active head-bob
 
         // FOV breathing: context-aware base + movement widening
         const baseFov = inRoom ? 65 : 55;  // wider in rooms, tighter in corridors
@@ -1856,10 +1859,14 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Look-at height: slightly higher in rooms to see more of the space
         const lookY = inRoom ? 0.3 : 0.1;
 
+        // Idle lateral sway for subtle breathing camera
+        const idleSwayX = isIdle ? Math.sin(elapsed * 0.5) * 0.04 : 0;
+        const idleSwayZ = isIdle ? Math.cos(elapsed * 0.37) * 0.03 : 0;
+
         this.chaseCamera.position.set(
-          this.chaseCamPosX + shakeX,
+          this.chaseCamPosX + shakeX + idleSwayX,
           this.chaseCamPosY + headBob,
-          this.chaseCamPosZ + shakeZ
+          this.chaseCamPosZ + shakeZ + idleSwayZ
         );
         this.chaseCamera.lookAt(this.chaseCamLookX, lookY, this.chaseCamLookZ);
       } else {
