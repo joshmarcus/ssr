@@ -778,6 +778,15 @@ function checkRoomEntry(): void {
         echoedRooms.add(currentRoom.name);
         const excerpt = foreshadowedRooms.get(currentRoom.name)!;
         display.addLog(`ECHO — You remember reading about this place: "${excerpt.slice(0, 80)}..."`, "milestone");
+        // CORVUS-7 foreshadowing acknowledgment (first time only)
+        if (!state.milestones.has("foreshadow_confirm")) {
+          const text = CORVUS_PERSONALITY_REACTIONS[corvusPersonality]?.["foreshadow_confirm"] ?? CORVUS_REACTIONS["foreshadow_confirm"];
+          if (text) {
+            const newMilestones = new Set(state.milestones);
+            newMilestones.add("foreshadow_confirm");
+            state = { ...state, milestones: newMilestones, logs: [...state.logs, { id: "log_corvus_foreshadow", timestamp: state.turn, source: "system", text, read: false }] };
+          }
+        }
       }
 
       // Archetype-specific environmental incident trace
@@ -2033,9 +2042,36 @@ function handleAction(action: Action): void {
       display.addLog(TUTORIAL_HINT_FIRST_DEDUCTION, "system");
       audio.playDeductionReady();
     }
+    // CORVUS-7 investigation progress milestones (evidence count)
+    {
+      const jLen = state.mystery.journal.length;
+      const evidenceThresholds = [
+        { count: 3, key: "evidence_3" },
+        { count: 6, key: "evidence_6" },
+        { count: 9, key: "evidence_9" },
+        { count: 12, key: "evidence_12" },
+        { count: 15, key: "evidence_15" },
+      ];
+      for (const t of evidenceThresholds) {
+        if (jLen >= t.count && !state.milestones.has(t.key)) {
+          const text = CORVUS_PERSONALITY_REACTIONS[corvusPersonality]?.[t.key] ?? CORVUS_REACTIONS[t.key];
+          if (text) {
+            const newMilestones = new Set(state.milestones);
+            newMilestones.add(t.key);
+            state = {
+              ...state,
+              milestones: newMilestones,
+              logs: [...state.logs, { id: `log_corvus_${t.key}`, timestamp: state.turn, source: "system", text, read: false }],
+            };
+          }
+        }
+      }
+    }
+
     // Evidence insight notification: fire when new journal entry contributes tags to an unlocked deduction
-    if (state.mystery.journal.length > lastJournalLength) {
-      const journal = state.mystery.journal;
+    const mystery = state.mystery!; // guaranteed non-null inside this if block
+    if (mystery.journal.length > lastJournalLength) {
+      const journal = mystery.journal;
       const newEntries = journal.slice(lastJournalLength);
 
       // Show evidence cards for important new journal entries (traces, crew items, key logs)
@@ -2046,7 +2082,7 @@ function handleAction(action: Action): void {
           (entry.category === "log" && entry.crewMentioned.length > 0);
         if (isImportant && display.showEvidenceCard) {
           const crewNames = entry.crewMentioned
-            .map(id => state.mystery!.crew.find(c => c.id === id))
+            .map(id => mystery.crew.find(c => c.id === id))
             .filter(Boolean)
             .map(c => `${c!.firstName} ${c!.lastName}`);
           display.showEvidenceCard(
@@ -2061,12 +2097,12 @@ function handleAction(action: Action): void {
 
       const newTags = new Set(newEntries.flatMap(j => j.tags));
       const prevConnectionCount = lastJournalLength > 0
-        ? (state.mystery.connections.length - newEntries.length) // approximate
+        ? (mystery.connections.length - newEntries.length) // approximate
         : 0;
       lastJournalLength = journal.length;
 
       // Notify about new auto-connections
-      const newConns = state.mystery.connections.filter(c => c.discovered);
+      const newConns = mystery.connections.filter(c => c.discovered);
       if (newConns.length > prevConnectionCount) {
         const recentConn = newConns[newConns.length - 1];
         if (recentConn) {
@@ -2079,7 +2115,7 @@ function handleAction(action: Action): void {
       }
 
       // Notify about insight reveals
-      for (const insight of state.mystery.insights) {
+      for (const insight of mystery.insights) {
         if (insight.revealed && !state.milestones.has(`insight_${insight.id}`)) {
           display.addLog(`INSIGHT REVEALED: ${insight.conclusionText}`, "milestone");
           display.triggerScreenFlash("milestone");
@@ -2088,9 +2124,9 @@ function handleAction(action: Action): void {
       }
 
       // Check if any unsolved deduction gained new tag coverage
-      const solvedIds = new Set(state.mystery.deductions.filter(d => d.solved).map(d => d.id));
+      const solvedIds = new Set(mystery.deductions.filter(d => d.solved).map(d => d.id));
       let insightFired = false;
-      for (const d of state.mystery.deductions) {
+      for (const d of mystery.deductions) {
         if (d.solved) continue;
         if (d.unlockAfter && !solvedIds.has(d.unlockAfter)) continue;
         const relevantNewTags = d.requiredTags.filter(t => newTags.has(t));
@@ -2138,10 +2174,10 @@ function handleAction(action: Action): void {
 
     // Mystery choice unlock notifications
     const choiceThresholds = [3, 6, 10];
-    for (let ci = 0; ci < state.mystery.choices.length && ci < choiceThresholds.length; ci++) {
-      const choice = state.mystery.choices[ci];
+    for (let ci = 0; ci < mystery.choices.length && ci < choiceThresholds.length; ci++) {
+      const choice = mystery.choices[ci];
       if (choice.chosen) continue;
-      if (state.mystery.journal.length >= choiceThresholds[ci] && !choicesPresented.has(choice.id)) {
+      if (mystery.journal.length >= choiceThresholds[ci] && !choicesPresented.has(choice.id)) {
         choicesPresented.add(choice.id);
         display.addLog(`CORVUS-7 CENTRAL: Decision ${ci + 1} now available. Open the Evidence Hub [v] to review.`, "milestone");
         display.triggerScreenFlash("milestone");

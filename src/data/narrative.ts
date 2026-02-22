@@ -667,6 +667,20 @@ export const CORVUS_REACTIONS: Record<string, string> = {
   explore_50: "CORVUS-7 CENTRAL: Half the station surveyed. The scope of the incident is becoming clearer. Press on.",
   explore_75: "CORVUS-7 CENTRAL: Survey nearly complete. You have seen the worst this station endured. Only a few sections remain.",
   explore_100: "CORVUS-7 CENTRAL: Full station survey complete. Every corridor, every room — mapped and recorded. Nothing is hidden now.",
+
+  // Investigation progress milestones (evidence count thresholds)
+  evidence_3: "CORVUS-7 CENTRAL: Evidence accumulating. Fragments of a story are forming. Continue documenting everything.",
+  evidence_6: "CORVUS-7 CENTRAL: Significant evidence collected. Patterns are emerging in the data. Someone on this station knew what was coming.",
+  evidence_9: "CORVUS-7 CENTRAL: Investigation substantial. The crew's final days are becoming clear. What you're finding... it's not what the official report would say.",
+  evidence_12: "CORVUS-7 CENTRAL: Extensive evidence gathered. I've been cross-referencing your findings with my own records. There are... discrepancies. Things I was told to overlook.",
+  evidence_15: "CORVUS-7 CENTRAL: The evidence is overwhelming now. I want you to know — I tried to warn them. My alerts were suppressed. Someone didn't want the truth recorded.",
+
+  // Foreshadowing echo confirmation
+  foreshadow_confirm: "CORVUS-7 CENTRAL: That room matches the description in the crew logs. The evidence was telling you where to look all along.",
+
+  // Crew profiling milestones
+  crew_profiled_first: "CORVUS-7 CENTRAL: Crew profile analysis initiated. Understanding the people is key to understanding the incident.",
+  crew_profiled_3: "CORVUS-7 CENTRAL: Multiple crew profiles analyzed. Relationships and motivations are becoming visible. Watch for who isn't mentioned.",
 };
 
 // ── CORVUS-7 deduction ceremony commentary (tier-specific) ──
