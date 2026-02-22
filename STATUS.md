@@ -197,6 +197,7 @@
 - **Sprint V35 — Low-angle corridor immersion**: Tighter chase cam fog (near 3, far 14) for claustrophobic corridors, wall-mounted warm light fixtures at eye level (0.5h) every 6th corridor tile with point lights, floor center guide strips (green emissive navigation lines), direction-aware strip orientation
 - **Sprint V36 — Room entry drama**: Room decoration density increased (up to 7 props in large rooms), room entry light boost ("lights come on" 1.5x intensity surge fading over 0.4s), area-based prop scaling
 - **Sprint V37 — Sweepo headlight**: Forward-facing SpotLight headlight (cone PI/5, range 8, warm white) with flutter animation, illuminates corridors ahead for flashlight-exploration feel
+- **Sprint V38 — Shadow casting**: PCFSoftShadowMap enabled, headlight casts shadows (512x512), floor/wall/door receive/cast shadows, corridor lights reduced (sparser, dimmer) since headlight is primary illumination
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
