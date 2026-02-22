@@ -294,6 +294,7 @@
 - **Sprint V132 — Airlock depressurization wind streaks**: 12 radial elongated streak sprites burst outward when an airlock opens. Blue-white additive blending with horizontal drift. Sparkle pool gains optional `_driftX`/`_driftZ` for radial particle movement. Combined with breach suction creates dramatic venting moments
 - **Sprint V133 — HP-reactive headlight color**: Headlight base color shifts from cool white through warm amber to red-orange as HP drops (75%→warm, 50%→amber, 25%→red). Room hazard tints still override. Creates immersive "systems failing" feel tied to player health
 - **Sprint V134 — Antenna movement spring wobble**: Antenna bounces with damped oscillation (14Hz Z + 11Hz X) during movement instead of being static. Settles smoothly when stopped (0.9 decay on x-rotation). Adds physical believability to Sweepo's locomotion
+- **Sprint V135 — Minimap fog of exploration border**: Semi-transparent dark tiles at the frontier between explored and unexplored areas. 4-connected adjacency check draws fog at unexplored tiles with explored neighbors. Creates visible exploration boundary on minimap
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

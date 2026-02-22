@@ -8372,6 +8372,27 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Fog border: semi-transparent dark tiles at frontier between explored and unexplored
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        if (state.tiles[y][x].explored) continue;
+        // Check if any adjacent tile is explored (4-connected)
+        const hasExploredNeighbor =
+          (y > 0 && state.tiles[y - 1][x].explored) ||
+          (y < state.height - 1 && state.tiles[y + 1][x].explored) ||
+          (x > 0 && state.tiles[y][x - 1].explored) ||
+          (x < state.width - 1 && state.tiles[y][x + 1].explored);
+        if (hasExploredNeighbor) {
+          const fx = Math.floor(x * scale);
+          const fy = Math.floor(y * scale);
+          const fw = Math.max(1, Math.ceil(scale));
+          const fh = Math.max(1, Math.ceil(scale));
+          ctx.fillStyle = "rgba(20,30,40,0.5)";
+          ctx.fillRect(fx, fy, fw, fh);
+        }
+      }
+    }
+
     // Entities as colored dots — larger for important types
     const now = performance.now() / 1000;
     for (const [id, entity] of state.entities) {
