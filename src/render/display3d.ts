@@ -8638,6 +8638,18 @@ export class BrowserDisplay3D implements IGameDisplay {
       ctx.fillText(`${pct}%`, w / 2, h - 2);
     }
 
+    // Turn counter with time pressure color
+    const turnRatio = state.turn / state.maxTurns;
+    const turnColor = turnRatio > 0.9 ? "#ff3344" : turnRatio > 0.8 ? "#ff8822" : turnRatio > 0.7 ? "#ffcc22" : "#88ccaa";
+    const turnPulse = turnRatio > 0.8 ? 0.6 + Math.sin(now * 4) * 0.4 : 1.0;
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.globalAlpha = turnPulse;
+    ctx.fillStyle = turnColor;
+    ctx.fillText(`T${state.turn}`, 3, h - 2);
+    ctx.globalAlpha = 1;
+
     // Render compass
     this.renderCompass();
   }
