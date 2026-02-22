@@ -446,6 +446,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Lighting
   private playerLight: THREE.PointLight;
   private _fillLight!: THREE.PointLight;
+  private headlight: THREE.SpotLight | null = null;
+  private headlightTarget: THREE.Object3D | null = null;
 
   // Tile instanced meshes
   private floorMesh: THREE.InstancedMesh;      // room floors
@@ -1750,6 +1752,11 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Player light subtle breathing pulse
     if (this.playerLight) {
       this.playerLight.intensity = 2.5 + Math.sin(elapsed * 1.5) * 0.3;
+    }
+
+    // Headlight: subtle intensity flutter (like a slightly unstable power connection)
+    if (this.headlight) {
+      this.headlight.intensity = 1.8 + Math.sin(elapsed * 3.7) * 0.2 + Math.sin(elapsed * 7.3) * 0.1;
     }
 
     // Interaction indicator: bob, spin, and ring pulse
@@ -4705,6 +4712,16 @@ export class BrowserDisplay3D implements IGameDisplay {
     const glowCircle = new THREE.Mesh(glowGeo, glowMat);
     glowCircle.position.y = -0.01; // just above floor
     group.add(glowCircle);
+
+    // Headlight: forward-facing spotlight for corridor exploration
+    this.headlightTarget = new THREE.Object3D();
+    this.headlightTarget.position.set(0, 0.1, 2); // 2 units ahead
+    group.add(this.headlightTarget);
+
+    this.headlight = new THREE.SpotLight(0xeeffff, 2.0, 8, Math.PI / 5, 0.4, 1.5);
+    this.headlight.position.set(0, 0.15, 0.2); // front of Sweepo
+    this.headlight.target = this.headlightTarget;
+    group.add(this.headlight);
 
     return group;
   }
