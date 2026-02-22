@@ -217,6 +217,26 @@ async function main(): Promise<void> {
       // Stop autoplay
       await page.keyboard.press("Escape");
       await page.waitForTimeout(200);
+
+      // Dismiss all queued evidence cards and overlays
+      // The evidence card system queues cards and shows them one at a time,
+      // each requiring Space/Escape to dismiss with a 500ms fade-out animation.
+      for (let dismiss = 0; dismiss < 15; dismiss++) {
+        const hasOverlay = await page.evaluate(() => {
+          const card = document.getElementById("evidence-card");
+          return card !== null && card.innerHTML.length > 10;
+        });
+        if (!hasOverlay) break;
+        // Dispatch a synthetic Space keydown event directly
+        await page.evaluate(() => {
+          window.dispatchEvent(new KeyboardEvent("keydown", {
+            key: " ", code: "Space", bubbles: true, cancelable: true,
+          }));
+        });
+        // Wait for fade-out (500ms) + next card to appear
+        await page.waitForTimeout(650);
+      }
+      await page.waitForTimeout(200);
     }
 
     // Open overlay if requested
