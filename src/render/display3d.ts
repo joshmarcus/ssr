@@ -7988,6 +7988,19 @@ export class BrowserDisplay3D implements IGameDisplay {
         continue;
       }
 
+      // Pulse ring for key unexhausted entities
+      const isKey = entity.type === EntityType.DataCore || entity.type === EntityType.EscapePod || entity.type === EntityType.CrewNPC;
+      if (isKey && !isEntityExhausted(entity)) {
+        const pulse = 0.3 + Math.sin(now * 2.5 + entity.pos.x * 3) * 0.3;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = pulse;
+        ctx.beginPath();
+        ctx.arc(px, py, 5 + Math.sin(now * 2) * 1.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
       // Distinct shapes per entity type for minimap readability
       ctx.fillStyle = color;
       ctx.strokeStyle = color;

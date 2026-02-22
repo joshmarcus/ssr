@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V109 completed, V110 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V120 completed, V121 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -279,6 +279,7 @@
 - **Sprint V117 — Sweepo damage particle sparks**: Orange sprite sparks shoot from Sweepo's body when HP <40%. Frequency increases with severity (0.3→0.1s interval). Short-lived (0.15-0.3s) upward-drifting sparks. Complements existing emissive body flash with actual particles
 - **Sprint V118 — Crew NPC breathing and weight shift**: Crew members breathe (Y-scale ±1.5% at 1Hz with unique phase) and shift weight when idle (subtle Z-rotation lean at 0.4Hz). Stops leaning when facing player. Makes crew feel alive and present
 - **Sprint V119 — DataCore energy arcs**: 3 magenta spark sprites radiate outward every ~2.5s from the DataCore. Elongated vertically (0.06x0.12), short-lived (0.2-0.35s). One-shot flag prevents multi-frame spawning. Adds crackling energy feel to the primary objective
+- **Sprint V120 — Minimap entity pulse rings**: Key unexhausted entities (DataCore, EscapePod, CrewNPC) get a pulsing ring on the minimap. Ring radius oscillates, opacity fades in/out at 2.5Hz. Draws player attention to important objectives without cluttering the map
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
