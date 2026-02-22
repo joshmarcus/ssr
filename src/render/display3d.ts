@@ -2152,6 +2152,28 @@ export class BrowserDisplay3D implements IGameDisplay {
         const emotionScale = this._playerHpPercent < 0.4 ? 0.7 : this._eyeWidenTimer > 0 ? 1.3 : 1.0;
         sweepoEye.scale.set(emotionScale, blinkScale * emotionScale, emotionScale);
         if (this._eyeWidenTimer > 0) this._eyeWidenTimer -= delta;
+        // Eye look direction: shift toward nearest entity in local space
+        let eyeLookX = 0, eyeLookZ = 0.27;
+        let closestEyeDist = 999;
+        for (const [, emesh] of this.entityMeshes) {
+          if (emesh.userData._exhausted) continue;
+          const edx = emesh.position.x - this.playerCurrentX;
+          const edz = emesh.position.z - this.playerCurrentZ;
+          const edist = Math.abs(edx) + Math.abs(edz);
+          if (edist < closestEyeDist && edist < 4) {
+            closestEyeDist = edist;
+            // Convert world direction to local space using player rotation
+            const pRot = this.playerMesh!.rotation.y;
+            const localX = Math.cos(pRot) * edx + Math.sin(pRot) * edz;
+            const localZ = -Math.sin(pRot) * edx + Math.cos(pRot) * edz;
+            const len = Math.sqrt(localX * localX + localZ * localZ);
+            if (len > 0.01) {
+              eyeLookX = (localX / len) * 0.04;
+              eyeLookZ = 0.27 + (localZ / len) * 0.02;
+            }
+          }
+        }
+        sweepoEye.position.set(eyeLookX, 0.1, eyeLookZ);
       }
 
       // Antenna signal pulse: tip glows when near unexhausted interactive entities (child 3)
