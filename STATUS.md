@@ -233,6 +233,7 @@
 - **Sprint V71 — Evacuation visual escalation**: Red klaxon ambient pulse during evacuation, ceiling panels glow red, persistent red alert hazard border, dramatic endgame atmosphere
 - **Sprint V72 — Entity animation polish**: EscapePod beacon flash (bright pulse every 3s), PowerCell/FuseBox intermittent spark, DataCore counter-rotating wireframe cage, EvidenceTrace scale pulse + layered float
 - **Sprint V73 — Corridor steam vents**: Occasional additive steam puff sprites near player in corridors (1.5-4.5s interval), drift upward, expand, and fade. Atmospheric broken-station detail
+- **Sprint V74 — Scan grid ripple**: Sensor scan wave now leaves glowing grid squares on the floor as it passes. Squares flash briefly in sensor color (40% coverage, additive blend) creating a tech-data-readout effect
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

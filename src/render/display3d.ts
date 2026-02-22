@@ -1033,8 +1033,31 @@ export class BrowserDisplay3D implements IGameDisplay {
     col.position.set(px, 1.25, pz);
     this.scene.add(col);
 
+    // Scan grid ripple — glowing grid squares appear in scan wave's wake
+    const gridSquares: THREE.Mesh[] = [];
+    const scanRadius = 6;
+    for (let gx = -scanRadius; gx <= scanRadius; gx++) {
+      for (let gz = -scanRadius; gz <= scanRadius; gz++) {
+        const dist = Math.abs(gx) + Math.abs(gz);
+        if (dist > scanRadius || dist < 1) continue;
+        // Only place on ~40% of tiles for variety
+        if (((Math.floor(px) + gx) * 17 + (Math.floor(pz) + gz) * 31) % 5 > 1) continue;
+        const sqGeo = new THREE.PlaneGeometry(0.7, 0.7);
+        sqGeo.rotateX(-Math.PI / 2);
+        const sqMat = new THREE.MeshBasicMaterial({
+          color: waveColor, transparent: true, opacity: 0,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const sq = new THREE.Mesh(sqGeo, sqMat);
+        sq.position.set(Math.floor(px) + gx + 0.5, 0.02, Math.floor(pz) + gz + 0.5);
+        (sq as any)._dist = dist;
+        this.scene.add(sq);
+        gridSquares.push(sq);
+      }
+    }
+
     const startTime = this.clock.getElapsedTime();
-    const duration = 1.2;
+    const duration = 1.5;
     const animateWave = () => {
       const t = (this.clock.getElapsedTime() - startTime) / duration;
       if (t >= 1) {
@@ -1044,6 +1067,11 @@ export class BrowserDisplay3D implements IGameDisplay {
         ringGeo.dispose(); ringMat.dispose();
         ring2Geo.dispose(); ring2Mat.dispose();
         colGeo.dispose(); colMat.dispose();
+        for (const sq of gridSquares) {
+          this.scene.remove(sq);
+          (sq.geometry as THREE.BufferGeometry).dispose();
+          (sq.material as THREE.MeshBasicMaterial).dispose();
+        }
         return;
       }
       // Primary ring expands fast
@@ -1059,6 +1087,21 @@ export class BrowserDisplay3D implements IGameDisplay {
 
       // Column fades out quickly
       colMat.opacity = 0.3 * Math.max(0, 1 - t * 3);
+
+      // Grid squares: appear as wave passes, then fade
+      for (const sq of gridSquares) {
+        const sqDist = (sq as any)._dist as number;
+        const wavePos = t * (scanRadius + 2); // wave front position
+        const sqT = wavePos - sqDist; // time since wave passed this tile
+        if (sqT < 0) {
+          (sq.material as THREE.MeshBasicMaterial).opacity = 0;
+        } else if (sqT < 0.5) {
+          // Appear: quick flash
+          (sq.material as THREE.MeshBasicMaterial).opacity = 0.2 * (1 - sqT * 2);
+        } else {
+          (sq.material as THREE.MeshBasicMaterial).opacity = 0;
+        }
+      }
 
       requestAnimationFrame(animateWave);
     };
