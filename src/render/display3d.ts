@@ -1376,26 +1376,39 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   private _subtitleTimer: ReturnType<typeof setTimeout> | null = null;
+  private _subtitleDismissHandler: ((e: KeyboardEvent) => void) | null = null;
 
-  /** Show a cinematic subtitle at the bottom of the 3D viewport */
+  /** Show a cinematic subtitle at the bottom of the 3D viewport — requires keypress to dismiss */
   private showSubtitle(text: string, source?: string): void {
     const el = document.getElementById("subtitle-bar");
     if (!el) return;
     // Strip HTML tags and [ECHO] prefix for cleaner display
     const cleanText = text.replace(/<[^>]*>/g, "").replace(/^\[ECHO\]\s*/, "");
     const sourceHtml = source ? `<span class="sub-source">${source}</span>` : "";
-    el.innerHTML = sourceHtml + cleanText;
+    el.innerHTML = sourceHtml + cleanText + `<span class="sub-dismiss">[Space/Esc]</span>`;
     el.className = "visible";
     if (this._subtitleTimer) clearTimeout(this._subtitleTimer);
-    // Hold visible for 3.5s, then fade out over 0.8s
-    this._subtitleTimer = setTimeout(() => {
-      el.className = "fade-out";
-      this._subtitleTimer = setTimeout(() => {
-        el.className = "";
-        el.innerHTML = "";
-        this._subtitleTimer = null;
-      }, 800);
-    }, 3500);
+    // Remove any previous dismiss handler
+    if (this._subtitleDismissHandler) {
+      window.removeEventListener("keydown", this._subtitleDismissHandler);
+    }
+    // Wait for spacebar or escape to dismiss
+    this._subtitleDismissHandler = (e: KeyboardEvent) => {
+      if (e.key === " " || e.key === "Escape") {
+        e.preventDefault();
+        el.className = "fade-out";
+        this._subtitleTimer = setTimeout(() => {
+          el.className = "";
+          el.innerHTML = "";
+          this._subtitleTimer = null;
+        }, 800);
+        if (this._subtitleDismissHandler) {
+          window.removeEventListener("keydown", this._subtitleDismissHandler);
+          this._subtitleDismissHandler = null;
+        }
+      }
+    };
+    window.addEventListener("keydown", this._subtitleDismissHandler);
   }
 
   getLogHistory(): DisplayLogEntry[] {
@@ -2040,6 +2053,11 @@ export class BrowserDisplay3D implements IGameDisplay {
     window.removeEventListener("keydown", this.boundKeyHandler);
     this.container.removeEventListener("wheel", this.boundWheelHandler);
     if (this.roomFlashTimer) clearTimeout(this.roomFlashTimer);
+    if (this._subtitleDismissHandler) {
+      window.removeEventListener("keydown", this._subtitleDismissHandler);
+      this._subtitleDismissHandler = null;
+    }
+    if (this._subtitleTimer) clearTimeout(this._subtitleTimer);
     // Clean up overlays
     const overlay = document.getElementById("gameover-overlay");
     if (overlay) overlay.classList.remove("active");
@@ -2586,8 +2604,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       const moveBob = isMoving ? Math.abs(Math.sin(elapsed * 8)) * 0.015 : 0;
       this.playerMesh.position.y = 0.02 + breathe + moveBob;
 
-      // Smooth rotation towards facing direction (offset by PI so front faces chase cam)
-      let targetRot = this.playerFacing + Math.PI;
+      // Smooth rotation towards facing direction
+      let targetRot = this.playerFacing;
       let currentRot = this.playerMesh.rotation.y;
       // Shortest path rotation
       let diff = targetRot - currentRot;
@@ -8934,12 +8952,21 @@ export class BrowserDisplay3D implements IGameDisplay {
     const isFirstRender = this.lastPlayerX < 0;
 
     // Track movement direction and update facing
+    // In tank/camera-relative mode, backward movement should NOT change facing
     if (this.lastPlayerX >= 0 && this.lastPlayerY >= 0) {
       const dx = px - this.lastPlayerX;
       const dy = py - this.lastPlayerY;
       if (dx !== 0 || dy !== 0) {
-        // Synty Sweepo model needs +PI/2 correction (flipped 180° from previous -PI/2).
-        this.playerFacing = -Math.atan2(dy, dx) + Math.PI / 2;
+        const moveAngle = -Math.atan2(dy, dx) + Math.PI / 2;
+        // Check if this move is roughly opposite to current facing (backward)
+        let angleDiff = moveAngle - this.playerFacing;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        const isBackward = Math.abs(angleDiff) > Math.PI * 0.6; // >108° counts as backward
+        if (!isBackward) {
+          this.playerFacing = moveAngle;
+        }
+        // else: preserve facing (tank-style backward)
       }
     }
     this.lastPlayerX = px;
