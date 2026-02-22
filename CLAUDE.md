@@ -272,6 +272,19 @@ Screen-space overlays, Sweepo detail, and minimap utility:
 - **Sensor visor tint is barely visible but important**: 6% opacity color wash with mix-blend-mode:multiply is almost subliminal, but players notice when it's removed. The breathing animation (1.5Hz) prevents it from feeling static.
 - **Append-only child strategy proven**: Through V91-V100, Sweepo group grew to 8+ children (body, head, antenna, tip, glow, eye, brushL, brushR) with zero index breakage. Always add new meshes at the end.
 
+## Sprint Learnings (V101-V110 Reflection)
+
+Minimap utility, environmental warnings, and interaction feedback polish:
+
+- **Minimap as planning tool**: Hazard icons (V101), room checkmarks (V98), exploration % (V107), and room names (V94) collectively turn the minimap from a simple map into a strategic planning overlay. Players can identify which rooms need attention, where dangers are, and how much they've explored without moving.
+- **Idle animations sell character**: Antenna sway (dual-frequency 1.2Hz + 0.7Hz, V102) makes Sweepo feel alive when stationary. The layered frequencies avoid mechanical repetition — a single sine wave looks robotic, two create organic motion.
+- **Entity-specific interaction colors**: Using ENTITY_COLORS_3D lookup in flashTile (V103) means each entity type has a distinct interaction feel. Brightening particles +60 per channel ensures visibility against the entity's base color.
+- **Flicker ratio as shared state**: Storing `_headlightFlickerRatio` (V104) as a class property lets cone mesh and ground spot sync without recalculating. Single source of truth for multi-element visual effects.
+- **Door proximity as spatial storytelling**: Unlocked doors brightening on approach (V105) creates a "motion sensor" feel. The contrast with locked doors' red pulse tells players at a glance which doors they can enter. Simple distance-based lerp, big navigation payoff.
+- **Following crew glow as social signal**: Green emissive on following NPCs (V106) provides constant reassurance that rescued crew are still with you. Pulsing prevents it from blending into static scene lighting.
+- **Breach danger rings scale to threat**: Additive-blend red rings (V108) with expanding pulse draw the eye to active hazards without blocking gameplay. The cleanup-on-seal pattern (remove from scene when userData._sealed flips) prevents visual artifacts.
+- **Sparkle pool reuse for different effects**: Relay activation sparks (V109) reuse `_discoverySparkles` pool with high `_driftY` values for upward burst. Same lifecycle management (spawn, drift, fade, cleanup) serves both ambient sparkles and event bursts. Pool reuse > new particle system.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
