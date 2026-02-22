@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V162 completed, V163 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V166 completed, V167 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -322,6 +322,10 @@
 - **Sprint V160 — Mid-wall accent strip**: Eye-level emissive trim at y=0.85 (0.45 emissive intensity). Walls now have 4 trim levels visible from chase cam
 - **Sprint V161 — Dramatic lighting contrast**: Ambient 3.2→1.8, key 2.8→1.8, fill 1.6→0.6, rim 1.0→0.5. Headlight boosted to 3.5/4.5 as hero light. Room center glow 2.0→3.0. Moody atmospheric rooms
 - **Sprint V162 — Enhanced surface textures**: Wall panels with edge gradients, darker grooves, beveled highlights, visible rivets. Floor grid with cross seams, tile boundary grooves, center rivets
+- **Sprint V163 — Corridor grate texture + cooler atmosphere**: Corridor grate with visible border grooves, highlight edges, corner bolts. Background shifted cooler blue. Toon gradient shadow raised (60→80)
+- **Sprint V164 — Film color grade**: CSS cool-blue gradient overlay (mix-blend-mode:color) for cinematic sci-fi desaturation. Active only in chase cam
+- **Sprint V165 — Brighter door frames**: Door frame pillar emissive 0.3→0.55, door PointLight intensity boosted (locked 0.6→1.0, unlocked 0.4→0.8), range 3→4
+- **Sprint V166 — Lower immersive camera**: Chase cam lowered (rooms 1.0→0.85, corridors 0.65→0.50) and brought closer (2.8→2.5, 2.0→1.8). Environment feels towering, floor detail clearly visible. Most impactful visual change of V160-V166
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
