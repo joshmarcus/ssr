@@ -1295,6 +1295,14 @@ export class BrowserDisplay3D implements IGameDisplay {
       requestAnimationFrame(animateRing);
     };
     requestAnimationFrame(animateRing);
+
+    // Entity reaction: pulse scale + brightness on the entity at this tile
+    for (const [, mesh] of this.entityMeshes) {
+      if (Math.abs(mesh.position.x - x) < 0.5 && Math.abs(mesh.position.z - y) < 0.5) {
+        (mesh as any)._interactPulse = 1.0;
+        break;
+      }
+    }
   }
 
   // Camera shake state
@@ -2607,6 +2615,24 @@ export class BrowserDisplay3D implements IGameDisplay {
             }
           }
         });
+      }
+    }
+
+    // Entity interaction pulse: scale bump + brightness on interact
+    for (const [, mesh] of this.entityMeshes) {
+      const pulse = (mesh as any)._interactPulse;
+      if (pulse > 0.01) {
+        const bump = Math.sin(pulse * Math.PI) * 0.15;
+        mesh.scale.set(1 + bump, 1 + bump, 1 + bump);
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.emissiveIntensity = Math.max(child.material.emissiveIntensity, pulse * 0.8);
+          }
+        });
+        (mesh as any)._interactPulse = pulse - delta * 3; // decay over ~0.3s
+      } else if (pulse !== undefined && pulse <= 0.01) {
+        mesh.scale.set(1, 1, 1);
+        (mesh as any)._interactPulse = 0;
       }
     }
 

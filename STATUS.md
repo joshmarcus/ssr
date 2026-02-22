@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V84 completed, V85 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V91 completed, V92 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -250,6 +250,7 @@
 - **Sprint V88 — Vacuum wind particles**: Blue wind sprites drift toward nearest breach entity on low-pressure tiles. Particles spawn around player, accelerate toward breach direction (1.02x per frame), fade and expand. Directional hazard visualization
 - **Sprint V89 — Heat shimmer sprites**: Wide thin orange particles rise rapidly from hot tiles (>25 heat) with horizontal wave distortion. Spawn rate increases with heat intensity. Visual heat haze effect complementing existing hazard sprites
 - **Sprint V90 — DataCore holographic ring**: Tilted torus ring orbits the DataCore entity (magenta, additive blend). Ring tilts with slow oscillation and pulses opacity. Visually marks the key objective as dramatically important
+- **Sprint V91 — Entity interaction feedback**: Entity meshes scale-bump and emissive-boost on interaction (set via flashTile, decays over ~0.3s). Satisfying tactile response when activating relays, terminals, and other interactables
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
