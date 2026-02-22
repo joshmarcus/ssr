@@ -2640,6 +2640,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeCorridorLightShafts(state);
     this.placeWallDamageDecals(state);
     this.placeSpaceViewports(state);
+    this.placeWallScreens(state);
     this.placeCorridorWallProps(state);
     this.placeEmergencyWallStrips(state);
     this.placeCorridorFixtures(state);
@@ -4821,6 +4822,17 @@ export class BrowserDisplay3D implements IGameDisplay {
     for (const vs of this._viewportStarSprites) {
       const twinkle = 0.5 + 0.5 * Math.sin(elapsed * 2.5 + vs.phase);
       (vs.sprite.material as THREE.SpriteMaterial).opacity = vs.baseOpacity * twinkle;
+    }
+
+    // ── Wall screen pulse ──────────────────────────────────────
+    for (const ws of this._wallScreens) {
+      const mat = ws.mesh.material as THREE.MeshBasicMaterial;
+      const pulse = 0.6 + 0.4 * Math.sin(elapsed * 1.8 + ws.phase);
+      const r = ((ws.color >> 16) & 0xff) / 255;
+      const g = ((ws.color >> 8) & 0xff) / 255;
+      const b = (ws.color & 0xff) / 255;
+      mat.color.setRGB(r * 0.3 * pulse, g * 0.3 * pulse, b * 0.3 * pulse);
+      mat.opacity = 0.6 + 0.3 * pulse;
     }
 
     // ── Station events: power fluctuations + hull groans ──────────
@@ -7918,6 +7930,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _wallDamageTiles: Set<string> = new Set();
   private _viewportRooms: Set<string> = new Set();
   private _viewportStarSprites: { sprite: THREE.Sprite; baseOpacity: number; phase: number }[] = [];
+  private _wallScreenRooms: Set<string> = new Set();
+  private _wallScreens: { mesh: THREE.Mesh; phase: number; color: number }[] = [];
 
   private placeWallDamageDecals(state: GameState): void {
     for (let y = 1; y < state.height - 1; y++) {
@@ -8110,6 +8124,101 @@ export class BrowserDisplay3D implements IGameDisplay {
           rGroup.add(star);
           this._viewportStarSprites.push({ sprite: star, baseOpacity: brightness, phase: starPhase });
         }
+      }
+    }
+  }
+
+  // ── Private: wall-mounted monitor screens ─────────────────────
+  /** Place glowing monitor screens on room walls for visual life */
+  private placeWallScreens(state: GameState): void {
+    for (const room of state.rooms) {
+      if (this._wallScreenRooms.has(room.id)) continue;
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
+      if (!state.tiles[cy][cx].explored) continue;
+      this._wallScreenRooms.add(room.id);
+
+      const rGroup = this.roomDecoGroups.get(room.id) ?? this.decorationGroup;
+      const tint = ROOM_WALL_TINTS_3D[room.name] ?? 0x44aaff;
+
+      // Screen color based on room type
+      const screenColors: Record<string, number> = {
+        "Data Core": 0x8844ff,
+        "Research Lab": 0x44ff88,
+        "Communications Hub": 0x4488ff,
+        "Bridge": 0x44ccff,
+        "Med Bay": 0x44ffcc,
+        "Power Relay Junction": 0xffaa44,
+        "Robotics Bay": 0x88ccff,
+        "Life Support": 0x44ddff,
+      };
+      const screenColor = screenColors[room.name] ?? ((tint & 0xfefefe) >> 1) | 0x224488;
+
+      // Find wall positions suitable for screens
+      const wallPositions: { wx: number; wz: number; rotY: number }[] = [];
+      for (let y = room.y; y < room.y + room.height; y++) {
+        for (let x = room.x; x < room.x + room.width; x++) {
+          if (y < 0 || y >= state.height || x < 0 || x >= state.width) continue;
+          if (state.tiles[y][x].type !== TileType.Floor) continue;
+          if (y > 0 && state.tiles[y - 1][x].type === TileType.Wall)
+            wallPositions.push({ wx: x, wz: y - 0.47, rotY: 0 });
+          if (y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Wall)
+            wallPositions.push({ wx: x, wz: y + 0.47, rotY: Math.PI });
+          if (x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Wall)
+            wallPositions.push({ wx: x + 0.47, wz: y, rotY: -Math.PI / 2 });
+          if (x > 0 && state.tiles[y][x - 1].type === TileType.Wall)
+            wallPositions.push({ wx: x - 0.47, wz: y, rotY: Math.PI / 2 });
+        }
+      }
+      if (wallPositions.length === 0) continue;
+
+      // Place 2-4 screens per room (avoid overlap with viewports — use different wall hash)
+      const hash = room.x * 47 + room.y * 23 + room.width;
+      const count = 2 + (hash % 3);
+      for (let i = 0; i < count && i < wallPositions.length; i++) {
+        const idx = (hash * (i + 3) * 11 + 5) % wallPositions.length;
+        const pos = wallPositions[idx];
+        const phase = ((hash + i * 19) % 100) / 100 * Math.PI * 2;
+
+        // Screen panel — small glowing rectangle
+        const sw = 0.3 + ((hash + i) % 3) * 0.08; // 0.30-0.46
+        const sh = 0.2 + ((hash + i * 7) % 2) * 0.06; // 0.20-0.26
+        const screenGeo = new THREE.PlaneGeometry(sw, sh);
+        const r = ((screenColor >> 16) & 0xff) / 255;
+        const g = ((screenColor >> 8) & 0xff) / 255;
+        const b = (screenColor & 0xff) / 255;
+        const screenMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(r * 0.4, g * 0.4, b * 0.4),
+          transparent: true,
+          opacity: 0.8,
+          depthWrite: false,
+        });
+        const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+        // Heights vary: 0.7-1.3 range (different from viewports at 1.05)
+        const screenY = 0.7 + ((hash + i * 3) % 6) * 0.1;
+        screenMesh.position.set(pos.wx, screenY, pos.wz);
+        screenMesh.rotation.y = pos.rotY;
+        rGroup.add(screenMesh);
+        this._wallScreens.push({ mesh: screenMesh, phase, color: screenColor });
+
+        // Screen glow — small additive halo
+        const glowGeo = new THREE.PlaneGeometry(sw + 0.12, sh + 0.12);
+        const glowMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(r * 0.1, g * 0.1, b * 0.15),
+          transparent: true,
+          opacity: 0.15,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        });
+        const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+        glowMesh.position.copy(screenMesh.position);
+        glowMesh.rotation.y = pos.rotY;
+        // Push glow slightly behind screen
+        const backOff = 0.004;
+        glowMesh.position.x -= Math.sin(pos.rotY) * backOff;
+        glowMesh.position.z -= Math.cos(pos.rotY) * backOff;
+        rGroup.add(glowMesh);
       }
     }
   }
