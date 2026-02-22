@@ -3480,19 +3480,43 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
     html += `<div class="synthesis-block">\u2605 ANALYSIS: ${esc(deduction.synthesisText)}</div>`;
   }
 
-  // ── Scrollable evidence log (read-only) ──
-  html += `<div style="border-top:1px solid #222;margin:6px 0;padding-top:4px">`;
-  html += `<div style="color:#888;font-size:10px;font-weight:bold;margin-bottom:3px">EVIDENCE LOG (${journal.length} entries)</div>`;
-  html += `<div style="max-height:120px;overflow-y:auto;font-size:11px;padding:2px 0">`;
-  for (const entry of journal) {
-    const crewNames = entry.crewMentioned.map(id => {
-      const member = crew.find(c => c.id === id);
-      return member ? `${member.lastName}` : "";
-    }).filter(Boolean);
-    const crewBadge = crewNames.length > 0 ? ` <span style="color:#6cf">[${crewNames.join(", ")}]</span>` : "";
-    html += `<div style="color:#aaa;padding:1px 2px;border-bottom:1px solid #111">\u2022 ${esc(entry.summary)}${crewBadge} <span style="color:#555">T${entry.turnDiscovered}</span></div>`;
+  // ── Key evidence (entries sharing tags with this deduction) ──
+  const deductionTags = new Set(deduction.requiredTags ?? []);
+  const keyEvidence = journal.filter(j => j.tags.some(t => deductionTags.has(t)));
+  const otherEvidence = journal.filter(j => !j.tags.some(t => deductionTags.has(t)));
+
+  if (keyEvidence.length > 0) {
+    html += `<div style="border-top:1px solid #443;margin:6px 0;padding-top:4px">`;
+    html += `<div style="color:#fca;font-size:10px;font-weight:bold;margin-bottom:4px">\u2605 KEY EVIDENCE (${keyEvidence.length} entries relevant to this question)</div>`;
+    for (const entry of keyEvidence.slice(0, 6)) {
+      const crewNames = entry.crewMentioned.map(id => {
+        const member = crew.find(c => c.id === id);
+        return member ? `${member.lastName}` : "";
+      }).filter(Boolean);
+      const crewBadge = crewNames.length > 0 ? ` <span style="color:#6cf">[${crewNames.join(", ")}]</span>` : "";
+      const excerpt = entry.detail.length > 100 ? entry.detail.slice(0, 100) + "..." : entry.detail;
+      html += `<div style="margin:3px 0;padding:4px 8px;background:rgba(255,200,100,0.04);border-left:2px solid #a86;font-size:11px">`;
+      html += `<div style="color:#dda;font-weight:bold">${esc(entry.summary)}${crewBadge}</div>`;
+      html += `<div style="color:#998;font-size:10px;margin-top:2px">${esc(excerpt)}</div>`;
+      html += `<div style="color:#556;font-size:9px;margin-top:1px">${esc(entry.roomFound)} · Turn ${entry.turnDiscovered}</div>`;
+      html += `</div>`;
+    }
+    if (keyEvidence.length > 6) {
+      html += `<div style="color:#556;font-size:10px;padding:2px 8px">...and ${keyEvidence.length - 6} more relevant entries</div>`;
+    }
+    html += `</div>`;
   }
-  html += `</div></div>`;
+
+  // ── Other evidence (less relevant, collapsed) ──
+  if (otherEvidence.length > 0) {
+    html += `<div style="border-top:1px solid #222;margin:4px 0;padding-top:3px">`;
+    html += `<div style="color:#667;font-size:10px;margin-bottom:2px">OTHER EVIDENCE (${otherEvidence.length} entries)</div>`;
+    html += `<div style="max-height:60px;overflow-y:auto;font-size:10px;padding:1px 0">`;
+    for (const entry of otherEvidence) {
+      html += `<div style="color:#556;padding:1px 2px">\u2022 ${esc(entry.summary)} <span style="color:#444">T${entry.turnDiscovered}</span></div>`;
+    }
+    html += `</div></div>`;
+  }
 
   // ── Answer section ──
   html += `<div style="border-top:1px solid #443;margin:4px 0;padding-top:4px">`;
