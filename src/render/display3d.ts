@@ -1255,6 +1255,25 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateRoomLabels(state);
     // Entity labels removed — sidebar already shows nearby entities
     this.renderMinimap(state);
+
+    // Hazard screen border: red/amber edge glow when player is in danger
+    const hazBorder = document.getElementById("hazard-border");
+    if (hazBorder) {
+      const px = state.player.entity.pos.x;
+      const py = state.player.entity.pos.y;
+      const playerTile = state.tiles[py]?.[px];
+      if (playerTile) {
+        const inDanger = playerTile.heat > 30 || playerTile.smoke > 40 || playerTile.pressure < 40;
+        const inWarning = playerTile.heat > 15 || playerTile.smoke > 20 || playerTile.pressure < 60;
+        if (inDanger) {
+          hazBorder.className = "active";
+        } else if (inWarning) {
+          hazBorder.className = "active amber";
+        } else {
+          hazBorder.className = "";
+        }
+      }
+    }
   }
 
   // ── Render sidebar UI (same HTML as 2D) ─────────────────────────

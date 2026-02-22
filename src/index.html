@@ -233,10 +233,26 @@
       pointer-events: none;
       background: radial-gradient(
         ellipse at center,
-        transparent 50%,
-        rgba(0, 0, 0, 0.4) 100%
+        transparent 40%,
+        rgba(0, 6, 2, 0.5) 85%,
+        rgba(0, 0, 0, 0.7) 100%
       );
       z-index: 2;
+    }
+    /* Subtle CRT scanline overlay for terminal aesthetic */
+    .mode-3d #rot-display::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 20, 8, 0.04) 2px,
+        rgba(0, 20, 8, 0.04) 4px
+      );
+      z-index: 3;
     }
 
     /* ── Game-over full-screen overlay ─────────────────── */
@@ -331,6 +347,23 @@
     #damage-flash.damage { background: radial-gradient(ellipse at center, transparent 40%, rgba(255,0,0,0.3) 100%); }
     #damage-flash.milestone { background: radial-gradient(ellipse at center, rgba(0,255,0,0.15) 0%, transparent 70%); }
     #damage-flash.stun { background: radial-gradient(ellipse at center, rgba(0,100,255,0.2) 0%, transparent 70%); }
+
+    /* Hazard warning screen border — persistent red/amber edge glow in dangerous areas */
+    #hazard-border {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      box-shadow: inset 0 0 60px rgba(255, 40, 0, 0.3), inset 0 0 120px rgba(255, 40, 0, 0.1);
+    }
+    #hazard-border.active {
+      opacity: 1;
+    }
+    #hazard-border.amber {
+      box-shadow: inset 0 0 40px rgba(255, 160, 0, 0.2), inset 0 0 80px rgba(255, 160, 0, 0.08);
+    }
 
     /* ── 3D room name banner ────────────────────────────── */
     #room-banner {
@@ -651,6 +684,7 @@
 </head>
 <body>
   <div id="damage-flash"></div>
+  <div id="hazard-border"></div>
   <div id="room-banner"></div>
   <div id="gameover-overlay"></div>
   <div id="broadcast-overlay"></div>
