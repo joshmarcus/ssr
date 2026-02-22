@@ -292,6 +292,7 @@
 - **Sprint V130 — Entity collection fly-to-player**: Pickup entities (Tool, Utility, Sensor, MedKit, PowerCell, CrewItem) fly toward Sweepo when collected instead of vanishing. Ease-in acceleration with upward arc, spin, shrink, and opacity fade (~0.4s). Adds tactile satisfaction to item collection
 - **Sprint V131 — Breach vacuum suction**: Nearby particle sprites (sparkles, dust kicks, breath puffs) get gravitationally pulled toward unsealed breach positions within 4 tiles. Inverse-square falloff creates realistic vacuum draw. Makes breaches feel physically dangerous — visible atmosphere being sucked out
 - **Sprint V132 — Airlock depressurization wind streaks**: 12 radial elongated streak sprites burst outward when an airlock opens. Blue-white additive blending with horizontal drift. Sparkle pool gains optional `_driftX`/`_driftZ` for radial particle movement. Combined with breach suction creates dramatic venting moments
+- **Sprint V133 — HP-reactive headlight color**: Headlight base color shifts from cool white through warm amber to red-orange as HP drops (75%→warm, 50%→amber, 25%→red). Room hazard tints still override. Creates immersive "systems failing" feel tied to player health
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

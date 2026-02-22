@@ -3286,7 +3286,16 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.headlight.intensity = headlightIntensity;
       this._headlightFlickerRatio = headlightIntensity / baseIntensity;
 
-      // Headlight color reacts to room hazards
+      // Headlight color reacts to room hazards and HP
+      // HP-reactive base: white → amber → red as HP drops
+      let baseColor = 0xeeffff; // default cool white
+      if (this._playerHpPercent < 0.25) {
+        baseColor = 0xff6644; // critical: red-orange
+      } else if (this._playerHpPercent < 0.5) {
+        baseColor = 0xffaa66; // warning: amber
+      } else if (this._playerHpPercent < 0.75) {
+        baseColor = 0xffeebb; // slight warm shift
+      }
       if (this._currentRoom) {
         const hazeMesh = this.roomHazeMeshes.get(this._currentRoom.id);
         const hazeColor = hazeMesh ? (hazeMesh.material as THREE.MeshBasicMaterial).color.getHex() : 0;
@@ -3295,10 +3304,10 @@ export class BrowserDisplay3D implements IGameDisplay {
         } else if (hazeColor === 0x4488cc) {
           this.headlight.color.setHex(0x88ccff); // cold blue in vacuum
         } else {
-          this.headlight.color.setHex(0xeeffff); // default cool white
+          this.headlight.color.setHex(baseColor);
         }
       } else {
-        this.headlight.color.setHex(0xeeffff);
+        this.headlight.color.setHex(baseColor);
       }
 
       // Volumetric cone visibility: brighter in corridors (dusty), dimmer in rooms
