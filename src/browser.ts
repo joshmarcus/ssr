@@ -223,7 +223,7 @@ let incidentCardOpen = false;
 let logReviewOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
 let investigationHubOpen = false;
-let hubSection: "evidence" | "connections" | "whatweknow" = "evidence";
+let hubSection: "evidence" | "connections" | "crew" | "whatweknow" = "evidence";
 let hubIdx = 0;                       // selected item index within current section
 let hubOptionIdx = 0;                 // selected option within a deduction/choice
 let hubDetailDeduction: string | null = null; // deduction ID in detail/answer mode
@@ -3170,13 +3170,14 @@ function renderInvestigationHub(): void {
   const journal = state.mystery.journal;
 
   // Tab bar
-  const tabs: Array<"evidence" | "connections" | "whatweknow"> = ["evidence", "connections", "whatweknow"];
+  const tabs: Array<"evidence" | "connections" | "crew" | "whatweknow"> = ["evidence", "connections", "crew", "whatweknow"];
   const newEvidenceCount = entries.length - lastEvidenceViewCount;
   const newBadge = newEvidenceCount > 0 && hubSection !== "evidence"
     ? ` <span style="color:#0f0;font-size:10px">+${newEvidenceCount} new</span>` : "";
   const tabLabels: Record<string, string> = {
     evidence: `EVIDENCE (${entries.length})${newBadge}`,
     connections: `CONNECTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`,
+    crew: `CREW (${state.mystery?.crew.length ?? 0})`,
     whatweknow: "WHAT WE KNOW",
   };
   // Update evidence view count when viewing evidence tab
@@ -3195,6 +3196,8 @@ function renderInvestigationHub(): void {
     bodyHtml = renderHubEvidence(entries);
   } else if (hubSection === "connections") {
     bodyHtml = renderHubConnections(deductions, journal);
+  } else if (hubSection === "crew") {
+    bodyHtml = renderHubCrew(journal);
   } else if (hubSection === "whatweknow") {
     bodyHtml = renderHubWhatWeKnow();
   }
@@ -3521,6 +3524,142 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
   return html;
 }
 
+/** CREW section — crew profiles with linked evidence and profiling insights. */
+function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): string {
+  if (!state.mystery) return `<div style="padding:16px;color:#888">No crew data available.</div>`;
+  const crew = state.mystery.crew;
+  if (crew.length === 0) return `<div style="padding:16px;color:#888">No crew records found.</div>`;
+
+  // Clamp hubIdx to crew length
+  if (hubIdx >= crew.length) hubIdx = crew.length - 1;
+  if (hubIdx < 0) hubIdx = 0;
+
+  // Build crew list (left panel)
+  let listHtml = "";
+  for (let i = 0; i < crew.length; i++) {
+    const c = crew[i];
+    const selected = i === hubIdx;
+    const mentionCount = journal.filter(j => j.crewMentioned.includes(c.id)).length;
+    const statusColor = c.fate === CrewFate.Dead ? "#f44" : c.fate === CrewFate.Missing ? "#fa0" : "#4a4";
+    const statusText = c.fate === CrewFate.Dead ? "DECEASED" : c.fate === CrewFate.Missing ? "MISSING" : c.fate === CrewFate.Escaped ? "EVACUATED" : c.fate === CrewFate.Survived ? "ALIVE" : "UNKNOWN";
+    const bg = selected ? "background:rgba(68,204,255,0.12);border-left:2px solid #4cf" : "border-left:2px solid transparent";
+    listHtml += `<div style="padding:6px 10px;cursor:pointer;${bg};margin:2px 0">
+      <div style="color:${selected ? "#eef" : "#aab"};font-weight:${selected ? "bold" : "normal"};font-size:13px">${c.firstName} ${c.lastName}</div>
+      <div style="font-size:10px;color:#667">${c.role.toUpperCase()} · <span style="color:${statusColor}">${statusText}</span>${mentionCount > 0 ? ` · ${mentionCount} evidence` : ""}</div>
+    </div>`;
+  }
+
+  // Build detail panel (right side) for selected crew member
+  const selected = crew[hubIdx];
+  const mentions = journal.filter(j => j.crewMentioned.includes(selected.id));
+  const profileReady = mentions.length >= 2;
+
+  let detailHtml = `<div style="padding:12px">`;
+  detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:2px;margin-bottom:8px">CREW PROFILE</div>`;
+  detailHtml += `<div style="color:#eef;font-size:16px;font-weight:bold;margin-bottom:4px">${selected.firstName} ${selected.lastName}</div>`;
+  detailHtml += `<div style="color:#8ac;font-size:12px;margin-bottom:10px">${selected.role.toUpperCase()} · Badge: ${selected.badgeId}</div>`;
+
+  // Personality and traits
+  if (selected.personality) {
+    detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:6px">Personality: <span style="color:#bbc">${selected.personality}</span></div>`;
+  }
+  if (selected.secret) {
+    detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:6px">Secret: <span style="color:#fca">${selected.secret}</span></div>`;
+  }
+  if (selected.lastKnownRoom) {
+    detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:10px">Last known location: <span style="color:#bbc">${selected.lastKnownRoom}</span></div>`;
+  }
+
+  // Relationships
+  if (selected.relationships && selected.relationships.length > 0) {
+    detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin:12px 0 6px">RELATIONSHIPS</div>`;
+    for (const rel of selected.relationships) {
+      const otherCrew = crew.find(c => c.id === rel.targetId);
+      if (otherCrew) {
+        detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">
+          <span style="color:#bbc">${otherCrew.firstName} ${otherCrew.lastName}</span>
+          <span style="color:#667"> — ${rel.type}</span>
+        </div>`;
+      }
+    }
+  }
+
+  // Linked evidence
+  if (mentions.length > 0) {
+    detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin:12px 0 6px">LINKED EVIDENCE (${mentions.length})</div>`;
+    for (const entry of mentions.slice(0, 8)) {
+      detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:4px;padding-left:8px;border-left:1px solid #333">
+        <span style="color:#bbc">${entry.summary}</span>
+        <span style="color:#556"> — ${entry.roomFound}</span>
+      </div>`;
+    }
+    if (mentions.length > 8) {
+      detailHtml += `<div style="color:#556;font-size:10px">...and ${mentions.length - 8} more</div>`;
+    }
+  } else {
+    detailHtml += `<div style="color:#556;font-size:11px;margin-top:10px;font-style:italic">No evidence linked to this crew member yet.</div>`;
+  }
+
+  // Profiling insight (when 2+ evidence pieces mention this person)
+  if (profileReady) {
+    const insight = getCrewProfileInsight(selected, mentions);
+    if (insight) {
+      detailHtml += `<div style="color:#fca;font-size:10px;letter-spacing:1.5px;margin:14px 0 6px">PROFILING INSIGHT</div>`;
+      detailHtml += `<div style="color:#dda;font-size:12px;line-height:1.5;padding:8px;background:rgba(255,200,100,0.05);border:1px solid rgba(255,200,100,0.15);border-radius:3px">${insight}</div>`;
+    }
+  } else if (mentions.length > 0) {
+    detailHtml += `<div style="color:#556;font-size:10px;margin-top:10px;font-style:italic">Collect more evidence mentioning ${selected.firstName} to unlock profiling insight (${mentions.length}/2)</div>`;
+  }
+
+  detailHtml += `</div>`;
+
+  return `<div class="journal-body"><div class="journal-list" style="overflow-y:auto;max-height:420px">${listHtml}</div><div class="journal-detail" style="overflow-y:auto;max-height:420px">${detailHtml}</div></div>`;
+}
+
+/** Generate a profiling insight for a crew member based on their evidence mentions */
+function getCrewProfileInsight(crew: import("./shared/types.js").CrewMember, mentions: import("./shared/types.js").JournalEntry[]): string {
+  if (!state.mystery) return "";
+  const archetype = state.mystery.timeline.archetype;
+  const role = crew.role;
+
+  // Check if this crew member is central to the mystery
+  const isCentral = state.mystery.timeline.events.some(e => e.actorId === crew.id);
+  const mentionText = mentions.map(m => m.detail).join(" ").toLowerCase();
+
+  // Generate contextual insight based on evidence content and crew role
+  const hasConflict = mentionText.includes("conflict") || mentionText.includes("argument") || mentionText.includes("disagree") || mentionText.includes("tension");
+  const hasSecret = mentionText.includes("secret") || mentionText.includes("hidden") || mentionText.includes("encrypt") || mentionText.includes("private");
+  const hasLocation = mentionText.includes("was seen") || mentionText.includes("last seen") || mentionText.includes("heading toward");
+  const hasAnxiety = mentionText.includes("worried") || mentionText.includes("nervous") || mentionText.includes("afraid") || mentionText.includes("scared");
+
+  const parts: string[] = [];
+
+  if (isCentral) {
+    parts.push(`${crew.firstName} appears in multiple timeline events — a key figure in what happened here.`);
+  }
+  if (hasConflict) {
+    parts.push(`Evidence suggests interpersonal conflict involving ${crew.firstName}. Their relationships with other crew may be relevant.`);
+  }
+  if (hasSecret) {
+    parts.push(`${crew.firstName} was involved with something they wanted kept hidden. The encrypted or private communications deserve closer attention.`);
+  }
+  if (hasLocation) {
+    parts.push(`${crew.firstName}'s movements through the station have been documented. Their location history could reveal their role in events.`);
+  }
+  if (hasAnxiety) {
+    parts.push(`${crew.firstName} showed signs of fear or anxiety before the incident. They may have known something was coming.`);
+  }
+  if (crew.secret) {
+    parts.push(`Profile analysis suggests ${crew.firstName} harbors a significant secret that may connect to the larger mystery.`);
+  }
+
+  if (parts.length === 0) {
+    parts.push(`${crew.firstName}'s involvement appears peripheral based on current evidence. Continue gathering information.`);
+  }
+
+  return parts.slice(0, 3).join(" ");
+}
+
 /** WHAT WE KNOW section — auto-generated narrative prose. */
 function renderHubWhatWeKnow(): string {
   if (!state.mystery) return `<div style="padding:16px;color:#888">No mystery data available.</div>`;
@@ -3738,7 +3877,7 @@ function handleHubInput(e: KeyboardEvent): void {
 
   // Tab cycles sections
   if (e.key === "Tab" && !hubDetailDeduction) {
-    const tabs: Array<"evidence" | "connections" | "whatweknow"> = ["evidence", "connections", "whatweknow"];
+    const tabs: Array<"evidence" | "connections" | "crew" | "whatweknow"> = ["evidence", "connections", "crew", "whatweknow"];
     const curIdx = tabs.indexOf(hubSection);
     hubSection = tabs[(curIdx + 1) % tabs.length];
     hubIdx = 0;
@@ -3752,6 +3891,8 @@ function handleHubInput(e: KeyboardEvent): void {
     handleHubEvidenceInput(e);
   } else if (hubSection === "connections") {
     handleHubConnectionsInput(e);
+  } else if (hubSection === "crew") {
+    handleHubCrewInput(e);
   } else if (hubSection === "whatweknow") {
     // No interactive elements in What We Know
     return;
@@ -3762,6 +3903,21 @@ function handleHubEvidenceInput(e: KeyboardEvent): void {
   const { entries } = getEvidenceEntries();
   const maxIdx = entries.length - 1;
 
+  if (e.key === "ArrowUp" || e.key === "w" || e.key === "k") {
+    hubIdx = Math.max(0, hubIdx - 1);
+    renderInvestigationHub();
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "s" || e.key === "j") {
+    hubIdx = Math.min(maxIdx, hubIdx + 1);
+    renderInvestigationHub();
+    return;
+  }
+}
+
+function handleHubCrewInput(e: KeyboardEvent): void {
+  const crew = state.mystery?.crew ?? [];
+  const maxIdx = crew.length - 1;
   if (e.key === "ArrowUp" || e.key === "w" || e.key === "k") {
     hubIdx = Math.max(0, hubIdx - 1);
     renderInvestigationHub();
