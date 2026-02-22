@@ -24,18 +24,22 @@ function createFloorGridTexture(): THREE.CanvasTexture {
   const ctx = canvas.getContext("2d")!;
 
   // Bright base — instance color multiplies through this, so lighter = brighter floors
-  ctx.fillStyle = "#eeeeee";
+  ctx.fillStyle = "#e8e8e8";
   ctx.fillRect(0, 0, size, size);
 
-  // Outer panel edge — white highlight
-  ctx.strokeStyle = "#f4f4f4";
+  // Outer panel edge — darker groove for visible tile boundaries
+  ctx.strokeStyle = "#aaaaaa";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(0.5, 0.5, size - 1, size - 1);
+  // Inner highlight for beveled edge look
+  ctx.strokeStyle = "#f2f2f2";
   ctx.lineWidth = 1;
-  ctx.strokeRect(1, 1, size - 2, size - 2);
+  ctx.strokeRect(2, 2, size - 4, size - 4);
 
-  // Corner accents — subtle blue highlight
-  ctx.strokeStyle = "#ddeeff";
-  ctx.lineWidth = 2;
-  const c = 8;
+  // Corner accents — blue-grey highlight
+  ctx.strokeStyle = "#c0d0e4";
+  ctx.lineWidth = 2.5;
+  const c = 10;
   ctx.beginPath();
   ctx.moveTo(0, c); ctx.lineTo(0, 0); ctx.lineTo(c, 0);
   ctx.moveTo(size - c, 0); ctx.lineTo(size, 0); ctx.lineTo(size, c);
@@ -43,13 +47,21 @@ function createFloorGridTexture(): THREE.CanvasTexture {
   ctx.moveTo(c, size); ctx.lineTo(0, size); ctx.lineTo(0, size - c);
   ctx.stroke();
 
-  // Subtle inner seam
-  ctx.strokeStyle = "#cccccc";
+  // Center cross seam — more visible
+  ctx.strokeStyle = "#bbbbbb";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(size / 2, 3);
-  ctx.lineTo(size / 2, size - 3);
+  ctx.moveTo(size / 2, 4);
+  ctx.lineTo(size / 2, size - 4);
+  ctx.moveTo(4, size / 2);
+  ctx.lineTo(size - 4, size / 2);
   ctx.stroke();
+
+  // Small center rivet
+  ctx.fillStyle = "#999999";
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, 2, 0, Math.PI * 2);
+  ctx.fill();
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
@@ -66,47 +78,77 @@ function createWallPanelTexture(): THREE.CanvasTexture {
   const ctx = canvas.getContext("2d")!;
 
   // Light base
-  ctx.fillStyle = "#e8e8e8";
+  ctx.fillStyle = "#e0e0e0";
   ctx.fillRect(0, 0, size, size * 2);
 
-  // Vertical panel groove
-  ctx.strokeStyle = "#cccccc";
+  // Subtle panel shading — darker edges, lighter center for depth
+  const gradient = ctx.createLinearGradient(0, 0, size, 0);
+  gradient.addColorStop(0, "rgba(0,0,0,0.06)");
+  gradient.addColorStop(0.15, "rgba(0,0,0,0)");
+  gradient.addColorStop(0.85, "rgba(0,0,0,0)");
+  gradient.addColorStop(1, "rgba(0,0,0,0.06)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size * 2);
+
+  // Vertical panel groove — darker for more visible seam
+  ctx.strokeStyle = "#999999";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(size / 2, 2);
   ctx.lineTo(size / 2, size * 2 - 2);
   ctx.stroke();
+  // Highlight edge beside groove
+  ctx.strokeStyle = "#f0f0f0";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(size / 2 + 2, 2);
+  ctx.lineTo(size / 2 + 2, size * 2 - 2);
+  ctx.stroke();
 
-  // Horizontal seam at 1/3 height
-  ctx.strokeStyle = "#cccccc";
+  // Horizontal seam at 1/3 height — stronger
+  ctx.strokeStyle = "#999999";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(2, Math.floor(size * 2 / 3));
   ctx.lineTo(size - 2, Math.floor(size * 2 / 3));
   ctx.stroke();
+  // Seam highlight
+  ctx.strokeStyle = "#f0f0f0";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(2, Math.floor(size * 2 / 3) + 2);
+  ctx.lineTo(size - 2, Math.floor(size * 2 / 3) + 2);
+  ctx.stroke();
 
   // Top/bottom border trim
-  ctx.strokeStyle = "#d0d8e0";
+  ctx.strokeStyle = "#b0b8c0";
   ctx.lineWidth = 3;
   ctx.strokeRect(0, 0, size, size * 2);
 
-  // Corner rivets
-  ctx.fillStyle = "#aabbcc";
-  const offsets = [[4, 4], [size - 5, 4], [4, size * 2 - 5], [size - 5, size * 2 - 5]];
+  // Corner rivets — larger and more visible
+  ctx.fillStyle = "#8899aa";
+  const offsets = [[5, 5], [size - 6, 5], [5, size * 2 - 6], [size - 6, size * 2 - 6],
+    [5, Math.floor(size * 2 / 3) - 3], [size - 6, Math.floor(size * 2 / 3) - 3]]; // extra rivets near seam
   for (const [rx, ry] of offsets) {
     ctx.beginPath();
-    ctx.arc(rx, ry, 2, 0, Math.PI * 2);
+    ctx.arc(rx, ry, 2.5, 0, Math.PI * 2);
     ctx.fill();
+    // Rivet highlight
+    ctx.fillStyle = "#ccd0d4";
+    ctx.beginPath();
+    ctx.arc(rx - 0.5, ry - 0.5, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#8899aa";
   }
 
-  // Subtle ventilation slits in upper panel
-  ctx.strokeStyle = "#bbbbbb";
-  ctx.lineWidth = 1;
+  // Ventilation slits in upper panel — more prominent
+  ctx.strokeStyle = "#888888";
+  ctx.lineWidth = 1.5;
   for (let i = 0; i < 3; i++) {
     const sy = 12 + i * 8;
     ctx.beginPath();
-    ctx.moveTo(size * 0.2, sy);
-    ctx.lineTo(size * 0.45, sy);
+    ctx.moveTo(size * 0.15, sy);
+    ctx.lineTo(size * 0.42, sy);
     ctx.stroke();
   }
 
