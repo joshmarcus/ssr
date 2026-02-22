@@ -1496,27 +1496,33 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Hazard screen border: colored edge glow when player is in danger
     const hazBorder = document.getElementById("hazard-border");
     if (hazBorder) {
-      const px = state.player.entity.pos.x;
-      const py = state.player.entity.pos.y;
-      const playerTile = state.tiles[py]?.[px];
-      if (playerTile) {
-        const heatDanger = playerTile.heat > 30;
-        const smokeDanger = playerTile.smoke > 40;
-        const vacuumDanger = playerTile.pressure < 40;
-        const heatWarning = playerTile.heat > 15;
-        const smokeWarning = playerTile.smoke > 20;
-        const vacuumWarning = playerTile.pressure < 60;
+      const currentPhase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
+      if (currentPhase === ObjectivePhase.Evacuate) {
+        // Evacuation: persistent red alert border (always visible)
+        hazBorder.className = "active";
+      } else {
+        const px = state.player.entity.pos.x;
+        const py = state.player.entity.pos.y;
+        const playerTile = state.tiles[py]?.[px];
+        if (playerTile) {
+          const heatDanger = playerTile.heat > 30;
+          const smokeDanger = playerTile.smoke > 40;
+          const vacuumDanger = playerTile.pressure < 40;
+          const heatWarning = playerTile.heat > 15;
+          const smokeWarning = playerTile.smoke > 20;
+          const vacuumWarning = playerTile.pressure < 60;
 
-        if (heatDanger || smokeDanger) {
-          hazBorder.className = "active"; // red glow for heat/smoke
-        } else if (vacuumDanger) {
-          hazBorder.className = "active frost"; // blue glow for vacuum
-        } else if (heatWarning || smokeWarning) {
-          hazBorder.className = "active amber";
-        } else if (vacuumWarning) {
-          hazBorder.className = "active frost";
-        } else {
-          hazBorder.className = "";
+          if (heatDanger || smokeDanger) {
+            hazBorder.className = "active"; // red glow for heat/smoke
+          } else if (vacuumDanger) {
+            hazBorder.className = "active frost"; // blue glow for vacuum
+          } else if (heatWarning || smokeWarning) {
+            hazBorder.className = "active amber";
+          } else if (vacuumWarning) {
+            hazBorder.className = "active frost";
+          } else {
+            hazBorder.className = "";
+          }
         }
       }
     }
@@ -2042,6 +2048,23 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (phase === ObjectivePhase.Evacuate) baseIntensity = 2.0;
         else if (phase === ObjectivePhase.Recover) baseIntensity = 2.8;
         this.ambientLight.intensity = baseIntensity * this._corridorDimFactor;
+
+        // Evacuation phase: pulsing red ambient for emergency klaxon feel
+        if (phase === ObjectivePhase.Evacuate) {
+          const klaxon = 0.5 + Math.abs(Math.sin(elapsed * 3)) * 0.5; // slow heavy pulse
+          this.ambientLight.intensity *= (0.7 + klaxon * 0.3);
+          // Ceiling panels tinted red during evacuation
+          if (this.ceilingMesh.visible) {
+            const ceilMat = this.ceilingMesh.material as THREE.MeshStandardMaterial;
+            ceilMat.emissive = ceilMat.emissive || new THREE.Color();
+            ceilMat.emissive.setHex(0xff1100);
+            ceilMat.emissiveIntensity = klaxon * 0.15;
+          }
+        } else if (this.ceilingMesh.visible) {
+          // Non-evacuation: ensure ceiling emissive is off
+          const ceilMat = this.ceilingMesh.material as THREE.MeshStandardMaterial;
+          if (ceilMat.emissiveIntensity > 0) ceilMat.emissiveIntensity = 0;
+        }
       }
 
       // Update movement trail
