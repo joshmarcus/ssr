@@ -941,7 +941,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     const floorGeo = new THREE.BoxGeometry(1, 0.08, 1);
     floorGeo.translate(0, -0.04, 0); // sit flush at y=0
     const floorGridTex = createFloorGridTexture();
-    const floorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: floorGridTex });
+    const floorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: floorGridTex, emissive: 0x222222, emissiveIntensity: 0.08 });
+    (floorMat as THREE.MeshStandardMaterial).roughness = 0.55;
+    (floorMat as THREE.MeshStandardMaterial).metalness = 0.15;
     this.floorMesh = new THREE.InstancedMesh(floorGeo, floorMat, this.maxTiles);
     this.floorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.floorMesh.frustumCulled = false; // instances span entire map
@@ -953,7 +955,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     const corridorFloorGeo = new THREE.BoxGeometry(1, 0.08, 1);
     corridorFloorGeo.translate(0, -0.04, 0);
     const corridorGrateTex = createCorridorGrateTexture();
-    const corridorFloorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: corridorGrateTex });
+    const corridorFloorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: corridorGrateTex, emissive: 0x181822, emissiveIntensity: 0.06 });
+    (corridorFloorMat as THREE.MeshStandardMaterial).roughness = 0.45;
+    (corridorFloorMat as THREE.MeshStandardMaterial).metalness = 0.2;
     this.corridorFloorMesh = new THREE.InstancedMesh(corridorFloorGeo, corridorFloorMat, this.maxTiles);
     this.corridorFloorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.corridorFloorMesh.frustumCulled = false;
@@ -963,7 +967,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     const wallGeo = new THREE.BoxGeometry(1, 2.0, 1);
     const wallPanelTex = createWallPanelTexture();
-    const wallMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: wallPanelTex });
+    const wallMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: wallPanelTex, emissive: 0x181818, emissiveIntensity: 0.06 });
     this.wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, this.maxTiles);
     this.wallMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.wallMesh.frustumCulled = false;
