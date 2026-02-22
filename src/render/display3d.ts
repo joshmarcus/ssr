@@ -2618,8 +2618,8 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         // Context-aware camera: wider/higher in rooms, tighter/lower in corridors
         const inRoom = this.lastRoomId !== "";
-        const chaseDist = inRoom ? 3.0 : 2.2;        // further back in rooms, closer in corridors
-        const chaseHeight = inRoom ? 1.2 : 0.7;      // higher in rooms, lower in corridors
+        const chaseDist = inRoom ? 2.8 : 2.0;        // further back in rooms, closer in corridors
+        const chaseHeight = inRoom ? 1.0 : 0.65;     // lower for more forward view, less ceiling
         const lookDist = inRoom ? 2.5 : 1.8;          // look further ahead in rooms
 
         // Target positions
@@ -2669,8 +2669,8 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.chaseCamera.fov += (targetFov - this.chaseCamera.fov) * camLerp;
         this.chaseCamera.updateProjectionMatrix();
 
-        // Look-at height: slightly higher in rooms to see more of the space
-        const lookY = inRoom ? 0.3 : 0.1;
+        // Look-at height: raised for more forward-looking camera angle
+        const lookY = inRoom ? 0.5 : 0.25;
 
         // Idle lateral sway for subtle breathing camera
         const idleSwayX = isIdle ? Math.sin(elapsed * 0.5) * 0.04 : 0;
@@ -2743,7 +2743,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (!this.chaseCamActive) {
           targetNear = 20; targetFar = 40;
         } else if (inRoom) {
-          targetNear = 3; targetFar = 12; // room — enclosed, fade before void boundary
+          targetNear = 4; targetFar = 14; // room — wide enough to see the whole space
         } else {
           targetNear = 1.5; targetFar = 8; // corridor — claustrophobic darkness
         }
@@ -3639,7 +3639,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Headlight: intensity flutter, hazard-reactive color, corridor brightness, damage flicker
     if (this.headlight) {
       const inRoom = this._currentRoom !== null;
-      const baseIntensity = inRoom ? 1.8 : 2.8;
+      const baseIntensity = inRoom ? 2.5 : 3.2; // brighter headlight for better forward visibility
       let headlightIntensity = baseIntensity + Math.sin(elapsed * 3.7) * 0.2 + Math.sin(elapsed * 7.3) * 0.1;
       // Damage flicker: headlight flickers when HP is low
       if (this._playerHpPercent < 0.6) {
@@ -3772,9 +3772,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         glowColor = 0x4488cc;
         glowIntensity = 0.8;
       } else {
-        // Normal room: warm room-tinted glow
+        // Normal room: warm room-tinted glow, bright enough to illuminate from chase cam
         glowColor = ROOM_LIGHT_COLORS[this._currentRoom.name] ?? 0xffeedd;
-        glowIntensity = 1.2;
+        glowIntensity = 2.0;
       }
 
       this._roomCenterGlow.color.setHex(glowColor);
