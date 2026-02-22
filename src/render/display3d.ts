@@ -853,7 +853,11 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.gltfLoader = new GLTFLoader();
 
     // ── Renderer ──
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+      stencil: false, // not needed — saves GPU memory
+    });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(COLORS_3D.background);
     // Enable shadow maps for dramatic headlight shadows
@@ -1820,6 +1824,19 @@ export class BrowserDisplay3D implements IGameDisplay {
   /** Whether the chase (1st/3rd person) camera is active */
   isChaseCam(): boolean {
     return this.chaseCamActive;
+  }
+
+  /** Turn the player bot left or right by one octant (45°) without moving */
+  turnPlayer(direction: "left" | "right"): void {
+    const step = Math.PI / 4; // 45° per turn
+    if (direction === "left") {
+      this.playerFacing += step;
+    } else {
+      this.playerFacing -= step;
+    }
+    // Normalize to (-π, π]
+    while (this.playerFacing > Math.PI) this.playerFacing -= Math.PI * 2;
+    while (this.playerFacing <= -Math.PI) this.playerFacing += Math.PI * 2;
   }
 
   destroy(): void {
@@ -3879,7 +3896,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       const spotDist = 2.5; // tiles ahead
       const spotX = this.playerCurrentX + Math.sin(facing) * spotDist;
       const spotZ = this.playerCurrentZ + Math.cos(facing) * spotDist;
-      this._headlightSpot.position.set(spotX, 0.015, spotZ);
+      this._headlightSpot.position.set(spotX, 0.04, spotZ);
       this._headlightSpot.rotation.z = -facing; // align elongation with facing
       const spotMat = this._headlightSpot.material as THREE.MeshBasicMaterial;
       const inRoom = this._currentRoom !== null;
@@ -8380,7 +8397,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       blending: THREE.AdditiveBlending,
     });
     const glowCircle = new THREE.Mesh(glowGeo, glowMat);
-    glowCircle.position.y = -0.01; // just above floor
+    glowCircle.position.y = 0.03; // above floor to avoid z-fighting
     group.add(glowCircle);
 
     // Eye light: small emissive sphere on front of body (child 5)

@@ -1212,7 +1212,7 @@ function handleAction(action: Action): void {
   state = step(state, resolvedAction);
 
   // Start background music on first player interaction
-  audio.startBgMusic();
+  // audio.startBgMusic(); // temporarily disabled
 
   // Action-triggered tutorial hints (fire once per action type)
   if (state.turn !== prevTurn) {
@@ -1962,7 +1962,7 @@ function handleAction(action: Action): void {
   if (state.gameOver) {
     deleteSave(); // Clear save on game end
     audio.stopAmbient(); // Silence the ambient drone
-    audio.stopBgMusic(); // Stop background music
+    // audio.stopBgMusic(); // Stop background music — temporarily disabled
 
     // Record run in history
     const deds = state.mystery?.deductions ?? [];
@@ -2109,6 +2109,14 @@ function handleAction(action: Action): void {
   if (display && 'getPlayerFacing' in display) {
     inputHandler.facingAngle = (display as any).getPlayerFacing();
     inputHandler.cameraRelativeMode = (display as any).isChaseCam();
+    // Wire up turn callback for tank-style controls (turn without moving)
+    if (!inputHandler.turnCallback) {
+      inputHandler.turnCallback = (dir: "left" | "right") => {
+        if (display && 'turnPlayer' in display) {
+          (display as any).turnPlayer(dir);
+        }
+      };
+    }
   }
 }
 

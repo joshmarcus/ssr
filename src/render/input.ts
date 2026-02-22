@@ -5,13 +5,15 @@ import { ActionType, Direction } from "../shared/types.js";
  * Keyboard input handler for browser play.
  * Maps key events to Action objects.
  *
- * When cameraRelativeMode is true (chase cam), arrow keys and WASD
- * map to forward/backward/turn-left/turn-right relative to player facing.
+ * When cameraRelativeMode is true (chase cam), arrow keys and WASD use
+ * tank-style controls: up/down = move forward/backward in facing direction,
+ * left/right = turn the bot (change facing, no movement, no turn consumed).
  * Vi keys (hjkl) and numpad always use absolute compass directions.
  */
 
 type ActionCallback = (action: Action) => void;
 type ScanCallback = () => void;
+type TurnCallback = (direction: "left" | "right") => void;
 
 // Direction ring for camera-relative mapping (CW from North)
 const DIRS_RING: Direction[] = [
@@ -28,6 +30,8 @@ export class InputHandler {
   cameraRelativeMode: boolean = false;
   /** Current player facing angle in radians (set by display3d) */
   facingAngle: number = 0;
+  /** Callback for turning the bot without moving (camera-relative mode) */
+  turnCallback: TurnCallback | null = null;
 
   constructor(callback: ActionCallback, scanCallback: ScanCallback) {
     this.callback = callback;
@@ -41,10 +45,10 @@ export class InputHandler {
   }
 
   /**
-   * Convert a relative direction (forward/back/left/right) to an absolute
+   * Convert a relative direction (forward/backward) to an absolute
    * Direction based on the current player facing angle.
    */
-  private resolveRelativeDirection(relDir: "forward" | "backward" | "left" | "right"): Direction {
+  private resolveRelativeDirection(relDir: "forward" | "backward"): Direction {
     // Normalize facing angle to (-π, π]
     let angle = this.facingAngle;
     while (angle > Math.PI) angle -= Math.PI * 2;
@@ -54,11 +58,25 @@ export class InputHandler {
     let octant = Math.round((Math.PI - angle) / (Math.PI / 4));
     if (octant < 0) octant += 8;
     octant = octant % 8;
-    const offsets = { forward: 0, right: 2, backward: 4, left: 6 };
+    const offsets = { forward: 0, backward: 4 };
     return DIRS_RING[(octant + offsets[relDir]) % 8];
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
+    // Handle turns separately (no game action consumed)
+    if (this.cameraRelativeMode && this.turnCallback) {
+      switch (e.key) {
+        case "ArrowLeft": case "a": case "A":
+          e.preventDefault();
+          this.turnCallback("left");
+          return;
+        case "ArrowRight": case "d": case "D":
+          e.preventDefault();
+          this.turnCallback("right");
+          return;
+      }
+    }
+
     const action = this.mapKeyToAction(e.key);
     if (action) {
       e.preventDefault();
@@ -71,17 +89,14 @@ export class InputHandler {
   }
 
   private mapKeyToAction(key: string): Action | null {
-    // Camera-relative directional keys (arrow keys + WASD) when chase cam active
+    // Camera-relative forward/backward (arrow up/down + W/S) when chase cam active
     if (this.cameraRelativeMode) {
       switch (key) {
         case "ArrowUp": case "w": case "W":
           return { type: ActionType.Move, direction: this.resolveRelativeDirection("forward") };
         case "ArrowDown": case "s": case "S":
           return { type: ActionType.Move, direction: this.resolveRelativeDirection("backward") };
-        case "ArrowLeft": case "a": case "A":
-          return { type: ActionType.Move, direction: this.resolveRelativeDirection("left") };
-        case "ArrowRight": case "d": case "D":
-          return { type: ActionType.Move, direction: this.resolveRelativeDirection("right") };
+        // Left/right handled in handleKeyDown as turns (no action)
       }
     }
 
