@@ -243,6 +243,7 @@
 - **Sprint V81 — Sweepo eye glow**: Small emissive sphere on Sweepo's front face, color-reactive to state (green=healthy, amber=damaged, orange=critical, red=stunned). Gentle 3Hz pulse adds personality and health-at-a-glance feedback
 - **Sprint V82 — Corridor breath puffs**: Small cold-air visualization from Sweepo's front in corridors. Puffs spawn every 2-3s, drift in facing direction, expand, and fade. Damaged space station atmosphere detail
 - **Sprint V83 — Entity shadow discs**: Dark translucent circles beneath all entities (GLTF and procedural) for ground shadow. 15% opacity, placed at floor level. Grounds entities in the scene and adds visual depth
+- **Sprint V84 — Relay energy dots**: Bright yellow sprites travel along relay power line curves between activated relays. Each dot follows the bezier arc at 0.4 speed with pulsing opacity. Satisfying puzzle-progress feedback
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

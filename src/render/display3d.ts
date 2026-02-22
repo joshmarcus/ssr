@@ -569,6 +569,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Relay power lines (visible energy beams between activated relays)
   private relayPowerLines: THREE.Line[] = [];
   private relayPowerLineCount: number = 0;
+  // Energy dots traveling along relay power lines
+  private _relayEnergyDots: { sprite: THREE.Sprite; curve: THREE.QuadraticBezierCurve3; t: number }[] = [];
   // Global scene lights for phase-reactive lighting
   private ambientLight: THREE.AmbientLight | null = null;
   private keyLight: THREE.DirectionalLight | null = null;
@@ -2802,6 +2804,17 @@ export class BrowserDisplay3D implements IGameDisplay {
       const mat = line.material as THREE.LineBasicMaterial;
       const phase = elapsed * 2 + i * 1.5;
       mat.opacity = 0.25 + Math.sin(phase) * 0.15;
+    }
+
+    // Energy dots: travel along relay power line curves
+    for (let i = 0; i < this._relayEnergyDots.length; i++) {
+      const ed = this._relayEnergyDots[i];
+      ed.t = (ed.t + delta * 0.4) % 1.0; // travel speed
+      const pos = ed.curve.getPoint(ed.t);
+      ed.sprite.position.copy(pos);
+      // Pulse brightness as it travels
+      const pulse = 0.6 + Math.sin(ed.t * Math.PI * 2) * 0.3;
+      (ed.sprite.material as THREE.SpriteMaterial).opacity = pulse;
     }
 
     // Particle animations
@@ -5432,13 +5445,18 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (activatedPositions.length === this.relayPowerLineCount) return;
     this.relayPowerLineCount = activatedPositions.length;
 
-    // Remove old lines
+    // Remove old lines and energy dots
     for (const line of this.relayPowerLines) {
       this.scene.remove(line);
       line.geometry.dispose();
       (line.material as THREE.LineBasicMaterial).dispose();
     }
     this.relayPowerLines = [];
+    for (const dot of this._relayEnergyDots) {
+      this.scene.remove(dot.sprite);
+      (dot.sprite.material as THREE.SpriteMaterial).dispose();
+    }
+    this._relayEnergyDots = [];
 
     if (activatedPositions.length < 2) return;
 
@@ -5470,6 +5488,16 @@ export class BrowserDisplay3D implements IGameDisplay {
         const line = new THREE.Line(geo, mat);
         this.scene.add(line);
         this.relayPowerLines.push(line);
+
+        // Energy dot: small bright sprite traveling along the curve
+        const dotMat = new THREE.SpriteMaterial({
+          color: 0xffee44, transparent: true, opacity: 0.8,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const dot = new THREE.Sprite(dotMat);
+        dot.scale.set(0.1, 0.1, 1);
+        this.scene.add(dot);
+        this._relayEnergyDots.push({ sprite: dot, curve, t: Math.random() });
       }
     }
   }
