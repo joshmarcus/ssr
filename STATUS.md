@@ -249,6 +249,7 @@
 - **Sprint V87 — Phase transition flash**: Full-screen color pulse on story phase transitions (orange=Investigation, red=Recovery, magenta=Evacuation). CSS overlay with 0.8s fade-out marks major story beats with dramatic visual impact
 - **Sprint V88 — Vacuum wind particles**: Blue wind sprites drift toward nearest breach entity on low-pressure tiles. Particles spawn around player, accelerate toward breach direction (1.02x per frame), fade and expand. Directional hazard visualization
 - **Sprint V89 — Heat shimmer sprites**: Wide thin orange particles rise rapidly from hot tiles (>25 heat) with horizontal wave distortion. Spawn rate increases with heat intensity. Visual heat haze effect complementing existing hazard sprites
+- **Sprint V90 — DataCore holographic ring**: Tilted torus ring orbits the DataCore entity (magenta, additive blend). Ring tilts with slow oscillation and pulses opacity. Visually marks the key objective as dramatically important
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

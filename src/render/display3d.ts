@@ -611,6 +611,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _heatShimmerSprites: THREE.Sprite[] = [];
   private _heatShimmerTimer: number = 0;
   private _playerTileHeat: number = 0;
+  // DataCore holographic ring
+  private _dataCoreHoloRing: THREE.Mesh | null = null;
   // Discovery sparkle: rooms visited this session for first-entry effects
   private _visitedRooms3D: Set<string> = new Set();
   private _discoverySparkles: THREE.Sprite[] = [];
@@ -2372,6 +2374,21 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Wireframe cage orbits in counter-direction (child 1 = wireframe cage)
         const cage = mesh.children[1];
         if (cage) cage.rotation.y = -elapsed * 0.4;
+        // Holographic orbit ring around the DataCore
+        if (!this._dataCoreHoloRing) {
+          const ringGeo = new THREE.TorusGeometry(0.6, 0.02, 8, 32);
+          const ringMat = new THREE.MeshBasicMaterial({
+            color: 0xff44ff, transparent: true, opacity: 0.3,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          this._dataCoreHoloRing = new THREE.Mesh(ringGeo, ringMat);
+          this.scene.add(this._dataCoreHoloRing);
+        }
+        this._dataCoreHoloRing.position.set(mesh.position.x, mesh.position.y, mesh.position.z);
+        this._dataCoreHoloRing.rotation.x = Math.PI / 4 + Math.sin(elapsed * 0.5) * 0.2;
+        this._dataCoreHoloRing.rotation.y = elapsed * 1.2;
+        const ringMat = this._dataCoreHoloRing.material as THREE.MeshBasicMaterial;
+        ringMat.opacity = 0.2 + Math.sin(elapsed * 2) * 0.1;
       } else if (userData.entityType === EntityType.Breach) {
         const scale = 1 + Math.sin(elapsed * 3) * 0.15;
         mesh.scale.set(scale, scale, scale);
