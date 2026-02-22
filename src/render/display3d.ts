@@ -4865,7 +4865,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           floorIdx++;
           // Void walls at the outer edge (forms a dark enclosure wall ring)
           if (dist >= totalRange - 1) {
-            this.dummy.position.set(vx, 0, vy);
+            this.dummy.position.set(vx, 1.0, vy); // y=1.0 matches wall box center (spans 0→2.0)
             this.dummy.rotation.set(0, 0, 0);
             this.dummy.scale.set(1, 1, 1);
             this.dummy.updateMatrix();
