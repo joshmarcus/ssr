@@ -458,6 +458,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _fillLight!: THREE.PointLight;
   private headlight: THREE.SpotLight | null = null;
   private headlightTarget: THREE.Object3D | null = null;
+  // Void enclosure planes
+  private _voidGround!: THREE.Mesh;
+  private _voidCeiling!: THREE.Mesh;
+  private _starfieldBg: THREE.Texture | null = null;
+  private _solidBg: THREE.Color = new THREE.Color(COLORS_3D.background);
 
   // Tile instanced meshes
   private floorMesh: THREE.InstancedMesh;      // room floors
@@ -660,6 +665,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _visitedRooms3D: Set<string> = new Set();
   private _discoverySparkles: THREE.Sprite[] = [];
   private starfieldPoints: THREE.Points | null = null;
+  private _nebulaMesh: THREE.Mesh | null = null;
 
   // Hazard visual effects (sprites at hazardous tile positions)
   private hazardSprites: THREE.Group = new THREE.Group();
@@ -752,7 +758,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.container = container;
     this.mapWidth = mapWidth ?? DEFAULT_MAP_WIDTH;
     this.mapHeight = mapHeight ?? DEFAULT_MAP_HEIGHT;
-    this.maxTiles = this.mapWidth * this.mapHeight;
+    this.maxTiles = Math.ceil(this.mapWidth * this.mapHeight * 1.5); // extra for void-fill boundary
 
     this.clock = new THREE.Clock();
     this.gltfLoader = new GLTFLoader();
@@ -771,7 +777,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Scene ──
     this.scene = new THREE.Scene();
-    this.scene.background = this.createStarfieldTexture();
+    this._starfieldBg = this.createStarfieldTexture();
+    // Chase cam starts active → solid background (inside station); ortho shows starfield
+    this.scene.background = this.chaseCamActive ? this._solidBg : this._starfieldBg;
     // Atmospheric fog — subtle fade at the far edges only
     this.scene.fog = new THREE.Fog(COLORS_3D.background, 20, 40);
 
@@ -838,6 +846,26 @@ export class BrowserDisplay3D implements IGameDisplay {
     this._fillLight = new THREE.PointLight(0xffffff, 0.8, 10);
     this._fillLight.position.set(0, 1.2, 0);
     this.scene.add(this._fillLight);
+
+    // Large void planes — catch any remaining gaps in tile geometry
+    // Ground plane: massive dark floor below everything
+    const voidGroundGeo = new THREE.PlaneGeometry(80, 80);
+    voidGroundGeo.rotateX(-Math.PI / 2);
+    const voidMat = new THREE.MeshBasicMaterial({
+      color: COLORS_3D.background,
+      depthWrite: true,
+    });
+    this._voidGround = new THREE.Mesh(voidGroundGeo, voidMat);
+    this._voidGround.position.set(0, -0.12, 0); // just below floor tiles
+    this._voidGround.renderOrder = -10;
+    this.scene.add(this._voidGround);
+    // Ceiling plane: massive dark ceiling above everything
+    const voidCeilGeo = new THREE.PlaneGeometry(80, 80);
+    voidCeilGeo.rotateX(Math.PI / 2);
+    this._voidCeiling = new THREE.Mesh(voidCeilGeo, voidMat.clone());
+    this._voidCeiling.position.set(0, 2.12, 0); // just above ceiling tiles
+    this._voidCeiling.renderOrder = -10;
+    this.scene.add(this._voidCeiling);
 
     // ── Instanced meshes for tiles ──
     // Material color is WHITE — instance colors control per-tile color directly
@@ -1016,6 +1044,12 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.chaseCamActive = !this.chaseCamActive;
         this.camera = this.chaseCamActive ? this.chaseCamera : this.orthoCamera;
         this.ceilingMesh.visible = this.chaseCamActive;
+        this._voidGround.visible = this.chaseCamActive;
+        this._voidCeiling.visible = this.chaseCamActive;
+        // Inside the station → solid dark background; overview → starfield
+        this.scene.background = this.chaseCamActive ? this._solidBg : this._starfieldBg;
+        if (this.starfieldPoints) this.starfieldPoints.visible = !this.chaseCamActive;
+        if (this._nebulaMesh) this._nebulaMesh.visible = !this.chaseCamActive;
         if (this.chaseCamActive) {
           // Initialize chase cam position to current player position to avoid snap
           const facing = this.playerFacing;
@@ -2695,6 +2729,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
       this._fillLight.position.set(this.playerCurrentX, 1.2, this.playerCurrentZ);
+      // Move void enclosure planes to follow player
+      this._voidGround.position.set(this.playerCurrentX, -0.12, this.playerCurrentZ);
+      this._voidCeiling.position.set(this.playerCurrentX, 2.12, this.playerCurrentZ);
       // Fill light only active in chase cam (in ortho, the overhead light is sufficient)
       this._fillLight.intensity = this.chaseCamActive ? 0.8 : 0;
 
@@ -2706,9 +2743,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (!this.chaseCamActive) {
           targetNear = 20; targetFar = 40;
         } else if (inRoom) {
-          targetNear = 4; targetFar = 16; // open room — wider view
+          targetNear = 3; targetFar = 12; // room — enclosed, fade before void boundary
         } else {
-          targetNear = 2; targetFar = 10; // corridor — claustrophobic darkness
+          targetNear = 1.5; targetFar = 8; // corridor — claustrophobic darkness
         }
         fog.near += (targetNear - fog.near) * 0.08;
         fog.far += (targetFar - fog.far) * 0.08;
@@ -4331,7 +4368,17 @@ export class BrowserDisplay3D implements IGameDisplay {
           const openE = x < state.width - 1 && state.tiles[y][x + 1].type !== TileType.Wall;
           const openW = x > 0 && state.tiles[y][x - 1].type !== TileType.Wall;
 
-          // Skip internal walls (no open neighbors)
+          // Always place ceiling panel above wall tiles (prevents seeing starfield through ceiling gaps)
+          this.dummy.position.set(x, 2.05, y);
+          this.dummy.rotation.set(0, 0, 0);
+          this.dummy.scale.set(1, 1, 1);
+          this.dummy.updateMatrix();
+          this.ceilingMesh.setMatrixAt(ceilIdx, this.dummy.matrix);
+          tempColor.setRGB(0.06, 0.07, 0.09); // very dark — wall ceiling reads as solid void
+          this.ceilingMesh.setColorAt(ceilIdx, tempColor);
+          ceilIdx++;
+
+          // Skip internal walls (no open neighbors) — but ceiling is still placed above
           if (!openN && !openS && !openE && !openW) continue;
 
           baseColor = this.getWallColor3D(state, x, y);
@@ -4567,16 +4614,64 @@ export class BrowserDisplay3D implements IGameDisplay {
 
           // Ceiling panel above this walkable tile
           this.dummy.position.set(x, 2.05, y);
+          this.dummy.rotation.set(0, 0, 0);
+          this.dummy.scale.set(1, 1, 1);
           this.dummy.updateMatrix();
           this.ceilingMesh.setMatrixAt(ceilIdx, this.dummy.matrix);
-          // Ceiling color: slightly darker version of floor for consistency
-          const ceilR = Math.max(0, ((baseColor >> 16) & 0xff) >> 2);
-          const ceilG = Math.max(0, ((baseColor >> 8) & 0xff) >> 2);
-          const ceilB = Math.max(0, (baseColor & 0xff) >> 2);
+          // Ceiling color: darker version of floor — bright enough to read as a surface
+          const ceilR = Math.max(0, ((baseColor >> 16) & 0xff) * 0.35);
+          const ceilG = Math.max(0, ((baseColor >> 8) & 0xff) * 0.35);
+          const ceilB = Math.max(0, (baseColor & 0xff) * 0.38); // slight blue shift for metallic feel
           tempColor.setRGB(ceilR / 255, ceilG / 255, ceilB / 255);
           if (!tile.visible) tempColor.multiplyScalar(0.5);
           this.ceilingMesh.setColorAt(ceilIdx, tempColor);
           ceilIdx++;
+        }
+      }
+    }
+
+    // Void-fill: place dark ceiling + floor + wall panels around the player
+    // Covers both unexplored tiles near the player AND tiles beyond the view range
+    // to create a continuous enclosed "dark shell" around the visible area
+    {
+      const px = state.player.entity.pos.x;
+      const py = state.player.entity.pos.y;
+      const totalRange = BrowserDisplay3D.CORRIDOR_VIEW_RANGE + 6; // full enclosure radius
+      for (let vy = py - totalRange; vy <= py + totalRange; vy++) {
+        for (let vx = px - totalRange; vx <= px + totalRange; vx++) {
+          const dist = Math.abs(vx - px) + Math.abs(vy - py);
+          if (dist > totalRange) continue;
+          if (vx < 0 || vx >= state.width || vy < 0 || vy >= state.height) continue;
+          // Skip tiles that were already given ceiling/floor in the main loop
+          const vTile = state.tiles[vy][vx];
+          if (vTile.explored && this.isTileInView(vx, vy, state)) continue;
+          // Void ceiling — always place
+          this.dummy.position.set(vx, 2.05, vy);
+          this.dummy.rotation.set(0, 0, 0);
+          this.dummy.scale.set(1, 1, 1);
+          this.dummy.updateMatrix();
+          this.ceilingMesh.setMatrixAt(ceilIdx, this.dummy.matrix);
+          tempColor.setRGB(0.04, 0.04, 0.05);
+          this.ceilingMesh.setColorAt(ceilIdx, tempColor);
+          ceilIdx++;
+          // Void floor — always place
+          this.dummy.position.set(vx, 0, vy);
+          this.dummy.updateMatrix();
+          this.floorMesh.setMatrixAt(floorIdx, this.dummy.matrix);
+          tempColor.setRGB(0.02, 0.02, 0.03);
+          this.floorMesh.setColorAt(floorIdx, tempColor);
+          floorIdx++;
+          // Void walls at the outer edge (forms a dark enclosure wall ring)
+          if (dist >= totalRange - 1) {
+            this.dummy.position.set(vx, 0, vy);
+            this.dummy.rotation.set(0, 0, 0);
+            this.dummy.scale.set(1, 1, 1);
+            this.dummy.updateMatrix();
+            this.wallMesh.setMatrixAt(wallIdx, this.dummy.matrix);
+            tempColor.setRGB(0.02, 0.02, 0.03);
+            this.wallMesh.setColorAt(wallIdx, tempColor);
+            wallIdx++;
+          }
         }
       }
     }
@@ -8802,9 +8897,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (!this._visibleRoomIds.has(room.id)) continue;
       if (x >= room.x && x < room.x + room.width &&
           y >= room.y && y < room.y + room.height) return true;
-      // Also show walls bordering visible rooms (1 tile outside)
-      if (x >= room.x - 1 && x <= room.x + room.width &&
-          y >= room.y - 1 && y <= room.y + room.height) return true;
+      // Also show walls bordering visible rooms (2 tiles outside for enclosure)
+      if (x >= room.x - 2 && x <= room.x + room.width + 1 &&
+          y >= room.y - 2 && y <= room.y + room.height + 1) return true;
     }
 
     return false;
@@ -9342,10 +9437,11 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       `,
     });
-    const nebulaMesh = new THREE.Mesh(nebulaGeo, nebulaMat);
-    nebulaMesh.position.y = -8;
-    nebulaMesh.renderOrder = -2;
-    this.scene.add(nebulaMesh);
+    this._nebulaMesh = new THREE.Mesh(nebulaGeo, nebulaMat);
+    this._nebulaMesh.position.y = -8;
+    this._nebulaMesh.renderOrder = -2;
+    this._nebulaMesh.visible = !this.chaseCamActive; // hidden inside the station
+    this.scene.add(this._nebulaMesh);
 
     const starCount = 400;
     const positions = new Float32Array(starCount * 3);
@@ -9390,6 +9486,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     this.starfieldPoints = new THREE.Points(starGeo, starMat);
     this.starfieldPoints.renderOrder = -1; // render behind everything
+    this.starfieldPoints.visible = !this.chaseCamActive; // hidden inside the station
     this.scene.add(this.starfieldPoints);
   }
 
