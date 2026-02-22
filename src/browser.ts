@@ -368,7 +368,7 @@ function hasAdjacentInteractable(): boolean {
   return false;
 }
 
-/** Execute one auto-explore step. */
+/** Execute one auto-explore step — phase-aware smart exploration. */
 function autoExploreStep(): void {
   if (!autoExploring || state.gameOver) {
     stopAutoExplore();
@@ -376,10 +376,38 @@ function autoExploreStep(): void {
   }
 
   const prevHp = state.player.hp;
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  const phase = state.mystery?.objectivePhase;
+
+  // Phase-aware action: clean during Maintenance (threshold 20 avoids wasting turns on near-clean tiles)
+  if (phase === ObjectivePhase.Clean) {
+    if (py >= 0 && py < state.height && px >= 0 && px < state.width) {
+      if (state.tiles[py][px].dirt > 20) {
+        handleAction({ type: ActionType.Clean });
+        autoExploreTimer = setTimeout(autoExploreStep, AUTO_EXPLORE_DELAY);
+        return;
+      }
+    }
+  }
+
+  // Phase-aware action: auto-interact with adjacent evidence during Investigate/Recover
+  if (phase === ObjectivePhase.Investigate || phase === ObjectivePhase.Recover) {
+    const interactTarget = getAutoExploreInteractTarget();
+    if (interactTarget) {
+      handleAction({ type: ActionType.Interact, targetId: interactTarget });
+      autoExploreTimer = setTimeout(autoExploreStep, AUTO_EXPLORE_DELAY);
+      return;
+    }
+  }
+
   const dir = autoExploreBFS();
 
   if (!dir) {
-    display.addLog("All accessible areas explored. Time to investigate — press [r] for Investigation Hub.", "milestone");
+    const phaseMsg = phase === ObjectivePhase.Clean
+      ? "All areas explored. Keep cleaning — press [c] on dirty tiles."
+      : "All accessible areas explored. Time to investigate — press [r] for Investigation Hub.";
+    display.addLog(phaseMsg, "milestone");
     stopAutoExplore();
     renderAll();
     return;
@@ -396,13 +424,6 @@ function autoExploreStep(): void {
     return;
   }
 
-  if (hasAdjacentInteractable()) {
-    display.addLog("Auto-explore stopped: something nearby.", "system");
-    stopAutoExplore();
-    renderAll();
-    return;
-  }
-
   if (state.gameOver) {
     stopAutoExplore();
     return;
@@ -410,6 +431,34 @@ function autoExploreStep(): void {
 
   // Schedule next step
   autoExploreTimer = setTimeout(autoExploreStep, AUTO_EXPLORE_DELAY);
+}
+
+/** Find an adjacent evidence entity to auto-interact with during exploration. */
+function getAutoExploreInteractTarget(): string | null {
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  const deltas = [
+    { x: 0, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 },
+    { x: -1, y: 0 }, { x: 1, y: 0 },
+  ];
+  for (const [id, ent] of state.entities) {
+    if (id === "player") continue;
+    for (const d of deltas) {
+      if (ent.pos.x !== px + d.x || ent.pos.y !== py + d.y) continue;
+      // Auto-interact with evidence sources
+      if (ent.type === EntityType.LogTerminal && !isEntityExhausted(ent)) return id;
+      if (ent.type === EntityType.EvidenceTrace && ent.props["discovered"] !== true && ent.props["scanHidden"] !== true) return id;
+      if (ent.type === EntityType.CrewItem && ent.props["examined"] !== true && ent.props["hidden"] !== true) return id;
+      if (ent.type === EntityType.Console && ent.props["read"] !== true) return id;
+      // Auto-pick up sensors
+      if (ent.type === EntityType.SensorPickup && ent.props["collected"] !== true) return id;
+      // Auto-interact with relays
+      if (ent.type === EntityType.Relay && ent.props["activated"] !== true && ent.props["locked"] !== true) return id;
+      // Auto-heal
+      if (ent.type === EntityType.MedKit && ent.props["used"] !== true && state.player.hp < state.player.maxHp) return id;
+    }
+  }
+  return null;
 }
 
 // ── Autoplay mode (bot plays the game) ──────────────────────────

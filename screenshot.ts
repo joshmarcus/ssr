@@ -209,13 +209,12 @@ async function main(): Promise<void> {
     // Auto-explore for N turns if requested
     if (opts.turns > 0) {
       console.log(`[screenshot] Auto-exploring for ${opts.turns} turns...`);
-      // Press Tab to start auto-explore
-      await page.keyboard.press("Tab");
-      // Wait for the auto-explore to complete the requested turns
-      // Each step is ~80ms, so turns * 100ms gives some buffer
-      const waitMs = Math.min(opts.turns * 100, 30000);
+      // Press F7 to start autoplay (full game-playing bot: cleans, interacts, explores)
+      await page.keyboard.press("F7");
+      // Each step is ~400ms in autoplay, so turns * 450ms gives buffer
+      const waitMs = Math.min(opts.turns * 450, 120000);
       await page.waitForTimeout(waitMs);
-      // Stop auto-explore
+      // Stop autoplay
       await page.keyboard.press("Escape");
       await page.waitForTimeout(200);
     }
