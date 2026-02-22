@@ -242,6 +242,7 @@
 - **Sprint V80 — Wall status LEDs**: Up to 4 small blinking indicator dots per room wall (room-tinted, additive blend). Blink with position-based phase offsets (primary flash every 4s + secondary 2s offset). Station-systems-alive detail
 - **Sprint V81 — Sweepo eye glow**: Small emissive sphere on Sweepo's front face, color-reactive to state (green=healthy, amber=damaged, orange=critical, red=stunned). Gentle 3Hz pulse adds personality and health-at-a-glance feedback
 - **Sprint V82 — Corridor breath puffs**: Small cold-air visualization from Sweepo's front in corridors. Puffs spawn every 2-3s, drift in facing direction, expand, and fade. Damaged space station atmosphere detail
+- **Sprint V83 — Entity shadow discs**: Dark translucent circles beneath all entities (GLTF and procedural) for ground shadow. 15% opacity, placed at floor level. Grounds entities in the scene and adds visual depth
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

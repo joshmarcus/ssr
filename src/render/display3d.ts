@@ -5824,6 +5824,15 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // Shadow disc — dark translucent circle for ground shadow
+      const shadowDisc = new THREE.Mesh(
+        new THREE.CircleGeometry(0.3, 12),
+        new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15, depthWrite: false })
+      );
+      shadowDisc.rotation.x = -Math.PI / 2;
+      shadowDisc.position.y = -baseY + 0.01;
+      group.add(shadowDisc);
+
       // Ground ring — glowing circle on the floor beneath the entity
       const ringColor = ENTITY_COLORS_3D[entity.type] ?? 0xffffff;
       const groundRing = new THREE.Mesh(
@@ -6201,6 +6210,15 @@ export class BrowserDisplay3D implements IGameDisplay {
       glow.position.set(0, 0.5, 0);
       group.add(glow);
     }
+
+    // Shadow disc — dark translucent circle for ground shadow
+    const shadowDiscFb = new THREE.Mesh(
+      new THREE.CircleGeometry(0.3, 12),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15, depthWrite: false })
+    );
+    shadowDiscFb.rotation.x = -Math.PI / 2;
+    shadowDiscFb.position.y = -baseY + 0.01;
+    group.add(shadowDiscFb);
 
     // Ground ring — glowing circle on the floor beneath the entity
     const groundRing = new THREE.Mesh(
