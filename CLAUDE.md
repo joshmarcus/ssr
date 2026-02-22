@@ -199,6 +199,21 @@ The 3D renderer lives in `src/render/display3d.ts` (~5500 lines). Key architectu
 - Flags: `--seed`, `--turns`, `--overlay`, `--out`
 - Saves to project root as `review_v*.png`
 
+## Sprint Learnings (V34-V43 Reflection)
+
+Key patterns and gotchas discovered during visual sprints:
+
+- **Ground-level camera changes everything**: Lowering the chase cam from 1.8 to 0.7-1.2 transformed the game feel. All subsequent visual work (wall fixtures, floor detail, door gaps) is driven by what's visible at ground level.
+- **Headlight is the hero light**: Adding a SpotLight to Sweepo and reducing corridor ambient lighting creates dramatic exploration atmosphere. Shadows from the headlight are the primary visual interest.
+- **Context-aware parameters**: Camera FOV, height, distance, and fog should all adapt to room vs corridor context. Smooth lerp transitions between parameters prevent jarring cuts.
+- **InstancedMesh for everything**: Floor strips, trim, emergency lights — always use InstancedMesh for repeated small elements. Draw call count is the main performance bottleneck.
+- **CSS post-processing is free**: Vignette, scanlines, hazard borders — all CSS overlays with zero GPU cost. Layer via z-index.
+- **Hazard sprites need userData type unions**: When adding new hazard types (spark, drip, scorch), expand the userData type assertion or it won't compile.
+- **Shadow maps**: Only enable castShadow on the headlight SpotLight (512x512). Directional light shadows would require covering the whole map and are too expensive.
+- **display3d.ts is 5500+ lines**: Consider splitting into modules if it grows further. The file has clear sections (textures, lights, camera, entities, corridors, rooms) that could be extracted.
+- **Grep tool sometimes fails on large files**: Use bash grep as fallback when the Grep tool returns no results on display3d.ts.
+- **Always check tile bounds**: Any code accessing `state.tiles[y][x]` must bounds-check first. Off-by-one errors crash the renderer silently.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
