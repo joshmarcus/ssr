@@ -2193,12 +2193,18 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           ];
 
           // Add journal entry
-          const phase = (target.props["phase"] as string) || "unknown";
+          const phase = (target.props["phase"] as string) || "";
+          const isCorridor = target.props["corridor"] === true;
+          const traceSummary = isCorridor
+            ? "Corridor trace"
+            : phase
+              ? `Trace: ${phase.replace(/_/g, " ")} evidence`
+              : "Physical evidence";
           next = addJournalEntry(
             next,
             `journal_trace_${targetId}`,
             "trace",
-            `Trace: ${phase.replace(/_/g, " ")} evidence`,
+            traceSummary,
             traceText,
             getPlayerRoomName(state),
             targetId,
