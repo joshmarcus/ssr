@@ -513,6 +513,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private lastRoomId = "";
   private showTrail = false;
   private cameraZoomPulse: number = 0; // >0 = zooming out briefly on room transition
+  private roomLightBoost: number = 0; // >0 = room entry light boost (decays over time)
   private cameraFrustumSize: number = CAMERA_FRUSTUM_SIZE_DEFAULT; // current zoom level (mouse wheel adjustable)
   private cameraElevation: number = 0.5; // 0 = top-down, 1 = side-on. Default = mid-angle
 
@@ -987,6 +988,8 @@ export class BrowserDisplay3D implements IGameDisplay {
 
       // Trigger camera zoom pulse for room transition
       this.cameraZoomPulse = 1.0;
+      // Room light boost — "lights come on" effect
+      this.roomLightBoost = 1.5;
 
       // Show room name banner on the 3D viewport
       const banner = document.getElementById("room-banner");
@@ -1768,8 +1771,15 @@ export class BrowserDisplay3D implements IGameDisplay {
       mat.emissiveIntensity = 0.3 + Math.abs(Math.sin(elapsed * 2.5)) * 0.5;
     }
 
-    // Room lights: emergency flicker for red/amber lights
-    for (const [, light] of this.roomLights) {
+    // Room entry light boost: decay over time
+    if (this.roomLightBoost > 0.01) {
+      this.roomLightBoost *= Math.max(0, 1 - delta * 2.5); // fade over ~0.4s
+    } else {
+      this.roomLightBoost = 0;
+    }
+
+    // Room lights: emergency flicker for red/amber lights, + room entry boost
+    for (const [roomId, light] of this.roomLights) {
       const c = light.color.getHex();
       if (c === 0xff2200) {
         // Red emergency strobe — fast harsh pulse
@@ -1777,6 +1787,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else if (c === 0xff8800) {
         // Amber warning — slower gentle pulse
         light.intensity = 0.5 + Math.sin(elapsed * 2) * 0.4;
+      } else if (this.roomLightBoost > 0.01 && roomId === this.lastRoomId) {
+        // Room entry boost: temporarily brighten the current room's light
+        light.intensity = 1.2 + this.roomLightBoost;
       }
     }
 
@@ -2790,8 +2803,10 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
-      // Place up to 5 decorations at deterministic positions (seeded by room id)
-      const maxDecor = Math.min(5, emptyFloors.length);
+      // Place up to 7 decorations at deterministic positions (seeded by room id)
+      // Larger rooms get more props for visual density at ground level
+      const roomArea = room.width * room.height;
+      const maxDecor = Math.min(roomArea >= 20 ? 7 : roomArea >= 12 ? 6 : 5, emptyFloors.length);
       // Simple deterministic shuffle based on room position
       const seed = room.x * 31 + room.y * 17;
       emptyFloors.sort((a, b) => ((a.x * 13 + a.y * 7 + seed) & 0xff) - ((b.x * 13 + b.y * 7 + seed) & 0xff));
