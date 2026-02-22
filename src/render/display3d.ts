@@ -2380,6 +2380,11 @@ export class BrowserDisplay3D implements IGameDisplay {
           const slideAmount = prevSlide + (targetSlide - prevSlide) * 0.15; // smooth lerp
           this._doorSlideState.set(doorKey, slideAmount);
 
+          // Door hiss effect: spawn particles when door begins opening
+          if (prevSlide < 0.02 && slideAmount > 0.02) {
+            this.spawnDoorHissParticles(x, y, isHorizontal);
+          }
+
           tempColor.setHex(doorColor);
           if (!tile.visible) tempColor.multiplyScalar(0.4);
 
@@ -4676,6 +4681,57 @@ export class BrowserDisplay3D implements IGameDisplay {
         s.position.y += (s as any)._vy * dt;
         (s as any)._vy -= 2.0 * dt;
         (s.material as THREE.MeshBasicMaterial).opacity = 1 - t;
+      }
+      requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }
+
+  /** Door hiss: small steam/air particles when door opens */
+  private spawnDoorHissParticles(x: number, y: number, isHorizontal: boolean): void {
+    const particles: THREE.Sprite[] = [];
+    for (let i = 0; i < 6; i++) {
+      const mat = new THREE.SpriteMaterial({
+        color: 0xccddee, transparent: true, opacity: 0.6,
+        depthWrite: false, blending: THREE.AdditiveBlending,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.08, 0.08, 1);
+      // Spread along door seam
+      const spread = (Math.random() - 0.5) * 0.3;
+      const height = 0.2 + Math.random() * 1.6;
+      if (isHorizontal) {
+        sprite.position.set(x + spread, height, y);
+      } else {
+        sprite.position.set(x, height, y + spread);
+      }
+      // Velocity: outward from door seam
+      const vel = (Math.random() * 0.3 + 0.1) * (Math.random() > 0.5 ? 1 : -1);
+      (sprite as any)._vx = isHorizontal ? vel : 0;
+      (sprite as any)._vz = isHorizontal ? 0 : vel;
+      (sprite as any)._vy = (Math.random() - 0.3) * 0.2;
+      this.scene.add(sprite);
+      particles.push(sprite);
+    }
+
+    const startTime = this.clock.getElapsedTime();
+    const animate = () => {
+      const t = this.clock.getElapsedTime() - startTime;
+      if (t > 0.6) {
+        for (const p of particles) {
+          this.scene.remove(p);
+          (p.material as THREE.SpriteMaterial).dispose();
+        }
+        return;
+      }
+      for (const p of particles) {
+        p.position.x += (p as any)._vx * 0.016;
+        p.position.z += (p as any)._vz * 0.016;
+        p.position.y += (p as any)._vy * 0.016;
+        const mat = p.material as THREE.SpriteMaterial;
+        mat.opacity = 0.6 * (1 - t / 0.6);
+        const s = 0.08 + t * 0.15; // expand slightly as they dissipate
+        p.scale.set(s, s, 1);
       }
       requestAnimationFrame(animate);
     };
