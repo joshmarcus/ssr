@@ -308,6 +308,7 @@
 - **Sprint V146 — Room ambient particles**: Room-type-specific floating motes add life to spaces. 10 room types get unique particle configs (color, drift speed, lifetime). Engine Core: fast orange sparks. Data Core: slow purple motes. Med Bay: gentle white specks. Max 15 concurrent particles, spawned via sparkle pool
 - **Sprint V147 — Floor trail decals**: Semi-transparent track marks left on the floor as Sweepo moves. Oriented to movement direction, fade over 12-16 seconds with quadratic decay. Max 50 active decals with FIFO removal. Creates visual breadcrumb trail in 3D space
 - **Sprint V148 — Hazard proximity camera tilt**: Camera subtly rolls toward nearby threats (breaches for vacuum, heat shimmer wobble). Uses breach positions for directional bias, converts world-space to screen-space via player facing. Max ±0.06 rad tilt, smoothly interpolated. Creates subconscious directional awareness of danger
+- **Sprint V149 — Relay activation celebration**: Camera zoom-in punch (-1.5 zoom), milestone screen flash, and 0.4s time-stretch (camera lerp slowed to 30%) on relay activation. Combined with existing golden sparks and pulse waves for epic moment
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

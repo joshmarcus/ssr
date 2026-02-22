@@ -642,6 +642,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Room ambient particle tracking
   private _ambientParticleCount: number = 0;
   private _ambientParticleFrame: number = 0;
+  // Relay activation time-stretch (brief slowdown)
+  private _relayTimeStretch: number = 0;
   // Floor trail decals (fading footprint marks)
   private _trailDecals: THREE.Sprite[] = [];
   private _lastTrailX: number = -99;
@@ -2585,8 +2587,14 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
 
+        // Relay time-stretch: brief slowdown after activation for dramatic emphasis
+        if (this._relayTimeStretch > 0) {
+          this._relayTimeStretch -= delta;
+        }
+        const timeScale = this._relayTimeStretch > 0 ? 0.3 : 1.0; // 30% speed during stretch
+
         // Smooth interpolation (slower than player movement for cinematic lag)
-        const camLerp = Math.min(1, 5 * delta);
+        const camLerp = Math.min(1, 5 * delta * timeScale);
         this.chaseCamPosX += (targetCamX - this.chaseCamPosX) * camLerp;
         this.chaseCamPosZ += (targetCamZ - this.chaseCamPosZ) * camLerp;
         this.chaseCamPosY += (chaseHeight - this.chaseCamPosY) * camLerp;
@@ -7194,6 +7202,11 @@ export class BrowserDisplay3D implements IGameDisplay {
           this.flashTile(entity.pos.x, entity.pos.y);
           // Queue pulse wave along all connected power lines
           this._pendingRelayPulses.push({ x: entity.pos.x, z: entity.pos.y });
+          // Camera celebration punch: zoom in briefly then pull back
+          this.cameraZoomPulse = -1.5; // negative = zoom in (dramatic zoom)
+          this.triggerScreenFlash("milestone");
+          // Brief momentary time-stretch: slow camera lerp for 0.4s
+          this._relayTimeStretch = 0.4;
           // Golden sparks shooting upward: celebration burst
           for (let si = 0; si < 8; si++) {
             const sparkMat = new THREE.SpriteMaterial({
