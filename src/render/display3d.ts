@@ -807,6 +807,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Room atmospheric haze (colored fog planes per room)
   private hazeRooms: Set<string> = new Set();
   private roomHazeMeshes: Map<string, THREE.Mesh> = new Map();
+  // Corridor junction beacons
+  private _junctionBeaconTiles: Set<string> = new Set();
+  private _junctionBeaconSprites: THREE.Sprite[] = [];
   // Corridor floor strip lights
   private corridorStripTiles: Set<string> = new Set();
   private static _stripLightGeo: THREE.BoxGeometry | null = null;
@@ -1889,6 +1892,10 @@ export class BrowserDisplay3D implements IGameDisplay {
   flashTile(x: number, y: number, _color?: string): void {
     // Sweepo eye widen on interaction
     this._eyeWidenTimer = 0.5;
+    // Camera micro-zoom on interaction: brief zoom toward entity
+    if (this.chaseCamActive) {
+      this.cameraZoomPulse = -0.3; // subtle zoom-in punch
+    }
     // 3D interaction flash: expanding ring + particle burst
     // Determine ring color from entity at this position (if any)
     let flashColor = 0x44ff88; // default green
@@ -2550,6 +2557,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeCorridorPipes(state);
     this.placeCorridorArches(state);
     this.placeCorridorStripLights(state);
+    this.placeCorridorJunctionBeacons(state);
     this.placeCorridorWallProps(state);
     this.placeEmergencyWallStrips(state);
     this.placeCorridorFixtures(state);
@@ -4320,31 +4328,36 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Proximity entity highlight: boost emissive + pulse ground ring for nearby entities (throttled: every 4th frame)
+    // Proximity entity highlight: smooth emissive ramp + pulse ground ring (throttled: every 4th frame)
     if (this.chaseCamActive && this.playerMesh && this._ambientParticleFrame % 4 === 0) {
       for (const [, mesh] of this.entityMeshes) {
         const dx = mesh.position.x - this.playerCurrentX;
         const dz = mesh.position.z - this.playerCurrentZ;
         const dist = Math.abs(dx) + Math.abs(dz);
-        const boost = dist < 2 ? 0.5 : dist < 4 ? 0.2 : 0;
+        // Smooth ramp: full boost at dist=0, fades to 0 at dist=6
+        const proximityT = Math.max(0, 1 - dist / 6);
+        const boost = proximityT * proximityT * 0.6; // quadratic falloff, max 0.6
         mesh.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-            if (boost > 0) {
+            if (boost > 0.01) {
               child.material.emissiveIntensity = Math.max(child.material.emissiveIntensity, boost);
             }
           }
-          // Pulse ground ring opacity when player is nearby
+          // Pulse ground ring opacity with smooth proximity ramp
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial &&
               child.rotation.x === -Math.PI / 2 && child.material.transparent) {
             if (dist < 2) {
-              // Close: bright pulsing ring
+              // Close: bright pulsing ring with scale
               child.material.opacity = 0.4 + Math.sin(elapsed * 4) * 0.2;
-              child.scale.set(1.2, 1.2, 1.2); // slightly larger
-            } else if (dist < 4) {
-              child.material.opacity = 0.15 + Math.sin(elapsed * 2) * 0.05;
+              const ringScale = 1.15 + Math.sin(elapsed * 3) * 0.08;
+              child.scale.set(ringScale, ringScale, ringScale);
+            } else if (dist < 5) {
+              // Medium: gentle pulse with smooth fade
+              const midT = 1 - (dist - 2) / 3;
+              child.material.opacity = 0.08 + midT * 0.15 + Math.sin(elapsed * 2) * midT * 0.05;
               child.scale.set(1, 1, 1);
             } else {
-              child.material.opacity = 0.1;
+              child.material.opacity = 0.08;
               child.scale.set(1, 1, 1);
             }
           }
@@ -4696,6 +4709,28 @@ export class BrowserDisplay3D implements IGameDisplay {
           const b2 = Math.round(baseB + (stressB - baseB) * stressFactor * 0.6);
           cl.color.setRGB(r2 / 255, g2 / 255, b2 / 255);
         }
+      }
+    }
+
+    // ── Corridor junction beacons: stress-reactive pulse ──────────
+    for (const beacon of this._junctionBeaconSprites) {
+      const bdx = beacon.position.x - this.playerCurrentX;
+      const bdz = beacon.position.z - this.playerCurrentZ;
+      const bDist = Math.abs(bdx) + Math.abs(bdz);
+      if (bDist > 12) continue; // skip distant beacons
+      const bMat = beacon.material as THREE.SpriteMaterial;
+      // Proximity brightness: brighter when player is nearby
+      const proximityBoost = bDist < 3 ? 0.3 : bDist < 6 ? 0.1 : 0;
+      const bPhase = elapsed * 1.5 + beacon.position.x * 3.1 + beacon.position.z * 5.7;
+      const breathe = 0.15 + Math.sin(bPhase) * 0.08;
+      bMat.opacity = breathe + proximityBoost;
+      // Station stress: shift from pale blue toward amber/red
+      if (this._stationStress > 0.15) {
+        const sf = Math.min(1, this._stationStress);
+        const bR = Math.round(0x88 + (0xff - 0x88) * sf * 0.7) / 255;
+        const bG = Math.round(0xbb + (0x88 - 0xbb) * sf * 0.7) / 255;
+        const bB = Math.round(0xff + (0x44 - 0xff) * sf * 0.7) / 255;
+        bMat.color.setRGB(bR, bG, bB);
       }
     }
 
@@ -7407,6 +7442,51 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.stripBrightInstanced!.instanceMatrix.needsUpdate = true;
       this.stripDimInstanced!.count = this.stripDimIdx;
       this.stripDimInstanced!.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  // ── Private: corridor junction beacons (glowing floor discs at forks/turns) ──
+
+  private placeCorridorJunctionBeacons(state: GameState): void {
+    for (let y = 1; y < state.height - 1; y++) {
+      for (let x = 1; x < state.width - 1; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored || tile.type !== TileType.Corridor) continue;
+
+        const key = `jb_${x},${y}`;
+        if (this._junctionBeaconTiles.has(key)) continue;
+
+        // Count adjacent corridor/door tiles (4-connected)
+        let connections = 0;
+        if (state.tiles[y - 1][x].type === TileType.Corridor || state.tiles[y - 1][x].type === TileType.Door) connections++;
+        if (state.tiles[y + 1][x].type === TileType.Corridor || state.tiles[y + 1][x].type === TileType.Door) connections++;
+        if (state.tiles[y][x - 1].type === TileType.Corridor || state.tiles[y][x - 1].type === TileType.Door) connections++;
+        if (state.tiles[y][x + 1].type === TileType.Corridor || state.tiles[y][x + 1].type === TileType.Door) connections++;
+
+        // Only place at junctions (3+ connections = T-junction or crossroads)
+        if (connections < 3) continue;
+
+        this._junctionBeaconTiles.add(key);
+
+        // Create glowing floor disc
+        const beaconMat = new THREE.SpriteMaterial({
+          color: 0x88bbff, // pale blue
+          transparent: true,
+          opacity: 0.25,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        });
+        const beacon = new THREE.Sprite(beaconMat);
+        beacon.scale.set(0.6, 0.6, 1);
+        beacon.position.set(x, 0.03, y);
+        // Rotate sprite to face up (floor)
+        beacon.material.rotation = 0;
+        (beacon as any)._baseX = x;
+        (beacon as any)._baseZ = y;
+        (beacon as any)._connections = connections;
+        this.getCorridorBucket(this.decorationGroup, x, y).add(beacon);
+        this._junctionBeaconSprites.push(beacon);
+      }
     }
   }
 
