@@ -809,9 +809,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.wallCornerMesh.count = 0;
     this.scene.add(this.wallCornerMesh);
 
-    const doorGeo = new THREE.BoxGeometry(0.85, 2.0, 0.15); // full wall height — door fills the opening
+    const doorGeo = new THREE.BoxGeometry(0.42, 2.0, 0.15); // half-width panel — two halves per door
     const doorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
-    this.doorMesh = new THREE.InstancedMesh(doorGeo, doorMat, 200);
+    this.doorMesh = new THREE.InstancedMesh(doorGeo, doorMat, 400); // 2 halves per door
     this.doorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.doorMesh.frustumCulled = false;
     this.doorMesh.castShadow = true;
@@ -2376,30 +2376,32 @@ export class BrowserDisplay3D implements IGameDisplay {
           // Smooth slide: track door open state
           const doorKey = `${x},${y}`;
           const prevSlide = this._doorSlideState.get(doorKey) ?? 0;
-          const targetSlide = shouldOpen ? 0.9 : 0; // slide 0.9 units to the side
+          const targetSlide = shouldOpen ? 0.45 : 0; // each half slides 0.45 units
           const slideAmount = prevSlide + (targetSlide - prevSlide) * 0.15; // smooth lerp
           this._doorSlideState.set(doorKey, slideAmount);
 
-          // Position with slide offset
-          let dx = 0, dz = 0;
-          if (isHorizontal) {
-            dz = slideAmount; // slide along Z axis
-            this.dummy.rotation.set(0, Math.PI / 2, 0);
-          } else {
-            dx = slideAmount; // slide along X axis
-            this.dummy.rotation.set(0, 0, 0);
-          }
+          tempColor.setHex(doorColor);
+          if (!tile.visible) tempColor.multiplyScalar(0.4);
 
-          this.dummy.position.set(x + dx, 1.0, y + dz);
-          this.dummy.scale.set(1, 1, 1);
+          // Split door: two half-panels that slide apart
+          for (let half = 0; half < 2; half++) {
+            const sign = half === 0 ? -1 : 1; // left half slides negative, right positive
+            const halfOffset = sign * (0.21 + slideAmount); // 0.21 = half of 0.42 panel width
 
-          this.dummy.updateMatrix();
-          if (doorIdx < 200) {
-            this.doorMesh.setMatrixAt(doorIdx, this.dummy.matrix);
-            tempColor.setHex(doorColor);
-            if (!tile.visible) tempColor.multiplyScalar(0.4);
-            this.doorMesh.setColorAt(doorIdx, tempColor);
-            doorIdx++;
+            if (isHorizontal) {
+              this.dummy.position.set(x, 1.0, y + halfOffset);
+              this.dummy.rotation.set(0, Math.PI / 2, 0);
+            } else {
+              this.dummy.position.set(x + halfOffset, 1.0, y);
+              this.dummy.rotation.set(0, 0, 0);
+            }
+            this.dummy.scale.set(1, 1, 1);
+            this.dummy.updateMatrix();
+            if (doorIdx < 400) {
+              this.doorMesh.setMatrixAt(doorIdx, this.dummy.matrix);
+              this.doorMesh.setColorAt(doorIdx, tempColor);
+              doorIdx++;
+            }
           }
           // Ceiling above door (flush with walls — no gap)
           this.dummy.position.set(x, 2.0, y);
@@ -5866,7 +5868,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     const mat = this.doorModelMat ?? makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
 
-    this.doorMesh = new THREE.InstancedMesh(this.doorModelGeo, mat, 200);
+    this.doorMesh = new THREE.InstancedMesh(this.doorModelGeo, mat, 400);
     this.doorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.doorMesh.frustumCulled = false;
     this.doorMesh.count = 0;
