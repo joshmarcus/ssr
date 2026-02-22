@@ -182,6 +182,16 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
     roomCleanlinessGoal: 60,
     triggeredEchoes: new Set<string>(),
     sceneEchoes: [],
+    connections: [],
+    insights: deductions.map(d => ({
+      id: d.id,
+      question: d.question,
+      requiredConnections: Math.max(2, d.requiredTags.length),
+      currentConnections: 0,
+      triggerTags: [...d.requiredTags],
+      revealed: false,
+      conclusionText: d.conclusionText ?? d.rewardDescription,
+    })),
   };
 
   placeEntities(state, rooms);

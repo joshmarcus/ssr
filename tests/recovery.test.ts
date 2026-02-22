@@ -54,6 +54,10 @@ function makeRecoveryState(phase: ObjectivePhase = ObjectivePhase.Recover) {
     evidenceThreshold: 3,
     cleaningDirective: false,
     roomCleanlinessGoal: 80,
+    triggeredEchoes: new Set<string>(),
+    sceneEchoes: [],
+    connections: [],
+    insights: [],
   };
   return { ...state, mystery };
 }

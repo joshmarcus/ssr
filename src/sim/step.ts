@@ -215,6 +215,44 @@ function addJournalEntry(
   const newJournal = [...state.mystery.journal, entry];
   const newEvidence = new Set([...state.mystery.discoveredEvidence, id]);
 
+  // Auto-detect evidence connections: find entries sharing 2+ tags
+  const newConnections = [...state.mystery.connections];
+  const newInsights = state.mystery.insights.map(i => ({ ...i }));
+  const connectedTags = new Set<string>();
+  for (const existing of state.mystery.journal) {
+    const shared = entry.tags.filter(t => existing.tags.includes(t));
+    if (shared.length >= 2) {
+      // Check if connection already exists
+      const alreadyExists = newConnections.some(
+        c => (c.sourceId === entry.id && c.targetId === existing.id) ||
+             (c.sourceId === existing.id && c.targetId === entry.id),
+      );
+      if (!alreadyExists) {
+        newConnections.push({
+          sourceId: entry.id,
+          targetId: existing.id,
+          sharedTags: shared,
+          discovered: true,
+        });
+        for (const t of shared) connectedTags.add(t);
+      }
+    }
+  }
+  // Update insight progress based on newly discovered tag connections
+  if (connectedTags.size > 0) {
+    for (const insight of newInsights) {
+      if (insight.revealed) continue;
+      const matchingTags = insight.triggerTags.filter(t => connectedTags.has(t));
+      insight.currentConnections = Math.min(
+        insight.requiredConnections,
+        insight.currentConnections + matchingTags.length,
+      );
+      if (insight.currentConnections >= insight.requiredConnections) {
+        insight.revealed = true;
+      }
+    }
+  }
+
   // Check for investigation → recovery phase transition
   let newPhase = state.mystery.objectivePhase;
   let newCleaningDirective = state.mystery.cleaningDirective;
@@ -247,6 +285,8 @@ function addJournalEntry(
       journal: newJournal,
       discoveredEvidence: newEvidence,
       threads: newThreads,
+      connections: newConnections,
+      insights: newInsights,
       objectivePhase: newPhase,
       cleaningDirective: newCleaningDirective,
       directiveOverrideTurn,

@@ -59,6 +59,10 @@ function addMysteryState(state: GameState, phase: ObjectivePhase = ObjectivePhas
     evidenceThreshold: 5,
     cleaningDirective: false,
     roomCleanlinessGoal: 80,
+    triggeredEchoes: new Set<string>(),
+    sceneEchoes: [],
+    connections: [],
+    insights: [],
   };
   return { ...state, mystery };
 }

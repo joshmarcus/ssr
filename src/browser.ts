@@ -2034,7 +2034,33 @@ function handleAction(action: Action): void {
       const journal = state.mystery.journal;
       const newEntries = journal.slice(lastJournalLength);
       const newTags = new Set(newEntries.flatMap(j => j.tags));
+      const prevConnectionCount = lastJournalLength > 0
+        ? (state.mystery.connections.length - newEntries.length) // approximate
+        : 0;
       lastJournalLength = journal.length;
+
+      // Notify about new auto-connections
+      const newConns = state.mystery.connections.filter(c => c.discovered);
+      if (newConns.length > prevConnectionCount) {
+        const recentConn = newConns[newConns.length - 1];
+        if (recentConn) {
+          const src = journal.find(j => j.id === recentConn.sourceId);
+          const tgt = journal.find(j => j.id === recentConn.targetId);
+          if (src && tgt) {
+            display.addLog(`CONNECTION: "${src.summary.slice(0, 35)}" links to "${tgt.summary.slice(0, 35)}" [${recentConn.sharedTags.join(", ")}]`, "narrative");
+          }
+        }
+      }
+
+      // Notify about insight reveals
+      for (const insight of state.mystery.insights) {
+        if (insight.revealed && !state.milestones.has(`insight_${insight.id}`)) {
+          display.addLog(`INSIGHT REVEALED: ${insight.conclusionText}`, "milestone");
+          display.triggerScreenFlash("milestone");
+          state.milestones.add(`insight_${insight.id}`);
+        }
+      }
+
       // Check if any unsolved deduction gained new tag coverage
       const solvedIds = new Set(state.mystery.deductions.filter(d => d.solved).map(d => d.id));
       let insightFired = false;
@@ -3248,11 +3274,58 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
     hubDetailDeduction = null;
   }
 
+  // ── Case Board: connections + insights summary ──
+  const connections = state.mystery?.connections ?? [];
+  const insights = state.mystery?.insights ?? [];
+  const discoveredConns = connections.filter(c => c.discovered);
+  const revealedInsights = insights.filter(i => i.revealed);
+
+  let caseBoardHtml = "";
+  if (discoveredConns.length > 0 || insights.length > 0) {
+    caseBoardHtml += `<div style="border:1px solid #553;background:#1a1500;padding:6px 8px;margin-bottom:6px">`;
+    caseBoardHtml += `<div style="color:#fa0;font-weight:bold;font-size:11px;letter-spacing:1px;margin-bottom:4px">CASE BOARD</div>`;
+
+    // Insight progress bars
+    for (const insight of insights) {
+      const pct = insight.requiredConnections > 0
+        ? Math.min(100, Math.round((insight.currentConnections / insight.requiredConnections) * 100))
+        : 0;
+      const barColor = insight.revealed ? "#0f0" : pct > 50 ? "#fa0" : "#555";
+      const icon = insight.revealed ? "\u2713" : "\u25c7";
+      caseBoardHtml += `<div style="margin:2px 0;font-size:11px">`;
+      caseBoardHtml += `<span style="color:${barColor}">[${icon}]</span> `;
+      caseBoardHtml += `<span style="color:#aaa">${esc(insight.question)}</span>`;
+      // Progress bar
+      caseBoardHtml += ` <span style="display:inline-block;width:60px;height:6px;background:#222;border:1px solid #444;vertical-align:middle">`;
+      caseBoardHtml += `<span style="display:block;height:100%;width:${pct}%;background:${barColor}"></span></span>`;
+      caseBoardHtml += ` <span style="color:${barColor};font-size:10px">${pct}%</span>`;
+      if (insight.revealed) {
+        caseBoardHtml += `<div style="color:#4a8;font-size:10px;padding:1px 12px;font-style:italic">${esc(insight.conclusionText)}</div>`;
+      }
+      caseBoardHtml += `</div>`;
+    }
+
+    // Recent connections
+    if (discoveredConns.length > 0) {
+      caseBoardHtml += `<div style="color:#886;font-size:10px;margin-top:4px;border-top:1px solid #332;padding-top:3px">${discoveredConns.length} evidence connection${discoveredConns.length !== 1 ? "s" : ""} found</div>`;
+      // Show last 3 connections
+      for (const conn of discoveredConns.slice(-3)) {
+        const src = journal.find(j => j.id === conn.sourceId);
+        const tgt = journal.find(j => j.id === conn.targetId);
+        if (src && tgt) {
+          caseBoardHtml += `<div style="color:#ca8;font-size:10px;padding:1px 0">\u2500 "${esc(src.summary.slice(0, 30))}" \u2194 "${esc(tgt.summary.slice(0, 30))}" [${conn.sharedTags.join(", ")}]</div>`;
+        }
+      }
+    }
+
+    caseBoardHtml += `</div>`;
+  }
+
   // Progress summary
   const solvedCount = deductions.filter(d => d.solved).length;
   const correctCount = deductions.filter(d => d.answeredCorrectly).length;
   const progressColor = solvedCount === deductions.length ? "#0f0" : solvedCount > 0 ? "#fa0" : "#888";
-  let listHtml = `<div style="color:${progressColor};padding:4px 8px;font-size:12px;border-bottom:1px solid #333;margin-bottom:4px">DEDUCTIONS: ${solvedCount}/${deductions.length} solved${correctCount > 0 ? ` (${correctCount} correct)` : ""}</div>`;
+  let listHtml = caseBoardHtml + `<div style="color:${progressColor};padding:4px 8px;font-size:12px;border-bottom:1px solid #333;margin-bottom:4px">DEDUCTIONS: ${solvedCount}/${deductions.length} solved${correctCount > 0 ? ` (${correctCount} correct)` : ""}</div>`;
 
   for (let di = 0; di < deductions.length; di++) {
     const d = deductions[di];

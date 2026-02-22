@@ -358,6 +358,24 @@ export interface NarrativeThread {
   entries: string[];      // journal entry IDs belonging to this thread
 }
 
+// ── Evidence connections (investigation board) ──────────────
+export interface EvidenceConnection {
+  sourceId: string;       // journal entry ID
+  targetId: string;       // journal entry ID
+  sharedTags: string[];   // tags both entries share
+  discovered: boolean;    // whether the player has seen this connection
+}
+
+export interface Insight {
+  id: string;             // maps to deduction ID
+  question: string;       // from deduction
+  requiredConnections: number; // how many connections needed to reveal
+  currentConnections: number;  // how many discovered so far
+  triggerTags: string[];  // tags that activate this insight
+  revealed: boolean;      // whether enough connections have been made
+  conclusionText: string; // shown when revealed
+}
+
 export interface MysteryState {
   crew: CrewMember[];
   timeline: IncidentTimeline;
@@ -378,6 +396,8 @@ export interface MysteryState {
   evacuation?: EvacuationState;
   triggeredEchoes: Set<string>; // crew IDs whose ghost echoes have been triggered
   sceneEchoes: SceneEcho[];     // environmental storytelling objects placed during procgen
+  connections: EvidenceConnection[]; // discovered evidence connections
+  insights: Insight[];           // investigation insights (wrapping deductions)
 }
 
 // ── What We Know (narrative summary) ─────────────────────────

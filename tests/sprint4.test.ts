@@ -389,6 +389,10 @@ describe("Cleaning directive", () => {
       evidenceThreshold: 5,
       cleaningDirective: true,
       roomCleanlinessGoal: 80,
+      triggeredEchoes: new Set<string>(),
+      sceneEchoes: [],
+      connections: [],
+      insights: [],
     };
 
     // Make the room dirty (average dirt > 20 = cleanliness < 80)
