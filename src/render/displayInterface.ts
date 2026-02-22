@@ -1,14 +1,19 @@
 import type { GameState } from "../shared/types.js";
 import { SensorType } from "../shared/types.js";
-import type { LogType, DisplayLogEntry } from "./display.js";
+
+// ── Log entry types for color-coding ────────────────────────────
+export type LogType = "system" | "narrative" | "warning" | "critical" | "milestone" | "sensor";
+
+export interface DisplayLogEntry {
+  text: string;
+  type: LogType;
+}
 
 // Re-export for convenience
 export { SensorType };
-export type { LogType, DisplayLogEntry };
 
 /**
- * Shared interface for 2D (ROT.js) and 3D (Three.js) renderers.
- * Both BrowserDisplay and BrowserDisplay3D implement this.
+ * Shared interface for the 3D (Three.js) renderer.
  */
 export interface IGameDisplay {
   render(state: GameState): void;
@@ -26,4 +31,5 @@ export interface IGameDisplay {
   showGameOverOverlay(state: GameState): void;
   copyRunSummary(): Promise<boolean>;
   destroy(): void;
+  setHubMode?(open: boolean): void;
 }

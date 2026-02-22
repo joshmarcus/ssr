@@ -1,9 +1,9 @@
 import { generate } from "./sim/procgen.js";
 import { step, applyDeductionReward as applyDeductionRewardSim } from "./sim/step.js";
 import { STORY_ROLES } from "./sim/deduction.js";
-import { BrowserDisplay } from "./render/display.js";
+import { BrowserDisplay3D } from "./render/display3d.js";
 import type { IGameDisplay } from "./render/displayInterface.js";
-import type { LogType } from "./render/display.js";
+import type { LogType } from "./render/displayInterface.js";
 import { InputHandler } from "./render/input.js";
 import { AudioManager } from "./render/audio.js";
 import { GOLDEN_SEED } from "./shared/constants.js";
@@ -188,20 +188,6 @@ function showOpeningCrawl(): void {
 try { localStorage.setItem(LAST_SEED_KEY, String(seed)); } catch { /* ignore */ }
 let state = generate(seed, difficulty);
 let display: IGameDisplay = undefined!; // assigned in initGame()
-let is3D = true; // default to 3D mode
-
-// 3D renderer constructor — eagerly loaded on startup
-let BrowserDisplay3D: (new (container: HTMLElement, w: number, h: number) => IGameDisplay) | null = null;
-let display3dLoadFailed = false;
-
-// Eagerly load 3D renderer module so it's ready by the time the crawl is dismissed
-import("./render/display3d.js").then((mod) => {
-  BrowserDisplay3D = mod.BrowserDisplay3D;
-}).catch((err) => {
-  console.warn("Failed to preload 3D renderer module:", err);
-  display3dLoadFailed = true;
-  is3D = false; // fall back to 2D
-});
 let inputHandler: InputHandler;
 let lastPlayerRoomId = "";
 const visitedRoomIds = new Set<string>();
@@ -984,9 +970,7 @@ function classifySimLog(logText: string, logSource: string): LogType {
 }
 
 function initGame(): void {
-  display = (is3D && BrowserDisplay3D)
-    ? new BrowserDisplay3D(containerEl, state.width, state.height)
-    : new BrowserDisplay(containerEl, state.width, state.height);
+  display = new BrowserDisplay3D(containerEl, state.width, state.height);
 
   // ── Dramatic link establishment sequence (compact) ──────────────
   display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. Sweepo online.", "milestone");
@@ -1031,8 +1015,6 @@ function initGame(): void {
 
   // Listen for restart key when game is over
   window.addEventListener("keydown", handleRestartKey);
-  // Listen for F3 to toggle 2D/3D renderer
-  window.addEventListener("keydown", handleToggleKey);
   // Listen for choice/deduction/crew-door input
   window.addEventListener("keydown", (e) => {
     // Any non-Tab key stops auto-explore
@@ -1295,9 +1277,7 @@ function resetGameState(newSeed: number): void {
   if (gameoverEl) { gameoverEl.classList.remove("active"); gameoverEl.innerHTML = ""; }
   display.destroy();
   containerEl.innerHTML = "";
-  display = (is3D && BrowserDisplay3D)
-    ? new BrowserDisplay3D(containerEl, state.width, state.height)
-    : new BrowserDisplay(containerEl, state.width, state.height);
+  display = new BrowserDisplay3D(containerEl, state.width, state.height);
 }
 
 function handleRestartKey(e: KeyboardEvent): void {
@@ -1331,61 +1311,6 @@ function handleRestartKey(e: KeyboardEvent): void {
         display.addLog("[Run summary copied to clipboard]", "system");
       }
     });
-  }
-}
-
-// ── Renderer toggle (F3) ─────────────────────────────────────
-let toggleInProgress = false;
-
-async function toggleRenderer(): Promise<void> {
-  if (toggleInProgress) return;
-
-  const wantingToSwitch3D = !is3D;
-
-  // If switching to 3D and we haven't loaded the module yet, do so now
-  if (wantingToSwitch3D && !BrowserDisplay3D) {
-    if (display3dLoadFailed) {
-      display.addLog("[3D renderer unavailable — load failed previously]", "warning");
-      renderAll();
-      return;
-    }
-    toggleInProgress = true;
-    display.addLog("[Loading 3D renderer...]", "system");
-    renderAll();
-    try {
-      const mod = await import("./render/display3d.js");
-      BrowserDisplay3D = mod.BrowserDisplay3D;
-    } catch (err) {
-      console.warn("Failed to load 3D renderer module:", err);
-      display3dLoadFailed = true;
-      display.addLog("[ERROR: 3D renderer failed to load — staying in 2D mode]", "warning");
-      renderAll();
-      toggleInProgress = false;
-      return;
-    }
-    toggleInProgress = false;
-  }
-
-  const logs = display.getLogHistory();
-  display.destroy();
-  containerEl.innerHTML = "";
-  is3D = !is3D;
-  display = (is3D && BrowserDisplay3D)
-    ? new BrowserDisplay3D(containerEl, state.width, state.height)
-    : new BrowserDisplay(containerEl, state.width, state.height);
-  // If we wanted 3D but constructor wasn't available, correct the flag
-  if (is3D && !BrowserDisplay3D) {
-    is3D = false;
-  }
-  for (const log of logs) display.addLog(log.text, log.type);
-  display.addLog(is3D ? "[3D MODE]" : "[2D MODE]", "system");
-  renderAll();
-}
-
-function handleToggleKey(e: KeyboardEvent): void {
-  if (e.key === "F3") {
-    e.preventDefault();
-    toggleRenderer();
   }
 }
 

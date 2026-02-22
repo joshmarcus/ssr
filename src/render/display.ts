@@ -1,3 +1,8 @@
+/**
+ * @deprecated V196 — 2D ROT.js renderer. Kept for reference only.
+ * The game now uses BrowserDisplay3D (display3d.ts) exclusively.
+ * Safe to delete once all visual parity work is confirmed.
+ */
 import * as ROT from "rot-js";
 import type { GameState, Entity, Room } from "../shared/types.js";
 import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase, IncidentArchetype, CrewFate } from "../shared/types.js";
@@ -28,13 +33,9 @@ const ARCHETYPE_REVEAL_LINES: Record<IncidentArchetype, string> = {
   [IncidentArchetype.Mutiny]: "Half the crew tried to destroy the station. The other half tried to save it. Both sides had their reasons.",
 };
 
-// ── Log entry types for color-coding ────────────────────────────
-export type LogType = "system" | "narrative" | "warning" | "critical" | "milestone" | "sensor";
-
-export interface DisplayLogEntry {
-  text: string;
-  type: LogType;
-}
+// Types now defined in displayInterface.ts — import for local use and re-export
+import type { LogType, DisplayLogEntry } from "./displayInterface.js";
+export type { LogType, DisplayLogEntry };
 
 // ── Color scheme ────────────────────────────────────────────────
 const COLORS = {
