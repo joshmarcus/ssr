@@ -505,6 +505,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Player damage state for visual effects
   private _playerHpPercent: number = 1.0; // 0-1 range
   private _playerStunned: boolean = false;
+  // Game over camera orbit
+  private _gameOverOrbit: boolean = false;
+  private _gameOverOrbitAngle: number = 0;
 
   // Smooth movement interpolation
   private playerTargetX: number = 0;
@@ -1436,6 +1439,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   showGameOverOverlay(state: GameState): void {
+    // Enable camera orbit for cinematic end
+    this._gameOverOrbit = true;
+    this._gameOverOrbitAngle = this.playerFacing;
     // 3D Victory celebration: golden confetti shower
     if (state.victory && this.chaseCamActive) {
       for (let ci = 0; ci < 30; ci++) {
@@ -2416,12 +2422,23 @@ export class BrowserDisplay3D implements IGameDisplay {
         const idleSwayX = isIdle ? Math.sin(elapsed * 0.5) * 0.04 : 0;
         const idleSwayZ = isIdle ? Math.cos(elapsed * 0.37) * 0.03 : 0;
 
-        this.chaseCamera.position.set(
-          this.chaseCamPosX + shakeX + idleSwayX,
-          this.chaseCamPosY + headBob,
-          this.chaseCamPosZ + shakeZ + idleSwayZ
-        );
-        this.chaseCamera.lookAt(this.chaseCamLookX, lookY, this.chaseCamLookZ);
+        // Game over orbit: slowly circle the player after game ends
+        if (this._gameOverOrbit) {
+          this._gameOverOrbitAngle += delta * 0.3; // slow orbit speed
+          const orbitDist = 4.0;
+          const orbitHeight = 2.0;
+          const ox = this.playerCurrentX + Math.sin(this._gameOverOrbitAngle) * orbitDist;
+          const oz = this.playerCurrentZ + Math.cos(this._gameOverOrbitAngle) * orbitDist;
+          this.chaseCamera.position.set(ox, orbitHeight, oz);
+          this.chaseCamera.lookAt(this.playerCurrentX, 0.3, this.playerCurrentZ);
+        } else {
+          this.chaseCamera.position.set(
+            this.chaseCamPosX + shakeX + idleSwayX,
+            this.chaseCamPosY + headBob,
+            this.chaseCamPosZ + shakeZ + idleSwayZ
+          );
+          this.chaseCamera.lookAt(this.chaseCamLookX, lookY, this.chaseCamLookZ);
+        }
       } else {
         // Orthographic top-down/isometric camera
         const camY = 4 + (1 - this.cameraElevation) * 12; // 4-16 range
