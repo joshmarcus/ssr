@@ -4581,6 +4581,22 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (entity.type !== EntityType.DataCore && entity.type !== EntityType.Drone) {
         mesh.position.y = mesh.userData.baseY ?? 0.3;
       }
+
+      // Exhaustion dimming: entities that have been fully interacted with appear greyed out
+      const exhausted = isEntityExhausted(entity);
+      const wasExhausted = mesh.userData._exhausted;
+      if (exhausted && !wasExhausted) {
+        mesh.userData._exhausted = true;
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.color.multiplyScalar(0.5);
+            child.material.emissive.setHex(0x000000);
+            child.material.emissiveIntensity = 0;
+            child.material.opacity = 0.7;
+            child.material.transparent = true;
+          }
+        });
+      }
     }
 
     // Remove stale entity meshes
