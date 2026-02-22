@@ -815,28 +815,28 @@ export class BrowserDisplay3D implements IGameDisplay {
     });
 
     // ── Lights (cel-shaded bright — vibrant toon look, well-lit scene) ──
-    const ambient = new THREE.AmbientLight(0xccddff, 3.2);
+    const ambient = new THREE.AmbientLight(0xccddff, 1.8);
     this.scene.add(ambient);
     this.ambientLight = ambient;
 
     // Strong key light — warm directional from upper-left
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 2.8);
+    const dirLight = new THREE.DirectionalLight(0xffeedd, 1.8);
     dirLight.position.set(-8, 15, -5);
     this.scene.add(dirLight);
     this.keyLight = dirLight;
 
     // Cool fill light from opposite side
-    const fillLight = new THREE.DirectionalLight(0x88aadd, 1.6);
+    const fillLight = new THREE.DirectionalLight(0x88aadd, 0.6);
     fillLight.position.set(8, 10, 5);
     this.scene.add(fillLight);
 
     // Rim light from behind for depth — strong cel-shaded pop
-    const rimLight = new THREE.DirectionalLight(0xbbbbff, 1.0);
+    const rimLight = new THREE.DirectionalLight(0xbbbbff, 0.5);
     rimLight.position.set(0, 5, 15);
     this.scene.add(rimLight);
 
     // Hemisphere light for natural sky/ground fill
-    const hemiLight = new THREE.HemisphereLight(0xccddff, 0x446688, 0.6);
+    const hemiLight = new THREE.HemisphereLight(0xccddff, 0x446688, 0.3);
     this.scene.add(hemiLight);
 
     this.playerLight = new THREE.PointLight(0x44ff66, 3.0, 22);
@@ -844,7 +844,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.add(this.playerLight);
 
     // Secondary fill light at lower height for chase cam corridor illumination
-    this._fillLight = new THREE.PointLight(0xffffff, 0.8, 10);
+    this._fillLight = new THREE.PointLight(0xffffff, 1.2, 12);
     this._fillLight.position.set(0, 1.2, 0);
     this.scene.add(this._fillLight);
 
@@ -1785,9 +1785,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (phase === ObjectivePhase.Evacuate && this.ambientLight && this.keyLight) {
         // RED ALERT: shift ambient and key light to emergency red
         this.ambientLight.color.setHex(0xff8888);
-        this.ambientLight.intensity = 2.0;
+        this.ambientLight.intensity = 1.2;
         this.keyLight.color.setHex(0xff6644);
-        this.keyLight.intensity = 2.0;
+        this.keyLight.intensity = 1.4;
         // Tighten fog for urgency
         const fog = this.scene.fog as THREE.Fog;
         if (fog) { fog.color.setHex(0x1a0505); }
@@ -1796,13 +1796,13 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else if (phase === ObjectivePhase.Recover && this.ambientLight) {
         // RECOVERY: slight amber tint for tension
         this.ambientLight.color.setHex(0xddc8a0);
-        this.ambientLight.intensity = 2.8;
+        this.ambientLight.intensity = 1.5;
       } else if (this.ambientLight && this.keyLight) {
         // Normal phases: standard lighting
         this.ambientLight.color.setHex(0xccddff);
-        this.ambientLight.intensity = 3.2;
+        this.ambientLight.intensity = 1.8;
         this.keyLight.color.setHex(0xffeedd);
-        this.keyLight.intensity = 2.8;
+        this.keyLight.intensity = 1.8;
         this.playerLight.color.setHex(0x44ff66);
       }
     }
@@ -2734,7 +2734,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._voidGround.position.set(this.playerCurrentX, -0.12, this.playerCurrentZ);
       this._voidCeiling.position.set(this.playerCurrentX, 2.12, this.playerCurrentZ);
       // Fill light only active in chase cam (in ortho, the overhead light is sufficient)
-      this._fillLight.intensity = this.chaseCamActive ? 0.8 : 0;
+      this._fillLight.intensity = this.chaseCamActive ? 1.2 : 0;
 
       // Adjust fog based on camera mode + room vs corridor
       const fog = this.scene.fog as THREE.Fog;
@@ -2755,13 +2755,13 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Corridor dimming: reduce ambient light in corridors for headlight-only feel
       if (this.ambientLight && this.chaseCamActive) {
         const inRoom = this._currentRoom !== null;
-        const targetDim = inRoom ? 1.0 : 0.35; // corridors get 35% ambient
+        const targetDim = inRoom ? 1.0 : 0.3; // corridors get 30% ambient for dramatic headlight contrast
         this._corridorDimFactor += (targetDim - this._corridorDimFactor) * 0.08;
         // Determine base intensity from phase
         const phase = this.currentPhase;
-        let baseIntensity = 3.2;
-        if (phase === ObjectivePhase.Evacuate) baseIntensity = 2.0;
-        else if (phase === ObjectivePhase.Recover) baseIntensity = 2.8;
+        let baseIntensity = 1.8;
+        if (phase === ObjectivePhase.Evacuate) baseIntensity = 1.2;
+        else if (phase === ObjectivePhase.Recover) baseIntensity = 1.5;
         this.ambientLight.intensity = baseIntensity * this._corridorDimFactor;
 
         // Evacuation phase: pulsing red ambient for emergency klaxon feel
@@ -3640,7 +3640,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Headlight: intensity flutter, hazard-reactive color, corridor brightness, damage flicker
     if (this.headlight) {
       const inRoom = this._currentRoom !== null;
-      const baseIntensity = inRoom ? 2.5 : 3.2; // brighter headlight for better forward visibility
+      const baseIntensity = inRoom ? 3.5 : 4.5; // headlight is hero light source — boosted with reduced ambient
       let headlightIntensity = baseIntensity + Math.sin(elapsed * 3.7) * 0.2 + Math.sin(elapsed * 7.3) * 0.1;
       // Damage flicker: headlight flickers when HP is low
       if (this._playerHpPercent < 0.6) {
@@ -3773,9 +3773,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         glowColor = 0x4488cc;
         glowIntensity = 0.8;
       } else {
-        // Normal room: warm room-tinted glow, bright enough to illuminate from chase cam
+        // Normal room: warm room-tinted glow — primary room illumination with reduced ambient
         glowColor = ROOM_LIGHT_COLORS[this._currentRoom.name] ?? 0xffeedd;
-        glowIntensity = 2.0;
+        glowIntensity = 3.0;
       }
 
       this._roomCenterGlow.color.setHex(glowColor);
