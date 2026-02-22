@@ -2088,6 +2088,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else if (userData.entityType === EntityType.DataCore) {
         mesh.rotation.y = elapsed * 0.8;
         mesh.position.y = 0.5 + Math.sin(elapsed * 1.5) * 0.1;
+        // Wireframe cage orbits in counter-direction (child 1 = wireframe cage)
+        const cage = mesh.children[1];
+        if (cage) cage.rotation.y = -elapsed * 0.4;
       } else if (userData.entityType === EntityType.Breach) {
         const scale = 1 + Math.sin(elapsed * 3) * 0.15;
         mesh.scale.set(scale, scale, scale);
@@ -2108,9 +2111,21 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
       } else if (userData.entityType === EntityType.EscapePod) {
-        // Slow pulsing glow
+        // Slow pulsing glow + emergency beacon flash
         const podScale = 1 + Math.sin(elapsed * 1.2) * 0.04;
         mesh.scale.set(podScale, podScale, podScale);
+        // Beacon: brief bright flash every ~3 seconds
+        const beaconPhase = (elapsed * 1.0 + mesh.position.x) % 3.0;
+        const beaconFlash = beaconPhase < 0.15 ? 1.0 : 0;
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.emissiveIntensity = 0.15 + beaconFlash * 0.8;
+          }
+          if (child instanceof THREE.PointLight) {
+            child.intensity = (child.userData._baseIntensity ?? child.intensity) + beaconFlash * 3.0;
+            if (!child.userData._baseIntensity) child.userData._baseIntensity = child.intensity;
+          }
+        });
       } else if (userData.entityType === EntityType.CrewNPC) {
         // Face player when nearby, idle sway when far
         const cdx = this.playerCurrentX - mesh.position.x;
@@ -2184,17 +2199,24 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         });
       } else if (userData.entityType === EntityType.PowerCell || userData.entityType === EntityType.FuseBox) {
-        // Subtle electrical flicker
+        // Electrical flicker with intermittent spark
+        const sparkPhase = (elapsed * 2.0 + mesh.position.x * 7 + mesh.position.z * 13) % 4.0;
+        const isSparking = sparkPhase < 0.1; // brief spark every ~4 seconds
+        const baseEmissive = 0.1 + Math.sin(elapsed * 6 + mesh.position.z) * 0.08;
         mesh.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-            child.material.emissiveIntensity = 0.1 + Math.sin(elapsed * 6 + mesh.position.z) * 0.08;
+            child.material.emissiveIntensity = baseEmissive + (isSparking ? 0.6 : 0);
+            if (isSparking) child.material.emissive.setHex(0xffee44);
           }
         });
       } else if (userData.entityType === EntityType.EvidenceTrace) {
-        // Float and spin — attention-grabbing mystery marker
+        // Float and spin — attention-grabbing mystery marker with variable speed
         const ud = mesh.userData as { baseY?: number };
-        mesh.position.y = (ud.baseY ?? 0.15) + Math.sin(elapsed * 2.0) * 0.1;
+        mesh.position.y = (ud.baseY ?? 0.15) + Math.sin(elapsed * 2.0) * 0.1 + Math.sin(elapsed * 0.7) * 0.05;
         mesh.rotation.y = elapsed * 1.2;
+        // Scale pulse — "calling out" effect
+        const tracePulse = 1 + Math.sin(elapsed * 3 + mesh.position.x) * 0.08;
+        mesh.scale.set(tracePulse, tracePulse, tracePulse);
       } else if (userData.entityType === EntityType.CrewItem) {
         // Gentle glow pulse
         const ud = mesh.userData as { baseY?: number };

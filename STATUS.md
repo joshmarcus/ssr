@@ -231,6 +231,7 @@
 - **Sprint V69 — Room entry signatures**: 13 room types get a distinct tinted screen flash on entry (purple Data Core, white Med Bay, red Armory, green Research Lab, etc.), brief fade-out overlay for visual room identity
 - **Sprint V70 — Sweepo damage state**: Antenna droops with damage, ground glow shifts green→amber→red, body sparks at <40% HP, stun causes rapid jitter. Visual storytelling of bot condition
 - **Sprint V71 — Evacuation visual escalation**: Red klaxon ambient pulse during evacuation, ceiling panels glow red, persistent red alert hazard border, dramatic endgame atmosphere
+- **Sprint V72 — Entity animation polish**: EscapePod beacon flash (bright pulse every 3s), PowerCell/FuseBox intermittent spark, DataCore counter-rotating wireframe cage, EvidenceTrace scale pulse + layered float
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
