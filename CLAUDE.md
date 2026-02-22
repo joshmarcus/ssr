@@ -298,6 +298,19 @@ Entity animation completeness, particle systems as feedback, and Sweepo personal
 - **Damage feedback layers**: Emissive body flash + actual sprite sparks (V117) + headlight flicker + HP vignette + eye color + antenna droop = 6 simultaneous damage indicators. Each addresses a different perception channel (body, particles, light, screen edges, eye, posture).
 - **Minimap attention drawing**: Pulsing rings on key entities (V120) use globalAlpha for clean fade without creating permanent canvas state. Ring radius oscillation (±1.5px) is subtle enough to not obscure underlying map data.
 
+## Sprint Learnings (V121-V130 Reflection)
+
+Interaction feedback, atmospheric layers, and animation lifecycle management:
+
+- **Single reusable indicator sprite**: The floating interact indicator (V121) creates one sprite, reuses it across frames by updating position/visibility. Avoids per-frame allocation for constantly-updating UI elements. Pattern: create lazily, hide when no target, show when target found.
+- **CSS overlays complement 3D rendering**: Room atmosphere tint (V123) uses a fixed div with `mix-blend-mode: soft-light` at 4% opacity — imperceptible individually but creates subconscious color association. CSS post-processing is nearly free compared to shader-based alternatives.
+- **Scout light for spatial awareness**: Forward blue PointLight (V124) uses 5% lerp to smoothly follow player facing direction 3 tiles ahead. Hidden in rooms (ceiling lights suffice), only active in corridors where visibility is the challenge.
+- **World-to-local conversion for eye tracking**: Sweepo eye look direction (V126) converts world-space entity direction to local space using player rotation matrix. Simple 2D rotation: `localX = cos(rot)*dx + sin(rot)*dz`. Prevents eye from "snapping" when player turns.
+- **One-shot discovery burst pattern**: EvidenceTrace golden burst (V125) uses `_discoveryBurst` flag on entity userData — fires once when player is within 3 tiles, never again. Prevents repeated triggering as player moves in and out of range.
+- **Minimap trail aging**: Player trail (V128) records positions at 1+ tile intervals, ages each dot every frame (age 0→1), removes when expired. Linear alpha decay creates natural fade. Cap at 40 entries prevents unbounded growth.
+- **Relay pulse wave as chain reaction visual**: Pulse waves (V129) spawn from activated relay position, travel along all connected curves at 4.5x normal dot speed. Pending pulse queue bridges the gap between activation detection and curve rebuilding.
+- **Collection fly-to-player animation**: Instead of instant entity removal (V130), pickup entities arc toward player with ease-in acceleration, spin, shrink, and opacity fade. Reparent from entityGroup to scene so they stay visible during animation. Traverse children for opacity since GLTF models have nested meshes.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
