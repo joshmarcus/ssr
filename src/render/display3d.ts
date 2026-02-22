@@ -558,6 +558,10 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Relay power lines (visible energy beams between activated relays)
   private relayPowerLines: THREE.Line[] = [];
   private relayPowerLineCount: number = 0;
+  // Global scene lights for phase-reactive lighting
+  private ambientLight: THREE.AmbientLight | null = null;
+  private keyLight: THREE.DirectionalLight | null = null;
+  private currentPhase: string = "";
 
   // Synty texture atlas (loaded at startup, applied to models that lack embedded textures)
   private syntyAtlas: THREE.Texture | null = null;
@@ -710,11 +714,13 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Lights (cel-shaded bright — vibrant toon look, well-lit scene) ──
     const ambient = new THREE.AmbientLight(0xccddff, 3.2);
     this.scene.add(ambient);
+    this.ambientLight = ambient;
 
     // Strong key light — warm directional from upper-left
     const dirLight = new THREE.DirectionalLight(0xffeedd, 2.8);
     dirLight.position.set(-8, 15, -5);
     this.scene.add(dirLight);
+    this.keyLight = dirLight;
 
     // Cool fill light from opposite side
     const fillLight = new THREE.DirectionalLight(0x88aadd, 1.6);
@@ -1327,6 +1333,35 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateTiles(state);
     this.updateEntities(state);
     this.updatePlayer(state);
+
+    // Phase-reactive global lighting
+    const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
+    if (phase !== this.currentPhase) {
+      this.currentPhase = phase;
+      if (phase === ObjectivePhase.Evacuate && this.ambientLight && this.keyLight) {
+        // RED ALERT: shift ambient and key light to emergency red
+        this.ambientLight.color.setHex(0xff8888);
+        this.ambientLight.intensity = 2.0;
+        this.keyLight.color.setHex(0xff6644);
+        this.keyLight.intensity = 2.0;
+        // Tighten fog for urgency
+        const fog = this.scene.fog as THREE.Fog;
+        if (fog) { fog.color.setHex(0x1a0505); }
+        // Player light turns red-tinged
+        this.playerLight.color.setHex(0xff6644);
+      } else if (phase === ObjectivePhase.Recover && this.ambientLight) {
+        // RECOVERY: slight amber tint for tension
+        this.ambientLight.color.setHex(0xddc8a0);
+        this.ambientLight.intensity = 2.8;
+      } else if (this.ambientLight && this.keyLight) {
+        // Normal phases: standard lighting
+        this.ambientLight.color.setHex(0xccddff);
+        this.ambientLight.intensity = 3.2;
+        this.keyLight.color.setHex(0xffeedd);
+        this.keyLight.intensity = 2.8;
+        this.playerLight.color.setHex(0x44ff66);
+      }
+    }
     this.updateFog(state);
     this.updateRoomLights(state);
     this.placeRoomDecorations(state);
