@@ -1130,6 +1130,8 @@ function initGame(): void {
       investigationHubOpen = true;
       hubSection = "evidence";
       hubIdx = 0;
+      display.setHubMode?.(true);
+      document.getElementById("game-container")?.classList.add("hub-open");
       renderInvestigationHub();
       return;
     }
@@ -1145,6 +1147,8 @@ function initGame(): void {
       e.preventDefault();
       investigationHubOpen = true;
       hubIdx = 0;
+      display.setHubMode?.(true);
+      document.getElementById("game-container")?.classList.add("hub-open");
       renderInvestigationHub();
       return;
     }
@@ -3589,6 +3593,8 @@ function closeInvestigationHub(): void {
   }
   investigationHubOpen = false;
   hubDetailDeduction = null;
+  display.setHubMode?.(false);
+  document.getElementById("game-container")?.classList.remove("hub-open");
   display.addLog("[Investigation Hub closed]", "system");
   renderAll();
 }

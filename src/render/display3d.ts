@@ -521,6 +521,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   private chaseCamPosZ: number = 0;
   private chaseCamLookX: number = 0;
   private chaseCamLookZ: number = 0;
+  // Hub mode (Investigation Board open — camera orbit + dimming)
+  private _hubMode: boolean = false;
+  private _hubModeBlend: number = 0;
+  private _hubOrbitAngle: number = 0;
+  private _hubAmbientBase: number = 0; // captured on hub open
   private mapWidth: number;
   private mapHeight: number;
 
@@ -2014,6 +2019,21 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.renderCompass();
   }
 
+  setHubMode(open: boolean): void {
+    this._hubMode = open;
+    if (open) {
+      // Capture current ambient intensity for dimming
+      this._hubAmbientBase = this.ambientLight?.intensity ?? 0.35;
+      // Start orbit from current camera angle relative to player
+      if (this.playerMesh) {
+        this._hubOrbitAngle = Math.atan2(
+          this.chaseCamPosZ - this.playerMesh.position.z,
+          this.chaseCamPosX - this.playerMesh.position.x,
+        );
+      }
+    }
+  }
+
   destroy(): void {
     cancelAnimationFrame(this.animFrameId);
     window.removeEventListener("resize", this.resizeHandler);
@@ -3024,6 +3044,16 @@ export class BrowserDisplay3D implements IGameDisplay {
         const idleSwayX = isIdle ? Math.sin(elapsed * 0.5) * 0.04 : 0;
         const idleSwayZ = isIdle ? Math.cos(elapsed * 0.37) * 0.03 : 0;
 
+        // Hub mode blend: lerp toward 1 when open, 0 when closed
+        const hubBlendTarget = this._hubMode ? 1 : 0;
+        this._hubModeBlend += (hubBlendTarget - this._hubModeBlend) * Math.min(1, 3 * delta);
+        if (Math.abs(this._hubModeBlend - hubBlendTarget) < 0.001) this._hubModeBlend = hubBlendTarget;
+
+        // Hub mode orbit: slow spin around player
+        if (this._hubModeBlend > 0.01) {
+          this._hubOrbitAngle += delta * 0.08; // very slow orbit
+        }
+
         // Game over orbit: slowly circle the player after game ends
         if (this._gameOverOrbit) {
           this._gameOverOrbitAngle += delta * 0.3; // slow orbit speed
@@ -3033,6 +3063,28 @@ export class BrowserDisplay3D implements IGameDisplay {
           const oz = this.playerCurrentZ + Math.cos(this._gameOverOrbitAngle) * orbitDist;
           this.chaseCamera.position.set(ox, orbitHeight, oz);
           this.chaseCamera.lookAt(this.playerCurrentX, 0.3, this.playerCurrentZ);
+        } else if (this._hubModeBlend > 0.01) {
+          // Hub mode: orbit camera blended with normal chase cam
+          const hubRadius = 4.0;
+          const hubHeight = 2.0;
+          const hubX = this.playerCurrentX + Math.sin(this._hubOrbitAngle) * hubRadius;
+          const hubZ = this.playerCurrentZ + Math.cos(this._hubOrbitAngle) * hubRadius;
+          const normalX = this.chaseCamPosX + shakeX + idleSwayX;
+          const normalY = this.chaseCamPosY + headBob;
+          const normalZ = this.chaseCamPosZ + shakeZ + idleSwayZ;
+          const b = this._hubModeBlend;
+          this.chaseCamera.position.set(
+            normalX + (hubX - normalX) * b,
+            normalY + (hubHeight - normalY) * b,
+            normalZ + (hubZ - normalZ) * b,
+          );
+          const lookY2 = lookY + (0.3 - lookY) * b;
+          this.chaseCamera.lookAt(
+            this.chaseCamLookX + (this.playerCurrentX - this.chaseCamLookX) * b,
+            lookY2,
+            this.chaseCamLookZ + (this.playerCurrentZ - this.chaseCamLookZ) * b,
+          );
+          this.chaseCamera.rotation.z += (0 - this.chaseCamera.rotation.z) * Math.min(1, 5 * delta);
         } else {
           this.chaseCamera.position.set(
             this.chaseCamPosX + shakeX + idleSwayX,
@@ -3071,6 +3123,10 @@ export class BrowserDisplay3D implements IGameDisplay {
         } else {
           targetNear = 1.5; targetFar = 8; // corridor — claustrophobic darkness
         }
+        // Hub mode: tighten fog by 20% for moody background
+        if (this._hubModeBlend > 0.01) {
+          targetFar *= (1.0 - 0.2 * this._hubModeBlend);
+        }
         fog.near += (targetNear - fog.near) * 0.08;
         fog.far += (targetFar - fog.far) * 0.08;
       }
@@ -3086,6 +3142,11 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (phase === ObjectivePhase.Evacuate) baseIntensity = 1.2;
         else if (phase === ObjectivePhase.Recover) baseIntensity = 1.5;
         this.ambientLight.intensity = baseIntensity * this._corridorDimFactor;
+
+        // Hub mode: dim ambient by 30% when investigation board is open
+        if (this._hubModeBlend > 0.01) {
+          this.ambientLight.intensity *= (1.0 - 0.3 * this._hubModeBlend);
+        }
 
         // Room-type ambient tint: blend ambient color toward room's light color when inside
         if (phase !== ObjectivePhase.Evacuate) {
