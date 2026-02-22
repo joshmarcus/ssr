@@ -582,6 +582,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Door frame accent lights
   private doorLights: Map<string, THREE.PointLight> = new Map();
 
+  // Door slide animation state (key → slide amount 0..0.9)
+  private _doorSlideState: Map<string, number> = new Map();
+
   // Floating room name labels
   private roomLabels3D: Map<string, THREE.Sprite> = new Map();
 
@@ -798,7 +801,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.wallCornerMesh.count = 0;
     this.scene.add(this.wallCornerMesh);
 
-    const doorGeo = new THREE.BoxGeometry(0.85, 1.4, 0.15); // slightly shorter — gap at bottom for Sweepo
+    const doorGeo = new THREE.BoxGeometry(0.85, 2.0, 0.15); // full wall height — door fills the opening
     const doorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.doorMesh = new THREE.InstancedMesh(doorGeo, doorMat, 200);
     this.doorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -2177,17 +2180,38 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
           const doorColor = tile.type === TileType.LockedDoor ? COLORS_3D.lockedDoor : COLORS_3D.door;
-          this.dummy.position.set(x, 0.9, y); // raised — visible gap at bottom for Sweepo to roll through
-          this.dummy.scale.set(1, 1, 1);
+          const isLocked = tile.type === TileType.LockedDoor;
 
           // Orient door to face corridor direction (check horizontal vs vertical)
           const openE = x < state.width - 1 && state.tiles[y][x + 1].walkable;
           const openW = x > 0 && state.tiles[y][x - 1].walkable;
-          if (openE || openW) {
+          const isHorizontal = openE || openW;
+
+          // Sliding door: unlocked doors slide open when player is within 1 tile
+          const px = state.player.entity.pos.x;
+          const py = state.player.entity.pos.y;
+          const playerDist = Math.abs(x - px) + Math.abs(y - py);
+          const shouldOpen = !isLocked && playerDist <= 1;
+
+          // Smooth slide: track door open state
+          const doorKey = `${x},${y}`;
+          const prevSlide = this._doorSlideState.get(doorKey) ?? 0;
+          const targetSlide = shouldOpen ? 0.9 : 0; // slide 0.9 units to the side
+          const slideAmount = prevSlide + (targetSlide - prevSlide) * 0.15; // smooth lerp
+          this._doorSlideState.set(doorKey, slideAmount);
+
+          // Position with slide offset
+          let dx = 0, dz = 0;
+          if (isHorizontal) {
+            dz = slideAmount; // slide along Z axis
             this.dummy.rotation.set(0, Math.PI / 2, 0);
           } else {
+            dx = slideAmount; // slide along X axis
             this.dummy.rotation.set(0, 0, 0);
           }
+
+          this.dummy.position.set(x + dx, 1.0, y + dz);
+          this.dummy.scale.set(1, 1, 1);
 
           this.dummy.updateMatrix();
           if (doorIdx < 200) {
@@ -2197,8 +2221,8 @@ export class BrowserDisplay3D implements IGameDisplay {
             this.doorMesh.setColorAt(doorIdx, tempColor);
             doorIdx++;
           }
-          // Ceiling above door
-          this.dummy.position.set(x, 2.05, y);
+          // Ceiling above door (flush with walls — no gap)
+          this.dummy.position.set(x, 2.0, y);
           this.dummy.rotation.set(0, 0, 0);
           this.dummy.scale.set(1, 1, 1);
           this.dummy.updateMatrix();
