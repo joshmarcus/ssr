@@ -3207,54 +3207,49 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
   const connections = state.mystery?.connections ?? [];
   const insights = state.mystery?.insights ?? [];
   const discoveredConns = connections.filter(c => c.discovered);
-  const revealedInsights = insights.filter(i => i.revealed);
 
   let caseBoardHtml = "";
   if (discoveredConns.length > 0 || insights.length > 0) {
-    caseBoardHtml += `<div style="border:1px solid #553;background:#1a1500;padding:6px 8px;margin-bottom:6px">`;
-    caseBoardHtml += `<div style="color:#fa0;font-weight:bold;font-size:11px;letter-spacing:1px;margin-bottom:4px">CASE BOARD</div>`;
+    caseBoardHtml += `<div class="case-board-header">\u25C8 CASE BOARD</div>`;
 
-    // Insight progress bars
+    // Insight progress cards
     for (const insight of insights) {
       const pct = insight.requiredConnections > 0
         ? Math.min(100, Math.round((insight.currentConnections / insight.requiredConnections) * 100))
         : 0;
-      const barColor = insight.revealed ? "#0f0" : pct > 50 ? "#fa0" : "#555";
+      const barClass = insight.revealed ? "complete" : pct > 50 ? "progress" : "empty";
+      const cardClass = insight.revealed ? "revealed" : pct > 0 ? "partial" : "empty";
       const icon = insight.revealed ? "\u2713" : "\u25c7";
-      caseBoardHtml += `<div style="margin:2px 0;font-size:11px">`;
-      caseBoardHtml += `<span style="color:${barColor}">[${icon}]</span> `;
-      caseBoardHtml += `<span style="color:#aaa">${esc(insight.question)}</span>`;
-      // Progress bar
-      caseBoardHtml += ` <span style="display:inline-block;width:60px;height:6px;background:#222;border:1px solid #444;vertical-align:middle">`;
-      caseBoardHtml += `<span style="display:block;height:100%;width:${pct}%;background:${barColor}"></span></span>`;
-      caseBoardHtml += ` <span style="color:${barColor};font-size:10px">${pct}%</span>`;
+      const iconColor = insight.revealed ? "#44ff88" : pct > 50 ? "#fa0" : "#555";
+      caseBoardHtml += `<div class="insight-card ${cardClass}">`;
+      caseBoardHtml += `<span style="color:${iconColor}">[${icon}]</span> `;
+      caseBoardHtml += `<span style="color:#aaa">${esc(insight.question)}</span> `;
+      caseBoardHtml += `<span class="insight-bar-track"><span class="insight-bar-fill ${barClass}" style="width:${pct}%"></span></span>`;
+      caseBoardHtml += ` <span style="color:${iconColor};font-size:10px">${pct}%</span>`;
       if (insight.revealed) {
-        caseBoardHtml += `<div style="color:#4a8;font-size:10px;padding:1px 12px;font-style:italic">${esc(insight.conclusionText)}</div>`;
+        caseBoardHtml += `<div style="color:#4a8;font-size:10px;padding:2px 12px;font-style:italic">${esc(insight.conclusionText)}</div>`;
       }
       caseBoardHtml += `</div>`;
     }
 
     // Recent connections
     if (discoveredConns.length > 0) {
-      caseBoardHtml += `<div style="color:#886;font-size:10px;margin-top:4px;border-top:1px solid #332;padding-top:3px">${discoveredConns.length} evidence connection${discoveredConns.length !== 1 ? "s" : ""} found</div>`;
-      // Show last 3 connections
+      caseBoardHtml += `<div style="color:#886;font-size:10px;margin-top:6px;padding-top:4px">${discoveredConns.length} evidence connection${discoveredConns.length !== 1 ? "s" : ""} found</div>`;
       for (const conn of discoveredConns.slice(-3)) {
         const src = journal.find(j => j.id === conn.sourceId);
         const tgt = journal.find(j => j.id === conn.targetId);
         if (src && tgt) {
-          caseBoardHtml += `<div style="color:#ca8;font-size:10px;padding:1px 0">\u2500 "${esc(src.summary.slice(0, 30))}" \u2194 "${esc(tgt.summary.slice(0, 30))}" [${conn.sharedTags.join(", ")}]</div>`;
+          caseBoardHtml += `<div class="connection-line">\u2500 "${esc(src.summary.slice(0, 30))}" \u2194 "${esc(tgt.summary.slice(0, 30))}" [${conn.sharedTags.join(", ")}]</div>`;
         }
       }
     }
-
-    caseBoardHtml += `</div>`;
   }
 
   // Progress summary
   const solvedCount = deductions.filter(d => d.solved).length;
   const correctCount = deductions.filter(d => d.answeredCorrectly).length;
-  const progressColor = solvedCount === deductions.length ? "#0f0" : solvedCount > 0 ? "#fa0" : "#888";
-  let listHtml = caseBoardHtml + `<div style="color:${progressColor};padding:4px 8px;font-size:12px;border-bottom:1px solid #333;margin-bottom:4px">DEDUCTIONS: ${solvedCount}/${deductions.length} solved${correctCount > 0 ? ` (${correctCount} correct)` : ""}</div>`;
+  const progressColor = solvedCount === deductions.length ? "#44ff88" : solvedCount > 0 ? "#fa0" : "#888";
+  let listHtml = caseBoardHtml + `<div style="color:${progressColor};padding:4px 8px;font-size:12px;border-bottom:1px solid rgba(68,255,136,0.15);margin-bottom:6px">DEDUCTIONS: ${solvedCount}/${deductions.length} solved${correctCount > 0 ? ` (${correctCount} correct)` : ""}</div>`;
 
   for (let di = 0; di < deductions.length; di++) {
     const d = deductions[di];
@@ -3278,13 +3273,14 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
       statusColor = "#555";
     }
 
-    let sectionClass = "broadcast-deduction";
-    if (locked) sectionClass += " locked";
-    if (d.solved) sectionClass += " solved";
-    if (isActive) sectionClass += " active-section";
+    let cardClass = "deduction-card";
+    if (locked) cardClass += " locked-card";
+    else if (d.solved) cardClass += d.answeredCorrectly ? " solved-card" : " failed-card";
+    else if (isUnlocked) cardClass += " unlocked-card";
+    if (isActive) cardClass += " active-card";
 
-    listHtml += `<div class="${sectionClass}">`;
-    listHtml += `<div class="broadcast-section-title"><span style="color:${statusColor}">[${statusIcon}]</span> <span style="color:#888;font-size:11px">${tierLabel}</span> ${catLabel}</div>`;
+    listHtml += `<div class="${cardClass}">`;
+    listHtml += `<div class="broadcast-section-title"><span style="color:${statusColor}">[${statusIcon}]</span> <span style="color:#666;font-size:11px">${tierLabel}</span> ${catLabel}</div>`;
 
     if (d.solved) {
       const answer = d.options.find(o => o.correct === d.answeredCorrectly) || d.options[0];
@@ -3313,7 +3309,7 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
       }
       listHtml += `<div style="margin:2px 8px">${tagPillsHtml}</div>`;
       if (allMet && isUnlocked && !d.solved) {
-        listHtml += `<div style="color:#fd0;padding:2px 8px;font-size:11px;font-weight:bold">ALL EVIDENCE GATHERED — ready to submit answer</div>`;
+        listHtml += `<div style="color:#44ff88;padding:2px 8px;font-size:11px;font-weight:bold;text-shadow:0 0 6px rgba(68,255,136,0.4)">ALL EVIDENCE GATHERED — ready to submit answer</div>`;
       } else if (!allMet && isUnlocked && !d.solved) {
         const missing = d.requiredTags.filter(t => !allTags.has(t));
         listHtml += `<div style="color:#888;padding:2px 8px;font-size:10px">Still needed: ${missing.map(t => esc(t)).join(", ")}</div>`;
@@ -3338,7 +3334,7 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
     }
 
     if (isActive && isUnlocked && !d.solved) {
-      listHtml += `<div style="color:#fa0;padding:4px 8px;font-size:11px">[Enter] Link evidence &amp; answer</div>`;
+      listHtml += `<div style="color:#44ff88;padding:4px 8px;font-size:11px">[Enter] Link evidence &amp; answer</div>`;
     }
 
     listHtml += `</div>`;
@@ -3488,13 +3484,17 @@ function renderHubWhatWeKnow(): string {
 
   const wwk = generateWhatWeKnow(state.mystery);
   const confidenceColors: Record<string, string> = {
-    none: "#555", low: "#ca8", medium: "#fa0", high: "#4a4", complete: "#0f0",
+    none: "#555", low: "#ca8", medium: "#fa0", high: "#4a4", complete: "#44ff88",
   };
   const confidenceLabels: Record<string, string> = {
     none: "INSUFFICIENT DATA", low: "PRELIMINARY", medium: "DEVELOPING", high: "SUBSTANTIAL", complete: "CONCLUSIVE",
   };
+  const confidencePct: Record<string, number> = {
+    none: 5, low: 25, medium: 50, high: 75, complete: 100,
+  };
   const confidenceColor = confidenceColors[wwk.confidence] || "#888";
   const confidenceLabel = confidenceLabels[wwk.confidence] || wwk.confidence.toUpperCase();
+  const confPct = confidencePct[wwk.confidence] ?? 0;
 
   // Track new evidence since last visit
   const currentJournalCount = state.mystery.journal.length;
@@ -3505,10 +3505,12 @@ function renderHubWhatWeKnow(): string {
     : "";
 
   let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:12px 16px">`;
-  html += `<div style="margin-bottom:12px"><span style="color:${confidenceColor};font-weight:bold;font-size:14px">\u25C9 ${confidenceLabel}</span>${updateBadge}</div>`;
+  html += `<div class="wwk-header">\u25C8 CORVUS-7 ANALYSIS</div>`;
+  html += `<div style="margin-bottom:4px"><span style="color:${confidenceColor};font-weight:bold;font-size:12px">${confidenceLabel}</span>${updateBadge}</div>`;
+  html += `<div class="wwk-confidence-track"><div class="wwk-confidence-fill" style="width:${confPct}%;background:${confidenceColor};box-shadow:0 0 8px ${confidenceColor}"></div></div>`;
 
   for (const para of wwk.paragraphs) {
-    html += `<div style="color:#ccc;margin-bottom:10px;line-height:1.5">${esc(para)}</div>`;
+    html += `<div class="wwk-paragraph">${esc(para)}</div>`;
   }
 
   // Dev mode: show correct answers alongside narrative
