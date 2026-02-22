@@ -2652,7 +2652,7 @@ export class BrowserDisplay3D implements IGameDisplay {
             cross.material.color.setRGB(1.0, 0.13 + heartbeat * 0.2, 0.13 + heartbeat * 0.2);
           }
         }
-      } else if (userData.entityType === EntityType.LogTerminal || userData.entityType === EntityType.SecurityTerminal) {
+      } else if (userData.entityType === EntityType.LogTerminal) {
         // Screen glow flicker + proximity activation + light pulse
         const termDx = this.playerCurrentX - mesh.position.x;
         const termDz = this.playerCurrentZ - mesh.position.z;
@@ -2663,9 +2663,47 @@ export class BrowserDisplay3D implements IGameDisplay {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
             child.material.emissiveIntensity = 0.15 + termBoost + termFlicker;
           }
-          // Sync screen/LED light with material flicker
           if (child instanceof THREE.PointLight) {
-            child.intensity = (userData.entityType === EntityType.SecurityTerminal ? 0.3 : 0.5) + termBoost * 0.8 + termFlicker * 0.3;
+            child.intensity = 0.5 + termBoost * 0.8 + termFlicker * 0.3;
+          }
+        });
+      } else if (userData.entityType === EntityType.SecurityTerminal) {
+        // Surveillance camera: screen flicker + lens tracking + awareness pulse
+        const secDx = this.playerCurrentX - mesh.position.x;
+        const secDz = this.playerCurrentZ - mesh.position.z;
+        const secDist = Math.sqrt(secDx * secDx + secDz * secDz);
+        const secBoost = secDist < 2 ? 0.4 : secDist < 3.5 ? 0.15 : 0;
+        const secFlicker = Math.sin(elapsed * 8 + mesh.position.x * 3) * 0.08;
+        // Lens tracking: point toward player when within range
+        const lens = mesh.children[2];
+        if (lens && secDist < 5) {
+          const trackAngle = Math.atan2(secDx, secDz);
+          lens.rotation.y = trackAngle;
+          // Lens pulse — faster when closer (surveillance awareness)
+          const lensRate = secDist < 2 ? 3.0 : 1.5;
+          if (lens instanceof THREE.Mesh && lens.material instanceof THREE.MeshBasicMaterial) {
+            const lensPulse = 0.4 + Math.sin(elapsed * lensRate) * 0.3;
+            lens.material.opacity = lensPulse;
+            lens.material.transparent = true;
+            lens.material.color.setHex(secDist < 2 ? 0xff2200 : 0xff4400);
+          }
+          lens.scale.setScalar(1 + secBoost * 0.3);
+        } else if (lens) {
+          // Idle sweep
+          lens.rotation.y = Math.sin(elapsed * 0.5) * 0.8;
+          if (lens instanceof THREE.Mesh && lens.material instanceof THREE.MeshBasicMaterial) {
+            lens.material.opacity = 0.5 + Math.sin(elapsed * 1.0) * 0.15;
+            lens.material.transparent = true;
+            lens.material.color.setHex(0xff0000);
+          }
+          lens.scale.setScalar(1);
+        }
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.emissiveIntensity = 0.15 + secBoost + secFlicker;
+          }
+          if (child instanceof THREE.PointLight) {
+            child.intensity = 0.3 + secBoost * 0.8 + secFlicker * 0.3;
           }
         });
       } else if (userData.entityType === EntityType.PowerCell || userData.entityType === EntityType.FuseBox) {
