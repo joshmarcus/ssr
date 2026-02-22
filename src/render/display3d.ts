@@ -595,6 +595,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Footstep dust kick sprites
   private _dustKickSprites: THREE.Sprite[] = [];
   private _dustKickTimer: number = 0;
+  // Headlight ground spot (elliptical glow ahead of Sweepo)
+  private _headlightSpot: THREE.Mesh | null = null;
   private starfieldPoints: THREE.Points | null = null;
 
   // Hazard visual effects (sprites at hazardous tile positions)
@@ -2428,6 +2430,25 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         });
       }
+    }
+
+    // Headlight ground spot: positioned 2-3 tiles ahead of player in facing direction
+    if (this._headlightSpot && this.chaseCamActive) {
+      const facing = this.playerMesh ? this.playerMesh.rotation.y : this.playerFacing;
+      const spotDist = 2.5; // tiles ahead
+      const spotX = this.playerCurrentX + Math.sin(facing) * spotDist;
+      const spotZ = this.playerCurrentZ + Math.cos(facing) * spotDist;
+      this._headlightSpot.position.set(spotX, 0.015, spotZ);
+      this._headlightSpot.rotation.z = -facing; // align elongation with facing
+      const spotMat = this._headlightSpot.material as THREE.MeshBasicMaterial;
+      const inRoom = this._currentRoom !== null;
+      const targetOpacity = inRoom ? 0.03 : 0.08; // brighter in corridors
+      spotMat.opacity += (targetOpacity - spotMat.opacity) * 0.08;
+      // Match headlight color
+      if (this.headlight) spotMat.color.copy(this.headlight.color);
+      this._headlightSpot.visible = true;
+    } else if (this._headlightSpot) {
+      this._headlightSpot.visible = false;
     }
 
     // Interaction indicator: bob, spin, and ring pulse
@@ -6118,6 +6139,18 @@ export class BrowserDisplay3D implements IGameDisplay {
     coneMesh.renderOrder = 999; // render after opaque
     coneMesh.userData = { isHeadlightCone: true };
     group.add(coneMesh);
+
+    // Headlight ground spot: elliptical glow on floor ahead of Sweepo
+    const spotGeo = new THREE.CircleGeometry(0.6, 16);
+    const spotMat = new THREE.MeshBasicMaterial({
+      color: 0xeeffff, transparent: true, opacity: 0.06,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this._headlightSpot = new THREE.Mesh(spotGeo, spotMat);
+    this._headlightSpot.rotation.x = -Math.PI / 2;
+    this._headlightSpot.scale.set(0.8, 1.4, 1); // elongated ellipse
+    this._headlightSpot.renderOrder = 1;
+    this.scene.add(this._headlightSpot);
 
     return group;
   }
