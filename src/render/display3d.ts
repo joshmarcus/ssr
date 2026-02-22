@@ -555,6 +555,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private corridorDecorTiles: Set<string> = new Set();
   // Corridor lights for flicker animation
   private corridorLightList: THREE.PointLight[] = [];
+  // Relay power lines (visible energy beams between activated relays)
+  private relayPowerLines: THREE.Line[] = [];
+  private relayPowerLineCount: number = 0;
 
   // Synty texture atlas (loaded at startup, applied to models that lack embedded textures)
   private syntyAtlas: THREE.Texture | null = null;
@@ -1788,9 +1791,18 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Entity animations
     for (const [id, mesh] of this.entityMeshes) {
-      const userData = mesh.userData as { entityType?: string };
+      const userData = mesh.userData as { entityType?: string; _activated?: boolean };
       if (userData.entityType === EntityType.Relay) {
-        mesh.rotation.y = elapsed * 0.5;
+        // Activated relays spin faster and glow brighter
+        const activated = userData._activated;
+        mesh.rotation.y = elapsed * (activated ? 1.5 : 0.5);
+        if (activated) {
+          mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.emissiveIntensity = 0.5 + Math.sin(elapsed * 3) * 0.2;
+            }
+          });
+        }
       } else if (userData.entityType === EntityType.DataCore) {
         mesh.rotation.y = elapsed * 0.8;
         mesh.position.y = 0.5 + Math.sin(elapsed * 1.5) * 0.1;
@@ -4401,6 +4413,62 @@ export class BrowserDisplay3D implements IGameDisplay {
     requestAnimationFrame(animate);
   }
 
+  /** Draw glowing energy lines between activated relays */
+  private updateRelayPowerLines(state: GameState): void {
+    // Collect activated relay positions
+    const activatedPositions: { x: number; z: number }[] = [];
+    for (const [, entity] of state.entities) {
+      if (entity.type === EntityType.Relay && entity.props["activated"] === true) {
+        activatedPositions.push({ x: entity.pos.x, z: entity.pos.y });
+      }
+    }
+
+    // Only redraw if count changed
+    if (activatedPositions.length === this.relayPowerLineCount) return;
+    this.relayPowerLineCount = activatedPositions.length;
+
+    // Remove old lines
+    for (const line of this.relayPowerLines) {
+      this.scene.remove(line);
+      line.geometry.dispose();
+      (line.material as THREE.LineBasicMaterial).dispose();
+    }
+    this.relayPowerLines = [];
+
+    if (activatedPositions.length < 2) return;
+
+    // Connect each pair of adjacent activated relays (within 15 tiles)
+    for (let i = 0; i < activatedPositions.length; i++) {
+      for (let j = i + 1; j < activatedPositions.length; j++) {
+        const a = activatedPositions[i];
+        const b = activatedPositions[j];
+        const dist = Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
+        if (dist > 15) continue; // only nearby relays
+
+        // Create a curved energy line (3 points: start, midpoint raised, end)
+        const midX = (a.x + b.x) / 2;
+        const midZ = (a.z + b.z) / 2;
+        const midY = 1.5 + dist * 0.05; // arc height scales with distance
+        const points = [
+          new THREE.Vector3(a.x, 0.6, a.z),
+          new THREE.Vector3(midX, midY, midZ),
+          new THREE.Vector3(b.x, 0.6, b.z),
+        ];
+        const curve = new THREE.QuadraticBezierCurve3(points[0], points[1], points[2]);
+        const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(16));
+        const mat = new THREE.LineBasicMaterial({
+          color: 0xffcc00,
+          transparent: true,
+          opacity: 0.4,
+          linewidth: 1,
+        });
+        const line = new THREE.Line(geo, mat);
+        this.scene.add(line);
+        this.relayPowerLines.push(line);
+      }
+    }
+  }
+
   private updateRoomLabels(state: GameState): void {
     for (const room of state.rooms) {
       if (this.roomLabels3D.has(room.id)) continue;
@@ -4597,6 +4665,38 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         });
       }
+
+      // Track relay activation state for animation
+      if (entity.type === EntityType.Relay) {
+        const activated = entity.props["activated"] === true;
+        const wasActivated = mesh.userData._activated;
+        mesh.userData._activated = activated;
+        if (activated && !wasActivated) {
+          // Just activated — boost emissive to bright yellow
+          mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.emissive.setHex(0xffcc00);
+              child.material.emissiveIntensity = 0.6;
+            }
+          });
+          // Trigger activation flash at relay position
+          this.flashTile(entity.pos.x, entity.pos.y);
+        }
+      }
+
+      // Track breach sealed state
+      if (entity.type === EntityType.Breach && entity.props["sealed"] === true) {
+        if (!mesh.userData._sealed) {
+          mesh.userData._sealed = true;
+          mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.emissive.setHex(0x448866);
+              child.material.emissiveIntensity = 0.2;
+              child.material.color.multiplyScalar(0.6);
+            }
+          });
+        }
+      }
     }
 
     // Remove stale entity meshes
@@ -4609,6 +4709,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.entityMeshes.delete(id);
       }
     }
+
+    // Update relay power lines: visible energy connections between activated relays
+    this.updateRelayPowerLines(state);
 
     // Update interaction indicator — show above nearest interactable entity
     if (this.interactionIndicator) {
