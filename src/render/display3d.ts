@@ -1590,9 +1590,12 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (this.chaseCamActive) {
         // 3rd-person chase cam: behind and above Sweepo, smoothly following
         const facing = this.playerMesh.rotation.y;
-        const chaseDist = 2.5;
-        const chaseHeight = 0.9; // low angle — Sweepo is a ground-level bot
-        const lookDist = 2.0;
+
+        // Context-aware camera: wider/higher in rooms, tighter/lower in corridors
+        const inRoom = this.lastRoomId !== "";
+        const chaseDist = inRoom ? 3.0 : 2.2;        // further back in rooms, closer in corridors
+        const chaseHeight = inRoom ? 1.2 : 0.7;      // higher in rooms, lower in corridors
+        const lookDist = inRoom ? 2.5 : 1.8;          // look further ahead in rooms
 
         // Target positions
         let targetCamX = this.playerCurrentX - Math.sin(facing) * chaseDist;
@@ -1625,19 +1628,22 @@ export class BrowserDisplay3D implements IGameDisplay {
                           Math.abs(this.playerTargetZ - this.playerCurrentZ);
         const headBob = moveSpeed > 0.01 ? Math.sin(elapsed * 8) * 0.03 : 0;
 
-        // FOV breathing: subtle widening during movement for speed sensation
-        const baseFov = 60;
+        // FOV breathing: context-aware base + movement widening
+        const baseFov = inRoom ? 65 : 55;  // wider in rooms, tighter in corridors
         const fovBreath = moveSpeed > 0.01 ? 3.0 : 0;
         const targetFov = baseFov + fovBreath + zoomOffset * 2;
         this.chaseCamera.fov += (targetFov - this.chaseCamera.fov) * camLerp;
         this.chaseCamera.updateProjectionMatrix();
+
+        // Look-at height: slightly higher in rooms to see more of the space
+        const lookY = inRoom ? 0.3 : 0.1;
 
         this.chaseCamera.position.set(
           this.chaseCamPosX + shakeX,
           this.chaseCamPosY + headBob,
           this.chaseCamPosZ + shakeZ
         );
-        this.chaseCamera.lookAt(this.chaseCamLookX, 0.15, this.chaseCamLookZ); // look at ground-level Sweepo
+        this.chaseCamera.lookAt(this.chaseCamLookX, lookY, this.chaseCamLookZ);
       } else {
         // Orthographic top-down/isometric camera
         const camY = 4 + (1 - this.cameraElevation) * 12; // 4-16 range
