@@ -531,6 +531,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _currentRoom: Room | null = null;
   private _roomTransitionFade: number = 0; // 1.0 = full black, fades to 0
   private static readonly CORRIDOR_VIEW_RANGE = 5; // tiles of corridor visible from player
+  private _corridorDimFactor: number = 1.0; // ambient light dimming (1.0 = full, 0.35 = corridor)
   private cameraFrustumSize: number = CAMERA_FRUSTUM_SIZE_DEFAULT; // current zoom level (mouse wheel adjustable)
   private cameraElevation: number = 0.5; // 0 = top-down, 1 = side-on. Default = mid-angle
 
@@ -1845,13 +1846,33 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Fill light only active in chase cam (in ortho, the overhead light is sufficient)
       this._fillLight.intensity = this.chaseCamActive ? 0.8 : 0;
 
-      // Adjust fog based on camera mode: tighter for chase cam = moodier corridors
+      // Adjust fog based on camera mode + room vs corridor
       const fog = this.scene.fog as THREE.Fog;
       if (fog) {
-        const targetNear = this.chaseCamActive ? 3 : 20;  // tighter fog at ground level
-        const targetFar = this.chaseCamActive ? 14 : 40; // claustrophobic corridor feel
-        fog.near += (targetNear - fog.near) * 0.05;
-        fog.far += (targetFar - fog.far) * 0.05;
+        const inRoom = this._currentRoom !== null;
+        let targetNear: number, targetFar: number;
+        if (!this.chaseCamActive) {
+          targetNear = 20; targetFar = 40;
+        } else if (inRoom) {
+          targetNear = 4; targetFar = 16; // open room — wider view
+        } else {
+          targetNear = 2; targetFar = 10; // corridor — claustrophobic darkness
+        }
+        fog.near += (targetNear - fog.near) * 0.08;
+        fog.far += (targetFar - fog.far) * 0.08;
+      }
+
+      // Corridor dimming: reduce ambient light in corridors for headlight-only feel
+      if (this.ambientLight && this.chaseCamActive) {
+        const inRoom = this._currentRoom !== null;
+        const targetDim = inRoom ? 1.0 : 0.35; // corridors get 35% ambient
+        this._corridorDimFactor += (targetDim - this._corridorDimFactor) * 0.08;
+        // Determine base intensity from phase
+        const phase = this.currentPhase;
+        let baseIntensity = 3.2;
+        if (phase === ObjectivePhase.Evacuate) baseIntensity = 2.0;
+        else if (phase === ObjectivePhase.Recover) baseIntensity = 2.8;
+        this.ambientLight.intensity = baseIntensity * this._corridorDimFactor;
       }
 
       // Update movement trail
@@ -1968,8 +1989,11 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
 
     // Headlight: subtle intensity flutter (like a slightly unstable power connection)
+    // Brighter in corridors where ambient is dimmed — headlight is primary illumination
     if (this.headlight) {
-      this.headlight.intensity = 1.8 + Math.sin(elapsed * 3.7) * 0.2 + Math.sin(elapsed * 7.3) * 0.1;
+      const inRoom = this._currentRoom !== null;
+      const baseIntensity = inRoom ? 1.8 : 2.8; // brighter headlight in corridors
+      this.headlight.intensity = baseIntensity + Math.sin(elapsed * 3.7) * 0.2 + Math.sin(elapsed * 7.3) * 0.1;
     }
 
     // Interaction indicator: bob, spin, and ring pulse
