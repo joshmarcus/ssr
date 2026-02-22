@@ -199,6 +199,7 @@
 - **Sprint V37 — Sweepo headlight**: Forward-facing SpotLight headlight (cone PI/5, range 8, warm white) with flutter animation, illuminates corridors ahead for flashlight-exploration feel
 - **Sprint V38 — Shadow casting**: PCFSoftShadowMap enabled, headlight casts shadows (512x512), floor/wall/door receive/cast shadows, corridor lights reduced (sparser, dimmer) since headlight is primary illumination
 - **Sprint V39 — Environmental storytelling**: Floor scorch marks near heat (dark radial decals with heat-scaled opacity/size), dripping condensation sprites near low-pressure areas (falling from ceiling, resetting on floor), environmental damage as visual narrative
+- **Sprint V40 — Dynamic camera**: Context-aware chase cam — rooms: wider FOV (65°), higher (1.2), further back (3.0); corridors: tighter FOV (55°), lower (0.7), closer (2.2). Smooth interpolation for dramatic room-corridor contrast
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
