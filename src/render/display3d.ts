@@ -2005,14 +2005,19 @@ export class BrowserDisplay3D implements IGameDisplay {
           mesh.rotation.y = Math.sin(elapsed * 0.8 + mesh.position.x * 2) * 0.15;
         }
       } else if (userData.entityType === EntityType.Console) {
-        // Screen flicker + proximity brighten
+        // Screen flicker + proximity brighten + glow projection pulse
         const conDx = this.playerCurrentX - mesh.position.x;
         const conDz = this.playerCurrentZ - mesh.position.z;
         const conDist = Math.sqrt(conDx * conDx + conDz * conDz);
         const proximityBoost = conDist < 2 ? 0.4 : conDist < 4 ? 0.15 : 0;
+        const screenFlicker = Math.sin(elapsed * 8 + mesh.position.x) * 0.15;
         mesh.children.forEach(child => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
-            child.material.opacity = 0.2 + proximityBoost + Math.sin(elapsed * 8 + mesh.position.x) * 0.15;
+            child.material.opacity = 0.2 + proximityBoost + screenFlicker;
+          }
+          // Pulse screen glow light intensity in sync
+          if (child instanceof THREE.PointLight) {
+            child.intensity = 0.8 + proximityBoost * 1.5 + screenFlicker * 0.5;
           }
         });
       } else if (userData.entityType === EntityType.UtilityPickup) {
@@ -2041,14 +2046,19 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
       } else if (userData.entityType === EntityType.LogTerminal || userData.entityType === EntityType.SecurityTerminal) {
-        // Screen glow flicker + proximity activation
+        // Screen glow flicker + proximity activation + light pulse
         const termDx = this.playerCurrentX - mesh.position.x;
         const termDz = this.playerCurrentZ - mesh.position.z;
         const termDist = Math.sqrt(termDx * termDx + termDz * termDz);
         const termBoost = termDist < 2 ? 0.35 : termDist < 3.5 ? 0.15 : 0;
+        const termFlicker = Math.sin(elapsed * 4 + mesh.position.x * 2) * 0.1;
         mesh.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-            child.material.emissiveIntensity = 0.15 + termBoost + Math.sin(elapsed * 4 + mesh.position.x * 2) * 0.1;
+            child.material.emissiveIntensity = 0.15 + termBoost + termFlicker;
+          }
+          // Sync screen/LED light with material flicker
+          if (child instanceof THREE.PointLight) {
+            child.intensity = (userData.entityType === EntityType.SecurityTerminal ? 0.3 : 0.5) + termBoost * 0.8 + termFlicker * 0.3;
           }
         });
       } else if (userData.entityType === EntityType.PowerCell || userData.entityType === EntityType.FuseBox) {
@@ -5343,7 +5353,17 @@ export class BrowserDisplay3D implements IGameDisplay {
         const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.27),
           new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3 }));
         glow.position.set(0, 0.32, 0.025);
-        group.add(stand, screen, glow);
+        // Screen glow projection — casts light forward onto the floor
+        const screenLight = new THREE.PointLight(color, 0.6, 3);
+        screenLight.position.set(0, 0.3, 0.15);
+        // Floor glow disc from screen light
+        const floorGlow = new THREE.Mesh(
+          new THREE.CircleGeometry(0.4, 12),
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.12, depthWrite: false })
+        );
+        floorGlow.rotation.x = -Math.PI / 2;
+        floorGlow.position.set(0, -0.18, 0.3); // just above floor level
+        group.add(stand, screen, glow, screenLight, floorGlow);
         baseY = 0.2;
         break;
       }
@@ -5419,7 +5439,10 @@ export class BrowserDisplay3D implements IGameDisplay {
         const lens = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6),
           new THREE.MeshBasicMaterial({ color: 0xff0000 }));
         lens.position.set(0, 0.35, 0.12);
-        group.add(pole, cam, lens);
+        // Red LED surveillance glow
+        const secLight = new THREE.PointLight(0xff2200, 0.4, 2.5);
+        secLight.position.set(0, 0.35, 0.2);
+        group.add(pole, cam, lens, secLight);
         baseY = 0.3;
         break;
       }
@@ -5537,7 +5560,10 @@ export class BrowserDisplay3D implements IGameDisplay {
         rightScr.position.set(0.85, 0.5, -0.1);
         rightScr.rotation.y = -0.5;
         rightScr.rotation.x = -0.2;
-        group.add(centerDesk, leftWing, rightWing, leftScr, rightScr);
+        // Multi-screen glow projection — casts blue light in a pool on the floor
+        const consoleScreenLight = new THREE.PointLight(color, 1.0, 4);
+        consoleScreenLight.position.set(0, 0.5, 0.5);
+        group.add(centerDesk, leftWing, rightWing, leftScr, rightScr, consoleScreenLight);
         baseY = 0.05;
         break;
       }
