@@ -7257,13 +7257,43 @@ export class BrowserDisplay3D implements IGameDisplay {
         continue;
       }
 
-      // Important entities get bigger dots
-      const isLarge = entity.type === EntityType.DataCore || entity.type === EntityType.EscapePod ||
-                      entity.type === EntityType.CrewNPC;
-      const dotSize = isLarge ? 4 : 3;
-      const offset = Math.floor(dotSize / 2);
+      // Distinct shapes per entity type for minimap readability
       ctx.fillStyle = color;
-      ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      if (entity.type === EntityType.DataCore) {
+        // Diamond shape
+        ctx.beginPath();
+        ctx.moveTo(px, py - 3);
+        ctx.lineTo(px + 3, py);
+        ctx.lineTo(px, py + 3);
+        ctx.lineTo(px - 3, py);
+        ctx.closePath();
+        ctx.fill();
+      } else if (entity.type === EntityType.EscapePod) {
+        // Circle
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (entity.type === EntityType.CrewNPC) {
+        // Triangle (person)
+        ctx.beginPath();
+        ctx.moveTo(px, py - 3);
+        ctx.lineTo(px + 2.5, py + 2);
+        ctx.lineTo(px - 2.5, py + 2);
+        ctx.closePath();
+        ctx.fill();
+      } else if (entity.type === EntityType.Relay) {
+        // Plus sign
+        ctx.fillRect(px - 1, py - 3, 2, 6);
+        ctx.fillRect(px - 3, py - 1, 6, 2);
+      } else {
+        // Default: small square dot
+        const isLarge = entity.type === EntityType.LogTerminal || entity.type === EntityType.Console;
+        const dotSize = isLarge ? 3 : 2;
+        const offset = Math.floor(dotSize / 2);
+        ctx.fillRect(px - offset, py - offset, dotSize, dotSize);
+      }
     }
 
     // Room boundary outlines — highlight current room, dim others

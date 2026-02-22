@@ -244,6 +244,7 @@
 - **Sprint V82 — Corridor breath puffs**: Small cold-air visualization from Sweepo's front in corridors. Puffs spawn every 2-3s, drift in facing direction, expand, and fade. Damaged space station atmosphere detail
 - **Sprint V83 — Entity shadow discs**: Dark translucent circles beneath all entities (GLTF and procedural) for ground shadow. 15% opacity, placed at floor level. Grounds entities in the scene and adds visual depth
 - **Sprint V84 — Relay energy dots**: Bright yellow sprites travel along relay power line curves between activated relays. Each dot follows the bezier arc at 0.4 speed with pulsing opacity. Satisfying puzzle-progress feedback
+- **Sprint V85 — Minimap entity icons**: Distinct shapes per entity type on minimap — diamond (DataCore), circle (EscapePod), triangle (CrewNPC), plus sign (Relay), squares for others. Improved map readability and entity identification at a glance
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
