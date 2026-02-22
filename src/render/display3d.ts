@@ -5965,6 +5965,51 @@ export class BrowserDisplay3D implements IGameDisplay {
           const threshold = new THREE.Mesh(threshGeo, thresholdMat);
           threshold.position.set(x, 0.008, y);
           trimSubGroup.add(threshold);
+
+          // Light spill: translucent floor plane extending from door into corridors
+          if (!isLocked) {
+            const spillColor = ROOM_WALL_TINTS_3D[room.name] ?? 0xeedd88;
+            const spillMat = new THREE.MeshBasicMaterial({
+              color: spillColor,
+              transparent: true,
+              opacity: 0.08,
+              depthWrite: false,
+              blending: THREE.AdditiveBlending,
+              side: THREE.DoubleSide,
+            });
+            // Spill along the open direction (E/W for horizontal, N/S for vertical)
+            if (isHorizontal) {
+              // Spill east if corridor
+              if (x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Corridor) {
+                const spill = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.7), spillMat);
+                spill.rotation.x = -Math.PI / 2;
+                spill.position.set(x + 1.2, 0.02, y);
+                trimSubGroup.add(spill);
+              }
+              // Spill west if corridor
+              if (x > 0 && state.tiles[y][x - 1].type === TileType.Corridor) {
+                const spill = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.7), spillMat);
+                spill.rotation.x = -Math.PI / 2;
+                spill.position.set(x - 1.2, 0.02, y);
+                trimSubGroup.add(spill);
+              }
+            } else {
+              // Spill south if corridor
+              if (y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Corridor) {
+                const spill = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 2.0), spillMat);
+                spill.rotation.x = -Math.PI / 2;
+                spill.position.set(x, 0.02, y + 1.2);
+                trimSubGroup.add(spill);
+              }
+              // Spill north if corridor
+              if (y > 0 && state.tiles[y - 1][x].type === TileType.Corridor) {
+                const spill = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 2.0), spillMat);
+                spill.rotation.x = -Math.PI / 2;
+                spill.position.set(x, 0.02, y - 1.2);
+                trimSubGroup.add(spill);
+              }
+            }
+          }
         }
       }
     }
