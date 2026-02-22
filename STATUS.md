@@ -265,6 +265,7 @@
 - **Sprint V103 — Entity-colored interaction rings**: Flash ring and particle burst on interaction now use the entity's type color (from ENTITY_COLORS_3D) instead of uniform green. Particles brightened +60 per channel. Visual variety per entity type
 - **Sprint V104 — Headlight flicker sync**: Volumetric cone and ground spot now sync with headlight damage flicker via stored ratio. All three (SpotLight, cone mesh, ground ellipse) dim together for coherent failing-flashlight effect
 - **Sprint V105 — Door proximity lighting**: Unlocked door lights brighten as player approaches (motion-sensor effect). Intensity +0.8 within 2 tiles, +0.3 within 4. Locked doors keep pulsing red warning. Creates welcoming-vs-forbidden contrast
+- **Sprint V106 — Following crew glow**: Crew NPCs that are following the player emit a pulsing green emissive glow (0.2 + sin*0.1 intensity). Tracked via entity `following` prop. Visual confirmation that crew are in your rescue party
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

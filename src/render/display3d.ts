@@ -2495,7 +2495,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Entity animations
     for (const [id, mesh] of this.entityMeshes) {
-      const userData = mesh.userData as { entityType?: string; _activated?: boolean };
+      const userData = mesh.userData as { entityType?: string; _activated?: boolean; _following?: boolean };
       if (userData.entityType === EntityType.Relay) {
         // Activated relays spin faster and glow brighter
         const activated = userData._activated;
@@ -2577,6 +2577,16 @@ export class BrowserDisplay3D implements IGameDisplay {
           mesh.rotation.y += crewDiff * 0.08; // smooth turn toward player
         } else {
           mesh.rotation.y = Math.sin(elapsed * 0.8 + mesh.position.x * 2) * 0.15;
+        }
+        // Following crew: green glow aura emissive boost
+        if (userData._following) {
+          mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.emissive = child.material.emissive || new THREE.Color();
+              child.material.emissive.setHex(0x22ff66);
+              child.material.emissiveIntensity = 0.2 + Math.sin(elapsed * 2) * 0.1;
+            }
+          });
         }
       } else if (userData.entityType === EntityType.Console) {
         // Screen flicker + proximity brighten + glow projection pulse
@@ -6082,6 +6092,11 @@ export class BrowserDisplay3D implements IGameDisplay {
             child.material.transparent = true;
           }
         });
+      }
+
+      // Track crew following state for visual indicator
+      if (entity.type === EntityType.CrewNPC) {
+        mesh.userData._following = entity.props["following"] === true;
       }
 
       // Track relay activation state for animation
