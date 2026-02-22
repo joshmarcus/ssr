@@ -855,11 +855,11 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Renderer ──
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: false, // off — MSAA resolve can trigger GPU stalls on NVIDIA
       powerPreference: "high-performance",
-      stencil: false, // not needed — saves GPU memory
+      stencil: false,
     });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // cap at 1x to reduce fill rate
     this.renderer.setClearColor(COLORS_3D.background);
     // Shadow maps off by default for performance (F5 to toggle)
     this.renderer.shadowMap.enabled = false;
