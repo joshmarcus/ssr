@@ -961,8 +961,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     floorGeo.translate(0, -0.04, 0); // sit flush at y=0
     const floorGridTex = createFloorGridTexture();
     const floorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: floorGridTex, emissive: 0x222222, emissiveIntensity: 0.08 });
-    (floorMat as THREE.MeshStandardMaterial).roughness = 0.55;
-    (floorMat as THREE.MeshStandardMaterial).metalness = 0.15;
+    (floorMat as THREE.MeshStandardMaterial).roughness = 0.35;
+    (floorMat as THREE.MeshStandardMaterial).metalness = 0.25;
     this.floorMesh = new THREE.InstancedMesh(floorGeo, floorMat, this.maxTiles);
     this.floorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.floorMesh.frustumCulled = false; // instances span entire map
@@ -975,8 +975,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     corridorFloorGeo.translate(0, -0.04, 0);
     const corridorGrateTex = createCorridorGrateTexture();
     const corridorFloorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient, map: corridorGrateTex, emissive: 0x181822, emissiveIntensity: 0.06 });
-    (corridorFloorMat as THREE.MeshStandardMaterial).roughness = 0.45;
-    (corridorFloorMat as THREE.MeshStandardMaterial).metalness = 0.2;
+    (corridorFloorMat as THREE.MeshStandardMaterial).roughness = 0.3;
+    (corridorFloorMat as THREE.MeshStandardMaterial).metalness = 0.3;
     this.corridorFloorMesh = new THREE.InstancedMesh(corridorFloorGeo, corridorFloorMat, this.maxTiles);
     this.corridorFloorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.corridorFloorMesh.frustumCulled = false;
