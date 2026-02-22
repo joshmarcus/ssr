@@ -2263,10 +2263,39 @@ export class BrowserDisplay3D implements IGameDisplay {
       };
       const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
       const phaseInfo = phaseLabels[phase] ?? { label: "UNKNOWN", color: "#888" };
+
+      // Phase-specific progress line
+      let progressHtml = "";
+      if (state.mystery) {
+        const journal = state.mystery.journal;
+        const deductions = state.mystery.deductions;
+        const solved = deductions.filter(d => d.solved && d.answeredCorrectly).length;
+        const total = deductions.length;
+        const unlocked = getUnlockedDeductions(deductions, journal);
+
+        if (phase === ObjectivePhase.Investigate || phase === ObjectivePhase.Recover) {
+          // Find next unsolved deduction's evidence threshold
+          const nextUnsolved = deductions.find(d => !d.solved);
+          const nextThreshold = nextUnsolved?.evidenceThreshold ?? 0;
+          const evidenceProgress = nextThreshold > 0
+            ? `<span style="color:#6cf">Evidence: ${journal.length}/${nextThreshold}</span>`
+            : `<span style="color:#6cf">Evidence: ${journal.length}</span>`;
+          const deductionProgress = `<span style="color:#fa0">Deductions: ${solved}/${total}</span>`;
+          progressHtml = `<br><span class="hud-obj-progress">${evidenceProgress} | ${deductionProgress}</span>`;
+        }
+
+        // Deduction-ready notification
+        if (unlocked.length > 0 && (phase === ObjectivePhase.Investigate || phase === ObjectivePhase.Recover)) {
+          const pulse = Math.sin(Date.now() * 0.006) > 0 ? "1" : "0.5";
+          progressHtml += `<br><span style="color:#ff0;font-weight:bold;opacity:${pulse}">[!] DEDUCTION AVAILABLE — press [V]</span>`;
+        }
+      }
+
       this._hudObjective.innerHTML =
         `<span class="hud-phase" style="color:${phaseInfo.color}">[${phaseInfo.label}]</span> ` +
         `<span class="hud-obj-text">${this.escapeHtml(objective.text)}</span>` +
-        `<br><span class="hud-obj-detail">${this.escapeHtml(objective.detail)}</span>`;
+        `<br><span class="hud-obj-detail">${this.escapeHtml(objective.detail)}</span>` +
+        progressHtml;
     }
 
     // ── Status bar ──────────────────────────────────────────────
@@ -2413,12 +2442,14 @@ export class BrowserDisplay3D implements IGameDisplay {
           const ew = dx < 0 ? "W" : dx > 0 ? "E" : "";
           return ns + ew || "here";
         };
+        const currentPhase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
         const scanTargets: { glyph: string; label: string; dist: number; dir: string; color: string; priority: number }[] = [];
         for (const [, ent] of state.entities) {
           const dx = ent.pos.x - spx;
           const dy = ent.pos.y - spy;
           const dist = Math.abs(dx) + Math.abs(dy);
           if (dist < 2) continue;
+          if (isEntityExhausted(ent)) continue;
           if (hasThermal && ent.type === EntityType.Relay && ent.props["activated"] !== true && ent.props["locked"] !== true) {
             scanTargets.push({ glyph: "\u26a1", label: "Relay", dist, dir: dirLabel(dx, dy), color: "#fa0", priority: 1 });
           }
@@ -2428,8 +2459,24 @@ export class BrowserDisplay3D implements IGameDisplay {
           if (hasAtmo && ent.type === EntityType.Breach && ent.props["sealed"] !== true) {
             scanTargets.push({ glyph: "\ud83d\udca8", label: "Breach", dist, dir: dirLabel(dx, dy), color: "#4af", priority: 2 });
           }
-          if (state.mystery?.objectivePhase === ObjectivePhase.Evacuate && ent.type === EntityType.EscapePod && ent.props["powered"] !== true) {
+          if (currentPhase === ObjectivePhase.Evacuate && ent.type === EntityType.EscapePod && ent.props["powered"] !== true) {
             scanTargets.push({ glyph: "\u2b21", label: "Pod", dist, dir: dirLabel(dx, dy), color: "#8f8", priority: 0 });
+          }
+          // Phase-aware: evidence sources during Investigate
+          if (currentPhase === ObjectivePhase.Investigate || currentPhase === ObjectivePhase.Recover) {
+            if (ent.type === EntityType.LogTerminal) {
+              scanTargets.push({ glyph: "\ud83d\udcbb", label: "Terminal", dist, dir: dirLabel(dx, dy), color: "#6cf", priority: 3 });
+            }
+            if (ent.type === EntityType.EvidenceTrace) {
+              scanTargets.push({ glyph: "\ud83d\udc63", label: "Evidence", dist, dir: dirLabel(dx, dy), color: "#ca8", priority: 2 });
+            }
+            if (ent.type === EntityType.CrewItem) {
+              scanTargets.push({ glyph: "\ud83d\uddc3\ufe0f", label: "Clue", dist, dir: dirLabel(dx, dy), color: "#ca8", priority: 3 });
+            }
+          }
+          // Phase-aware: DataCore during Recover
+          if (currentPhase === ObjectivePhase.Recover && ent.type === EntityType.DataCore) {
+            scanTargets.push({ glyph: "\ud83d\udc8e", label: "Data Core", dist, dir: dirLabel(dx, dy), color: "#f0f", priority: 0 });
           }
         }
         if (visitedRoomIds && state.rooms.length > 0) {
