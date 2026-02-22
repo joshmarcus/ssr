@@ -532,6 +532,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _roomTransitionFade: number = 0; // 1.0 = full black, fades to 0
   private static readonly CORRIDOR_VIEW_RANGE = 5; // tiles of corridor visible from player
   private _corridorDimFactor: number = 1.0; // ambient light dimming (1.0 = full, 0.35 = corridor)
+  private _roomCenterGlow: THREE.PointLight | null = null; // warm glow at current room center
   private cameraFrustumSize: number = CAMERA_FRUSTUM_SIZE_DEFAULT; // current zoom level (mouse wheel adjustable)
   private cameraElevation: number = 0.5; // 0 = top-down, 1 = side-on. Default = mid-angle
 
@@ -2027,6 +2028,27 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._roomTransitionFade *= Math.max(0, 1 - delta * 3.0); // fade over ~0.3s
     } else {
       this._roomTransitionFade = 0;
+    }
+
+    // Room center glow: warm light at the center of the current room
+    if (this._currentRoom) {
+      if (!this._roomCenterGlow) {
+        this._roomCenterGlow = new THREE.PointLight(0xffeedd, 0, 10);
+        this._roomCenterGlow.position.set(0, 1.5, 0);
+        this.scene.add(this._roomCenterGlow);
+      }
+      const roomTint = ROOM_LIGHT_COLORS[this._currentRoom.name] ?? 0xffeedd;
+      this._roomCenterGlow.color.setHex(roomTint);
+      const targetIntensity = 1.2 + this.roomLightBoost * 0.5;
+      this._roomCenterGlow.intensity += (targetIntensity - this._roomCenterGlow.intensity) * 0.1;
+      const cx = this._currentRoom.x + this._currentRoom.width / 2;
+      const cz = this._currentRoom.y + this._currentRoom.height / 2;
+      this._roomCenterGlow.position.set(cx, 1.5, cz);
+      this._roomCenterGlow.visible = true;
+    } else if (this._roomCenterGlow) {
+      // In corridor — fade out room glow
+      this._roomCenterGlow.intensity *= 0.9;
+      if (this._roomCenterGlow.intensity < 0.05) this._roomCenterGlow.visible = false;
     }
 
     // Room lights: emergency flicker for red/amber lights, + room entry boost
@@ -6643,19 +6665,43 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Dust motes: slowly drift and follow camera center
     if (this.dustParticles) {
       const posArr = this.dustParticles.geometry.attributes.position.array as Float32Array;
+      const inRoom = this._currentRoom !== null;
+      const driftSpeed = inRoom ? 0.08 : 0.15; // faster in corridors (turbulence)
+      const spreadRadius = inRoom ? 12 : 6; // tighter in corridors
+
       for (let i = 0; i < posArr.length; i += 3) {
         // Slow upward drift + gentle swirl
-        posArr[i] += Math.sin(elapsed * 0.3 + i) * delta * 0.1;
+        posArr[i] += Math.sin(elapsed * 0.3 + i) * delta * driftSpeed;
         posArr[i + 1] += delta * 0.05;
-        posArr[i + 2] += Math.cos(elapsed * 0.2 + i * 0.7) * delta * 0.1;
+        posArr[i + 2] += Math.cos(elapsed * 0.2 + i * 0.7) * delta * driftSpeed;
 
-        // Wrap particles to stay near camera
+        // Wrap particles to stay near camera, constrain to spread radius
         if (posArr[i + 1] > 3) posArr[i + 1] = 0;
+        if (Math.abs(posArr[i]) > spreadRadius) posArr[i] *= 0.5;
+        if (Math.abs(posArr[i + 2]) > spreadRadius) posArr[i + 2] *= 0.5;
       }
       this.dustParticles.geometry.attributes.position.needsUpdate = true;
 
       // Keep dust centered on camera target
       this.dustParticles.position.set(this.cameraPosX, 0, this.cameraPosZ);
+
+      // Tint dust particles to match current room color
+      const dustMat = this.dustParticles.material as THREE.PointsMaterial;
+      if (this._currentRoom) {
+        const roomTint = ROOM_WALL_TINTS_3D[this._currentRoom.name] ?? 0xccddee;
+        // Blend white-ish dust with room tint (30%)
+        const tr = ((roomTint >> 16) & 0xff);
+        const tg = ((roomTint >> 8) & 0xff);
+        const tb = (roomTint & 0xff);
+        const r = Math.round(0xcc * 0.7 + tr * 0.3);
+        const g = Math.round(0xdd * 0.7 + tg * 0.3);
+        const b = Math.round(0xee * 0.7 + tb * 0.3);
+        dustMat.color.setRGB(r / 255, g / 255, b / 255);
+        dustMat.opacity = 0.5; // more visible in lit rooms
+      } else {
+        dustMat.color.setHex(0x889999); // dimmer, greyer in corridors
+        dustMat.opacity = 0.3; // less visible in dark corridors
+      }
     }
 
     // Starfield: dynamic twinkle with individual star variation
