@@ -2137,6 +2137,32 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // Sensor mode visor tint: subtle full-screen color wash while sensor overlay is active
+      {
+        let sensorTint = document.getElementById("sensor-visor-tint");
+        if (this.sensorMode) {
+          if (!sensorTint) {
+            sensorTint = document.createElement("div");
+            sensorTint.id = "sensor-visor-tint";
+            sensorTint.style.cssText =
+              "position:fixed;inset:0;pointer-events:none;z-index:86;mix-blend-mode:multiply;";
+            document.body.appendChild(sensorTint);
+          }
+          const sensorTints: Record<string, string> = {
+            [SensorType.Thermal]: "rgba(255,200,180,0.06)",
+            [SensorType.Atmospheric]: "rgba(180,220,255,0.06)",
+            [SensorType.Cleanliness]: "rgba(200,255,180,0.06)",
+          };
+          sensorTint.style.display = "block";
+          sensorTint.style.backgroundColor = sensorTints[this.sensorMode] ?? "transparent";
+          // Subtle breathing at sensor-specific rate
+          const breathe = 0.8 + Math.sin(elapsed * 1.5) * 0.2;
+          sensorTint.style.opacity = breathe.toFixed(2);
+        } else if (sensorTint) {
+          sensorTint.style.display = "none";
+        }
+      }
+
       // Smoothly move camera and light to follow
       this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
       this.cameraPosZ += (this.cameraTargetZ - this.cameraPosZ) * lerpFactor;

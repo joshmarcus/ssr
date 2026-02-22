@@ -258,6 +258,7 @@
 - **Sprint V96 — Low HP warning vignette**: Pulsing red inset box-shadow around screen edges when Sweepo HP <40%. Severity-scaled spread (60-100px) and opacity pulse (2.5Hz). Classic danger feedback for critical health states
 - **Sprint V97 — Sweepo cleaning brushes**: Two small rotating cylinders on Sweepo's underside. Spin fast (15 rad/s) when moving, slow idle rotation. Counter-rotating pair reinforces Sweepo's identity as a cleaning bot
 - **Sprint V98 — Minimap room checkmarks**: Green checkmark on minimap for rooms where all entities are exhausted. Helps players track which rooms still need attention and which are fully explored
+- **Sprint V99 — Sensor visor tint**: Subtle full-screen color wash when sensor overlay is active (warm for Thermal, cool for Atmospheric, green for Cleanliness). 6% opacity with breathing animation. Creates "scanning visor" immersion
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
