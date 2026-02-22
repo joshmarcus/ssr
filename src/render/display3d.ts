@@ -6074,7 +6074,28 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
-      // (Ceiling light fixtures removed — they obscured the camera view)
+      // Recessed ceiling light panels — flush with ceiling, glowing downward
+      // Placed at beam intersection grid (every 4 tiles in both directions)
+      const lightPanelGeo = new THREE.PlaneGeometry(0.5, 0.5);
+      const lightPanelMat = new THREE.MeshBasicMaterial({
+        color: tint,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      for (let ry = room.y; ry < room.y + room.height; ry++) {
+        if ((ry - room.y) % 4 !== 2) continue; // offset from beams for centered placement
+        for (let rx = room.x; rx < room.x + room.width; rx++) {
+          if ((rx - room.x) % 4 !== 2) continue;
+          if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
+          if (state.tiles[ry][rx].type !== TileType.Floor) continue;
+          const panel = new THREE.Mesh(lightPanelGeo, lightPanelMat);
+          panel.rotation.x = Math.PI / 2; // face downward
+          panel.position.set(rx, ceilingY - 0.01, ry);
+          ceilSubGroup.add(panel);
+        }
+      }
     }
   }
 
