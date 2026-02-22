@@ -337,6 +337,21 @@ Screen-space effects, camera expressiveness, and environmental storytelling:
 - **Time-stretch for milestone emphasis**: Relay activation (V149) slows camera lerp to 30% for 0.4s — not actual time slowdown but perceived pause. Combined with zoom-in punch + golden sparks for layered celebration.
 - **Minimap as sensor status indicator**: Colored border + 3-letter label (V150) communicates sensor state without reading the sidebar. Same minimap canvas, just 3 additional draw calls (strokeRect + fillText).
 
+## Sprint Learnings (V151-V160 Reflection)
+
+Room enclosure, fundamental visual fixes, and screenshot-driven development:
+
+- **Screenshot-driven development is essential**: The user's feedback "are you reviewing screenshots?" triggered a paradigm shift. V156-V160 fixed fundamental spatial issues (ceiling gaps, starfield bleed) that 100+ sprints of micro-effects had never addressed because they weren't visible in code review. Always take and carefully analyze screenshots between sprints.
+- **Ceiling above ALL tile types, not just walkable**: The original ceiling only covered Floor and Door tiles. Wall tiles had no ceiling, creating gaps where the starfield was visible. The fix: place ceiling BEFORE the internal-wall skip check so every wall tile gets a ceiling panel too.
+- **scene.background vs scene objects**: Changing `scene.background` from starfield texture to solid color didn't hide the 400-star THREE.Points object or the nebula shader mesh — those are separate scene children. Must track and `.visible = false` each one independently.
+- **Void-fill geometry prevents edge-of-world gaps**: Large PlaneGeometry ground/ceiling (80x80) following the player plus a ring of dark floor/ceiling/wall instances beyond the view range prevents any peek at the void. The void planes at renderOrder -10 sit behind everything.
+- **InstancedMesh maxTiles needs headroom**: Void-fill geometry ring adds many instances beyond the normal tile count. Bumping capacity to `width * height * 1.5` prevents overflow when filling unexplored areas around the player.
+- **Mid-wall accent strips sell wall depth**: Adding a 4th trim level at y=0.85 (eye level from chase cam at 1.0 height) breaks up flat wall surfaces. The existing baseboard/glow/rail at floor/ceiling were invisible from low-angle chase cam. Eye-level detail matters most.
+- **Ceiling beam subtlety**: Cross-braces should be structural scaffolding, not decoration. Darkened (base 0x18 vs 0x40), thinned (0.04 vs 0.06 height), and spaced wider (every 4 vs 3 tiles). Faint emissive (0.08) catches ambient light naturally.
+- **Entity glow is the primary visual identifier**: From the chase cam, entities are identified by their glow color + ground ring, not by model detail. Boosting emissive from 0.3→0.5 and ground ring opacity 0.25→0.35 had more impact than model improvements would.
+- **Fundamental before decorative**: 155 sprints of particle effects, camera tricks, and micro-animations couldn't compensate for rooms that didn't look enclosed. Always fix spatial/structural issues before adding polish effects.
+- **Screenshot tool reliability**: The tool frequently times out (exit code 124) but saves the PNG before timeout. The `timeout 90` prefix + `|| true` suffix handles this gracefully. Always check if the PNG exists even after apparent failure.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
