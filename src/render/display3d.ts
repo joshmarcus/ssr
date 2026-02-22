@@ -614,6 +614,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _playerTileDirt: number = 0;
   // Cleaning sparkle sprites (green sparkles when moving over dirty tiles)
   private _cleanSparkleTimer: number = 0;
+  // Damage spark timer (orange sparks shooting from body at low HP)
+  private _damageSparkTimer: number = 0;
   // Headlight damage flicker ratio (1.0 = normal, <1.0 when flickering)
   private _headlightFlickerRatio: number = 1.0;
   // Pipe steam leak sprites (small puffs from corridor pipes)
@@ -2053,6 +2055,28 @@ export class BrowserDisplay3D implements IGameDisplay {
             body.material.emissiveIntensity = spark;
             body.material.emissive = body.material.emissive || new THREE.Color(0xff4400);
             if (spark > 0) body.material.emissive.setHex(0xff4400);
+          }
+          // Actual spark sprites shooting from body when critically damaged
+          this._damageSparkTimer -= delta;
+          if (this._damageSparkTimer <= 0) {
+            const severity = 1 - this._playerHpPercent / 0.4;
+            this._damageSparkTimer = 0.3 - severity * 0.2; // more frequent at lower HP
+            const dsMat = new THREE.SpriteMaterial({
+              color: 0xffaa22, transparent: true, opacity: 0.7,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const ds = new THREE.Sprite(dsMat);
+            ds.scale.set(0.04, 0.04, 1);
+            ds.position.set(
+              this.playerCurrentX + (Math.random() - 0.5) * 0.3,
+              0.15 + Math.random() * 0.3,
+              this.playerCurrentZ + (Math.random() - 0.5) * 0.3,
+            );
+            (ds as any)._life = 0;
+            (ds as any)._maxLife = 0.15 + Math.random() * 0.15;
+            (ds as any)._driftY = 1.0 + Math.random() * 1.5;
+            this.scene.add(ds);
+            this._discoverySparkles.push(ds);
           }
         }
       } else {
