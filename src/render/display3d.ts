@@ -2531,6 +2531,29 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else if (userData.entityType === EntityType.Breach) {
         const scale = 1 + Math.sin(elapsed * 3) * 0.15;
         mesh.scale.set(scale, scale, scale);
+        // Unsealed breaches: pulsing red danger ring on floor
+        if (!mesh.userData._sealed) {
+          if (!mesh.userData._dangerRing) {
+            const drGeo = new THREE.RingGeometry(0.5, 0.65, 24);
+            drGeo.rotateX(-Math.PI / 2);
+            const drMat = new THREE.MeshBasicMaterial({
+              color: 0xff2200, transparent: true, opacity: 0.3,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const dr = new THREE.Mesh(drGeo, drMat);
+            dr.position.set(mesh.position.x, 0.03, mesh.position.z);
+            this.scene.add(dr);
+            mesh.userData._dangerRing = dr;
+          }
+          const dr = mesh.userData._dangerRing as THREE.Mesh;
+          const ringPulse = 0.5 + Math.sin(elapsed * 4) * 0.5;
+          (dr.material as THREE.MeshBasicMaterial).opacity = 0.15 + ringPulse * 0.2;
+          const rScale = 1 + ringPulse * 0.3;
+          dr.scale.set(rScale, 1, rScale);
+        } else if (mesh.userData._dangerRing) {
+          this.scene.remove(mesh.userData._dangerRing as THREE.Mesh);
+          mesh.userData._dangerRing = null;
+        }
       } else if (userData.entityType === EntityType.Drone) {
         mesh.position.y = 0.6 + Math.sin(elapsed * 2 + mesh.position.x) * 0.08;
         // Spin propeller ring (child index 1 = torus ring)
