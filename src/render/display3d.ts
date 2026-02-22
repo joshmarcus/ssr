@@ -2339,9 +2339,28 @@ export class BrowserDisplay3D implements IGameDisplay {
           `repeating-linear-gradient(${Math.random()*360}deg,rgba(255,255,255,${0.1+Math.random()*0.3}) 0px,transparent 1px,transparent 2px)`;
         stunOverlay.style.backgroundPosition = `${rx}px ${ry}px`;
         stunOverlay.style.backgroundSize = "3px 3px";
+
+        // REBOOTING text overlay
+        let rebootText = document.getElementById("stun-reboot-text");
+        if (!rebootText) {
+          rebootText = document.createElement("div");
+          rebootText.id = "stun-reboot-text";
+          rebootText.style.cssText =
+            "position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:89;" +
+            "font-family:monospace;font-size:16px;color:#4488ff;text-align:center;text-shadow:0 0 8px #44f;";
+          document.body.appendChild(rebootText);
+        }
+        const bootLines = ["SYSTEM REBOOT", "RECALIBRATING...", "SIGNAL LOST", "RECONNECTING..."];
+        const lineIdx = Math.floor(elapsed * 2) % bootLines.length;
+        const dots = ".".repeat(Math.floor(elapsed * 4) % 4);
+        rebootText.textContent = bootLines[lineIdx] + dots;
+        rebootText.style.display = "block";
+        rebootText.style.opacity = String(0.4 + Math.sin(elapsed * 5) * 0.3);
       } else {
         const stunOverlay = document.getElementById("stun-static-overlay");
         if (stunOverlay) stunOverlay.style.display = "none";
+        const rebootText = document.getElementById("stun-reboot-text");
+        if (rebootText) rebootText.style.display = "none";
       }
 
       // Eye glow: state-reactive color + gentle pulse + emotion (child 5)

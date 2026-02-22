@@ -310,6 +310,7 @@
 - **Sprint V148 — Hazard proximity camera tilt**: Camera subtly rolls toward nearby threats (breaches for vacuum, heat shimmer wobble). Uses breach positions for directional bias, converts world-space to screen-space via player facing. Max ±0.06 rad tilt, smoothly interpolated. Creates subconscious directional awareness of danger
 - **Sprint V149 — Relay activation celebration**: Camera zoom-in punch (-1.5 zoom), milestone screen flash, and 0.4s time-stretch (camera lerp slowed to 30%) on relay activation. Combined with existing golden sparks and pulse waves for epic moment
 - **Sprint V150 — Minimap sensor border**: Colored frame and 3-letter sensor label (THM/ATM/CLN) drawn on minimap when sensor mode is active. Red for thermal, blue for atmospheric, green for cleanliness. Reinforces sensor state at a glance
+- **Sprint V151 — Stun reboot text overlay**: "SYSTEM REBOOT", "RECALIBRATING...", "SIGNAL LOST", "RECONNECTING..." messages cycle during stun with pulsing opacity and animated dots. Reinforces terminal-link narrative during stun state
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
