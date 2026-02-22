@@ -352,6 +352,21 @@ Room enclosure, fundamental visual fixes, and screenshot-driven development:
 - **Fundamental before decorative**: 155 sprints of particle effects, camera tricks, and micro-animations couldn't compensate for rooms that didn't look enclosed. Always fix spatial/structural issues before adding polish effects.
 - **Screenshot tool reliability**: The tool frequently times out (exit code 124) but saves the PNG before timeout. The `timeout 90` prefix + `|| true` suffix handles this gracefully. Always check if the PNG exists even after apparent failure.
 
+## Sprint Learnings (V161-V170 Reflection)
+
+Dramatic lighting, material properties, and atmospheric room identity:
+
+- **Reducing global lights is more impactful than adding local ones**: V161's reduction of ambient/fill/rim by ~50% while boosting headlight and room center glow created more visual drama than 50 sprints of adding new light sources. The headlight becomes the hero when everything else is dim.
+- **Material roughness/metalness matter for floor readability**: Lowering floor roughness from 0.7→0.55 and raising metalness 0.1→0.15 creates visible specular highlights from the headlight. The floor looks "alive" instead of flat matte. Corridor metal grate at 0.45/0.2 is shinier — correct for metal.
+- **Subtle emissive on tile materials aids shadow readability**: Floor emissive 0x222222 at 0.08 and wall emissive 0x181818 at 0.06 mean procedural texture details (grid lines, panel grooves) remain visible even in shadowed areas. The self-illumination is barely perceptible but prevents "pure black" dead zones.
+- **Room-type ambient tinting is subliminal but important**: Blending 30% of the room's light color into the ambient creates a "feel" difference between rooms — Power rooms warm, Data Core purple — without being obvious. The smooth lerp (0.06 rate) prevents jarring color pops on room transitions.
+- **Door light spill needs corridor adjacency check**: Light spill planes should only extend toward corridor tiles, not into other rooms. Simple N/S/E/W check against TileType.Corridor + orientation-aware placement. Additive blending at 8% is the right subtlety level.
+- **Enhanced textures need darker grooves, not more detail**: V162 wall panel texture improvement was about deepening existing grooves (#ccc→#999) and adding beveled highlights beside them, not adding new geometry. Bigger contrast = more visible from the low chase cam.
+- **Film color grade adds cinematic cohesion**: A single CSS div with mix-blend-mode:color and a cool-blue gradient unifies the color palette. Active only in chase cam. The 6% edge darkening creates vignette-like color framing at zero GPU cost.
+- **Lower camera is always better (to a point)**: Every camera lowering (V157→V166→current) has improved screenshots. Rooms 1.0→0.85, corridors 0.65→0.50. The floor, wall base trim, and entity ground rings dominate the frame, which is the right composition.
+- **Screenshot consistency masks incremental changes**: V167-V170 screenshots look nearly identical because the same room from the same seed produces similar results. Need to use different seeds or more turns for variety. Corridor screenshots are hard to capture because auto-explore prioritizes rooms.
+- **Toon gradient shadow level affects overall mood**: Raising toon shadow from 60→80 brightened shadow areas slightly, reducing the harshest shadows while keeping the cel-shaded look. This was more impactful than any single light adjustment.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)

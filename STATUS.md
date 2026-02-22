@@ -1,10 +1,10 @@
 # SSR — Project Status
 
-*Last updated: 2026-02-21*
+*Last updated: 2026-02-22*
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V166 completed, V167 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V170 completed, V171 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -326,6 +326,10 @@
 - **Sprint V164 — Film color grade**: CSS cool-blue gradient overlay (mix-blend-mode:color) for cinematic sci-fi desaturation. Active only in chase cam
 - **Sprint V165 — Brighter door frames**: Door frame pillar emissive 0.3→0.55, door PointLight intensity boosted (locked 0.6→1.0, unlocked 0.4→0.8), range 3→4
 - **Sprint V166 — Lower immersive camera**: Chase cam lowered (rooms 1.0→0.85, corridors 0.65→0.50) and brought closer (2.8→2.5, 2.0→1.8). Environment feels towering, floor detail clearly visible. Most impactful visual change of V160-V166
+- **Sprint V167 — Headlight ground spot boost**: Ground spot radius 0.6→0.8, scale wider (1.0,1.8,1), opacity 0.10. Target opacity rooms 0.06/corridors 0.12. More visible floor illumination from lower camera angle
+- **Sprint V168 — Surface material polish**: Floor roughness 0.55, metalness 0.15, emissive for shadow readability. Corridor roughness 0.45, metalness 0.2. Wall emissive 0.06. Specular response from headlight on floor
+- **Sprint V169 — Dynamic ambient tint**: Ambient light blends 30% toward current room's light color. Power rooms feel warm, Data Core purple, Med Bay cool. Smooth lerp transition in/out of rooms
+- **Sprint V170 — Door light spill**: Unlocked doors emit translucent floor planes (additive, 8% opacity) extending 2 tiles into adjacent corridors. Room-tinted color. Light pools at doorways
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
