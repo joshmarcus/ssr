@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 87 (V207 completed — Alan Wake mystery rework in progress)
+- **Phase**: Sprint 90 (V213 completed — Mystery rework complete, visual polish)
 - **Test status**: 292 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -111,6 +111,20 @@
 
 - Controller/gamepad input not yet implemented
 - No CI pipeline deployed
+
+## Sprint 88-90 Changes (V208-V213)
+
+### Mystery Deduction Rework Complete
+- **V208 — Evidence-driven deduction view**: Key evidence highlighting in deduction detail, scrollable evidence log replaces tag-linking UI
+- **V209 — CORVUS-7 reactive commentary**: 60+ investigation-reactive lines with evidence milestones (3/6/9/12/15), foreshadowing, and crew profiling
+- **V211 — Post-deduction cinematic overlay**: Full-screen narrative overlay for correct/wrong/lockout results with revelations, penalties, next deduction teaser
+- **V212 — "Case Closed" cinematic**: Golden overlay when all deductions solved — archetype title, story summary, deduction record, S-D rating
+- **V213 — Investigation aura + bloom**: Bloom post-processing enabled by default, golden motes in evidence rooms, blue motes in fully-investigated rooms, room center glow tinting
+
+### Technical
+- Fixed TypeScript narrowing invalidation in commitDeductionAnswer (state.mystery → local variable)
+- Entity type comparisons use EntityType enum instead of string literals
+- 292 tests passing across 24 test files
 
 ## Sprint 73 Changes (In Progress)
 

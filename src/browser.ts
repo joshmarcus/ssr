@@ -204,6 +204,7 @@ let lastRoomIdForAmbient = ""; // track room changes for ambient counter
 const escortArcSteps = new Map<string, number>(); // track escort dialogue arc step per crew NPC
 const corridorAmbientFired = new Set<string>(); // track corridor segments that have triggered ambient text
 let lastCorridorAmbientTurn = 0; // cooldown: don't fire corridor ambient more than once per 20 turns
+let lastStationEventTurn = 0; // cooldown for station-wide ambient events
 let lastJournalLength = 0; // track journal size for insight notifications
 const foreshadowedRooms = new Map<string, string>(); // room name → log excerpt (for manuscript echo)
 const echoedRooms = new Set<string>(); // rooms where we've already shown the echo
@@ -1310,6 +1311,21 @@ function renderAll(): void {
     (display as any).setInvestigationRooms(investigationRooms);
   }
 
+  // Station stress level: compute from overall hazard severity for dynamic events
+  if ((display as any).setStationStress) {
+    let hazardTiles = 0;
+    let totalTiles = 0;
+    for (let y = 0; y < state.tiles.length; y++) {
+      for (let x = 0; x < state.tiles[y].length; x++) {
+        totalTiles++;
+        const tile = state.tiles[y][x];
+        if (tile.heat > 40 || tile.smoke > 30 || tile.pressure < 60) hazardTiles++;
+      }
+    }
+    const stress = totalTiles > 0 ? Math.min(1, (hazardTiles / totalTiles) * 8) : 0;
+    (display as any).setStationStress(stress);
+  }
+
   // Auto-explore badge
   const autoEl = document.getElementById("auto-explore-badge");
   if (autoEl) {
@@ -1749,6 +1765,29 @@ function handleAction(action: Action): void {
     } else {
       currentRoomTurns = 0;
       lastRoomIdForAmbient = roomId;
+    }
+  }
+
+  // ── Station-wide ambient events: distant sounds, structural stress ──
+  if (state.turn !== prevTurn && state.turn - lastStationEventTurn >= 12) {
+    // ~20% chance per turn after cooldown
+    const eventRoll = ((state.turn * 41 + state.seed * 7) % 100);
+    if (eventRoll < 20) {
+      lastStationEventTurn = state.turn;
+      const STATION_AMBIENT = [
+        "A distant metallic groan reverberates through the hull.",
+        "Something clatters in a far-off corridor. Then silence.",
+        "The overhead lights flicker — a brief power fluctuation from deep in the grid.",
+        "A faint hiss echoes from the ventilation ducts above.",
+        "The deck plates vibrate briefly underfoot. Structural settling.",
+        "A rhythmic tapping emanates from inside the walls — thermal expansion in the pipes.",
+        "Emergency lighting stutters in a nearby corridor. The station shivers.",
+        "Air pressure shifts subtly — a door cycling somewhere deeper in the station.",
+        "The station's spine creaks. Metal fatigue speaking in its own language.",
+        "A brief whine from the power conduits, then nothing. Systems compensating.",
+      ];
+      const ambIdx = ((state.turn * 13 + state.seed) % STATION_AMBIENT.length);
+      display.addLog(STATION_AMBIENT[ambIdx], "narrative");
     }
   }
 

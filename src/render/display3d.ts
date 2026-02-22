@@ -863,6 +863,23 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _tileHeight: number = 0;
   private _lastState: GameState | null = null;
 
+  // ── Station event system ──────────────────────────────────
+  // Power fluctuation: periodic whole-station light dim
+  private _powerFluxNextTime: number = 15 + Math.random() * 15; // first event at 15-30s
+  private _powerFluxActive: boolean = false;
+  private _powerFluxStartTime: number = 0;
+  private _powerFluxDuration: number = 0; // 0.8-2.5s
+  private _powerFluxIntensity: number = 0; // 0 = normal, 1 = full blackout
+  // Hull groan: occasional camera micro-shake
+  private _hullGroanNextTime: number = 25 + Math.random() * 20; // first at 25-45s
+  private _hullGroanActive: boolean = false;
+  private _hullGroanStartTime: number = 0;
+  private _hullGroanDuration: number = 0; // 0.6-1.5s
+  // Distant sound event: brief subtitle flash
+  private _distantEventNextTime: number = 40 + Math.random() * 30; // first at 40-70s
+  // Station event intensity multiplier (increases with hazard state)
+  private _stationStress: number = 0; // 0 = calm, 1 = critical
+
   constructor(container: HTMLElement, mapWidth?: number, mapHeight?: number) {
     this.container = container;
     this.mapWidth = mapWidth ?? DEFAULT_MAP_WIDTH;
@@ -1764,6 +1781,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   /** Update which rooms have collected evidence for investigation aura effects. */
   setInvestigationRooms(rooms: Map<string, { evidenceCount: number; fullyInvestigated: boolean }>): void {
     this._investigationRooms = rooms;
+  }
+
+  /** Set station stress level (0-1) based on overall hazard state — drives event frequency */
+  setStationStress(stress: number): void {
+    this._stationStress = Math.max(0, Math.min(1, stress));
   }
 
   getLogHistory(): DisplayLogEntry[] {
@@ -4628,6 +4650,76 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // ── Station events: power fluctuations + hull groans ──────────
+    // Power fluctuation: periodic whole-station light dim
+    const stressFreqMult = 1 + this._stationStress * 2; // more frequent at higher stress
+    if (!this._powerFluxActive) {
+      if (elapsed >= this._powerFluxNextTime) {
+        this._powerFluxActive = true;
+        this._powerFluxStartTime = elapsed;
+        this._powerFluxDuration = 0.8 + Math.random() * 1.7; // 0.8-2.5s
+        this._powerFluxIntensity = 0.3 + Math.random() * 0.4 + this._stationStress * 0.2; // 30-90% dim
+        // Schedule next
+        this._powerFluxNextTime = elapsed + (15 + Math.random() * 25) / stressFreqMult;
+      }
+    }
+    let powerDimFactor = 1.0;
+    if (this._powerFluxActive) {
+      const t = (elapsed - this._powerFluxStartTime) / this._powerFluxDuration;
+      if (t >= 1) {
+        this._powerFluxActive = false;
+      } else {
+        // Envelope: quick ramp down, hold, quick restore with some flutter
+        const envelope = t < 0.1 ? t / 0.1 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        const flutter = 1 + Math.sin(elapsed * 23.7) * 0.1 + Math.sin(elapsed * 37.3) * 0.05;
+        powerDimFactor = 1 - this._powerFluxIntensity * envelope * flutter;
+        powerDimFactor = Math.max(0.05, Math.min(1, powerDimFactor));
+      }
+    }
+    // Apply power dim to ambient and key lights
+    if (this.ambientLight) {
+      const baseAmb = 1.8;
+      this.ambientLight.intensity = baseAmb * powerDimFactor;
+    }
+    if (this.keyLight) {
+      const baseKey = 1.8;
+      this.keyLight.intensity = baseKey * powerDimFactor;
+    }
+    // Apply to room center glow
+    if (this._roomCenterGlow && this._roomCenterGlow.visible) {
+      this._roomCenterGlow.intensity *= powerDimFactor;
+    }
+    // Apply to corridor lights already animated above
+    if (powerDimFactor < 0.95) {
+      for (let i = 0; i < this.corridorLightList.length; i++) {
+        const cl = this.corridorLightList[i];
+        if (cl.visible) cl.intensity *= powerDimFactor;
+      }
+    }
+
+    // Hull groan: occasional camera micro-shake (visual only, no subtitle here)
+    if (!this._hullGroanActive && elapsed >= this._hullGroanNextTime) {
+      this._hullGroanActive = true;
+      this._hullGroanStartTime = elapsed;
+      this._hullGroanDuration = 0.6 + Math.random() * 0.9; // 0.6-1.5s
+      this._hullGroanNextTime = elapsed + (20 + Math.random() * 30) / stressFreqMult;
+    }
+    if (this._hullGroanActive) {
+      const gt = (elapsed - this._hullGroanStartTime) / this._hullGroanDuration;
+      if (gt >= 1) {
+        this._hullGroanActive = false;
+      } else {
+        // Low-frequency rumble: camera offset with decay envelope
+        const groanEnv = Math.sin(gt * Math.PI); // rise and fall
+        const freq1 = Math.sin(elapsed * 4.7) * 0.012 * groanEnv;
+        const freq2 = Math.sin(elapsed * 7.3) * 0.006 * groanEnv;
+        if (this.camera instanceof THREE.PerspectiveCamera) {
+          this.camera.position.x += freq1;
+          this.camera.position.y += freq2;
+        }
+      }
+    }
+
     // Corridor fixture light distance culling (every 3rd frame for perf)
     if (this._ambientParticleFrame % 3 === 0) {
       for (let i = 0; i < this.corridorFixtureLights.length; i++) {
@@ -5354,6 +5446,55 @@ export class BrowserDisplay3D implements IGameDisplay {
                 }
                 break;
               }
+            }
+
+            // Corridor hazard tinting: darken and tint corridors near hazardous areas
+            // Sample nearby tiles for hazards — creates "damage zones" in corridors
+            let maxNearHeat = tile.heat;
+            let minNearPressure = tile.pressure;
+            let maxNearSmoke = tile.smoke;
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const ny = y + dy, nx = x + dx;
+                if (ny >= 0 && ny < state.height && nx >= 0 && nx < state.width) {
+                  const nt = state.tiles[ny][nx];
+                  if (nt.heat > maxNearHeat) maxNearHeat = nt.heat;
+                  if (nt.pressure < minNearPressure) minNearPressure = nt.pressure;
+                  if (nt.smoke > maxNearSmoke) maxNearSmoke = nt.smoke;
+                }
+              }
+            }
+            // Apply hazard corridor tinting (always visible, not sensor-gated)
+            if (maxNearHeat > 30) {
+              // Heat damage: warm red-orange darkening
+              const hf = Math.min(1, (maxNearHeat - 30) / 50);
+              const r2 = ((baseColor >> 16) & 0xff);
+              const g2 = ((baseColor >> 8) & 0xff);
+              const b2 = (baseColor & 0xff);
+              baseColor = (Math.min(255, Math.round(r2 * (1 - hf * 0.2) + hf * 40)) << 16) |
+                          (Math.max(0, Math.round(g2 * (1 - hf * 0.4))) << 8) |
+                          Math.max(0, Math.round(b2 * (1 - hf * 0.5)));
+            }
+            if (minNearPressure < 70) {
+              // Vacuum damage: cold blue darkening
+              const pf = Math.max(0, (70 - minNearPressure) / 50);
+              const r2 = ((baseColor >> 16) & 0xff);
+              const g2 = ((baseColor >> 8) & 0xff);
+              const b2 = (baseColor & 0xff);
+              baseColor = (Math.max(0, Math.round(r2 * (1 - pf * 0.4))) << 16) |
+                          (Math.max(0, Math.round(g2 * (1 - pf * 0.15))) << 8) |
+                          Math.min(255, Math.round(b2 * (1 - pf * 0.1) + pf * 30));
+            }
+            if (maxNearSmoke > 20) {
+              // Smoke haze: desaturate and darken
+              const sf = Math.min(1, (maxNearSmoke - 20) / 40);
+              const r2 = ((baseColor >> 16) & 0xff);
+              const g2 = ((baseColor >> 8) & 0xff);
+              const b2 = (baseColor & 0xff);
+              const gray = Math.round(r2 * 0.3 + g2 * 0.59 + b2 * 0.11);
+              baseColor = (Math.round(r2 * (1 - sf * 0.6) + gray * sf * 0.6) << 16) |
+                          (Math.round(g2 * (1 - sf * 0.6) + gray * sf * 0.6) << 8) |
+                          Math.round(b2 * (1 - sf * 0.6) + gray * sf * 0.6);
             }
           } else {
             // Room floors: subtle tint from room wall color
@@ -10010,10 +10151,58 @@ export class BrowserDisplay3D implements IGameDisplay {
         return color;
       }
     }
+    // Corridor walls: base color with hash-based variety + hazard tinting
     const hash = ((x * 3) + (y * 7)) & 0xf;
-    if (hash < 4) return 0x778899;
-    if (hash > 11) return 0x99aabb;
-    return COLORS_3D.wall;
+    let corridorWallColor: number;
+    if (hash < 4) corridorWallColor = 0x778899;
+    else if (hash > 11) corridorWallColor = 0x99aabb;
+    else corridorWallColor = COLORS_3D.wall;
+
+    // Check nearby tiles for hazards — corridor walls reflect environmental damage
+    if (this._lastState) {
+      let maxH = 0, minP = 100, maxS = 0;
+      for (let dy2 = -2; dy2 <= 2; dy2++) {
+        for (let dx2 = -2; dx2 <= 2; dx2++) {
+          const ny = y + dy2, nx = x + dx2;
+          if (ny >= 0 && ny < this._lastState.height && nx >= 0 && nx < this._lastState.width) {
+            const nt = this._lastState.tiles[ny][nx];
+            if (nt.heat > maxH) maxH = nt.heat;
+            if (nt.pressure < minP) minP = nt.pressure;
+            if (nt.smoke > maxS) maxS = nt.smoke;
+          }
+        }
+      }
+      if (maxH > 30) {
+        const hf = Math.min(1, (maxH - 30) / 50);
+        const wr = ((corridorWallColor >> 16) & 0xff);
+        const wg = ((corridorWallColor >> 8) & 0xff);
+        const wb = (corridorWallColor & 0xff);
+        corridorWallColor = (Math.min(255, Math.round(wr + hf * 25)) << 16) |
+                            (Math.max(0, Math.round(wg * (1 - hf * 0.3))) << 8) |
+                            Math.max(0, Math.round(wb * (1 - hf * 0.4)));
+      }
+      if (minP < 60) {
+        const pf = Math.max(0, (60 - minP) / 40);
+        const wr = ((corridorWallColor >> 16) & 0xff);
+        const wg = ((corridorWallColor >> 8) & 0xff);
+        const wb = (corridorWallColor & 0xff);
+        corridorWallColor = (Math.max(0, Math.round(wr * (1 - pf * 0.3))) << 16) |
+                            (Math.round(wg * (1 - pf * 0.1)) << 8) |
+                            Math.min(255, Math.round(wb + pf * 20));
+      }
+      if (maxS > 25) {
+        const sf = Math.min(1, (maxS - 25) / 35);
+        const wr = ((corridorWallColor >> 16) & 0xff);
+        const wg = ((corridorWallColor >> 8) & 0xff);
+        const wb = (corridorWallColor & 0xff);
+        const wgray = Math.round(wr * 0.3 + wg * 0.59 + wb * 0.11);
+        corridorWallColor = (Math.round(wr * (1 - sf * 0.5) + wgray * sf * 0.5) << 16) |
+                            (Math.round(wg * (1 - sf * 0.5) + wgray * sf * 0.5) << 8) |
+                            Math.round(wb * (1 - sf * 0.5) + wgray * sf * 0.5);
+      }
+    }
+
+    return corridorWallColor;
   }
 
   // ── Private: helpers (duplicated from display.ts for independence) ──
