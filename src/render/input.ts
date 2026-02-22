@@ -148,6 +148,7 @@ export class InputHandler {
       case "E":
       case "i":
       case "I":
+      case "Enter":
         return { type: ActionType.Interact };
       // Scan (sensor cycle)
       case "t":
@@ -167,9 +168,7 @@ export class InputHandler {
       case ".":
       case "5":
         return { type: ActionType.Wait };
-      // Space: contextual — interact if possible, else wait (resolved in handleAction)
-      case " ":
-        return { type: ActionType.Interact };
+      // Space: reserved for subtitle dismiss (no game action)
       // Journal / notes
       case ";":
         return { type: ActionType.Journal };

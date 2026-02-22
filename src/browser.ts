@@ -91,7 +91,6 @@ const difficulty: Difficulty = difficultyParam === "easy" ? Difficulty.Easy
 
 // ── DOM elements ────────────────────────────────────────────────
 const containerEl = document.getElementById("rot-display")!;
-const uiPanel = document.getElementById("ui-panel")!;
 const crawlOverlay = document.getElementById("crawl-overlay")!;
 
 // ── Opening crawl ───────────────────────────────────────────────
@@ -219,6 +218,7 @@ let confirmingDeduction = false; // Y/N confirmation before locking in deduction
 let mapOpen = false;
 let helpOpen = false;
 let incidentCardOpen = false;
+let logReviewOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
 let investigationHubOpen = false;
 let hubSection: "evidence" | "connections" | "whatweknow" = "evidence";
@@ -1032,6 +1032,15 @@ function initGame(): void {
       }
       return; // swallow all input while incident card is open
     }
+    if (logReviewOpen) {
+      if (e.key === "Escape" || e.key === "`") {
+        e.preventDefault();
+        logReviewOpen = false;
+        const overlay = document.getElementById("journal-overlay");
+        if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; }
+      }
+      return; // swallow all input while log review is open
+    }
     if (helpOpen) {
       if (e.key === "Escape" || e.key === "?") {
         e.preventDefault();
@@ -1142,6 +1151,13 @@ function initGame(): void {
       showHelp();
       return;
     }
+    // ` key toggles message log review
+    if (e.key === "`" && !journalOpen && !investigationHubOpen) {
+      e.preventDefault();
+      logReviewOpen = true;
+      showLogReview();
+      return;
+    }
     // R opens Investigation Hub (last-visited section)
     if (e.key === "r" && !journalOpen && !state.gameOver) {
       e.preventDefault();
@@ -1195,7 +1211,7 @@ function initGame(): void {
 function renderAll(): void {
   display.updateRoomFlash(state);
   display.render(state);
-  display.renderUI(state, uiPanel, visitedRoomIds);
+  display.renderHUD(state, visitedRoomIds);
   // Auto-explore badge
   const autoEl = document.getElementById("auto-explore-badge");
   if (autoEl) {
@@ -1242,6 +1258,7 @@ function resetGameState(newSeed: number): void {
   mapOpen = false;
   helpOpen = false;
   incidentCardOpen = false;
+  logReviewOpen = false;
   activeDeduction = null;
   deductionSelectedIdx = 0;
   confirmingDeduction = false;
@@ -1505,17 +1522,7 @@ function handleAction(action: Action): void {
         break;
       }
       case ActionType.Wait: {
-        const wpx = state.player.entity.pos.x;
-        const wpy = state.player.entity.pos.y;
-        const wtile = state.tiles[wpy]?.[wpx];
-        if (wtile && wtile.heat > 15) {
-          const msg = WAIT_MESSAGES_HOT[waitMsgIndex % WAIT_MESSAGES_HOT.length];
-          display.addLog(msg, "warning");
-        } else {
-          const msg = WAIT_MESSAGES_COOL[waitMsgIndex % WAIT_MESSAGES_COOL.length];
-          display.addLog(msg, "system");
-        }
-        waitMsgIndex++;
+        // Wait messages removed — subtitle-only display makes idle chatter disruptive
         break;
       }
     }
@@ -2510,10 +2517,9 @@ function showHelp(): void {
 
         <div>
           <div style="color:#4af;font-weight:bold;margin-bottom:6px">── Actions ──</div>
-          <div><span style="color:#fff">[i] [Space]</span>  Interact with adjacent objects</div>
+          <div><span style="color:#fff">[i] [Enter]</span>  Interact with adjacent objects</div>
           <div style="color:#888;margin-left:20px">Terminals, doors, airlocks, relays,</div>
           <div style="color:#888;margin-left:20px">repair cradles, crew NPCs, escape pods</div>
-          <div style="color:#888;margin-left:20px">(Space waits if nothing nearby)</div>
           <div><span style="color:#fff">[c]</span>  Clean current tile</div>
           <div><span style="color:#fff">[t] / [q]</span>  Cycle sensor overlay</div>
           <div><span style="color:#fff">[x]</span>  Look (examine surroundings)</div>
@@ -2526,6 +2532,7 @@ function showHelp(): void {
           <div><span style="color:#fff">[r]</span>  Investigation Hub (evidence, deductions, narrative)</div>
           <div><span style="color:#fff">[v]</span>  Investigation Hub → Evidence</div>
           <div><span style="color:#fff">[;]</span>  Quick journal toggle</div>
+          <div><span style="color:#fff">[\`]</span>  Message log review</div>
           <div><span style="color:#fff">[g]</span>  Incident summary card</div>
           <div><span style="color:#fff">[m]</span>  Station map overlay</div>
           <div><span style="color:#fff">[?]</span>  This help screen</div>
@@ -2559,6 +2566,36 @@ function closeHelpOverlay(): void {
     overlay.innerHTML = "";
     overlay.classList.remove("active");
   }
+}
+
+// ── Message log review ───────────────────────────────────────────
+function showLogReview(): void {
+  const overlay = document.getElementById("journal-overlay");
+  if (!overlay) return;
+
+  const logHistory = display.getLogHistory();
+  const logEntries = logHistory.length > 0
+    ? logHistory.map(entry => {
+        const cls = `log-${entry.type}`;
+        return `<div class="${cls}" style="padding:3px 0;border-bottom:1px solid #1a1a1a"><span class="log-prefix">&gt; </span>${entry.text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+      }).join("")
+    : '<div style="color:#555;text-align:center;padding:2rem">No messages yet.</div>';
+
+  overlay.innerHTML = `
+    <div class="journal-container" style="padding:20px;overflow-y:auto;color:#ccc">
+      <div style="text-align:center;margin-bottom:12px">
+        <span style="color:#4cf;font-size:16px;font-weight:bold;letter-spacing:2px">MESSAGE LOG</span>
+        <div style="color:#555;font-size:11px">Press [\`] or [Esc] to close</div>
+      </div>
+      <div style="flex:1;overflow-y:auto;font-family:monospace;font-size:13px;line-height:1.6">
+        ${logEntries}
+      </div>
+    </div>`;
+  overlay.classList.add("active");
+
+  // Scroll to bottom
+  const container = overlay.querySelector(".journal-container > div:last-child") as HTMLElement | null;
+  if (container) container.scrollTop = container.scrollHeight;
 }
 
 // ── Station map display (HTML overlay — no longer destroys log panel) ──

@@ -13,6 +13,16 @@ playtest.jsonl
 playtest_log.txt
 screenshots/
 screenshot*.png
-public/
+public/*
 !public/music/
+!public/models/
+!public/model-list.json
+public/models/*
+!public/models/synty-space-gltf/
+!public/models/synty-gltf/
+!public/models/kenney-space/
+!public/models/Items/
+!public/models/Characters/
+# Note: only files actually referenced by src/render/display3d.ts should be committed.
+# Unused models in these directories are fine to add — total is ~198MB across 5 dirs.
 space_station_roguelike_docs_v10.zip

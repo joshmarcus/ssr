@@ -17,7 +17,7 @@ export { SensorType };
  */
 export interface IGameDisplay {
   render(state: GameState): void;
-  renderUI(state: GameState, panel: HTMLElement, visitedRoomIds?: Set<string>): void;
+  renderHUD(state: GameState, visitedRoomIds?: Set<string>): void;
   updateRoomFlash(state: GameState): void;
   addLog(msg: string, type?: LogType): void;
   toggleSensor(type: SensorType): void;

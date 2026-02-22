@@ -1299,7 +1299,13 @@ export class BrowserDisplay implements IGameDisplay {
     return getObjectiveShared(state);
   }
 
-  renderUI(state: GameState, panel: HTMLElement, visitedRoomIds?: Set<string>): void {
+  renderHUD(state: GameState, visitedRoomIds?: Set<string>): void {
+    // 2D renderer is deprecated (V196: 3D-only). HUD is handled by display3d.ts.
+    // Keeping method to satisfy IGameDisplay interface.
+  }
+
+  /** @deprecated — kept for reference, no longer called */
+  private _renderUI_legacy(state: GameState, panel: HTMLElement, visitedRoomIds?: Set<string>): void {
     // Sensor overlay indicator is now a dedicated line (see overlayLine below)
 
     // ── Objective with phase indicator ─────────────────────────

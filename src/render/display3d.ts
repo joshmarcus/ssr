@@ -1369,9 +1369,15 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (this.logHistory.length > BrowserDisplay3D.MAX_LOG_ENTRIES) {
       this.logHistory.shift();
     }
-    // Cinematic subtitle for narrative and milestone messages
-    if (this.chaseCamActive && (type === "narrative" || type === "milestone")) {
-      this.showSubtitle(msg, type === "milestone" ? "CORVUS-7 CENTRAL" : undefined);
+    // Show all messages as subtitles (sidebar removed — subtitles are the primary message display)
+    if (this.chaseCamActive) {
+      const source = type === "milestone" ? "CORVUS-7 CENTRAL"
+        : type === "critical" ? "ALERT"
+        : type === "warning" ? "WARNING"
+        : type === "sensor" ? "SENSOR"
+        : type === "system" ? "SYSTEM"
+        : undefined;
+      this.showSubtitle(msg, source);
     }
   }
 
@@ -2110,10 +2116,10 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    this.updatePlayer(state);  // must run before updateTiles so culling uses correct player position
     this.updateTiles(state);
     this.updateAirFlowArrows(state);
     this.updateEntities(state);
-    this.updatePlayer(state);
 
     // Phase-reactive global lighting
     const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
@@ -2228,348 +2234,232 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
   }
 
-  // ── Render sidebar UI (same HTML as 2D) ─────────────────────────
+  // ── HUD overlays (replaces sidebar) ────────────────────────────
 
-  renderUI(state: GameState, panel: HTMLElement, visitedRoomIds?: Set<string>): void {
-    // This shares the same HTML-rendering logic as BrowserDisplay.
-    // We duplicate the essential parts here so display3d.ts is self-contained.
+  private _hudObjective: HTMLElement | null = null;
+  private _hudStatus: HTMLElement | null = null;
+  private _hudScanner: HTMLElement | null = null;
+  private _hudInteract: HTMLElement | null = null;
 
-    // Sensor mode tag
-    const sensorNames: Record<string, string> = {
-      [SensorType.Thermal]: "THERMAL",
-      [SensorType.Cleanliness]: "CLEANLINESS",
-      [SensorType.Atmospheric]: "ATMOSPHERIC",
-    };
-    const sensorTag = this.sensorMode
-      ? ` <span class='thermal-active'>[${sensorNames[this.sensorMode] ?? this.sensorMode.toUpperCase()}]</span>`
-      : "";
-
-    // Objective with phase indicator
-    const objective = this.getObjective(state);
-    const phaseLabels: Record<string, { label: string; color: string }> = {
-      [ObjectivePhase.Clean]: { label: "MAINTENANCE", color: "#4a4" },
-      [ObjectivePhase.Investigate]: { label: "INVESTIGATION", color: "#fa0" },
-      [ObjectivePhase.Recover]: { label: "RECOVERY", color: "#f44" },
-      [ObjectivePhase.Evacuate]: { label: "EVACUATION", color: "#f0f" },
-    };
-    const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
-    const phaseInfo = phaseLabels[phase] ?? { label: "UNKNOWN", color: "#888" };
-    const phaseTag = `<span style="color:${phaseInfo.color};font-weight:bold;font-size:11px;letter-spacing:1px">[${phaseInfo.label}]</span> `;
-    const objectiveHtml = `<div class="objective-panel">` +
-      `${phaseTag}<span class="objective-label">OBJECTIVE:</span> ` +
-      `<span class="objective-text">${this.escapeHtml(objective.text)}</span>` +
-      `<br><span class="objective-detail">${this.escapeHtml(objective.detail)}</span>` +
-      `</div>`;
-
-    // Interaction hint
-    let interactHint = "";
-    if (!state.gameOver) {
-      const nearby = this.getAdjacentInteractables(state);
-      if (nearby.length > 0) {
-        const target = nearby[0];
-        const name = entityDisplayName(target);
-        interactHint = `<span class="interact-hint"> ▸ [i] ${this.escapeHtml(name)}</span>`;
-      }
-    }
-
-    // Proximity
-    let proximityHtml = "";
-    if (!state.gameOver) {
-      const nearbyEnts = this.getNearbyEntities(state, 3);
-      if (nearbyEnts.length > 0) {
-        const items = nearbyEnts.slice(0, 4).map(n => {
-          const name = entityDisplayName(n.entity);
-          const color = ENTITY_COLORS_CSS[n.entity.type] || "#aaa";
-          return `<span style="color:${color}">${this.escapeHtml(name)}</span> <span class="label">(${n.dist} tile${n.dist > 1 ? "s" : ""} ${n.dir})</span>`;
-        });
-        proximityHtml = `<div class="proximity-bar"><span class="label">NEARBY:</span> ${items.join(" | ")}</div>`;
-      }
-    }
-
-    // Status bar
-    const room = this.getPlayerRoom(state);
-    const zoneTag = room?.zone ? ` <span class="label">[${this.escapeHtml(room.zone)}]</span>` : "";
-    const roomLabel = room
-      ? ` | <span class="value">${this.escapeHtml(room.name)}</span>${zoneTag}`
-      : "";
-
-    const hpPercent = Math.round((state.player.hp / state.player.maxHp) * 100);
-    const hpColor = hpPercent > 60 ? "#0f0" : hpPercent > 30 ? "#fa0" : "#f00";
-    const hpBarWidth = 10;
-    const filledBlocks = Math.round((state.player.hp / state.player.maxHp) * hpBarWidth);
-    const emptyBlocks = hpBarWidth - filledBlocks;
-    const hpBar = "\u2588".repeat(filledBlocks) + "\u2591".repeat(emptyBlocks);
-    const hpCriticalClass = hpPercent <= 25 ? " hp-critical" : "";
-    const hpWarning = hpPercent <= 25 ? " \u26a0 CRITICAL" : hpPercent <= 50 ? " \u26a0" : "";
-    const hpTag = ` | <span class="label">HP:</span><span class="${hpCriticalClass}" style="color:${hpColor}">${hpBar} ${state.player.hp}/${state.player.maxHp}${hpWarning}</span>`;
-
-    // Stun indicator
-    const stunTag = state.player.stunTurns > 0
-      ? ` | <span style="color:#44f; font-weight:bold">\u26a1 STUNNED (${state.player.stunTurns})</span>`
-      : "";
-
-    const unreadCount = state.logs.filter(l => l.read === false).length;
-    const unreadTag = unreadCount > 0
-      ? ` | <span style="color:#ca8">[${unreadCount} UNREAD]</span>`
-      : "";
-
-    // Discovery counter (shared utility)
-    const disc = getDiscoveries(state);
-    const discoveryTag = ` | <span class="label">Discoveries:</span> <span style="color:#ca8">${disc.discovered}/${disc.total}</span>`;
-
-    // Evidence & deduction progress
-    let evidenceTag = "";
-    let deductionTag = "";
-    if (state.mystery) {
-      const jCount = state.mystery.journal.length;
-      if (jCount > 0) {
-        evidenceTag = ` | <span class="label">Evidence:</span> <span style="color:#6cf">${jCount}</span>`;
-      }
-      const deductions = state.mystery.deductions ?? [];
-      const unlocked = getUnlockedDeductions(deductions, state.mystery.journal);
-      if (deductions.length > 0) {
-        const correct = deductions.filter(d => d.answeredCorrectly).length;
-        const solved = deductions.filter(d => d.solved).length;
-        deductionTag = ` | <span class="label">Deductions:</span> <span style="color:#fa0">${correct}/${solved}</span>`;
-        if (unlocked.length > 0) {
-          deductionTag += ` <span style="color:#ff0">[${unlocked.length} NEW]</span>`;
-        }
-      }
-    }
-
-    // Turn warning at 70%+ of max turns
-    const maxTurns = state.maxTurns;
-    const remaining = maxTurns - state.turn;
-    const warnThreshold = Math.floor(maxTurns * 0.70);
-    const turnWarning = state.turn >= warnThreshold
-      ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold">[${remaining} left]</span>`
-      : "";
-
-    const statusHtml = `<div class="status-bar">` +
-      `<span class="label">T:</span><span class="value">${state.turn}</span>${turnWarning}` +
-      roomLabel + sensorTag + stunTag +
-      `<br>` + hpTag.replace(/ \| /, '') +
-      `<br>` + discoveryTag.replace(/ \| /, '') + evidenceTag.replace(/ \| /, '') + deductionTag.replace(/ \| /, '') + unreadTag.replace(/ \| /g, '') +
-      interactHint +
-      `</div>`;
-
-    // Objective Scanner — sensor-gated directional hints
-    let scannerHtml = "";
-    if (!state.gameOver) {
-      const sensors = state.player.sensors ?? [];
-      const hasThermal = sensors.includes(SensorType.Thermal);
-      const hasAtmo = sensors.includes(SensorType.Atmospheric);
-      const spx = state.player.entity.pos.x;
-      const spy = state.player.entity.pos.y;
-      const dirLabel = (dx: number, dy: number): string => {
-        const ns = dy < 0 ? "N" : dy > 0 ? "S" : "";
-        const ew = dx < 0 ? "W" : dx > 0 ? "E" : "";
-        return ns + ew || "here";
-      };
-      const scanTargets: { glyph: string; label: string; dist: number; dir: string; color: string; priority: number }[] = [];
-      for (const [, ent] of state.entities) {
-        const dx = ent.pos.x - spx;
-        const dy = ent.pos.y - spy;
-        const dist = Math.abs(dx) + Math.abs(dy);
-        if (dist < 2) continue;
-        if (hasThermal && ent.type === EntityType.Relay && ent.props["activated"] !== true && ent.props["locked"] !== true) {
-          scanTargets.push({ glyph: "\u26a1", label: "Relay", dist, dir: dirLabel(dx, dy), color: "#fa0", priority: 1 });
-        }
-        if (hasAtmo && ent.type === EntityType.CrewNPC && ent.props["following"] !== true && ent.props["evacuated"] !== true) {
-          scanTargets.push({ glyph: "\ud83d\ude4b", label: "Life Signs", dist, dir: dirLabel(dx, dy), color: "#f0f", priority: 0 });
-        }
-        if (hasAtmo && ent.type === EntityType.Breach && ent.props["sealed"] !== true) {
-          scanTargets.push({ glyph: "\ud83d\udca8", label: "Breach", dist, dir: dirLabel(dx, dy), color: "#4af", priority: 2 });
-        }
-        if (state.mystery?.objectivePhase === ObjectivePhase.Evacuate && ent.type === EntityType.EscapePod && ent.props["powered"] !== true) {
-          scanTargets.push({ glyph: "\u2b21", label: "Pod", dist, dir: dirLabel(dx, dy), color: "#8f8", priority: 0 });
-        }
-      }
-      if (visitedRoomIds && state.rooms.length > 0) {
-        let nearestUnexplored: { name: string; dist: number; dir: string } | null = null;
-        for (const room of state.rooms) {
-          if (visitedRoomIds.has(room.id)) continue;
-          const cx = room.x + Math.floor(room.width / 2);
-          const cy = room.y + Math.floor(room.height / 2);
-          const dx = cx - spx;
-          const dy = cy - spy;
-          const dist = Math.abs(dx) + Math.abs(dy);
-          if (!nearestUnexplored || dist < nearestUnexplored.dist) {
-            nearestUnexplored = { name: room.name, dist, dir: dirLabel(dx, dy) };
-          }
-        }
-        if (nearestUnexplored) {
-          scanTargets.push({ glyph: "?", label: nearestUnexplored.name, dist: nearestUnexplored.dist, dir: nearestUnexplored.dir, color: "#666", priority: 5 });
-        }
-      }
-      scanTargets.sort((a, b) => a.priority - b.priority || a.dist - b.dist);
-      const shown = scanTargets.slice(0, 2);
-      if (shown.length > 0) {
-        const items = shown.map(t =>
-          `<span style="color:${t.color}">${t.glyph} ${this.escapeHtml(t.label)}</span> <span class="label">${t.dist} ${t.dir}</span>`
-        );
-        scannerHtml = `<div style="color:#8ac;font-size:11px;padding:2px 0;border-bottom:1px solid #222">` +
-          `<span style="color:#556;font-weight:bold">SCANNER:</span> ${items.join(" &middot; ")}</div>`;
-      }
-    }
-
-    // Room list
-    const cameraRevealedRoomIds = new Set<string>();
-    for (let ri = 0; ri < state.rooms.length; ri++) {
-      const r = state.rooms[ri];
-      if (visitedRoomIds && visitedRoomIds.has(r.id)) continue;
-      let anyExplored = false;
-      for (let ry = r.y; ry < r.y + r.height && !anyExplored; ry++) {
-        for (let rx = r.x; rx < r.x + r.width && !anyExplored; rx++) {
-          if (rx >= 0 && rx < state.width && ry >= 0 && ry < state.height) {
-            if (state.tiles[ry][rx].explored) anyExplored = true;
-          }
-        }
-      }
-      if (anyExplored) cameraRevealedRoomIds.add(r.id);
-    }
-
-    let roomListHtml = "";
-    if (state.rooms.length > 0 && visitedRoomIds) {
-      const roomItems = state.rooms.map(r => {
-        const visited = visitedRoomIds.has(r.id);
-        const cameraRevealed = cameraRevealedRoomIds.has(r.id);
-        const mark = visited
-          ? `<span style="color:#0f0">\u2713</span>`
-          : cameraRevealed
-            ? `<span style="color:#4af">\u25cb</span>`
-            : `<span class="label">\u00b7</span>`;
-        const label = visited
-          ? `<span style="color:#8b8">${this.escapeHtml(r.name)}</span>`
-          : cameraRevealed
-            ? `<span style="color:#4a8">${this.escapeHtml(r.name)}</span>`
-            : `<span class="label">???</span>`;
-        return `${mark} ${label}`;
-      });
-      const half = Math.ceil(roomItems.length / 2);
-      const col1 = roomItems.slice(0, half);
-      const col2 = roomItems.slice(half);
-      let rows = "";
-      for (let i = 0; i < half; i++) {
-        const left = col1[i] || "";
-        const right = col2[i] || "";
-        rows += `<div class="room-row"><span class="room-col">${left}</span><span class="room-col">${right}</span></div>`;
-      }
-      roomListHtml = `<div class="room-list-panel"><span class="label">STATION MAP:</span>${rows}</div>`;
-    }
-
-    const controlsHtml = `<span class="label">Keys:</span> ` +
-      `<span class="key">WASD</span> move ` +
-      `<span class="key">i</span> interact ` +
-      `<span class="key">t</span> sensor ` +
-      `<span class="key">c</span> clean ` +
-      `<span class="key">l</span> look ` +
-      `<span class="key">F2</span> chase cam ` +
-      `<span class="key">F3</span> toggle 2D/3D ` +
-      `<span class="key">F4</span> outlines ` +
-      `<span class="key">Space</span> wait`;
-
-    const infoHtml = `<div class="info-bar">${controlsHtml}</div>`;
-
-    // Log panel
-    const logEntries = this.logHistory.length > 0
-      ? this.logHistory
-          .map((entry) => {
-            const cls = LOG_TYPE_CLASSES[entry.type] || "log";
-            return `<span class="${cls}"><span class="log-prefix">&gt; </span>${this.escapeHtml(entry.text)}</span>`;
-          })
-          .join("")
-      : '<span class="log log-system">-- awaiting telemetry --</span>';
-
-    const logHtml = `<div class="log-panel">${logEntries}</div>`;
-
-    const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${scannerHtml}${statusHtml}${proximityHtml}${roomListHtml}${infoHtml}</div>`;
-    panel.innerHTML = logHtml + bottomHtml;
-
-    const logPanel = panel.querySelector(".log-panel");
-    if (logPanel) {
-      logPanel.scrollTop = logPanel.scrollHeight;
-    }
-
-    // ── Dynamic legend — entities visible in current room ────────
-    this.renderLegend(state);
+  private getHudEl(id: string): HTMLElement | null {
+    return document.getElementById(id);
   }
 
-  /** Populate the map-legend element with visible entity glyphs */
-  private renderLegend(state: GameState): void {
-    const mapLegendEl = document.getElementById("map-legend");
-    if (!mapLegendEl) return;
+  renderHUD(state: GameState, visitedRoomIds?: Set<string>): void {
+    // Lazy-cache HUD DOM refs
+    if (!this._hudObjective) this._hudObjective = this.getHudEl("hud-objective");
+    if (!this._hudStatus) this._hudStatus = this.getHudEl("hud-status");
+    if (!this._hudScanner) this._hudScanner = this.getHudEl("hud-scanner");
+    if (!this._hudInteract) this._hudInteract = this.getHudEl("hud-interact");
 
-    const currentRoom = this.getPlayerRoom(state);
-    const visibleEntityTypes = new Set<string>();
+    // ── Objective box ───────────────────────────────────────────
+    if (this._hudObjective) {
+      const objective = this.getObjective(state);
+      const phaseLabels: Record<string, { label: string; color: string }> = {
+        [ObjectivePhase.Clean]: { label: "MAINTENANCE", color: "#4a4" },
+        [ObjectivePhase.Investigate]: { label: "INVESTIGATION", color: "#fa0" },
+        [ObjectivePhase.Recover]: { label: "RECOVERY", color: "#f44" },
+        [ObjectivePhase.Evacuate]: { label: "EVACUATION", color: "#f0f" },
+      };
+      const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
+      const phaseInfo = phaseLabels[phase] ?? { label: "UNKNOWN", color: "#888" };
+      this._hudObjective.innerHTML =
+        `<span class="hud-phase" style="color:${phaseInfo.color}">[${phaseInfo.label}]</span> ` +
+        `<span class="hud-obj-text">${this.escapeHtml(objective.text)}</span>` +
+        `<br><span class="hud-obj-detail">${this.escapeHtml(objective.detail)}</span>`;
+    }
 
-    // Entities in current room
-    if (currentRoom) {
-      for (const [, entity] of state.entities) {
-        if (entity.pos.x >= currentRoom.x && entity.pos.x < currentRoom.x + currentRoom.width &&
-            entity.pos.y >= currentRoom.y && entity.pos.y < currentRoom.y + currentRoom.height) {
-          visibleEntityTypes.add(entity.type);
+    // ── Status bar ──────────────────────────────────────────────
+    if (this._hudStatus) {
+      const sensorNames: Record<string, string> = {
+        [SensorType.Thermal]: "THERMAL",
+        [SensorType.Cleanliness]: "CLEANLINESS",
+        [SensorType.Atmospheric]: "ATMOSPHERIC",
+      };
+      const sensorTag = this.sensorMode
+        ? ` <span style="color:#f44;font-weight:bold">[${sensorNames[this.sensorMode] ?? this.sensorMode.toUpperCase()}]</span>`
+        : "";
+
+      const room = this.getPlayerRoom(state);
+      const roomLabel = room
+        ? `<span class="hud-value">${this.escapeHtml(room.name)}</span>`
+        : "";
+
+      const hpPercent = Math.round((state.player.hp / state.player.maxHp) * 100);
+      const hpColor = hpPercent > 60 ? "#0f0" : hpPercent > 30 ? "#fa0" : "#f00";
+      const hpBarWidth = 10;
+      const filledBlocks = Math.round((state.player.hp / state.player.maxHp) * hpBarWidth);
+      const emptyBlocks = hpBarWidth - filledBlocks;
+      const hpBar = "\u2588".repeat(filledBlocks) + "\u2591".repeat(emptyBlocks);
+      const hpCriticalClass = hpPercent <= 25 ? " hp-critical" : "";
+
+      const stunTag = state.player.stunTurns > 0
+        ? ` <span style="color:#44f;font-weight:bold">\u26a1 STUNNED (${state.player.stunTurns})</span>`
+        : "";
+
+      // Turn warning at 70%+ of max turns
+      const maxTurns = state.maxTurns;
+      const remaining = maxTurns - state.turn;
+      const warnThreshold = Math.floor(maxTurns * 0.70);
+      const turnWarning = state.turn >= warnThreshold
+        ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold">[${remaining} left]</span>`
+        : "";
+
+      this._hudStatus.innerHTML =
+        `<span class="hud-hp${hpCriticalClass}" style="color:${hpColor}">${hpBar} ${state.player.hp}/${state.player.maxHp}</span>` +
+        ` <span class="hud-label">T:</span><span class="hud-value">${state.turn}</span>${turnWarning}` +
+        sensorTag + stunTag +
+        (roomLabel ? ` | ${roomLabel}` : "");
+    }
+
+    // ── Interact hint ───────────────────────────────────────────
+    if (this._hudInteract) {
+      if (!state.gameOver) {
+        const nearby = this.getAdjacentInteractables(state);
+        if (nearby.length > 0) {
+          const target = nearby[0];
+          const name = entityDisplayName(target);
+          this._hudInteract.innerHTML = `\u25b8 [Enter] ${this.escapeHtml(name)}`;
+          this._hudInteract.classList.add("visible");
+        } else {
+          this._hudInteract.classList.remove("visible");
         }
+      } else {
+        this._hudInteract.classList.remove("visible");
       }
     }
 
-    // Entities within 3 tiles of the player
-    const px = state.player.entity.pos.x;
-    const py = state.player.entity.pos.y;
-    for (const [, entity] of state.entities) {
-      const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
-      if (dist <= 3) visibleEntityTypes.add(entity.type);
-    }
+    // ── Scanner / legend ────────────────────────────────────────
+    if (this._hudScanner) {
+      const currentRoom = this.getPlayerRoom(state);
+      const visibleEntityTypes = new Set<string>();
 
-    // Legend items: use per-entity-type emoji glyphs matching 2D renderer
-    const allLegendItems: { key: string; color: string; label: string; glyph: string }[] = [
-      { key: EntityType.SensorPickup, color: "#0ff", label: "Sensor", glyph: "\ud83d\udce1" },
-      { key: EntityType.Relay, color: "#ff0", label: "Relay", glyph: "\u26a1" },
-      { key: EntityType.DataCore, color: "#f0f", label: "Data Core", glyph: "\ud83d\udc8e" },
-      { key: EntityType.LogTerminal, color: "#6cf", label: "Terminal", glyph: "\ud83d\udcbb" },
-      { key: EntityType.ServiceBot, color: "#fa0", label: "Service Bot", glyph: "\ud83d\udd0b" },
-      { key: EntityType.CrewItem, color: "#ca8", label: "Crew Item", glyph: "\ud83d\uddc3\ufe0f" },
-      { key: EntityType.Drone, color: "#8a8", label: "Drone", glyph: "\ud83d\udd35" },
-      { key: EntityType.MedKit, color: "#f88", label: "Med Kit", glyph: "\ud83d\udc8a" },
-      { key: EntityType.RepairBot, color: "#fa8", label: "Repair Bot", glyph: "\ud83d\udd27" },
-      { key: EntityType.RepairCradle, color: "#4df", label: "Repair Cradle", glyph: "\u2695\ufe0f" },
-      { key: EntityType.Breach, color: "#f44", label: "Breach", glyph: "\ud83d\udca8" },
-      { key: EntityType.SecurityTerminal, color: "#4af", label: "Security", glyph: "\ud83d\udcf7" },
-      { key: EntityType.PatrolDrone, color: "#f22", label: "Patrol", glyph: "\ud83d\udef8" },
-      { key: EntityType.PressureValve, color: "#4ba", label: "Valve", glyph: "\u2699\ufe0f" },
-      { key: EntityType.FuseBox, color: "#d80", label: "Fuse Box", glyph: "\ud83d\udd0c" },
-      { key: EntityType.PowerCell, color: "#fd4", label: "Power Cell", glyph: "\ud83d\udd0b" },
-      { key: EntityType.EscapePod, color: "#4fa", label: "Escape Pod", glyph: "\ud83d\ude80" },
-      { key: EntityType.CrewNPC, color: "#fe6", label: "Crew", glyph: "\ud83d\ude4b" },
-      { key: EntityType.EvidenceTrace, color: "#ca8", label: "Evidence", glyph: "\ud83d\udc63" },
-      { key: EntityType.Console, color: "#6ac", label: "Console", glyph: "\ud83d\udcbb" },
-      { key: EntityType.ToolPickup, color: "#fa4", label: "Tool", glyph: "\ud83d\udd27" },
-      { key: EntityType.UtilityPickup, color: "#4da", label: "Utility", glyph: "\u2b22" },
-      { key: EntityType.Airlock, color: "#88c", label: "Airlock", glyph: "\u229f" },
-    ];
-
-    const activeLegend = allLegendItems.filter(l => visibleEntityTypes.has(l.key));
-
-    if (activeLegend.length > 0) {
-      mapLegendEl.innerHTML = activeLegend.map(l => {
-        // Check if all entities of this type in the room are exhausted
-        let allExhausted = false;
-        if (currentRoom) {
-          const entitiesOfType: boolean[] = [];
-          for (const [, e] of state.entities) {
-            if (e.type !== l.key) continue;
-            if (e.pos.x < currentRoom.x || e.pos.x >= currentRoom.x + currentRoom.width) continue;
-            if (e.pos.y < currentRoom.y || e.pos.y >= currentRoom.y + currentRoom.height) continue;
-            entitiesOfType.push(isEntityExhausted(e));
+      // Entities in current room
+      if (currentRoom) {
+        for (const [, entity] of state.entities) {
+          if (entity.pos.x >= currentRoom.x && entity.pos.x < currentRoom.x + currentRoom.width &&
+              entity.pos.y >= currentRoom.y && entity.pos.y < currentRoom.y + currentRoom.height) {
+            visibleEntityTypes.add(entity.type);
           }
-          allExhausted = entitiesOfType.length > 0 && entitiesOfType.every(x => x);
         }
-        const color = allExhausted ? "#555" : l.color;
-        const labelStyle = allExhausted ? ' style="color:#555"' : "";
-        return `<span class="legend-item"><span class="legend-glyph" style="color:${color}">${l.glyph}</span><span class="legend-label"${labelStyle}>${l.label}</span></span>`;
-      }).join("");
-    } else {
-      mapLegendEl.innerHTML = `<span class="legend-label">No notable objects nearby.</span>`;
+      }
+      // Entities within 3 tiles of the player
+      const px = state.player.entity.pos.x;
+      const py = state.player.entity.pos.y;
+      for (const [, entity] of state.entities) {
+        const dist = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+        if (dist <= 3) visibleEntityTypes.add(entity.type);
+      }
+
+      // Legend items
+      const allLegendItems: { key: string; color: string; label: string; glyph: string }[] = [
+        { key: EntityType.SensorPickup, color: "#0ff", label: "Sensor", glyph: "\ud83d\udce1" },
+        { key: EntityType.Relay, color: "#ff0", label: "Relay", glyph: "\u26a1" },
+        { key: EntityType.DataCore, color: "#f0f", label: "Data Core", glyph: "\ud83d\udc8e" },
+        { key: EntityType.LogTerminal, color: "#6cf", label: "Terminal", glyph: "\ud83d\udcbb" },
+        { key: EntityType.ServiceBot, color: "#fa0", label: "Service Bot", glyph: "\ud83d\udd0b" },
+        { key: EntityType.CrewItem, color: "#ca8", label: "Crew Item", glyph: "\ud83d\uddc3\ufe0f" },
+        { key: EntityType.Drone, color: "#8a8", label: "Drone", glyph: "\ud83d\udd35" },
+        { key: EntityType.MedKit, color: "#f88", label: "Med Kit", glyph: "\ud83d\udc8a" },
+        { key: EntityType.RepairBot, color: "#fa8", label: "Repair Bot", glyph: "\ud83d\udd27" },
+        { key: EntityType.RepairCradle, color: "#4df", label: "Repair Cradle", glyph: "\u2695\ufe0f" },
+        { key: EntityType.Breach, color: "#f44", label: "Breach", glyph: "\ud83d\udca8" },
+        { key: EntityType.SecurityTerminal, color: "#4af", label: "Security", glyph: "\ud83d\udcf7" },
+        { key: EntityType.PatrolDrone, color: "#f22", label: "Patrol", glyph: "\ud83d\udef8" },
+        { key: EntityType.PressureValve, color: "#4ba", label: "Valve", glyph: "\u2699\ufe0f" },
+        { key: EntityType.FuseBox, color: "#d80", label: "Fuse Box", glyph: "\ud83d\udd0c" },
+        { key: EntityType.PowerCell, color: "#fd4", label: "Power Cell", glyph: "\ud83d\udd0b" },
+        { key: EntityType.EscapePod, color: "#4fa", label: "Escape Pod", glyph: "\ud83d\ude80" },
+        { key: EntityType.CrewNPC, color: "#fe6", label: "Crew", glyph: "\ud83d\ude4b" },
+        { key: EntityType.EvidenceTrace, color: "#ca8", label: "Evidence", glyph: "\ud83d\udc63" },
+        { key: EntityType.Console, color: "#6ac", label: "Console", glyph: "\ud83d\udcbb" },
+        { key: EntityType.ToolPickup, color: "#fa4", label: "Tool", glyph: "\ud83d\udd27" },
+        { key: EntityType.UtilityPickup, color: "#4da", label: "Utility", glyph: "\u2b22" },
+        { key: EntityType.Airlock, color: "#88c", label: "Airlock", glyph: "\u229f" },
+      ];
+
+      const activeLegend = allLegendItems.filter(l => visibleEntityTypes.has(l.key));
+
+      let legendHtml = "";
+      if (activeLegend.length > 0) {
+        legendHtml = activeLegend.map(l => {
+          let allExhausted = false;
+          if (currentRoom) {
+            const entitiesOfType: boolean[] = [];
+            for (const [, e] of state.entities) {
+              if (e.type !== l.key) continue;
+              if (e.pos.x < currentRoom.x || e.pos.x >= currentRoom.x + currentRoom.width) continue;
+              if (e.pos.y < currentRoom.y || e.pos.y >= currentRoom.y + currentRoom.height) continue;
+              entitiesOfType.push(isEntityExhausted(e));
+            }
+            allExhausted = entitiesOfType.length > 0 && entitiesOfType.every(x => x);
+          }
+          const color = allExhausted ? "#555" : l.color;
+          const labelColor = allExhausted ? "#555" : "#999";
+          return `<span class="hud-legend-item"><span class="hud-legend-glyph" style="color:${color}">${l.glyph}</span><span class="hud-legend-label" style="color:${labelColor}">${l.label}</span></span>`;
+        }).join("");
+      }
+
+      // Scanner directional hints
+      let scannerHintHtml = "";
+      if (!state.gameOver) {
+        const sensors = state.player.sensors ?? [];
+        const hasThermal = sensors.includes(SensorType.Thermal);
+        const hasAtmo = sensors.includes(SensorType.Atmospheric);
+        const spx = state.player.entity.pos.x;
+        const spy = state.player.entity.pos.y;
+        const dirLabel = (dx: number, dy: number): string => {
+          const ns = dy < 0 ? "N" : dy > 0 ? "S" : "";
+          const ew = dx < 0 ? "W" : dx > 0 ? "E" : "";
+          return ns + ew || "here";
+        };
+        const scanTargets: { glyph: string; label: string; dist: number; dir: string; color: string; priority: number }[] = [];
+        for (const [, ent] of state.entities) {
+          const dx = ent.pos.x - spx;
+          const dy = ent.pos.y - spy;
+          const dist = Math.abs(dx) + Math.abs(dy);
+          if (dist < 2) continue;
+          if (hasThermal && ent.type === EntityType.Relay && ent.props["activated"] !== true && ent.props["locked"] !== true) {
+            scanTargets.push({ glyph: "\u26a1", label: "Relay", dist, dir: dirLabel(dx, dy), color: "#fa0", priority: 1 });
+          }
+          if (hasAtmo && ent.type === EntityType.CrewNPC && ent.props["following"] !== true && ent.props["evacuated"] !== true) {
+            scanTargets.push({ glyph: "\ud83d\ude4b", label: "Life Signs", dist, dir: dirLabel(dx, dy), color: "#f0f", priority: 0 });
+          }
+          if (hasAtmo && ent.type === EntityType.Breach && ent.props["sealed"] !== true) {
+            scanTargets.push({ glyph: "\ud83d\udca8", label: "Breach", dist, dir: dirLabel(dx, dy), color: "#4af", priority: 2 });
+          }
+          if (state.mystery?.objectivePhase === ObjectivePhase.Evacuate && ent.type === EntityType.EscapePod && ent.props["powered"] !== true) {
+            scanTargets.push({ glyph: "\u2b21", label: "Pod", dist, dir: dirLabel(dx, dy), color: "#8f8", priority: 0 });
+          }
+        }
+        if (visitedRoomIds && state.rooms.length > 0) {
+          let nearestUnexplored: { name: string; dist: number; dir: string } | null = null;
+          for (const room of state.rooms) {
+            if (visitedRoomIds.has(room.id)) continue;
+            const cx = room.x + Math.floor(room.width / 2);
+            const cy = room.y + Math.floor(room.height / 2);
+            const dx = cx - spx;
+            const dy = cy - spy;
+            const dist = Math.abs(dx) + Math.abs(dy);
+            if (!nearestUnexplored || dist < nearestUnexplored.dist) {
+              nearestUnexplored = { name: room.name, dist, dir: dirLabel(dx, dy) };
+            }
+          }
+          if (nearestUnexplored) {
+            scanTargets.push({ glyph: "?", label: nearestUnexplored.name, dist: nearestUnexplored.dist, dir: nearestUnexplored.dir, color: "#666", priority: 5 });
+          }
+        }
+        scanTargets.sort((a, b) => a.priority - b.priority || a.dist - b.dist);
+        const shown = scanTargets.slice(0, 3);
+        if (shown.length > 0) {
+          const items = shown.map(t =>
+            `<span style="color:${t.color}">${t.glyph} ${this.escapeHtml(t.label)}</span> <span style="color:#556">${t.dist} ${t.dir}</span>`
+          );
+          scannerHintHtml = `<div class="hud-scanner-hint"><span style="color:#556;font-weight:bold">SCANNER:</span> ${items.join(" &middot; ")}</div>`;
+        }
+      }
+
+      this._hudScanner.innerHTML = legendHtml + scannerHintHtml;
     }
   }
 
@@ -9099,15 +8989,13 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   private getAspect(): number {
-    const sidebarWidth = 340;
-    const availW = window.innerWidth - sidebarWidth;
+    const availW = window.innerWidth;
     const availH = window.innerHeight;
     return availW / availH;
   }
 
   private handleResize(): void {
-    const sidebarWidth = 340;
-    const availW = window.innerWidth - sidebarWidth;
+    const availW = window.innerWidth;
     const availH = window.innerHeight;
 
     this.renderer.setSize(availW, availH);
@@ -9117,8 +9005,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   private updateCameraFrustum(): void {
-    const sidebarWidth = 340;
-    const availW = window.innerWidth - sidebarWidth;
+    const availW = window.innerWidth;
     const availH = window.innerHeight;
     const aspect = availW / availH;
 

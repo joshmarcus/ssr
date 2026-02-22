@@ -14,15 +14,13 @@
       height: 100vh;
     }
     #game-container {
-      display: flex;
-      flex-direction: row;
       height: 100vh;
       width: 100%;
+      position: relative;
     }
     #map-column {
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
+      width: 100%;
+      height: 100%;
     }
     #rot-display {
       display: flex;
@@ -31,146 +29,22 @@
       position: relative;
       flex-shrink: 0;
     }
-    #map-legend {
-      font-family: monospace;
-      font-size: 16px;
-      color: #888;
-      background: #0c0c0c;
-      padding: 8px 14px;
-      border-top: 1px solid #222;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px 16px;
-      max-width: 100%;
-    }
-    #map-legend .legend-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      white-space: nowrap;
-    }
-    #map-legend .legend-glyph {
-      font-size: 20px;
-      font-weight: bold;
-    }
-    #map-legend .legend-label {
-      color: #666;
-      font-size: 15px;
-    }
     #rot-display canvas {
       display: block;
     }
-    #ui-panel {
-      font-family: monospace;
-      font-size: 13px;
-      color: #aaa;
-      background: #0e0e0e;
-      border-right: 1px solid #222;
-      padding: 0;
-      flex: 1;
-      min-width: 320px;
-      max-width: 420px;
-      overflow: hidden;
-      height: 100vh;
-      line-height: 1.5;
-      display: flex;
-      flex-direction: column;
-    }
-    #ui-panel .ui-bottom {
-      flex-shrink: 0;
-      padding: 8px 12px 4px;
-      overflow: hidden;
-    }
-    #ui-panel .label { color: #555; }
-    #ui-panel .value { color: #0f0; }
-    #ui-panel .log { font-style: italic; }
-    #ui-panel .log-system { color: #888; }
-    #ui-panel .log-narrative { color: #0ff; font-style: normal; border-left: 2px solid #088; padding-left: 6px; display: inline-block; margin: 1px 0; }
-    #ui-panel .log-warning { color: #fa0; }
-    #ui-panel .log-critical { color: #f44; font-weight: bold; animation: pulse-red 1s ease-in-out 3; }
-    #ui-panel .log-milestone { color: #0f0; font-weight: bold; font-style: normal; text-shadow: 0 0 8px rgba(0,255,0,0.4); }
-    #ui-panel .log-sensor { color: #6cf; }
-    #ui-panel .thermal-active { color: #f44; font-weight: bold; }
-    #ui-panel .interact-hint { color: #fa0; font-weight: bold; }
+    /* ── Global log type classes (for log review overlay) ─── */
+    .log { font-style: italic; }
+    .log-system { color: #888; }
+    .log-narrative { color: #0ff; font-style: normal; border-left: 2px solid #088; padding-left: 6px; display: inline-block; margin: 1px 0; }
+    .log-warning { color: #fa0; }
+    .log-critical { color: #f44; font-weight: bold; animation: pulse-red 1s ease-in-out 3; }
+    .log-milestone { color: #0f0; font-weight: bold; font-style: normal; text-shadow: 0 0 8px rgba(0,255,0,0.4); }
+    .log-sensor { color: #6cf; }
+    .log-prefix { color: #444; user-select: none; }
 
     @keyframes pulse-red {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
-    }
-
-    #ui-panel .objective-panel {
-      padding: 4px 0 6px;
-      border-bottom: 1px solid #222;
-      margin-bottom: 4px;
-    }
-    #ui-panel .objective-label { color: #fa0; font-weight: bold; }
-    #ui-panel .objective-text { color: #fff; font-weight: bold; }
-    #ui-panel .objective-detail { color: #888; font-size: 12px; }
-
-    #ui-panel .status-bar { margin-bottom: 2px; }
-
-    #ui-panel .info-bar {
-      font-size: 12px;
-      color: #666;
-      padding: 2px 0 4px;
-      border-bottom: 1px solid #222;
-    }
-    #ui-panel .legend-glyph { font-weight: bold; margin-left: 4px; }
-    #ui-panel .legend-name { color: #777; margin-right: 2px; }
-    #ui-panel .key {
-      background: #222;
-      color: #aaa;
-      padding: 0 3px;
-      border: 1px solid #444;
-      border-radius: 2px;
-      font-size: 11px;
-    }
-
-    #ui-panel .proximity-bar {
-      color: #888;
-      font-size: 12px;
-      padding: 2px 0;
-      border-bottom: 1px solid #1a1a1a;
-    }
-
-    #ui-panel .room-list-panel {
-      font-size: 11px;
-      padding: 3px 0;
-      border-bottom: 1px solid #222;
-    }
-    #ui-panel .room-row {
-      display: flex;
-    }
-    #ui-panel .room-col {
-      flex: 1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      padding-right: 8px;
-    }
-
-    #ui-panel .log-panel {
-      flex: 1;
-      padding: 4px 12px;
-      border-bottom: 1px solid #333;
-      overflow-y: auto;
-      min-height: 0;
-    }
-    #ui-panel .log-prefix { color: #444; user-select: none; }
-    #ui-panel .log-panel > span { display: block; padding: 2px 0; border-bottom: 1px solid #333; }
-
-    /* ── Sidebar section headers ────────────────────────── */
-    #ui-panel .sidebar-section {
-      margin-bottom: 6px;
-    }
-    #ui-panel .sidebar-hp {
-      margin: 4px 0;
-    }
-    #ui-panel .sidebar-stats {
-      font-size: 12px;
-      color: #888;
-      padding: 2px 0;
-      border-bottom: 1px solid #222;
     }
 
     /* ── 3D mode: disable CRT barrel distortion + enhance UI ──────── */
@@ -181,42 +55,9 @@
     .mode-3d #rot-display {
       perspective: none;
     }
-    .mode-3d #ui-panel {
-      background: rgba(8, 10, 16, 0.88);
-      border-right: 1px solid rgba(68, 255, 136, 0.15);
-      backdrop-filter: blur(8px);
-    }
-    .mode-3d #ui-panel .label {
-      color: #5a7a6a;
-    }
-    .mode-3d #ui-panel .value {
-      color: #44ff88;
-      text-shadow: 0 0 6px rgba(68, 255, 136, 0.3);
-    }
-    .mode-3d #ui-panel .objective-label {
-      color: #44ff88;
-      text-shadow: 0 0 8px rgba(68, 255, 136, 0.4);
-    }
-    .mode-3d #ui-panel .objective-panel {
-      border-color: rgba(68, 255, 136, 0.2);
-      background: rgba(0, 20, 10, 0.3);
-    }
-    .mode-3d #ui-panel .log-milestone {
-      text-shadow: 0 0 12px rgba(0, 255, 0, 0.6);
-    }
-    .mode-3d #ui-panel .log-narrative {
-      border-left-color: rgba(0, 255, 200, 0.3);
-    }
-    .mode-3d #ui-panel .room-list-panel {
-      border-color: rgba(68, 255, 136, 0.1);
-    }
-    .mode-3d #ui-panel .sidebar-stats {
-      border-bottom-color: rgba(68, 255, 136, 0.08);
-    }
-    /* Hub-open dimming: sidebar + minimap fade when Investigation Hub is open */
-    .hub-open #ui-panel { opacity: 0.3; transition: opacity 0.3s ease; }
+    /* Hub-open dimming: HUD + minimap fade when Investigation Hub is open */
+    .hub-open #hud-objective, .hub-open #hud-status, .hub-open #hud-scanner { opacity: 0.2; transition: opacity 0.3s ease; }
     .hub-open #minimap-canvas { opacity: 0.3; transition: opacity 0.3s ease; }
-    #ui-panel { transition: opacity 0.3s ease; }
     /* 3D minimap overlay */
     .mode-3d #minimap-canvas {
       position: absolute;
@@ -418,8 +259,7 @@
       text-align: center;
     }
 
-    /* ── Narrative log highlight ────────────────────────── */
-    #ui-panel .log-narrative-terminal {
+    .log-narrative-terminal {
       color: #4ec9b0;
       font-style: normal;
       border-left: 3px solid #2a7a6a;
@@ -429,6 +269,91 @@
       background: rgba(42, 122, 106, 0.08);
       line-height: 1.5;
     }
+
+    /* ── HUD overlays (3D mode) ─────────────────────────── */
+    #hud-objective, #hud-status, #hud-scanner, #hud-interact {
+      position: fixed;
+      pointer-events: none;
+      z-index: 10;
+      font-family: monospace;
+      font-size: 13px;
+      color: #ccc;
+      background: rgba(8, 10, 16, 0.7);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1px solid rgba(68, 255, 136, 0.15);
+      border-radius: 4px;
+      padding: 6px 10px;
+      transition: opacity 0.3s ease;
+    }
+    #hud-objective {
+      top: 12px;
+      left: 12px;
+      max-width: 360px;
+      line-height: 1.4;
+    }
+    #hud-objective .hud-phase {
+      font-weight: bold;
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+    #hud-objective .hud-obj-text {
+      color: #fff;
+      font-weight: bold;
+    }
+    #hud-objective .hud-obj-detail {
+      color: #888;
+      font-size: 12px;
+    }
+    #hud-status {
+      bottom: 12px;
+      left: 12px;
+      max-width: 420px;
+      line-height: 1.5;
+    }
+    #hud-status .hud-label { color: #5a7a6a; }
+    #hud-status .hud-value { color: #44ff88; text-shadow: 0 0 6px rgba(68, 255, 136, 0.3); }
+    #hud-status .hud-hp { font-weight: bold; }
+    #hud-scanner {
+      bottom: 72px;
+      left: 12px;
+      max-width: 420px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    #hud-scanner .hud-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+    #hud-scanner .hud-legend-glyph {
+      font-size: 14px;
+    }
+    #hud-scanner .hud-legend-label {
+      font-size: 11px;
+    }
+    #hud-scanner .hud-scanner-hint {
+      font-size: 11px;
+      color: #8ac;
+      border-top: 1px solid rgba(68, 255, 136, 0.1);
+      margin-top: 4px;
+      padding-top: 3px;
+    }
+    #hud-scanner:empty { display: none; }
+    #hud-interact {
+      bottom: 100px;
+      right: 16px;
+      font-size: 15px;
+      font-weight: bold;
+      color: #fa0;
+      background: rgba(8, 10, 16, 0.8);
+      border-color: rgba(255, 170, 0, 0.2);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    #hud-interact.visible { opacity: 1; }
 
     /* ── Opening crawl overlay ─────────────────────────── */
     #crawl-overlay {
@@ -910,11 +835,13 @@
   <div id="broadcast-overlay"></div>
   <div id="journal-overlay"></div>
   <div id="crawl-overlay"></div>
+  <div id="hud-objective"></div>
+  <div id="hud-status"></div>
+  <div id="hud-scanner"></div>
+  <div id="hud-interact"></div>
   <div id="game-container">
-    <div id="ui-panel"></div>
     <div id="map-column">
       <div id="rot-display"><canvas id="minimap-canvas" width="200" height="200" style="display:none"></canvas><canvas id="compass-canvas" width="60" height="60" style="display:none"></canvas></div>
-      <div id="map-legend"></div>
     </div>
   </div>
   <script type="module" src="./browser.ts"></script>
