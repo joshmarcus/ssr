@@ -3788,7 +3788,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._headlightSpot.rotation.z = -facing; // align elongation with facing
       const spotMat = this._headlightSpot.material as THREE.MeshBasicMaterial;
       const inRoom = this._currentRoom !== null;
-      const targetOpacity = (inRoom ? 0.03 : 0.08) * this._headlightFlickerRatio;
+      const targetOpacity = (inRoom ? 0.06 : 0.12) * this._headlightFlickerRatio;
       spotMat.opacity += (targetOpacity - spotMat.opacity) * 0.1;
       // Match headlight color
       if (this.headlight) spotMat.color.copy(this.headlight.color);
@@ -8224,7 +8224,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     const coneMat = new THREE.MeshBasicMaterial({
       color: 0xeeffff,
       transparent: true,
-      opacity: 0.03,
+      opacity: 0.04,
       side: THREE.DoubleSide,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
@@ -8236,14 +8236,14 @@ export class BrowserDisplay3D implements IGameDisplay {
     group.add(coneMesh);
 
     // Headlight ground spot: elliptical glow on floor ahead of Sweepo
-    const spotGeo = new THREE.CircleGeometry(0.6, 16);
+    const spotGeo = new THREE.CircleGeometry(0.8, 16);
     const spotMat = new THREE.MeshBasicMaterial({
-      color: 0xeeffff, transparent: true, opacity: 0.06,
+      color: 0xeeffff, transparent: true, opacity: 0.10,
       depthWrite: false, blending: THREE.AdditiveBlending,
     });
     this._headlightSpot = new THREE.Mesh(spotGeo, spotMat);
     this._headlightSpot.rotation.x = -Math.PI / 2;
-    this._headlightSpot.scale.set(0.8, 1.4, 1); // elongated ellipse
+    this._headlightSpot.scale.set(1.0, 1.8, 1); // larger elongated ellipse for dramatic floor pool
     this._headlightSpot.renderOrder = 1;
     this.scene.add(this._headlightSpot);
 
