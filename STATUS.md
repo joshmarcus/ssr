@@ -93,7 +93,7 @@
 - Signal interference: first 3 turns suppress scan on SignalAnomaly with static-burst opening
 - "What We Know" confidence indicator with descriptive labels and new evidence badge
 - Resilient save loading: validates state structure, auto-deletes corrupt saves, graceful fallback to new game
-- **3D mode** (default, toggle F3): Full Three.js renderer with Synty POLYGON Sci-Fi Space + synty-gltf + kenney-space + Characters + Items + quaternius models, room decorations, entity animations, atmospheric particles, room lighting, movement trail, nebula backdrop, chase cam (F2)
+- **3D mode** (default, toggle F3): Full Three.js renderer with Synty POLYGON Sci-Fi Space + synty-gltf + kenney-space + Characters + Items + quaternius models, room decorations, entity animations, atmospheric particles, room lighting, movement trail, nebula backdrop, chase cam (default, F2 toggle), F4 outline toggle, InstancedMesh trim + strip lights, distance culling
 - **Screenshot tool** (`npm run screenshot`): Playwright-based headless Chromium captures for visual inspection of game state — supports `--seed`, `--turns`, `--overlay`, `--out` flags
 - **Spatial investigation**: Evidence access requires puzzle solving, sensors, and urgency:
   - Puzzle-gated terminals: 3 log terminals offline until relay milestones (first_relay, all_relays)
@@ -186,6 +186,10 @@
 - **Sprint V24 — Model library integration**: Massively expanded decorations with synty-gltf models (200+ industrial props), expanded wall props per room type (cameras, valves, lockers, ventilation), expanded corridor wall models. Console entity uses Bridge Console model at 1.8x scale (spans ~2-3 cells). **3rd-person chase cam** (F2 toggle). Closer zoom (frustum min 1.5). Sweepo flipped 180°. Ceiling lights removed
 - **Sprint V25 — Entity model upgrades**: PatrolDrone=Enemy_Flying, CrewNPC=Astronaut, Airlock=kenney gate-door, ToolPickup=Pickup_Crate, UtilityPickup=Pickup_Thunder, MedKit=Pickup_Health, RepairBot=quaternius Robot. Checkerboard floor pattern
 - **Sprint V26 — Chase cam polish**: Smooth cinematic chase cam with lerped position/look-at, position initialization on toggle. Dust particles increased to 120
+- **Sprint V27 — Corridor arches**: Synty corridor arch GLTF model with procedural fallback, kenney cables added to corridor wall props, model variety expansion
+- **Sprint V28 — Head-bob**: Subtle vertical camera oscillation during movement in chase cam mode
+- **Sprint V29 — Distance culling**: Per-room sub-groups for trim/decorations/ceiling, spatial bucket groups for corridor elements, manhattan distance culling (12 tiles), chase cam now default, F4 outline toggle
+- **Sprint V30 — InstancedMesh optimization**: Room trim (baseboard, edge glow, top rail) converted to 3 InstancedMesh with per-instance color (~900 meshes → 3 draw calls). Corridor strip lights converted to 2 InstancedMesh (~300 meshes → 2 draw calls). Combined with distance culling, ~60-70% total draw call reduction
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
