@@ -272,6 +272,7 @@
 - **Sprint V110 — Animate remaining static entities**: PressureValve (slow wheel rotation + pressure-reactive red glow when critical), RepairCradle (oscillating arm clamp + subtle green hum), ClosedDoor (proximity tremor jitter), Airlock (proximity teal glow pulse). All 4 previously-static entity types now animated
 - **Sprint V111 — PowerCell/FuseBox spark particles**: 4 yellow-white sprites shoot outward during electrical spark phase (brief burst every ~4s). Reuses discovery sparkle pool with short lifetimes (0.2-0.4s). One-shot flag prevents multi-frame spawning
 - **Sprint V112 — SecurityTerminal surveillance lens**: Lens (child 2) tracks player when within 5 tiles with smooth rotation. Pulse rate increases on proximity (1.5Hz idle → 3Hz close). Color shifts red→deeper red. Idle sweep oscillation when no player nearby. Camera "watches you" personality
+- **Sprint V113 — Sweepo emotion eye**: Eye blinks every ~4s (Y-scale squish to 20%), squints when HP critical, widens on interaction (triggered from flashTile, decays over 0.5s). Gives Sweepo expressive personality beyond color changes
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

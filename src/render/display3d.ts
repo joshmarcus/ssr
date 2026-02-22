@@ -616,6 +616,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Pipe steam leak sprites (small puffs from corridor pipes)
   private _pipeLeakSprites: THREE.Sprite[] = [];
   private _pipeLeakTimer: number = 0;
+  // Sweepo eye emotion: widen timer on discovery/interaction
+  private _eyeWidenTimer: number = 0;
   // DataCore holographic ring
   private _dataCoreHoloRing: THREE.Mesh | null = null;
   // Discovery sparkle: rooms visited this session for first-entry effects
@@ -1229,6 +1231,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   flashTile(x: number, y: number, _color?: string): void {
+    // Sweepo eye widen on interaction
+    this._eyeWidenTimer = 0.5;
     // 3D interaction flash: expanding ring + particle burst
     // Determine ring color from entity at this position (if any)
     let flashColor = 0x44ff88; // default green
@@ -2088,7 +2092,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (stunOverlay) stunOverlay.style.display = "none";
       }
 
-      // Eye glow: state-reactive color + gentle pulse (child 5)
+      // Eye glow: state-reactive color + gentle pulse + emotion (child 5)
       const sweepoEye = this.playerMesh.children[5];
       if (sweepoEye instanceof THREE.Mesh) {
         const eyeMat = sweepoEye.material as THREE.MeshBasicMaterial;
@@ -2106,6 +2110,14 @@ export class BrowserDisplay3D implements IGameDisplay {
           eyeMat.color.setHex(0x44ff88); // green when healthy
           eyeMat.opacity = pulse;
         }
+        // Eye blink: periodic squint (scale Y down briefly)
+        const blinkCycle = (elapsed + 1.7) % 4.0; // blink every ~4s
+        const blinkT = blinkCycle < 0.12 ? 1 - blinkCycle / 0.06 : blinkCycle < 0.24 ? (blinkCycle - 0.12) / 0.06 - 1 : 0;
+        const blinkScale = 1 - Math.max(0, blinkT) * 0.8; // squish to 20% height at peak
+        // Emotion: widen on discovery (flash tile boost), squint when damaged
+        const emotionScale = this._playerHpPercent < 0.4 ? 0.7 : this._eyeWidenTimer > 0 ? 1.3 : 1.0;
+        sweepoEye.scale.set(emotionScale, blinkScale * emotionScale, emotionScale);
+        if (this._eyeWidenTimer > 0) this._eyeWidenTimer -= delta;
       }
 
       // Antenna signal pulse: tip glows when near unexhausted interactive entities (child 3)
