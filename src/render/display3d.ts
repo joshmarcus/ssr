@@ -2705,9 +2705,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         // Context-aware camera: wider/higher in rooms, tighter/lower in corridors
         const inRoom = this.lastRoomId !== "";
-        const chaseDist = inRoom ? 2.8 : 2.0;        // further back in rooms, closer in corridors
-        const chaseHeight = inRoom ? 1.0 : 0.65;     // lower for more forward view, less ceiling
-        const lookDist = inRoom ? 2.5 : 1.8;          // look further ahead in rooms
+        const chaseDist = inRoom ? 2.5 : 1.8;        // closer to player for more immersive view
+        const chaseHeight = inRoom ? 0.85 : 0.50;    // lower for ground-level immersion
+        const lookDist = inRoom ? 2.8 : 2.0;          // look further ahead for forward-looking angle
 
         // Target positions
         let targetCamX = this.playerCurrentX - Math.sin(facing) * chaseDist;
@@ -2757,7 +2757,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.chaseCamera.updateProjectionMatrix();
 
         // Look-at height: raised for more forward-looking camera angle
-        const lookY = inRoom ? 0.5 : 0.25;
+        const lookY = inRoom ? 0.4 : 0.2; // slightly lower to look more forward, less up
 
         // Idle lateral sway for subtle breathing camera
         const idleSwayX = isIdle ? Math.sin(elapsed * 0.5) * 0.04 : 0;
