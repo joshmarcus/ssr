@@ -225,6 +225,7 @@
 - **Sprint V63 — Door hiss particles**: 6 steam/air particles spawn on door seam when opening, drift outward, fade over 0.6s
 - **Sprint V64 — Chromatic aberration**: Red/blue RGB fringe on damage (0.3s) and stun (0.5s), CSS box-shadow overlay with mix-blend-mode
 - **Sprint V65 — Entity motion detail + room exit**: Drone/PatrolDrone propeller spin, RepairBot arm swing, ServiceBot head swivel, MedKit heartbeat cross pulse, room→corridor exit darkness pulse with FOV tighten
+- **Sprint V66 — Entity awareness**: CrewNPC faces player within 4 tiles, Drone eye tracks player, Console/Terminal screens brighten on approach, RepairBot extends arm + faces player, ServiceBot head-tracks player
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

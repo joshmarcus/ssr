@@ -1974,18 +1974,45 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Spin propeller ring (child index 1 = torus ring)
         const propRing = mesh.children[1];
         if (propRing) propRing.rotation.z = elapsed * 12;
+        // Eye tracks player direction (child index 2 = eye sphere)
+        const droneEye = mesh.children[2];
+        if (droneEye) {
+          const edx = this.playerCurrentX - mesh.position.x;
+          const edz = this.playerCurrentZ - mesh.position.z;
+          const eDist = Math.sqrt(edx * edx + edz * edz);
+          if (eDist < 5 && eDist > 0.1) {
+            droneEye.position.x = (edx / eDist) * 0.08;
+            droneEye.position.z = (edz / eDist) * 0.08;
+          }
+        }
       } else if (userData.entityType === EntityType.EscapePod) {
         // Slow pulsing glow
         const podScale = 1 + Math.sin(elapsed * 1.2) * 0.04;
         mesh.scale.set(podScale, podScale, podScale);
       } else if (userData.entityType === EntityType.CrewNPC) {
-        // Subtle idle sway
-        mesh.rotation.y = Math.sin(elapsed * 0.8 + mesh.position.x * 2) * 0.15;
+        // Face player when nearby, idle sway when far
+        const cdx = this.playerCurrentX - mesh.position.x;
+        const cdz = this.playerCurrentZ - mesh.position.z;
+        const crewDist = Math.abs(cdx) + Math.abs(cdz);
+        if (crewDist < 4 && this.chaseCamActive) {
+          // Turn to face player
+          const faceAngle = -Math.atan2(cdz, cdx) + Math.PI / 2;
+          let crewDiff = faceAngle - mesh.rotation.y;
+          while (crewDiff > Math.PI) crewDiff -= Math.PI * 2;
+          while (crewDiff < -Math.PI) crewDiff += Math.PI * 2;
+          mesh.rotation.y += crewDiff * 0.08; // smooth turn toward player
+        } else {
+          mesh.rotation.y = Math.sin(elapsed * 0.8 + mesh.position.x * 2) * 0.15;
+        }
       } else if (userData.entityType === EntityType.Console) {
-        // Screen flicker: subtle Y-scale jitter on the group
+        // Screen flicker + proximity brighten
+        const conDx = this.playerCurrentX - mesh.position.x;
+        const conDz = this.playerCurrentZ - mesh.position.z;
+        const conDist = Math.sqrt(conDx * conDx + conDz * conDz);
+        const proximityBoost = conDist < 2 ? 0.4 : conDist < 4 ? 0.15 : 0;
         mesh.children.forEach(child => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
-            child.material.opacity = 0.2 + Math.sin(elapsed * 8 + mesh.position.x) * 0.15;
+            child.material.opacity = 0.2 + proximityBoost + Math.sin(elapsed * 8 + mesh.position.x) * 0.15;
           }
         });
       } else if (userData.entityType === EntityType.UtilityPickup) {
@@ -2014,10 +2041,14 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
       } else if (userData.entityType === EntityType.LogTerminal || userData.entityType === EntityType.SecurityTerminal) {
-        // Subtle screen glow flicker via emissive
+        // Screen glow flicker + proximity activation
+        const termDx = this.playerCurrentX - mesh.position.x;
+        const termDz = this.playerCurrentZ - mesh.position.z;
+        const termDist = Math.sqrt(termDx * termDx + termDz * termDz);
+        const termBoost = termDist < 2 ? 0.35 : termDist < 3.5 ? 0.15 : 0;
         mesh.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-            child.material.emissiveIntensity = 0.15 + Math.sin(elapsed * 4 + mesh.position.x * 2) * 0.1;
+            child.material.emissiveIntensity = 0.15 + termBoost + Math.sin(elapsed * 4 + mesh.position.x * 2) * 0.1;
           }
         });
       } else if (userData.entityType === EntityType.PowerCell || userData.entityType === EntityType.FuseBox) {
@@ -2039,17 +2070,49 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else if (userData.entityType === EntityType.RepairBot) {
         // Hover and wobble
         mesh.position.y = 0.4 + Math.sin(elapsed * 1.8 + mesh.position.z) * 0.06;
-        mesh.rotation.y = Math.sin(elapsed * 0.5) * 0.2;
-        // Arm swing — mechanical idle (child index 1 = arm)
-        const arm = mesh.children[1];
-        if (arm) arm.rotation.z = -0.4 + Math.sin(elapsed * 1.2 + mesh.position.x) * 0.2;
+        const rbDx = this.playerCurrentX - mesh.position.x;
+        const rbDz = this.playerCurrentZ - mesh.position.z;
+        const rbDist = Math.abs(rbDx) + Math.abs(rbDz);
+        if (rbDist < 3 && this.chaseCamActive) {
+          // Face player and extend arm (repair gesture)
+          const rbAngle = -Math.atan2(rbDz, rbDx) + Math.PI / 2;
+          let rbDiff = rbAngle - mesh.rotation.y;
+          while (rbDiff > Math.PI) rbDiff -= Math.PI * 2;
+          while (rbDiff < -Math.PI) rbDiff += Math.PI * 2;
+          mesh.rotation.y += rbDiff * 0.06;
+          const arm = mesh.children[1];
+          if (arm) arm.rotation.z = -0.6 + Math.sin(elapsed * 2) * 0.1; // extended
+        } else {
+          mesh.rotation.y = Math.sin(elapsed * 0.5) * 0.2;
+          const arm = mesh.children[1];
+          if (arm) arm.rotation.z = -0.4 + Math.sin(elapsed * 1.2 + mesh.position.x) * 0.2;
+        }
       } else if (userData.entityType === EntityType.ServiceBot) {
-        // Hover and wobble with head swivel
+        // Hover and wobble
         mesh.position.y = 0.4 + Math.sin(elapsed * 1.8 + mesh.position.z) * 0.06;
-        mesh.rotation.y = Math.sin(elapsed * 0.5) * 0.2;
-        // Head swivel — scanning left/right (child index 1 = head)
-        const head = mesh.children[1];
-        if (head) head.rotation.y = Math.sin(elapsed * 0.7 + mesh.position.z * 3) * 0.4;
+        const sbDx = this.playerCurrentX - mesh.position.x;
+        const sbDz = this.playerCurrentZ - mesh.position.z;
+        const sbDist = Math.abs(sbDx) + Math.abs(sbDz);
+        if (sbDist < 4 && this.chaseCamActive) {
+          // Turn body toward player
+          const sbAngle = -Math.atan2(sbDz, sbDx) + Math.PI / 2;
+          let sbDiff = sbAngle - mesh.rotation.y;
+          while (sbDiff > Math.PI) sbDiff -= Math.PI * 2;
+          while (sbDiff < -Math.PI) sbDiff += Math.PI * 2;
+          mesh.rotation.y += sbDiff * 0.05;
+          // Head tracks player more eagerly
+          const head = mesh.children[1];
+          if (head) {
+            let headDiff = sbAngle - (mesh.rotation.y + (head.rotation.y || 0));
+            while (headDiff > Math.PI) headDiff -= Math.PI * 2;
+            while (headDiff < -Math.PI) headDiff += Math.PI * 2;
+            head.rotation.y += headDiff * 0.1;
+          }
+        } else {
+          mesh.rotation.y = Math.sin(elapsed * 0.5) * 0.2;
+          const head = mesh.children[1];
+          if (head) head.rotation.y = Math.sin(elapsed * 0.7 + mesh.position.z * 3) * 0.4;
+        }
       } else if (userData.entityType === EntityType.PatrolDrone) {
         // Patrol sweep motion + propeller spin
         mesh.position.y = 0.7 + Math.sin(elapsed * 2.5) * 0.1;
