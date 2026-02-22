@@ -1742,9 +1742,18 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (Math.abs(this.playerTargetX - this.playerCurrentX) < 0.01) this.playerCurrentX = this.playerTargetX;
       if (Math.abs(this.playerTargetZ - this.playerCurrentZ) < 0.01) this.playerCurrentZ = this.playerTargetZ;
 
+      // Movement velocity for animation
+      const velX = this.playerTargetX - this.playerCurrentX;
+      const velZ = this.playerTargetZ - this.playerCurrentZ;
+      const speed = Math.sqrt(velX * velX + velZ * velZ);
+      const isMoving = speed > 0.05;
+
       this.playerMesh.position.x = this.playerCurrentX;
       this.playerMesh.position.z = this.playerCurrentZ;
-      this.playerMesh.position.y = 0.02 + Math.sin(elapsed * 2) * 0.01; // Sweepo rides on the floor
+      // Floor-level with subtle breathing + bounce on arrival
+      const breathe = Math.sin(elapsed * 2) * 0.01;
+      const moveBob = isMoving ? Math.abs(Math.sin(elapsed * 8)) * 0.015 : 0;
+      this.playerMesh.position.y = 0.02 + breathe + moveBob;
 
       // Smooth rotation towards facing direction
       let targetRot = this.playerFacing;
@@ -1754,6 +1763,15 @@ export class BrowserDisplay3D implements IGameDisplay {
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       this.playerMesh.rotation.y += diff * Math.min(1, 10 * delta);
+
+      // Movement tilt: lean forward when moving, sideways when turning
+      const forwardTilt = isMoving ? -0.08 : 0; // slight forward lean
+      const turnLean = diff * -0.15; // lean into turns
+      const targetTiltX = forwardTilt;
+      const targetTiltZ = Math.max(-0.12, Math.min(0.12, turnLean));
+      // Smooth tilt
+      this.playerMesh.rotation.x += (targetTiltX - this.playerMesh.rotation.x) * 0.15;
+      this.playerMesh.rotation.z += (targetTiltZ - this.playerMesh.rotation.z) * 0.15;
 
       // Smoothly move camera and light to follow
       this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
