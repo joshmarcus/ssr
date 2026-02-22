@@ -207,6 +207,8 @@
 - **Sprint V45 — Interaction particle burst + dual scan wave**: 10-particle burst with gravity on interaction, dual-ring scan wave with trailing ring + vertical column flash
 - **Sprint V46 — Door unlock effects**: Dynamic door light updates (red→green on unlock), green energy column + ring + 6 sparks on door unlock, fixes red-stays-red bug
 - **Sprint V47 — Entity exhaustion dimming**: Exhausted entities dim to 50% color, 0 emissive, 70% opacity for clear "already done" visual feedback
+- **Sprint V48 — Relay power visualization**: Activated relays spin 3x faster with yellow glow, curved energy lines between activated relays, sealed breaches dim to muted green
+- **Sprint V49 — Ambient station life**: Edge glow pulse, room light generator hum, relay power line opacity pulse, starfield breathing + rotation
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
