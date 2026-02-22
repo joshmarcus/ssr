@@ -3082,7 +3082,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Door light animations: locked doors pulse red, distance-based visibility
+    // Door light animations: locked doors pulse red, unlocked brighten on approach
     for (const [key, light] of this.doorLights) {
       // Parse position from key "door_x,y"
       const parts = key.replace("door_", "").split(",");
@@ -3090,7 +3090,12 @@ export class BrowserDisplay3D implements IGameDisplay {
       const dist = Math.abs(this.playerCurrentX - dx) + Math.abs(this.playerCurrentZ - dy);
       light.visible = dist <= BrowserDisplay3D.CORRIDOR_VIEW_RANGE + 3;
       if (light.color.getHex() === 0xff3333) {
+        // Locked: pulsing red warning
         light.intensity = 0.3 + Math.sin(elapsed * 2) * 0.3;
+      } else {
+        // Unlocked: brightens as player approaches (motion sensor effect)
+        const proximityBoost = dist < 2 ? 0.8 : dist < 4 ? 0.3 : 0;
+        light.intensity = 0.4 + proximityBoost + Math.sin(elapsed * 1.5) * 0.05;
       }
     }
 
