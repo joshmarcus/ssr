@@ -1275,6 +1275,41 @@ function renderAll(): void {
   display.updateRoomFlash(state);
   display.render(state);
   display.renderHUD(state, visitedRoomIds);
+
+  // Update investigation aura: pass evidence room data to 3D renderer
+  if (state.mystery && (display as any).setInvestigationRooms) {
+    const journal = state.mystery.journal;
+    const investigationRooms = new Map<string, { evidenceCount: number; fullyInvestigated: boolean }>();
+    for (const entry of journal) {
+      const existing = investigationRooms.get(entry.roomFound);
+      if (existing) {
+        existing.evidenceCount++;
+      } else {
+        investigationRooms.set(entry.roomFound, { evidenceCount: 1, fullyInvestigated: false });
+      }
+    }
+    // Mark rooms as fully investigated if all evidence entities in the room are exhausted
+    for (const room of state.rooms) {
+      const data = investigationRooms.get(room.name);
+      if (data) {
+        let hasUnexhausted = false;
+        for (const [, entity] of state.entities) {
+          if (entity.pos.x >= room.x && entity.pos.x < room.x + room.width &&
+              entity.pos.y >= room.y && entity.pos.y < room.y + room.height) {
+            if ((entity.type === EntityType.LogTerminal || entity.type === EntityType.EvidenceTrace ||
+                 entity.type === EntityType.Console || entity.type === EntityType.SecurityTerminal) &&
+                !entity.props["exhausted"]) {
+              hasUnexhausted = true;
+              break;
+            }
+          }
+        }
+        data.fullyInvestigated = !hasUnexhausted;
+      }
+    }
+    (display as any).setInvestigationRooms(investigationRooms);
+  }
+
   // Auto-explore badge
   const autoEl = document.getElementById("auto-explore-badge");
   if (autoEl) {

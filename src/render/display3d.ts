@@ -656,7 +656,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private toonGradient: THREE.DataTexture;
   private bloomComposer: EffectComposer | null = null;
   private bloomPass: UnrealBloomPass | null = null;
-  private bloomEnabled: boolean = false; // off by default for performance
+  private bloomEnabled: boolean = true; // enabled by default — subtle glow halos on emissive surfaces
   private _particlesEnabled: boolean = false; // off by default for performance
 
   // Room lights (colored point lights at room centers)
@@ -754,6 +754,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Discovery sparkle: rooms visited this session for first-entry effects
   private _visitedRooms3D: Set<string> = new Set();
   private _discoverySparkles: THREE.Sprite[] = [];
+  // Investigation aura: rooms with collected evidence get golden particle motes
+  private _investigationRooms: Map<string, { evidenceCount: number; fullyInvestigated: boolean }> = new Map();
   private starfieldPoints: THREE.Points | null = null;
   private _nebulaMesh: THREE.Mesh | null = null;
 
@@ -1757,6 +1759,11 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     };
     window.addEventListener("keydown", this._caseClosedDismissHandler);
+  }
+
+  /** Update which rooms have collected evidence for investigation aura effects. */
+  setInvestigationRooms(rooms: Map<string, { evidenceCount: number; fullyInvestigated: boolean }>): void {
+    this._investigationRooms = rooms;
   }
 
   getLogHistory(): DisplayLogEntry[] {
@@ -4503,6 +4510,32 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Normal room: warm room-tinted glow — primary room illumination with reduced ambient
         glowColor = ROOM_LIGHT_COLORS[this._currentRoom.name] ?? 0xffeedd;
         glowIntensity = 3.0;
+
+        // Investigation aura: blend golden tint for rooms where evidence was collected
+        const investigationData = this._investigationRooms.get(this._currentRoom.name);
+        if (investigationData && investigationData.evidenceCount > 0) {
+          if (investigationData.fullyInvestigated) {
+            // Fully investigated rooms get a subtle blue-white "resolved" tint
+            const blendAmt = 0.15;
+            const baseR = (glowColor >> 16) & 0xff;
+            const baseG = (glowColor >> 8) & 0xff;
+            const baseB = glowColor & 0xff;
+            const tintR = Math.round(baseR * (1 - blendAmt) + 0x99 * blendAmt);
+            const tintG = Math.round(baseG * (1 - blendAmt) + 0xdd * blendAmt);
+            const tintB = Math.round(baseB * (1 - blendAmt) + 0xff * blendAmt);
+            glowColor = (tintR << 16) | (tintG << 8) | tintB;
+          } else {
+            // Partially investigated rooms get a golden investigation tint
+            const blendAmt = Math.min(0.2, investigationData.evidenceCount * 0.04);
+            const baseR = (glowColor >> 16) & 0xff;
+            const baseG = (glowColor >> 8) & 0xff;
+            const baseB = glowColor & 0xff;
+            const tintR = Math.round(baseR * (1 - blendAmt) + 0xff * blendAmt);
+            const tintG = Math.round(baseG * (1 - blendAmt) + 0xcc * blendAmt);
+            const tintB = Math.round(baseB * (1 - blendAmt) + 0x44 * blendAmt);
+            glowColor = (tintR << 16) | (tintG << 8) | tintB;
+          }
+        }
       }
 
       // Evidence proximity flicker: room lights subtly flicker when undiscovered evidence is nearby
@@ -5098,7 +5131,32 @@ export class BrowserDisplay3D implements IGameDisplay {
         this._ambientParticleCount++;
       }
     }
-    // Decrement ambient count as particles die (tracked via _isAmbient flag in sparkle removal)
+
+    // Investigation aura particles: golden motes in rooms with collected evidence
+    if (this._currentRoom && this._ambientParticleCount < 15) {
+      const investData = this._investigationRooms.get(this._currentRoom.name);
+      if (investData && investData.evidenceCount > 0 && Math.random() < 0.08) {
+        const rx = this._currentRoom.x + Math.random() * this._currentRoom.width;
+        const rz = this._currentRoom.y + Math.random() * this._currentRoom.height;
+        const auraColor = investData.fullyInvestigated ? 0x99ddff : 0xffcc44;
+        const mat = new THREE.SpriteMaterial({
+          color: auraColor, transparent: true, opacity: 0.3,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const mote = new THREE.Sprite(mat);
+        mote.scale.set(0.03, 0.03, 1);
+        mote.position.set(rx, 0.3 + Math.random() * 0.8, rz);
+        (mote as any)._life = 0;
+        (mote as any)._maxLife = 3.0 + Math.random() * 2.0;
+        (mote as any)._driftY = 0.05 + Math.random() * 0.08;
+        (mote as any)._driftX = (Math.random() - 0.5) * 0.06;
+        (mote as any)._driftZ = (Math.random() - 0.5) * 0.06;
+        (mote as any)._isAmbient = true;
+        this.scene.add(mote);
+        this._discoverySparkles.push(mote);
+        this._ambientParticleCount++;
+      }
+    }
 
     // Air flow arrow pulsing animation
     for (const arrow of this._airFlowArrows) {
