@@ -227,6 +227,7 @@
 - **Sprint V65 — Entity motion detail + room exit**: Drone/PatrolDrone propeller spin, RepairBot arm swing, ServiceBot head swivel, MedKit heartbeat cross pulse, room→corridor exit darkness pulse with FOV tighten
 - **Sprint V66 — Entity awareness**: CrewNPC faces player within 4 tiles, Drone eye tracks player, Console/Terminal screens brighten on approach, RepairBot extends arm + faces player, ServiceBot head-tracks player
 - **Sprint V67 — Screen glow projection**: Console/LogTerminal cast colored PointLights onto the floor with proximity-reactive intensity, SecurityTerminal red LED glow, floor glow discs, synced light+material flicker
+- **Sprint V68 — Volumetric headlight beam**: Semi-transparent cone mesh on Sweepo matching SpotLight angle, additive blending, brighter in corridors (0.045 opacity) than rooms (0.015), color-synced with hazard-reactive headlight
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

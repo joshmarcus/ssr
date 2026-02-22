@@ -2196,6 +2196,18 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else {
         this.headlight.color.setHex(0xeeffff);
       }
+
+      // Volumetric cone visibility: brighter in corridors (dusty), dimmer in rooms
+      if (this.playerMesh) {
+        this.playerMesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.userData?.isHeadlightCone) {
+            const targetOpacity = inRoom ? 0.015 : 0.045; // much more visible in corridors
+            const mat = child.material as THREE.MeshBasicMaterial;
+            mat.opacity += (targetOpacity - mat.opacity) * 0.05;
+            mat.color.copy(this.headlight!.color); // match headlight color
+          }
+        });
+      }
     }
 
     // Interaction indicator: bob, spin, and ring pulse
@@ -5728,6 +5740,27 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.headlight.shadow.camera.near = 0.2;
     this.headlight.shadow.camera.far = 8;
     group.add(this.headlight);
+
+    // Volumetric headlight cone — visible light beam in dusty corridors
+    const coneLength = 4.0; // length of the visible beam
+    const coneRadius = Math.tan(Math.PI / 5) * coneLength; // match SpotLight angle
+    const coneGeo = new THREE.ConeGeometry(coneRadius, coneLength, 16, 1, true);
+    // Rotate cone to point forward (+Z direction in group space)
+    coneGeo.rotateX(Math.PI / 2);
+    coneGeo.translate(0, 0, coneLength / 2 + 0.2); // start from headlight pos
+    const coneMat = new THREE.MeshBasicMaterial({
+      color: 0xeeffff,
+      transparent: true,
+      opacity: 0.03,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+    coneMesh.position.y = 0.15; // match headlight Y
+    coneMesh.renderOrder = 999; // render after opaque
+    coneMesh.userData = { isHeadlightCone: true };
+    group.add(coneMesh);
 
     return group;
   }
