@@ -601,6 +601,19 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Outline effect toggle
   private outlineEnabled: boolean = true;
 
+  // InstancedMesh for trim elements (baseboard, edge glow, top rail)
+  private trimBBInstanced: THREE.InstancedMesh | null = null;
+  private trimGlowInstanced: THREE.InstancedMesh | null = null;
+  private trimRailInstanced: THREE.InstancedMesh | null = null;
+  private trimInstanceIdx: number = 0;
+  // InstancedMesh for corridor strip lights (bright / dim)
+  private stripBrightInstanced: THREE.InstancedMesh | null = null;
+  private stripDimInstanced: THREE.InstancedMesh | null = null;
+  private stripBrightIdx: number = 0;
+  private stripDimIdx: number = 0;
+  private static readonly MAX_TRIM_INSTANCES = 2000;
+  private static readonly MAX_STRIP_INSTANCES = 600;
+
   // Player movement trail
   private trailPoints: THREE.Points | null = null;
   private trailPositions: Float32Array = new Float32Array(0);
@@ -798,6 +811,10 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Ceiling beam structure (cross-beams + light fixtures) ──
     this.scene.add(this.ceilingGroup);
+
+    // ── InstancedMesh for trim and strip lights (massive draw call reduction) ──
+    this.initTrimInstances();
+    this.initStripInstances();
 
     // ── Starfield background (distant stars visible through station gaps) ──
     this.createStarfield();
@@ -2376,6 +2393,88 @@ export class BrowserDisplay3D implements IGameDisplay {
     ],
   };
 
+  /** Initialize InstancedMesh for room trim elements (baseboard, edge glow, top rail) */
+  private initTrimInstances(): void {
+    // Ensure shared geometries exist
+    if (!BrowserDisplay3D._bbGeo) {
+      BrowserDisplay3D._bbGeo = new THREE.BoxGeometry(1.02, 0.06, 0.08);
+      BrowserDisplay3D._railGeo = new THREE.BoxGeometry(1.02, 0.04, 0.06);
+      BrowserDisplay3D._pillarGeo = new THREE.BoxGeometry(0.08, 2.1, 0.08);
+      BrowserDisplay3D._edgeGlowGeo = new THREE.BoxGeometry(1.0, 0.02, 0.02);
+    }
+    const max = BrowserDisplay3D.MAX_TRIM_INSTANCES;
+
+    // Baseboard: white material, per-instance color multiplied in
+    const bbMat = makeToonMaterial({
+      color: 0xffffff,
+      gradientMap: this.toonGradient,
+      emissive: 0x888888,
+      emissiveIntensity: 0.15,
+    });
+    this.trimBBInstanced = new THREE.InstancedMesh(BrowserDisplay3D._bbGeo!, bbMat, max);
+    this.trimBBInstanced.count = 0;
+    this.trimBBInstanced.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(max * 3), 3
+    );
+    this.scene.add(this.trimBBInstanced);
+
+    // Edge glow: bright emissive
+    const glowMat = makeToonMaterial({
+      color: 0xffffff,
+      gradientMap: this.toonGradient,
+      emissive: 0xaaaaaa,
+      emissiveIntensity: 0.6,
+    });
+    this.trimGlowInstanced = new THREE.InstancedMesh(BrowserDisplay3D._edgeGlowGeo!, glowMat, max);
+    this.trimGlowInstanced.count = 0;
+    this.trimGlowInstanced.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(max * 3), 3
+    );
+    this.scene.add(this.trimGlowInstanced);
+
+    // Top rail: same style as baseboard
+    const railMat = makeToonMaterial({
+      color: 0xffffff,
+      gradientMap: this.toonGradient,
+      emissive: 0x888888,
+      emissiveIntensity: 0.15,
+    });
+    this.trimRailInstanced = new THREE.InstancedMesh(BrowserDisplay3D._railGeo!, railMat, max);
+    this.trimRailInstanced.count = 0;
+    this.trimRailInstanced.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(max * 3), 3
+    );
+    this.scene.add(this.trimRailInstanced);
+  }
+
+  /** Initialize InstancedMesh for corridor strip lights (bright + dim) */
+  private initStripInstances(): void {
+    if (!BrowserDisplay3D._stripLightGeo) {
+      BrowserDisplay3D._stripLightGeo = new THREE.BoxGeometry(0.8, 0.01, 0.04);
+    }
+    const max = BrowserDisplay3D.MAX_STRIP_INSTANCES;
+
+    const brightMat = makeToonMaterial({
+      color: 0x44ddff,
+      gradientMap: this.toonGradient,
+      emissive: 0x44ddff,
+      emissiveIntensity: 0.5,
+    });
+    this.stripBrightInstanced = new THREE.InstancedMesh(BrowserDisplay3D._stripLightGeo!, brightMat, max);
+    this.stripBrightInstanced.count = 0;
+    this.scene.add(this.stripBrightInstanced);
+
+    const dimMat = makeToonMaterial({
+      color: 0x225588,
+      gradientMap: this.toonGradient,
+      emissive: 0x225588,
+      emissiveIntensity: 0.3,
+    });
+    this.stripDimInstanced = new THREE.InstancedMesh(BrowserDisplay3D._stripLightGeo!, dimMat, max);
+    this.stripDimInstanced.count = 0;
+    this.scene.add(this.stripDimInstanced);
+  }
+
   /** Get or create a per-room sub-group within a parent group for distance culling */
   private getRoomSubGroup(
     parent: THREE.Group,
@@ -2691,15 +2790,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private static _edgeGlowGeo: THREE.BoxGeometry | null = null;
 
   private placeRoomTrim(state: GameState): void {
-    // Create shared geometries once
-    if (!BrowserDisplay3D._bbGeo) {
-      BrowserDisplay3D._bbGeo = new THREE.BoxGeometry(1.02, 0.06, 0.08);
-      BrowserDisplay3D._railGeo = new THREE.BoxGeometry(1.02, 0.04, 0.06);
-      BrowserDisplay3D._pillarGeo = new THREE.BoxGeometry(0.08, 2.1, 0.08);
-      BrowserDisplay3D._edgeGlowGeo = new THREE.BoxGeometry(1.0, 0.02, 0.02); // very thin glow strip
-    }
-    const bbGeo = BrowserDisplay3D._bbGeo!;
-    const railGeo = BrowserDisplay3D._railGeo!;
+    const dummy = this.dummy;
+    const tempColor = new THREE.Color();
 
     for (const room of state.rooms) {
       if (this.trimmedRooms.has(room.id)) continue;
@@ -2717,20 +2809,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       const tg = Math.min(255, ((tint >> 8) & 0xff) + 40);
       const tb = Math.min(255, (tint & 0xff) + 40);
       const trimColor = (tr << 16) | (tg << 8) | tb;
-      const trimMat = makeToonMaterial({
-        color: trimColor,
-        gradientMap: this.toonGradient,
-        emissive: trimColor,
-        emissiveIntensity: 0.15,
-      });
-
-      // Sci-fi edge glow: bright emissive strip at wall base
-      const glowMat = makeToonMaterial({
-        color: tint,
-        gradientMap: this.toonGradient,
-        emissive: tint,
-        emissiveIntensity: 0.6,
-      });
+      const glowColor = tint;
 
       // Scan room perimeter for wall tiles adjacent to floor
       for (let y = room.y - 1; y <= room.y + room.height; y++) {
@@ -2746,37 +2825,54 @@ export class BrowserDisplay3D implements IGameDisplay {
           const inW = x > 0 && state.tiles[y][x - 1].type === TileType.Floor;
           if (!inN && !inS && !inE && !inW) continue;
 
-          // Baseboard: thin strip at base of wall, facing into room (shared geo)
-          const bb = new THREE.Mesh(bbGeo, trimMat);
+          if (this.trimInstanceIdx >= BrowserDisplay3D.MAX_TRIM_INSTANCES) continue;
 
-          if (inN) {
-            bb.position.set(x, 0.03, y - 0.47);
-          } else if (inS) {
-            bb.position.set(x, 0.03, y + 0.47);
-          } else if (inE) {
-            bb.rotation.y = Math.PI / 2;
-            bb.position.set(x + 0.47, 0.03, y);
-          } else if (inW) {
-            bb.rotation.y = Math.PI / 2;
-            bb.position.set(x - 0.47, 0.03, y);
-          }
-          trimSubGroup.add(bb);
+          // Compute position and rotation for this wall edge
+          let px = 0, py = 0, pz = 0, ry = 0;
+          if (inN) { px = x; py = 0.03; pz = y - 0.47; ry = 0; }
+          else if (inS) { px = x; py = 0.03; pz = y + 0.47; ry = 0; }
+          else if (inE) { px = x + 0.47; py = 0.03; pz = y; ry = Math.PI / 2; }
+          else if (inW) { px = x - 0.47; py = 0.03; pz = y; ry = Math.PI / 2; }
 
-          // Sci-fi edge glow strip: thin bright line at floor-wall junction
-          const glow = new THREE.Mesh(BrowserDisplay3D._edgeGlowGeo!, glowMat);
-          glow.position.copy(bb.position);
-          glow.position.y = 0.01; // right at floor level
-          glow.rotation.copy(bb.rotation);
-          trimSubGroup.add(glow);
+          const idx = this.trimInstanceIdx;
 
-          // Top rail: thin strip at top of wall (shared geo)
-          const rail = new THREE.Mesh(railGeo, trimMat);
-          rail.position.copy(bb.position);
-          rail.position.y = 1.98;
-          rail.rotation.copy(bb.rotation);
-          trimSubGroup.add(rail);
+          // Baseboard instance
+          dummy.position.set(px, py, pz);
+          dummy.rotation.set(0, ry, 0);
+          dummy.scale.set(1, 1, 1);
+          dummy.updateMatrix();
+          this.trimBBInstanced!.setMatrixAt(idx, dummy.matrix);
+          tempColor.setHex(trimColor);
+          this.trimBBInstanced!.setColorAt(idx, tempColor);
+
+          // Edge glow instance (same pos, lower Y)
+          dummy.position.y = 0.01;
+          dummy.updateMatrix();
+          this.trimGlowInstanced!.setMatrixAt(idx, dummy.matrix);
+          tempColor.setHex(glowColor);
+          this.trimGlowInstanced!.setColorAt(idx, tempColor);
+
+          // Top rail instance (same pos, high Y)
+          dummy.position.y = 1.98;
+          dummy.updateMatrix();
+          this.trimRailInstanced!.setMatrixAt(idx, dummy.matrix);
+          tempColor.setHex(trimColor);
+          this.trimRailInstanced!.setColorAt(idx, tempColor);
+
+          this.trimInstanceIdx++;
         }
       }
+
+      // Update instance counts and mark for GPU upload
+      this.trimBBInstanced!.count = this.trimInstanceIdx;
+      this.trimBBInstanced!.instanceMatrix.needsUpdate = true;
+      this.trimBBInstanced!.instanceColor!.needsUpdate = true;
+      this.trimGlowInstanced!.count = this.trimInstanceIdx;
+      this.trimGlowInstanced!.instanceMatrix.needsUpdate = true;
+      this.trimGlowInstanced!.instanceColor!.needsUpdate = true;
+      this.trimRailInstanced!.count = this.trimInstanceIdx;
+      this.trimRailInstanced!.instanceMatrix.needsUpdate = true;
+      this.trimRailInstanced!.instanceColor!.needsUpdate = true;
 
       // Door frames: vertical pillars on each side of door tiles in this room
       for (let y = room.y - 1; y <= room.y + room.height; y++) {
@@ -3181,24 +3277,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // ── Private: corridor floor strip lights ───────────────────────
 
   private placeCorridorStripLights(state: GameState): void {
-    if (!BrowserDisplay3D._stripLightGeo) {
-      BrowserDisplay3D._stripLightGeo = new THREE.BoxGeometry(0.8, 0.01, 0.04); // thin floor strip
-    }
-
-    const stripMat = makeToonMaterial({
-      color: 0x44ddff,
-      gradientMap: this.toonGradient,
-      emissive: 0x44ddff,
-      emissiveIntensity: 0.5,
-    });
-
-    // Dimmer variant for alternating pattern
-    const stripMatDim = makeToonMaterial({
-      color: 0x225588,
-      gradientMap: this.toonGradient,
-      emissive: 0x225588,
-      emissiveIntensity: 0.3,
-    });
+    const dummy = this.dummy;
+    let changed = false;
 
     for (let y = 0; y < state.height; y++) {
       for (let x = 0; x < state.width; x++) {
@@ -3220,32 +3300,35 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         // Alternate bright/dim based on position hash
         const isBright = ((x * 3 + y * 7) & 0x3) < 2;
-        const mat = isBright ? stripMat : stripMatDim;
 
-        const stripBucket = this.getCorridorBucket(this.ceilingGroup, x, y);
-        if (wallN) {
-          const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
-          strip.position.set(x, -0.05, y - 0.46);
-          stripBucket.add(strip);
-        }
-        if (wallS) {
-          const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
-          strip.position.set(x, -0.05, y + 0.46);
-          stripBucket.add(strip);
-        }
-        if (wallE) {
-          const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
-          strip.rotation.y = Math.PI / 2;
-          strip.position.set(x + 0.46, -0.05, y);
-          stripBucket.add(strip);
-        }
-        if (wallW) {
-          const strip = new THREE.Mesh(BrowserDisplay3D._stripLightGeo!, mat);
-          strip.rotation.y = Math.PI / 2;
-          strip.position.set(x - 0.46, -0.05, y);
-          stripBucket.add(strip);
-        }
+        const addStripInstance = (px: number, pz: number, rotated: boolean) => {
+          const instanced = isBright ? this.stripBrightInstanced! : this.stripDimInstanced!;
+          const idx = isBright ? this.stripBrightIdx : this.stripDimIdx;
+          if (idx >= BrowserDisplay3D.MAX_STRIP_INSTANCES) return;
+
+          dummy.position.set(px, -0.05, pz);
+          dummy.rotation.set(0, rotated ? Math.PI / 2 : 0, 0);
+          dummy.scale.set(1, 1, 1);
+          dummy.updateMatrix();
+          instanced.setMatrixAt(idx, dummy.matrix);
+
+          if (isBright) this.stripBrightIdx++;
+          else this.stripDimIdx++;
+          changed = true;
+        };
+
+        if (wallN) addStripInstance(x, y - 0.46, false);
+        if (wallS) addStripInstance(x, y + 0.46, false);
+        if (wallE) addStripInstance(x + 0.46, y, true);
+        if (wallW) addStripInstance(x - 0.46, y, true);
       }
+    }
+
+    if (changed) {
+      this.stripBrightInstanced!.count = this.stripBrightIdx;
+      this.stripBrightInstanced!.instanceMatrix.needsUpdate = true;
+      this.stripDimInstanced!.count = this.stripDimIdx;
+      this.stripDimInstanced!.instanceMatrix.needsUpdate = true;
     }
   }
 
