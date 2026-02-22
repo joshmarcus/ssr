@@ -1428,6 +1428,29 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   showGameOverOverlay(state: GameState): void {
+    // 3D Victory celebration: golden confetti shower
+    if (state.victory && this.chaseCamActive) {
+      for (let ci = 0; ci < 30; ci++) {
+        const confettiColor = [0xffdd44, 0xff8844, 0x44ff88, 0x44aaff, 0xff66ff][ci % 5];
+        const cMat = new THREE.SpriteMaterial({
+          color: confettiColor, transparent: true, opacity: 0.8,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const confetti = new THREE.Sprite(cMat);
+        confetti.scale.set(0.06 + Math.random() * 0.04, 0.06 + Math.random() * 0.04, 1);
+        confetti.position.set(
+          this.playerCurrentX + (Math.random() - 0.5) * 4,
+          1.5 + Math.random() * 1.0,
+          this.playerCurrentZ + (Math.random() - 0.5) * 4,
+        );
+        (confetti as any)._life = 0;
+        (confetti as any)._maxLife = 1.5 + Math.random() * 1.5;
+        (confetti as any)._driftY = -0.3 + Math.random() * 0.6; // some float up, some drift down
+        this.scene.add(confetti);
+        this._discoverySparkles.push(confetti);
+      }
+    }
+
     const overlay = document.getElementById("gameover-overlay");
     if (!overlay) return;
 

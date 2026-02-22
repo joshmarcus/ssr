@@ -286,6 +286,7 @@
 - **Sprint V124 — Corridor forward scout light**: Blue PointLight moves 3 tiles ahead of player facing direction in corridors. Smooth follow with 5% lerp factor. Creates "motion sensor activation" feel — lights activate before you reach them. Hidden in rooms
 - **Sprint V125 — EvidenceTrace discovery burst**: One-time golden sparkle burst (6 sprites in radial pattern) when player first gets within 3 tiles of an EvidenceTrace. _discoveryBurst flag prevents repeat triggering. Rewards clue discovery with celebratory particles
 - **Sprint V126 — Sweepo eye look direction**: Eye position shifts toward nearest entity within 4 tiles (±0.04 in local X). Converts world direction to local space using player rotation. Gives Sweepo spatial awareness — the eye "looks at" nearby things
+- **Sprint V127 — Victory confetti celebration**: 30 multi-colored confetti sprites spawn around player on victory. 5 color cycle (gold, orange, green, blue, magenta). Mixed drift directions (some float up, some down). Long lifetime (1.5-3s). Celebratory reward for completing the game
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
