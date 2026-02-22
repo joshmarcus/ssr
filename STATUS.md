@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V170 completed, V171 next)
+- **Phase**: Sprint 74 ongoing (Performance + Controls — V177 completed, V178 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -330,6 +330,16 @@
 - **Sprint V168 — Surface material polish**: Floor roughness 0.55, metalness 0.15, emissive for shadow readability. Corridor roughness 0.45, metalness 0.2. Wall emissive 0.06. Specular response from headlight on floor
 - **Sprint V169 — Dynamic ambient tint**: Ambient light blends 30% toward current room's light color. Power rooms feel warm, Data Core purple, Med Bay cool. Smooth lerp transition in/out of rooms
 - **Sprint V170 — Door light spill**: Unlocked doors emit translucent floor planes (additive, 8% opacity) extending 2 tiles into adjacent corridors. Room-tinted color. Light pools at doorways
+- **Sprint V171 — Ceiling light panels**: Recessed emissive panels at ceiling height, room-tinted, placed every 4 tiles
+- **Sprint V172 — Bloom post-processing**: UnrealBloomPass via EffectComposer. Strength 0.15, radius 0.3, threshold 0.92. F4 cycles bloom/outline/plain
+- **Sprint V173 — Entity glow pools**: Additive-blended ground rings + diffuse glow pool discs under entities
+- **Sprint V174 — Context-aware bloom**: Bloom dynamically adjusts (rooms 0.12, corridors 0.28, evacuation 0.25+)
+- **Sprint V175 — Bloom-friendly emissive boosts**: Player ground glow additive, edge/mid trim emissive boosted
+- **Sprint V176 — Polished space station floors**: Floor roughness 0.35, metalness 0.25. Corridor roughness 0.30, metalness 0.30
+- **Sprint V177 — Performance + controls + ceiling fix**:
+  - Performance: Cache 8 DOM overlay elements, eliminate per-frame Color allocations, distance-cull corridor lights
+  - Movement: Camera-relative arrow/WASD keys (up=forward, left=turn left, right=turn right, down=backward)
+  - Ceiling fix: Walls repositioned y=0→y=1.0 (span 0→2.0), eliminating gap where space was visible through ceiling
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
