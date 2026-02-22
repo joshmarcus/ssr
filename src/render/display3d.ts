@@ -4385,6 +4385,20 @@ export class BrowserDisplay3D implements IGameDisplay {
           // Door hiss effect: spawn particles when door begins opening
           if (prevSlide < 0.02 && slideAmount > 0.02) {
             this.spawnDoorHissParticles(x, y, isHorizontal);
+            // Light shaft: brief volumetric beam through opening door
+            const shaftMat = new THREE.SpriteMaterial({
+              color: 0xeeffdd,
+              transparent: true, opacity: 0.15,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const shaft = new THREE.Sprite(shaftMat);
+            shaft.scale.set(0.6, 2.0, 1);
+            shaft.position.set(x, 1.0, y);
+            (shaft as any)._life = 0;
+            (shaft as any)._maxLife = 1.2;
+            (shaft as any)._driftY = 0;
+            this.scene.add(shaft);
+            this._discoverySparkles.push(shaft);
           }
 
           tempColor.setHex(doorColor);
