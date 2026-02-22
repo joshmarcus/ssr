@@ -2631,6 +2631,33 @@ export class BrowserDisplay3D implements IGameDisplay {
             this.chaseCamPosZ + shakeZ + idleSwayZ
           );
           this.chaseCamera.lookAt(this.chaseCamLookX, lookY, this.chaseCamLookZ);
+
+          // Hazard proximity camera tilt: subtle roll toward nearby threats
+          let hazardTiltTarget = 0;
+          if (this._playerTileHeat > 40 || this._playerTilePressure < 60) {
+            // Find directional bias from hazard sources (breaches for vacuum, hot tiles)
+            let hx = 0, hz = 0;
+            for (const bp of this._breachPositions) {
+              const ddx = bp.x - this.playerCurrentX;
+              const ddz = bp.z - this.playerCurrentZ;
+              const d = Math.sqrt(ddx * ddx + ddz * ddz);
+              if (d < 6 && d > 0.5) {
+                const w = 1 / d;
+                hx += ddx * w;
+                hz += ddz * w;
+              }
+            }
+            if (Math.abs(hx) + Math.abs(hz) > 0.01) {
+              // Convert world-space hazard direction to screen-space tilt
+              const facing = this.playerMesh!.rotation.y;
+              const localX = Math.cos(facing) * hx + Math.sin(facing) * hz;
+              hazardTiltTarget = Math.max(-0.06, Math.min(0.06, localX * 0.04));
+            } else if (this._playerTileHeat > 40) {
+              // Heat shimmer wobble
+              hazardTiltTarget = Math.sin(elapsed * 1.5) * 0.02 * (this._playerTileHeat / 100);
+            }
+          }
+          this.chaseCamera.rotation.z += (hazardTiltTarget - this.chaseCamera.rotation.z) * Math.min(1, 3 * delta);
         }
       } else {
         // Orthographic top-down/isometric camera
