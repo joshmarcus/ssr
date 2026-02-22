@@ -225,6 +225,16 @@
       image-rendering: pixelated;
       pointer-events: none;
     }
+    .mode-3d #compass-canvas {
+      position: absolute;
+      top: 140px;
+      right: 10px;
+      z-index: 10;
+      border: 1px solid rgba(68, 255, 136, 0.2);
+      border-radius: 50%;
+      background: rgba(8, 10, 16, 0.7);
+      pointer-events: none;
+    }
     /* Vignette overlay in 3D mode */
     .mode-3d #rot-display::after {
       content: "";
@@ -696,7 +706,7 @@
   <div id="game-container">
     <div id="ui-panel"></div>
     <div id="map-column">
-      <div id="rot-display"><canvas id="minimap-canvas" width="120" height="120" style="display:none"></canvas></div>
+      <div id="rot-display"><canvas id="minimap-canvas" width="120" height="120" style="display:none"></canvas><canvas id="compass-canvas" width="60" height="60" style="display:none"></canvas></div>
       <div id="map-legend"></div>
     </div>
   </div>

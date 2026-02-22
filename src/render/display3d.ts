@@ -6805,6 +6805,8 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   private minimapCanvas: HTMLCanvasElement | null = null;
   private minimapCtx: CanvasRenderingContext2D | null = null;
+  private compassCanvas: HTMLCanvasElement | null = null;
+  private compassCtx: CanvasRenderingContext2D | null = null;
 
   private renderMinimap(state: GameState): void {
     if (!this.minimapCanvas) {
@@ -6937,6 +6939,76 @@ export class BrowserDisplay3D implements IGameDisplay {
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1;
     ctx.strokeRect(ppx - 3, ppy - 3, 7, 7);
+
+    // Render compass
+    this.renderCompass();
+  }
+
+  private renderCompass(): void {
+    if (!this.compassCanvas) {
+      this.compassCanvas = document.getElementById("compass-canvas") as HTMLCanvasElement;
+      if (this.compassCanvas) {
+        this.compassCanvas.style.display = this.chaseCamActive ? "block" : "none";
+        this.compassCtx = this.compassCanvas.getContext("2d");
+      }
+    }
+    if (!this.compassCtx || !this.compassCanvas || !this.chaseCamActive) {
+      if (this.compassCanvas) this.compassCanvas.style.display = "none";
+      return;
+    }
+    this.compassCanvas.style.display = "block";
+
+    const ctx = this.compassCtx;
+    const w = this.compassCanvas.width;
+    const h = this.compassCanvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const r = Math.min(cx, cy) - 4;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Outer ring
+    ctx.strokeStyle = "rgba(68, 255, 136, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Cardinal direction labels
+    // Player facing: 0 = +Z (south in typical game coords), need to map to compass
+    const facing = this.playerFacing;
+    const dirs = [
+      { label: "N", angle: 0 },
+      { label: "E", angle: Math.PI / 2 },
+      { label: "S", angle: Math.PI },
+      { label: "W", angle: -Math.PI / 2 },
+    ];
+
+    ctx.font = "bold 9px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    for (const d of dirs) {
+      // Rotate direction by player facing so compass rotates with view
+      const a = d.angle - facing + Math.PI; // offset so N is "up" when facing north
+      const lx = cx + Math.sin(a) * (r - 8);
+      const ly = cy - Math.cos(a) * (r - 8);
+
+      // Highlight the direction the player is facing
+      const angleDiff = Math.abs(d.angle - (facing % (Math.PI * 2)));
+      const isActive = angleDiff < 0.5 || angleDiff > Math.PI * 2 - 0.5;
+      ctx.fillStyle = isActive ? "#44ff88" : "rgba(68, 255, 136, 0.4)";
+      ctx.fillText(d.label, lx, ly);
+    }
+
+    // Forward pointer (small triangle)
+    ctx.fillStyle = "#44ff88";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r + 2);
+    ctx.lineTo(cx - 3, cy - r + 8);
+    ctx.lineTo(cx + 3, cy - r + 8);
+    ctx.closePath();
+    ctx.fill();
   }
 
   // ── Starfield background ─────────────────────────────────────

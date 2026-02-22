@@ -234,6 +234,7 @@
 - **Sprint V72 — Entity animation polish**: EscapePod beacon flash (bright pulse every 3s), PowerCell/FuseBox intermittent spark, DataCore counter-rotating wireframe cage, EvidenceTrace scale pulse + layered float
 - **Sprint V73 — Corridor steam vents**: Occasional additive steam puff sprites near player in corridors (1.5-4.5s interval), drift upward, expand, and fade. Atmospheric broken-station detail
 - **Sprint V74 — Scan grid ripple**: Sensor scan wave now leaves glowing grid squares on the floor as it passes. Squares flash briefly in sensor color (40% coverage, additive blend) creating a tech-data-readout effect
+- **Sprint V75 — Compass heading indicator**: Canvas-rendered compass HUD below minimap showing N/E/S/W cardinal directions, rotating with player facing, active direction highlighted in green, forward pointer triangle
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
