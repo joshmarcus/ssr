@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V129 completed, V130 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V130 completed, V131 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -289,6 +289,7 @@
 - **Sprint V127 — Victory confetti celebration**: 30 multi-colored confetti sprites spawn around player on victory. 5 color cycle (gold, orange, green, blue, magenta). Mixed drift directions (some float up, some down). Long lifetime (1.5-3s). Celebratory reward for completing the game
 - **Sprint V128 — Minimap player trail**: Fading green dots on minimap showing recent player path (up to 40 positions). Each dot fades over time (age 0→1 with linear alpha decay). Records every 1+ tile of movement. Helps players retrace steps and stay oriented
 - **Sprint V129 — Relay chain pulse wave**: One-shot bright pulse sprite travels along power line curves when a relay activates. Pulse originates from the activated relay and races outward along all connected curves (4.5x energy dot speed). White additive sprite with quadratic opacity fade and slight scale growth. Cleaned up on arrival. Creates a satisfying "power ripple" visual on relay activation
+- **Sprint V130 — Entity collection fly-to-player**: Pickup entities (Tool, Utility, Sensor, MedKit, PowerCell, CrewItem) fly toward Sweepo when collected instead of vanishing. Ease-in acceleration with upward arc, spin, shrink, and opacity fade (~0.4s). Adds tactile satisfaction to item collection
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

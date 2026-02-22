@@ -573,6 +573,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _relayEnergyDots: { sprite: THREE.Sprite; curve: THREE.QuadraticBezierCurve3; t: number }[] = [];
   private _relayPulseWaves: { sprite: THREE.Sprite; curve: THREE.QuadraticBezierCurve3; t: number; forward: boolean }[] = [];
   private _pendingRelayPulses: { x: number; z: number }[] = [];
+  // Entity collection fly-to-player animations
+  private _flyToPlayerAnims: { mesh: THREE.Object3D; startX: number; startZ: number; startY: number; t: number }[] = [];
   // Global scene lights for phase-reactive lighting
   private ambientLight: THREE.AmbientLight | null = null;
   private keyLight: THREE.DirectionalLight | null = null;
@@ -3644,6 +3646,38 @@ export class BrowserDisplay3D implements IGameDisplay {
       pw.sprite.scale.setScalar(0.18 + progress * 0.12); // grows slightly as it travels
     }
 
+    // Entity fly-to-player collection animations
+    for (let i = this._flyToPlayerAnims.length - 1; i >= 0; i--) {
+      const anim = this._flyToPlayerAnims[i];
+      anim.t += delta * 2.5; // ~0.4s total
+      if (anim.t >= 1) {
+        this.scene.remove(anim.mesh);
+        anim.mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh) child.geometry?.dispose();
+        });
+        this._flyToPlayerAnims.splice(i, 1);
+        continue;
+      }
+      // Ease-in curve for acceleration toward player
+      const ease = anim.t * anim.t;
+      const px = anim.startX + (this.playerCurrentX - anim.startX) * ease;
+      const pz = anim.startZ + (this.playerCurrentZ - anim.startZ) * ease;
+      const py = anim.startY + (0.4 - anim.startY) * ease + Math.sin(anim.t * Math.PI) * 0.5; // arc upward
+      anim.mesh.position.set(px, py, pz);
+      // Shrink as it approaches
+      const shrink = 1 - ease * 0.8;
+      anim.mesh.scale.setScalar(shrink);
+      // Spin during flight
+      anim.mesh.rotation.y += delta * 10;
+      // Fade opacity
+      anim.mesh.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.material && 'opacity' in child.material) {
+          (child.material as THREE.MeshStandardMaterial).transparent = true;
+          (child.material as THREE.MeshStandardMaterial).opacity = 1 - ease;
+        }
+      });
+    }
+
     // Particle animations
     this.animateParticles(elapsed, delta);
 
@@ -6691,12 +6725,30 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Remove stale entity meshes
+    // Remove stale entity meshes (with fly-to-player for pickup types)
+    const pickupTypes = new Set([
+      EntityType.ToolPickup, EntityType.UtilityPickup, EntityType.SensorPickup,
+      EntityType.MedKit, EntityType.PowerCell, EntityType.CrewItem,
+    ]);
     for (const [id, mesh] of this.entityMeshes) {
       if (!activeIds.has(id)) {
-        this.entityGroup.remove(mesh);
-        if (mesh instanceof THREE.Mesh) {
-          mesh.geometry?.dispose();
+        const entType = mesh.userData.entityType as EntityType | undefined;
+        if (entType && pickupTypes.has(entType) && this.chaseCamActive) {
+          // Fly-to-player animation: reparent to scene so it stays visible
+          this.entityGroup.remove(mesh);
+          this.scene.add(mesh);
+          this._flyToPlayerAnims.push({
+            mesh,
+            startX: mesh.position.x,
+            startZ: mesh.position.z,
+            startY: mesh.position.y,
+            t: 0,
+          });
+        } else {
+          this.entityGroup.remove(mesh);
+          if (mesh instanceof THREE.Mesh) {
+            mesh.geometry?.dispose();
+          }
         }
         this.entityMeshes.delete(id);
       }
