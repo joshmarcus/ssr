@@ -6595,16 +6595,21 @@ export class BrowserDisplay3D implements IGameDisplay {
     canvas.height = 48;
     const ctx = canvas.getContext("2d")!;
 
-    // Background
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillRect(0, 8, 256, 32);
+    // Background with rounded corners
+    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+    ctx.beginPath();
+    ctx.roundRect(16, 6, 224, 36, 6);
+    ctx.fill();
 
-    // Text
-    ctx.fillStyle = color;
+    // Text with glow
     ctx.font = "bold 18px 'Courier New', monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = color;
     ctx.fillText(text, 128, 24);
+    ctx.shadowBlur = 0;
 
     const tex = new THREE.CanvasTexture(canvas);
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.8, depthWrite: false });

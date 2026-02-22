@@ -296,6 +296,7 @@
 - **Sprint V134 — Antenna movement spring wobble**: Antenna bounces with damped oscillation (14Hz Z + 11Hz X) during movement instead of being static. Settles smoothly when stopped (0.9 decay on x-rotation). Adds physical believability to Sweepo's locomotion
 - **Sprint V135 — Minimap fog of exploration border**: Semi-transparent dark tiles at the frontier between explored and unexplored areas. 4-connected adjacency check draws fog at unexplored tiles with explored neighbors. Creates visible exploration boundary on minimap
 - **Sprint V136 — Minimap turn counter with time pressure**: Turn number displayed at bottom-left of minimap with color that shifts green→yellow→orange→red as turn ratio approaches limit. Pulses at 80%+ urgency. Constant time awareness without sidebar reading
+- **Sprint V137 — Entity label glow and rounded background**: Entity name labels upgraded with rounded rectangle backgrounds and colored text glow (shadowBlur 8). Improves readability against all backgrounds and adds visual polish
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
