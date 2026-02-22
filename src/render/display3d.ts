@@ -2118,11 +2118,19 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
       } else {
-        // Healthy: idle antenna sway (gentle scanning motion)
+        // Healthy: idle antenna sway + movement spring wobble
         const antenna = this.playerMesh.children[2];
         if (antenna) {
-          const sway = isMoving ? 0 : Math.sin(elapsed * 1.2) * 0.12 + Math.sin(elapsed * 0.7) * 0.05;
-          antenna.rotation.z = sway;
+          if (isMoving) {
+            // Spring wobble: antenna lags behind movement with damped oscillation
+            const wobble = Math.sin(elapsed * 14) * 0.15 * Math.exp(-((elapsed * 3) % 1) * 2);
+            antenna.rotation.z = wobble;
+            antenna.rotation.x = Math.sin(elapsed * 11) * 0.08;
+          } else {
+            const sway = Math.sin(elapsed * 1.2) * 0.12 + Math.sin(elapsed * 0.7) * 0.05;
+            antenna.rotation.z = sway;
+            antenna.rotation.x *= 0.9; // settle x-rotation when stopped
+          }
         }
         const groundGlow = this.playerMesh.children[4];
         if (groundGlow instanceof THREE.Mesh) {

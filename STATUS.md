@@ -293,6 +293,7 @@
 - **Sprint V131 — Breach vacuum suction**: Nearby particle sprites (sparkles, dust kicks, breath puffs) get gravitationally pulled toward unsealed breach positions within 4 tiles. Inverse-square falloff creates realistic vacuum draw. Makes breaches feel physically dangerous — visible atmosphere being sucked out
 - **Sprint V132 — Airlock depressurization wind streaks**: 12 radial elongated streak sprites burst outward when an airlock opens. Blue-white additive blending with horizontal drift. Sparkle pool gains optional `_driftX`/`_driftZ` for radial particle movement. Combined with breach suction creates dramatic venting moments
 - **Sprint V133 — HP-reactive headlight color**: Headlight base color shifts from cool white through warm amber to red-orange as HP drops (75%→warm, 50%→amber, 25%→red). Room hazard tints still override. Creates immersive "systems failing" feel tied to player health
+- **Sprint V134 — Antenna movement spring wobble**: Antenna bounces with damped oscillation (14Hz Z + 11Hz X) during movement instead of being static. Settles smoothly when stopped (0.9 decay on x-rotation). Adds physical believability to Sweepo's locomotion
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
