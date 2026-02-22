@@ -1378,12 +1378,40 @@ export class BrowserDisplay3D implements IGameDisplay {
         : type === "sensor" ? "SENSOR"
         : type === "system" ? "SYSTEM"
         : undefined;
-      this.showSubtitle(msg, source);
+      // Priority: sensor/milestone/critical messages go to front of queue
+      const priority = type === "sensor" || type === "milestone" || type === "critical";
+      this.queueSubtitle(msg, source, priority);
     }
   }
 
   private _subtitleTimer: ReturnType<typeof setTimeout> | null = null;
   private _subtitleDismissHandler: ((e: KeyboardEvent) => void) | null = null;
+  private _subtitleQueue: { text: string; source?: string }[] = [];
+  private _subtitleActive: boolean = false;
+
+  /** Queue a subtitle message — priority messages go to the front */
+  private queueSubtitle(text: string, source?: string, priority: boolean = false): void {
+    if (priority) {
+      this._subtitleQueue.unshift({ text, source });
+    } else {
+      this._subtitleQueue.push({ text, source });
+    }
+    // If no subtitle is currently showing, show the next one
+    if (!this._subtitleActive) {
+      this.showNextSubtitle();
+    }
+  }
+
+  /** Show the next subtitle from the queue */
+  private showNextSubtitle(): void {
+    const next = this._subtitleQueue.shift();
+    if (!next) {
+      this._subtitleActive = false;
+      return;
+    }
+    this._subtitleActive = true;
+    this.showSubtitle(next.text, next.source);
+  }
 
   /** Show a cinematic subtitle at the bottom of the 3D viewport — requires keypress to dismiss */
   private showSubtitle(text: string, source?: string): void {
@@ -1399,7 +1427,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (this._subtitleDismissHandler) {
       window.removeEventListener("keydown", this._subtitleDismissHandler);
     }
-    // Wait for spacebar or escape to dismiss
+    // Wait for spacebar or escape to dismiss, then show next queued subtitle
     this._subtitleDismissHandler = (e: KeyboardEvent) => {
       if (e.key === " " || e.key === "Escape") {
         e.preventDefault();
@@ -1408,7 +1436,9 @@ export class BrowserDisplay3D implements IGameDisplay {
           el.className = "";
           el.innerHTML = "";
           this._subtitleTimer = null;
-        }, 800);
+          // Show next queued subtitle after fade
+          this.showNextSubtitle();
+        }, 400);
         if (this._subtitleDismissHandler) {
           window.removeEventListener("keydown", this._subtitleDismissHandler);
           this._subtitleDismissHandler = null;
