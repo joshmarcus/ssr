@@ -2034,6 +2034,29 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Edge glow strip pulse: subtle breathing for sci-fi atmosphere
+    if (this.trimGlowInstanced) {
+      const mat = this.trimGlowInstanced.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = 0.45 + Math.sin(elapsed * 0.8) * 0.15;
+    }
+
+    // Room lights: subtle generator hum oscillation for non-emergency rooms
+    for (const [roomId, light] of this.roomLights) {
+      const c = light.color.getHex();
+      if (c !== 0xff2200 && c !== 0xff8800 && roomId !== this.lastRoomId) {
+        // Normal rooms get subtle brightness oscillation (generator hum)
+        light.intensity = 1.2 + Math.sin(elapsed * 1.0 + light.position.x * 2.3 + light.position.z * 3.7) * 0.1;
+      }
+    }
+
+    // Relay power line pulse animation
+    for (let i = 0; i < this.relayPowerLines.length; i++) {
+      const line = this.relayPowerLines[i];
+      const mat = line.material as THREE.LineBasicMaterial;
+      const phase = elapsed * 2 + i * 1.5;
+      mat.opacity = 0.25 + Math.sin(phase) * 0.15;
+    }
+
     // Particle animations
     this.animateParticles(elapsed, delta);
 
@@ -6311,12 +6334,15 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.dustParticles.position.set(this.cameraPosX, 0, this.cameraPosZ);
     }
 
-    // Starfield: subtle twinkle by varying opacity
+    // Starfield: dynamic twinkle with individual star variation
     if (this.starfieldPoints) {
       const mat = this.starfieldPoints.material as THREE.PointsMaterial;
       mat.opacity = 0.4 + Math.sin(elapsed * 0.5) * 0.2;
+      mat.size = 0.12 + Math.sin(elapsed * 0.3) * 0.02; // subtle size breathing
       // Keep starfield centered on camera
       this.starfieldPoints.position.set(this.cameraPosX, 0, this.cameraPosZ);
+      // Slow rotation for cosmic drift
+      this.starfieldPoints.rotation.y = elapsed * 0.01;
     }
   }
 }
