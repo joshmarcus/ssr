@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 in progress (3D Visual Mode Restoration + Enhancement)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V84 completed, V85 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable

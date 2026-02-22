@@ -244,6 +244,21 @@ Entity personality and environmental storytelling through animation:
 - **Corridor steam vents = atmospheric filler**: Occasional sprite puffs near the player fill the visual silence of corridor traversal. Pool and dispose to avoid memory leaks.
 - **Scan grid ripple gives feedback**: Floor grid squares that flash as the scan wave passes make scanning feel satisfying and tech-forward. Use additive blending for the glow-through-floor effect.
 
+## Sprint Learnings (V75-V84 Reflection)
+
+Layered atmospheric effects and ground-level visual feedback:
+
+- **Corridor light shafts make dark corridors readable**: Volumetric cylinders (CylinderGeometry, additive blend) descending from ceiling lights with floor pool discs create visible "islands of light" in corridors. Distance-based fade + hazard-reactive flicker keeps performance tight.
+- **Floor-level effects ground the player**: Footstep dust kicks, headlight ground spots, and breath puffs all operate near y=0. These tiny effects (0.04-0.15 opacity) are surprisingly impactful because the chase cam is low-angle and they fill the foreground.
+- **Discovery sparkles reward exploration**: First-time room entry triggers 12 room-tinted twinkle sprites. The 15Hz twinkle (`sin(life*15)`) reads as magical/rewarding without being overwhelming. Track visited rooms in a session Set.
+- **Wall LEDs sell "active station"**: 4 tiny blinking sprites per room wall with position-based phase offsets create the illusion of computer panel status indicators. Each blink cycle needs both a primary and secondary flash for visual interest.
+- **Sweepo personality through the eye**: A single emissive sphere (0.04 radius) on the bot's front with HP-reactive color (green→amber→orange→red) adds character. Combined with antenna droop and ground glow, the bot tells its story visually.
+- **Breath puffs in corridors**: Small white puffs from Sweepo's front in corridors (every 2-3s) sell the "cold damaged station" atmosphere. Must drift in facing direction, not just upward.
+- **Entity shadow discs vs shadow maps**: A simple dark circle (0.15 opacity) under each entity is cheaper than shadow casting and always visible. Works alongside the existing ground ring for a grounded look.
+- **Puzzle feedback with energy dots**: Sprites traveling along bezier curves between activated relays give satisfying visual confirmation that "power is flowing". Store the curve reference alongside the line for animation.
+- **Child index stability**: When adding meshes to Sweepo's group, always append (don't insert) to avoid breaking existing damage visualization that references specific child indices.
+- **Compass HUD below minimap**: Canvas-rendered compass works better than Three.js overlay because it stays pixel-sharp. Cardinal labels rotating with `playerFacing` gives instant directional awareness.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
