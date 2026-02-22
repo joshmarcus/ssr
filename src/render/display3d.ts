@@ -5428,12 +5428,12 @@ export class BrowserDisplay3D implements IGameDisplay {
     );
     this.scene.add(this.trimBBInstanced);
 
-    // Edge glow: bright emissive
+    // Edge glow: bright emissive (boosted for bloom)
     const glowMat = makeToonMaterial({
       color: 0xffffff,
       gradientMap: this.toonGradient,
-      emissive: 0xaaaaaa,
-      emissiveIntensity: 0.6,
+      emissive: 0xcccccc,
+      emissiveIntensity: 0.8,
     });
     this.trimGlowInstanced = new THREE.InstancedMesh(BrowserDisplay3D._edgeGlowGeo!, glowMat, max);
     this.trimGlowInstanced.count = 0;
@@ -5456,12 +5456,12 @@ export class BrowserDisplay3D implements IGameDisplay {
     );
     this.scene.add(this.trimRailInstanced);
 
-    // Mid-wall accent: emissive eye-level strip visible from chase cam
+    // Mid-wall accent: emissive eye-level strip visible from chase cam (boosted for bloom)
     const midMat = makeToonMaterial({
       color: 0xffffff,
       gradientMap: this.toonGradient,
-      emissive: 0xcccccc,
-      emissiveIntensity: 0.45,
+      emissive: 0xdddddd,
+      emissiveIntensity: 0.65,
     });
     this.trimMidInstanced = new THREE.InstancedMesh(BrowserDisplay3D._midAccentGeo!, midMat, max);
     this.trimMidInstanced.count = 0;
@@ -8311,14 +8311,15 @@ export class BrowserDisplay3D implements IGameDisplay {
     tip.position.y = 0.67;
     group.add(tip);
 
-    // Ground glow circle under Sweepo
-    const glowGeo = new THREE.CircleGeometry(0.5, 16);
+    // Ground glow circle under Sweepo (additive for bloom-friendly halo)
+    const glowGeo = new THREE.CircleGeometry(0.6, 16);
     glowGeo.rotateX(-Math.PI / 2);
     const glowMat = new THREE.MeshBasicMaterial({
       color: 0x22ff66,
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.18,
       depthWrite: false,
+      blending: THREE.AdditiveBlending,
     });
     const glowCircle = new THREE.Mesh(glowGeo, glowMat);
     glowCircle.position.y = -0.01; // just above floor
