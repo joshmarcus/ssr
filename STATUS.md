@@ -193,6 +193,7 @@
 - **Sprint V31 — Chase cam polish**: Wall collision avoidance (camera pulls closer when behind wall), FOV breathing (+3° during movement), dynamic fog (tighter 6-18 in chase cam vs 20-40 in ortho)
 - **Sprint V32 — Ceiling panels**: InstancedMesh ceiling panels above all explored tiles at y=2.05, dark metallic coloring, only visible in chase cam for enclosed corridor atmosphere
 - **Sprint V33 — Entity visibility**: Fill light at eye level for chase cam, player light range 18→22, proximity entity highlight (emissive boost within 2/4 tiles in chase cam)
+- **Sprint V34 — Ground Sweepo + atmosphere**: Sweepo grounded to floor level (y=0.02 vs old 0.4), chase cam lowered to 0.9 for dramatic ground perspective, doors raised with visible gap at bottom for bot pass-through, emergency red wall light strips on hazardous corridors (pulsing emissive), breach spark particles (flickering orange jitter near breach entities)
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
