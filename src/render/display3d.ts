@@ -1976,20 +1976,35 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Proximity entity highlight: boost emissive for nearby entities in chase cam
+    // Proximity entity highlight: boost emissive + pulse ground ring for nearby entities
     if (this.chaseCamActive && this.playerMesh) {
       for (const [, mesh] of this.entityMeshes) {
         const dx = mesh.position.x - this.playerCurrentX;
         const dz = mesh.position.z - this.playerCurrentZ;
         const dist = Math.abs(dx) + Math.abs(dz);
-        const boost = dist < 2 ? 0.4 : dist < 4 ? 0.15 : 0;
-        if (boost > 0) {
-          mesh.traverse((child) => {
-            if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        const boost = dist < 2 ? 0.5 : dist < 4 ? 0.2 : 0;
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            if (boost > 0) {
               child.material.emissiveIntensity = Math.max(child.material.emissiveIntensity, boost);
             }
-          });
-        }
+          }
+          // Pulse ground ring opacity when player is nearby
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial &&
+              child.rotation.x === -Math.PI / 2 && child.material.transparent) {
+            if (dist < 2) {
+              // Close: bright pulsing ring
+              child.material.opacity = 0.4 + Math.sin(elapsed * 4) * 0.2;
+              child.scale.set(1.2, 1.2, 1.2); // slightly larger
+            } else if (dist < 4) {
+              child.material.opacity = 0.15 + Math.sin(elapsed * 2) * 0.05;
+              child.scale.set(1, 1, 1);
+            } else {
+              child.material.opacity = 0.1;
+              child.scale.set(1, 1, 1);
+            }
+          }
+        });
       }
     }
 
