@@ -623,6 +623,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _pipeLeakTimer: number = 0;
   // Sweepo eye emotion: widen timer on discovery/interaction
   private _eyeWidenTimer: number = 0;
+  // Floating interact indicator sprite
+  private _interactIndicator: THREE.Sprite | null = null;
   // DataCore holographic ring
   private _dataCoreHoloRing: THREE.Mesh | null = null;
   // Discovery sparkle: rooms visited this session for first-entry effects
@@ -3058,6 +3060,47 @@ export class BrowserDisplay3D implements IGameDisplay {
         mesh.scale.set(1, 1, 1);
         (mesh as any)._interactPulse = 0;
       }
+    }
+
+    // Floating interact indicator: bobbing arrow above nearest interactable entity
+    if (this.chaseCamActive) {
+      let nearestInteractMesh: THREE.Object3D | null = null;
+      let nearestInteractDist = 999;
+      for (const [, mesh] of this.entityMeshes) {
+        if (mesh.userData._exhausted) continue;
+        const dx = mesh.position.x - this.playerCurrentX;
+        const dz = mesh.position.z - this.playerCurrentZ;
+        const dist = Math.abs(dx) + Math.abs(dz);
+        if (dist < 1.8 && dist < nearestInteractDist) {
+          nearestInteractDist = dist;
+          nearestInteractMesh = mesh;
+        }
+      }
+      if (nearestInteractMesh) {
+        if (!this._interactIndicator) {
+          const indMat = new THREE.SpriteMaterial({
+            color: 0x88ffcc, transparent: true, opacity: 0.7,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          this._interactIndicator = new THREE.Sprite(indMat);
+          this._interactIndicator.scale.set(0.15, 0.15, 1);
+          this.scene.add(this._interactIndicator);
+        }
+        this._interactIndicator.visible = true;
+        const bob = Math.sin(elapsed * 3) * 0.08;
+        const entityHeight = (nearestInteractMesh.userData.baseY as number ?? 0.3) + 0.5;
+        this._interactIndicator.position.set(
+          nearestInteractMesh.position.x,
+          entityHeight + 0.3 + bob,
+          nearestInteractMesh.position.z,
+        );
+        const indMat = this._interactIndicator.material as THREE.SpriteMaterial;
+        indMat.opacity = 0.5 + Math.sin(elapsed * 4) * 0.2;
+      } else if (this._interactIndicator) {
+        this._interactIndicator.visible = false;
+      }
+    } else if (this._interactIndicator) {
+      this._interactIndicator.visible = false;
     }
 
     // Player light: breathing pulse + room entry bloom

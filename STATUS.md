@@ -280,6 +280,7 @@
 - **Sprint V118 — Crew NPC breathing and weight shift**: Crew members breathe (Y-scale ±1.5% at 1Hz with unique phase) and shift weight when idle (subtle Z-rotation lean at 0.4Hz). Stops leaning when facing player. Makes crew feel alive and present
 - **Sprint V119 — DataCore energy arcs**: 3 magenta spark sprites radiate outward every ~2.5s from the DataCore. Elongated vertically (0.06x0.12), short-lived (0.2-0.35s). One-shot flag prevents multi-frame spawning. Adds crackling energy feel to the primary objective
 - **Sprint V120 — Minimap entity pulse rings**: Key unexhausted entities (DataCore, EscapePod, CrewNPC) get a pulsing ring on the minimap. Ring radius oscillates, opacity fades in/out at 2.5Hz. Draws player attention to important objectives without cluttering the map
+- **Sprint V121 — Floating interact indicator**: Glowing green-teal sprite hovers above nearest unexhausted entity within 1.8 tiles. Bobs vertically (3Hz) and pulses opacity (4Hz). Single reusable sprite moves between targets. Clear visual cue for interactable entities
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
