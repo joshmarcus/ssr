@@ -2592,6 +2592,32 @@ export class BrowserDisplay3D implements IGameDisplay {
         this._dataCoreHoloRing.rotation.y = elapsed * 1.2;
         const ringMat = this._dataCoreHoloRing.material as THREE.MeshBasicMaterial;
         ringMat.opacity = 0.2 + Math.sin(elapsed * 2) * 0.1;
+        // Energy arcs: periodic magenta sparks radiating outward
+        const arcPhase = (elapsed * 1.5 + mesh.position.x * 7) % 2.5;
+        if (arcPhase < 0.05 && !mesh.userData._arcSpawned) {
+          mesh.userData._arcSpawned = true;
+          for (let ai = 0; ai < 3; ai++) {
+            const angle = Math.random() * Math.PI * 2;
+            const arcMat = new THREE.SpriteMaterial({
+              color: 0xff66ff, transparent: true, opacity: 0.8,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const arc = new THREE.Sprite(arcMat);
+            arc.scale.set(0.06, 0.12, 1);
+            arc.position.set(
+              mesh.position.x + Math.cos(angle) * 0.3,
+              mesh.position.y + (Math.random() - 0.5) * 0.3,
+              mesh.position.z + Math.sin(angle) * 0.3,
+            );
+            (arc as any)._life = 0;
+            (arc as any)._maxLife = 0.2 + Math.random() * 0.15;
+            (arc as any)._driftY = 0.5 + Math.random() * 0.5;
+            this.scene.add(arc);
+            this._discoverySparkles.push(arc);
+          }
+        } else if (arcPhase >= 0.05) {
+          mesh.userData._arcSpawned = false;
+        }
       } else if (userData.entityType === EntityType.Breach) {
         const scale = 1 + Math.sin(elapsed * 3) * 0.15;
         mesh.scale.set(scale, scale, scale);

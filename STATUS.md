@@ -278,6 +278,7 @@
 - **Sprint V116 — Cleaning sparkle trail**: Green sparkles rise from floor when Sweepo moves over dirty tiles (dirt>30). Intensity scales with dirt level. Reuses sparkle pool with upward drift. Visual reward for the core cleaning loop
 - **Sprint V117 — Sweepo damage particle sparks**: Orange sprite sparks shoot from Sweepo's body when HP <40%. Frequency increases with severity (0.3→0.1s interval). Short-lived (0.15-0.3s) upward-drifting sparks. Complements existing emissive body flash with actual particles
 - **Sprint V118 — Crew NPC breathing and weight shift**: Crew members breathe (Y-scale ±1.5% at 1Hz with unique phase) and shift weight when idle (subtle Z-rotation lean at 0.4Hz). Stops leaning when facing player. Makes crew feel alive and present
+- **Sprint V119 — DataCore energy arcs**: 3 magenta spark sprites radiate outward every ~2.5s from the DataCore. Elongated vertically (0.06x0.12), short-lived (0.2-0.35s). One-shot flag prevents multi-frame spawning. Adds crackling energy feel to the primary objective
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
