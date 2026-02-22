@@ -7840,9 +7840,35 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
 
         const isHazard = nearHeat > 40 || nearSmoke > 30 || lowPress;
+
+        // Room proximity tinting: corridor shafts near rooms blend with room color
+        let baseShaftColor = 0x88bbdd;
+        for (const room of state.rooms) {
+          const nearestRx = Math.max(room.x, Math.min(x, room.x + room.width - 1));
+          const nearestRy = Math.max(room.y, Math.min(y, room.y + room.height - 1));
+          const rDist = Math.abs(x - nearestRx) + Math.abs(y - nearestRy);
+          if (rDist <= 3) {
+            const roomTint = ROOM_WALL_TINTS_3D[room.name];
+            if (roomTint) {
+              // Blend: closer to room = more room color
+              const blend = 1 - rDist / 4;
+              const br = ((baseShaftColor >> 16) & 0xff);
+              const bg = ((baseShaftColor >> 8) & 0xff);
+              const bb = (baseShaftColor & 0xff);
+              const rr = ((roomTint >> 16) & 0xff);
+              const rg = ((roomTint >> 8) & 0xff);
+              const rb = (roomTint & 0xff);
+              baseShaftColor = (Math.round(br + (rr - br) * blend * 0.5) << 16) |
+                               (Math.round(bg + (rg - bg) * blend * 0.5) << 8) |
+                               Math.round(bb + (rb - bb) * blend * 0.5);
+            }
+            break;
+          }
+        }
+
         const shaftColor = isHazard
           ? (nearHeat > 40 ? 0xff6633 : lowPress ? 0x4488ff : 0x999966)
-          : 0x88bbdd;
+          : baseShaftColor;
 
         // Volumetric light shaft: semi-transparent cylinder from ceiling
         const shaftGeo = new THREE.CylinderGeometry(0.15, 0.25, 1.8, 8, 1, true);
@@ -11023,6 +11049,25 @@ export class BrowserDisplay3D implements IGameDisplay {
     ctx.fillStyle = turnColor;
     ctx.fillText(`T${state.turn}`, 3, h - 2);
     ctx.globalAlpha = 1;
+
+    // Exploration percentage: shows how much of the walkable map has been explored
+    {
+      let walkable = 0, explored = 0;
+      for (let ey = 0; ey < state.height; ey++) {
+        for (let ex = 0; ex < state.width; ex++) {
+          if (state.tiles[ey][ex].walkable) {
+            walkable++;
+            if (state.tiles[ey][ex].explored) explored++;
+          }
+        }
+      }
+      const pct = walkable > 0 ? Math.round((explored / walkable) * 100) : 0;
+      ctx.font = "bold 7px monospace";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = pct >= 80 ? "rgba(68,255,136,0.7)" : pct >= 50 ? "rgba(200,220,180,0.5)" : "rgba(140,160,180,0.4)";
+      ctx.fillText(`${pct}%`, w - 3, h - 2);
+    }
 
     // Sensor mode minimap border: colored frame when sensor is active
     if (this.sensorMode) {
