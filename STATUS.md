@@ -257,6 +257,7 @@
 - **Sprint V95 — Stun screen static**: Persistent TV-noise overlay while Sweepo is stunned. Randomized gradient lines at 12% opacity, mix-blend-mode screen, refreshed every frame for flickering static effect. Auto-hides when stun ends
 - **Sprint V96 — Low HP warning vignette**: Pulsing red inset box-shadow around screen edges when Sweepo HP <40%. Severity-scaled spread (60-100px) and opacity pulse (2.5Hz). Classic danger feedback for critical health states
 - **Sprint V97 — Sweepo cleaning brushes**: Two small rotating cylinders on Sweepo's underside. Spin fast (15 rad/s) when moving, slow idle rotation. Counter-rotating pair reinforces Sweepo's identity as a cleaning bot
+- **Sprint V98 — Minimap room checkmarks**: Green checkmark on minimap for rooms where all entities are exhausted. Helps players track which rooms still need attention and which are fully explored
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

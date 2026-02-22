@@ -7690,6 +7690,33 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Room cleared checkmarks: small tick for rooms with all entities exhausted
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    for (const room of state.rooms) {
+      const rcx = room.x + Math.floor(room.width / 2);
+      const rcy = room.y + Math.floor(room.height / 2);
+      if (!(rcy >= 0 && rcy < state.height && rcx >= 0 && rcx < state.width && state.tiles[rcy][rcx].explored)) continue;
+      // Count entities in this room
+      let total = 0;
+      let exhausted = 0;
+      for (const [eid, ent] of state.entities) {
+        if (eid === "player") continue;
+        if (ent.pos.x >= room.x && ent.pos.x < room.x + room.width &&
+            ent.pos.y >= room.y && ent.pos.y < room.y + room.height) {
+          total++;
+          if (isEntityExhausted(ent)) exhausted++;
+        }
+      }
+      if (total > 0 && exhausted === total) {
+        const rx = Math.floor((room.x + room.width) * scale) - 2;
+        const ry = Math.floor(room.y * scale) + 1;
+        ctx.fillStyle = "rgba(68,255,100,0.7)";
+        ctx.fillText("\u2713", rx, ry); // checkmark
+      }
+    }
+
     // Player: bright green dot with facing direction arrow
     const ppx = Math.floor(state.player.entity.pos.x * scale);
     const ppy = Math.floor(state.player.entity.pos.y * scale);
