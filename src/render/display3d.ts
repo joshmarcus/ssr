@@ -1840,8 +1840,16 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Turn warning at 70%+ of max turns
+    const maxTurns = state.maxTurns;
+    const remaining = maxTurns - state.turn;
+    const warnThreshold = Math.floor(maxTurns * 0.70);
+    const turnWarning = state.turn >= warnThreshold
+      ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold">[${remaining} left]</span>`
+      : "";
+
     const statusHtml = `<div class="status-bar">` +
-      `<span class="label">T:</span><span class="value">${state.turn}</span>` +
+      `<span class="label">T:</span><span class="value">${state.turn}</span>${turnWarning}` +
       roomLabel + sensorTag + stunTag +
       `<br>` + hpTag.replace(/ \| /, '') +
       `<br>` + discoveryTag.replace(/ \| /, '') + evidenceTag.replace(/ \| /, '') + deductionTag.replace(/ \| /, '') + unreadTag.replace(/ \| /g, '') +

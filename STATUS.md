@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V130 completed, V131 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V140 completed, V141 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -299,6 +299,7 @@
 - **Sprint V137 — Entity label glow and rounded background**: Entity name labels upgraded with rounded rectangle backgrounds and colored text glow (shadowBlur 8). Improves readability against all backgrounds and adds visual polish
 - **Sprint V138 — Game over camera orbit**: Camera slowly orbits the player after victory or defeat (4-unit radius, 2-unit height, 0.3 rad/s). Creates cinematic end-of-game moment instead of static camera. Initial angle matches player facing direction
 - **Sprint V139 — Objective scanner compass**: Sensor-gated directional hints to key objectives (relays via thermal, crew/breaches via atmospheric, pods during evacuation, nearest unexplored room). Shows up to 2 targets sorted by priority with distance and cardinal direction. Brings 2D parity for critical navigation info
+- **Sprint V140 — Turn limit warning in 3D sidebar**: Color-coded turn remaining warning appears at 70%+ turn usage (amber→orange→red at 70%/80%/90% thresholds). Matches 2D parity for time pressure awareness
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
