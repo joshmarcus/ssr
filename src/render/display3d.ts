@@ -1837,9 +1837,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     return this.chaseCamActive;
   }
 
-  /** Turn the player bot left or right by 90° without moving */
+  /** Turn the player bot left or right by 45° without moving */
   turnPlayer(direction: "left" | "right"): void {
-    const step = Math.PI / 2; // 90° per turn
+    const step = Math.PI / 4; // 45° per turn
     if (direction === "left") {
       this.playerFacing += step;
     } else {
@@ -2933,11 +2933,11 @@ export class BrowserDisplay3D implements IGameDisplay {
         fog.far += (targetFar - fog.far) * 0.08;
       }
 
-      // Corridor dimming: reduce ambient light in corridors for headlight-only feel
+      // Corridor dimming: subtle ambient reduction in corridors (not dramatic)
       if (this.ambientLight && this.chaseCamActive) {
         const inRoom = this._currentRoom !== null;
-        const targetDim = inRoom ? 1.0 : 0.3; // corridors get 30% ambient for dramatic headlight contrast
-        this._corridorDimFactor += (targetDim - this._corridorDimFactor) * 0.08;
+        const targetDim = inRoom ? 1.0 : 0.75; // corridors get 75% ambient (subtle, not dramatic)
+        this._corridorDimFactor += (targetDim - this._corridorDimFactor) * 0.15; // faster lerp = less noticeable
         // Determine base intensity from phase
         const phase = this.currentPhase;
         let baseIntensity = 1.8;
@@ -7816,7 +7816,18 @@ export class BrowserDisplay3D implements IGameDisplay {
       const group = new THREE.Group();
       const clone = gltfModel.clone();
       group.add(clone);
-      const baseY = entity.type === EntityType.Drone ? 0.6 : 0.3;
+      // Entity base height: flying entities hover, ground entities sit on floor
+      const ENTITY_BASE_Y: Partial<Record<string, number>> = {
+        [EntityType.Drone]: 0.6,
+        [EntityType.PatrolDrone]: 0.5,
+        [EntityType.SensorPickup]: 0.15,
+        [EntityType.ToolPickup]: 0.15,
+        [EntityType.UtilityPickup]: 0.15,
+        [EntityType.MedKit]: 0.15,
+        [EntityType.PowerCell]: 0.15,
+        [EntityType.FuseBox]: 0.15,
+      };
+      const baseY = ENTITY_BASE_Y[entity.type] ?? 0; // default: sit on floor
       group.userData = { entityType: entity.type, baseY, isGltf: true };
       group.position.set(entity.pos.x, baseY, entity.pos.y);
 
