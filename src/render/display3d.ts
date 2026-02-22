@@ -1199,10 +1199,33 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (type === "damage") {
       this.cameraShakeIntensity = 0.15;
       this.cameraShakeDecay = 3.0;
+      // Chromatic aberration effect via CSS
+      this.triggerChromaticAberration(0.3);
     } else if (type === "stun") {
       this.cameraShakeIntensity = 0.25;
       this.cameraShakeDecay = 2.0;
+      this.triggerChromaticAberration(0.5);
     }
+  }
+
+  /** Brief chromatic aberration effect using CSS text-shadow-like overlay */
+  private triggerChromaticAberration(duration: number): void {
+    let aberration = document.getElementById("chromatic-aberration");
+    if (!aberration) {
+      aberration = document.createElement("div");
+      aberration.id = "chromatic-aberration";
+      aberration.style.cssText =
+        "position:fixed;inset:0;pointer-events:none;z-index:91;" +
+        "mix-blend-mode:screen;opacity:0;transition:opacity 0.1s;";
+      document.body.appendChild(aberration);
+    }
+    // Red and blue offset shadows create chromatic aberration look
+    aberration.style.boxShadow =
+      "inset 3px 0 10px rgba(255,0,0,0.15), inset -3px 0 10px rgba(0,0,255,0.15)";
+    aberration.style.opacity = "1";
+    setTimeout(() => {
+      aberration!.style.opacity = "0";
+    }, duration * 1000);
   }
 
   showGameOverOverlay(state: GameState): void {
