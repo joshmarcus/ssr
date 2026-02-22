@@ -445,6 +445,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Lighting
   private playerLight: THREE.PointLight;
+  private _fillLight!: THREE.PointLight;
 
   // Tile instanced meshes
   private floorMesh: THREE.InstancedMesh;      // room floors
@@ -703,9 +704,14 @@ export class BrowserDisplay3D implements IGameDisplay {
     const hemiLight = new THREE.HemisphereLight(0xccddff, 0x446688, 0.6);
     this.scene.add(hemiLight);
 
-    this.playerLight = new THREE.PointLight(0x44ff66, 3.0, 18);
+    this.playerLight = new THREE.PointLight(0x44ff66, 3.0, 22);
     this.playerLight.position.set(0, 3, 0);
     this.scene.add(this.playerLight);
+
+    // Secondary fill light at lower height for chase cam corridor illumination
+    this._fillLight = new THREE.PointLight(0xffffff, 0.8, 10);
+    this._fillLight.position.set(0, 1.2, 0);
+    this.scene.add(this._fillLight);
 
     // ── Instanced meshes for tiles ──
     // Material color is WHITE — instance colors control per-tile color directly
@@ -1618,6 +1624,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.orthoCamera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
       }
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
+      this._fillLight.position.set(this.playerCurrentX, 1.2, this.playerCurrentZ);
+      // Fill light only active in chase cam (in ortho, the overhead light is sufficient)
+      this._fillLight.intensity = this.chaseCamActive ? 0.8 : 0;
 
       // Adjust fog based on camera mode: tighter for chase cam = moodier corridors
       const fog = this.scene.fog as THREE.Fog;
@@ -1707,6 +1716,23 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Patrol sweep motion
         mesh.position.y = 0.7 + Math.sin(elapsed * 2.5) * 0.1;
         mesh.rotation.y = elapsed * 1.5;
+      }
+    }
+
+    // Proximity entity highlight: boost emissive for nearby entities in chase cam
+    if (this.chaseCamActive && this.playerMesh) {
+      for (const [, mesh] of this.entityMeshes) {
+        const dx = mesh.position.x - this.playerCurrentX;
+        const dz = mesh.position.z - this.playerCurrentZ;
+        const dist = Math.abs(dx) + Math.abs(dz);
+        const boost = dist < 2 ? 0.4 : dist < 4 ? 0.15 : 0;
+        if (boost > 0) {
+          mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.emissiveIntensity = Math.max(child.material.emissiveIntensity, boost);
+            }
+          });
+        }
       }
     }
 
