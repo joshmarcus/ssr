@@ -648,6 +648,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(COLORS_3D.background);
+    // Enable shadow maps for dramatic headlight shadows
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
     // Add mode-3d class to game container for CSS
@@ -731,6 +734,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.floorMesh = new THREE.InstancedMesh(floorGeo, floorMat, this.maxTiles);
     this.floorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.floorMesh.frustumCulled = false; // instances span entire map
+    this.floorMesh.receiveShadow = true;
     this.floorMesh.count = 0;
     this.scene.add(this.floorMesh);
 
@@ -742,6 +746,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.corridorFloorMesh = new THREE.InstancedMesh(corridorFloorGeo, corridorFloorMat, this.maxTiles);
     this.corridorFloorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.corridorFloorMesh.frustumCulled = false;
+    this.corridorFloorMesh.receiveShadow = true;
     this.corridorFloorMesh.count = 0;
     this.scene.add(this.corridorFloorMesh);
 
@@ -751,6 +756,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, this.maxTiles);
     this.wallMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.wallMesh.frustumCulled = false;
+    this.wallMesh.receiveShadow = true;
+    this.wallMesh.castShadow = true;
     this.wallMesh.count = 0;
     this.scene.add(this.wallMesh);
 
@@ -768,6 +775,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.doorMesh = new THREE.InstancedMesh(doorGeo, doorMat, 200);
     this.doorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.doorMesh.frustumCulled = false;
+    this.doorMesh.castShadow = true;
+    this.doorMesh.receiveShadow = true;
     this.doorMesh.count = 0;
     this.scene.add(this.doorMesh);
 
@@ -3844,9 +3853,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         const tile = state.tiles[y][x];
         if (tile.type !== TileType.Corridor || !tile.explored) continue;
         // Only every 3rd tile (checkerboard-ish pattern for performance)
-        if ((x + y) % 5 !== 0) continue; // every 5th tile for performance
+        if ((x + y) % 7 !== 0) continue; // sparser — headlight provides primary illumination
         this.corridorLitTiles.add(key);
-        const corridorLight = new THREE.PointLight(0xaaccee, 1.2, 6);
+        const corridorLight = new THREE.PointLight(0x8899bb, 0.6, 4); // dimmer ambient corridor lighting
         corridorLight.position.set(x, 1.5, y);
         this.scene.add(corridorLight);
       }
@@ -4721,6 +4730,11 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.headlight = new THREE.SpotLight(0xeeffff, 2.0, 8, Math.PI / 5, 0.4, 1.5);
     this.headlight.position.set(0, 0.15, 0.2); // front of Sweepo
     this.headlight.target = this.headlightTarget;
+    this.headlight.castShadow = true;
+    this.headlight.shadow.mapSize.width = 512;
+    this.headlight.shadow.mapSize.height = 512;
+    this.headlight.shadow.camera.near = 0.2;
+    this.headlight.shadow.camera.far = 8;
     group.add(this.headlight);
 
     return group;
