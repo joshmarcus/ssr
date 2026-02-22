@@ -221,6 +221,8 @@
 - **Sprint V59 — Enhanced entity proximity feedback**: Ground rings pulse/scale when player approaches (1.2x at 2 tiles, bright opacity), emissive boost increased
 - **Sprint V60 — Sweepo movement animation**: Forward tilt on movement, sideways lean into turns, movement bob (8Hz), smooth lerped animation
 - **Sprint V61 — Idle camera sway**: Gentle breathing sway when player is idle (vertical + lateral drift), distinct from active head-bob
+- **Sprint V62 — Split sliding doors**: Star Trek-style doors with two half-panels that slide apart symmetrically, 400 instance capacity
+- **Sprint V63 — Door hiss particles**: 6 steam/air particles spawn on door seam when opening, drift outward, fade over 0.6s
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
