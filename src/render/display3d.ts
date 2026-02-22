@@ -2897,6 +2897,16 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
 
+        // Dynamic bloom: stronger in corridors for dramatic headlight, subtle in rooms
+        if (this.bloomPass && this.bloomEnabled) {
+          const targetStrength = inRoom ? 0.12 : 0.28;
+          this.bloomPass.strength += (targetStrength - this.bloomPass.strength) * 0.06;
+          // Evacuation: boost bloom for red-alert drama
+          if (phase === ObjectivePhase.Evacuate) {
+            this.bloomPass.strength = Math.max(this.bloomPass.strength, 0.25);
+          }
+        }
+
         // Evacuation phase: pulsing red ambient for emergency klaxon feel
         if (phase === ObjectivePhase.Evacuate) {
           const klaxon = 0.5 + Math.abs(Math.sin(elapsed * 3)) * 0.5; // slow heavy pulse
