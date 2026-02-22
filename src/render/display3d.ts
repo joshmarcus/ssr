@@ -642,6 +642,10 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Room ambient particle tracking
   private _ambientParticleCount: number = 0;
   private _ambientParticleFrame: number = 0;
+  // Floor trail decals (fading footprint marks)
+  private _trailDecals: THREE.Sprite[] = [];
+  private _lastTrailX: number = -99;
+  private _lastTrailZ: number = -99;
   // Floating interact indicator sprite
   private _interactIndicator: THREE.Sprite | null = null;
   // Corridor forward scout light
@@ -2711,6 +2715,35 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // Floor trail decals: fading track marks left by Sweepo
+      if (isMoving) {
+        const tdx = this.playerCurrentX - this._lastTrailX;
+        const tdz = this.playerCurrentZ - this._lastTrailZ;
+        const trailDist = Math.sqrt(tdx * tdx + tdz * tdz);
+        if (trailDist > 0.8) {
+          this._lastTrailX = this.playerCurrentX;
+          this._lastTrailZ = this.playerCurrentZ;
+          const trailMat = new THREE.SpriteMaterial({
+            color: 0x556666, transparent: true, opacity: 0.12,
+            depthWrite: false, depthTest: true,
+          });
+          const decal = new THREE.Sprite(trailMat);
+          decal.scale.set(0.25, 0.15, 1);
+          decal.position.set(this.playerCurrentX, 0.011, this.playerCurrentZ);
+          decal.material.rotation = -this.playerFacing + Math.PI / 2;
+          (decal as any)._life = 0;
+          (decal as any)._maxLife = 12 + Math.random() * 4;
+          this.scene.add(decal);
+          this._trailDecals.push(decal);
+          // Cap total decals
+          if (this._trailDecals.length > 50) {
+            const old = this._trailDecals.shift()!;
+            this.scene.remove(old);
+            (old.material as THREE.SpriteMaterial).dispose();
+          }
+        }
+      }
+
       // Cleaning sparkles: green sparkles when moving over dirty tiles
       if (isMoving && this._playerTileDirt > 30 && this.chaseCamActive) {
         this._cleanSparkleTimer -= delta;
@@ -4102,6 +4135,22 @@ export class BrowserDisplay3D implements IGameDisplay {
       const s = 0.05 + t * 0.15; // expand
       bp.scale.set(s, s, 1);
       (bp.material as THREE.SpriteMaterial).opacity = 0.15 * (1 - t); // linear fade
+    }
+
+    // Floor trail decal aging
+    for (let i = this._trailDecals.length - 1; i >= 0; i--) {
+      const decal = this._trailDecals[i];
+      (decal as any)._life += delta;
+      const life = (decal as any)._life;
+      const maxLife = (decal as any)._maxLife;
+      if (life >= maxLife) {
+        this.scene.remove(decal);
+        (decal.material as THREE.SpriteMaterial).dispose();
+        this._trailDecals.splice(i, 1);
+        continue;
+      }
+      const t = life / maxLife;
+      (decal.material as THREE.SpriteMaterial).opacity = 0.12 * (1 - t * t);
     }
 
     // Room ambient particles: subtle floating motes per room type
