@@ -232,6 +232,7 @@
 - **Sprint V70 — Sweepo damage state**: Antenna droops with damage, ground glow shifts green→amber→red, body sparks at <40% HP, stun causes rapid jitter. Visual storytelling of bot condition
 - **Sprint V71 — Evacuation visual escalation**: Red klaxon ambient pulse during evacuation, ceiling panels glow red, persistent red alert hazard border, dramatic endgame atmosphere
 - **Sprint V72 — Entity animation polish**: EscapePod beacon flash (bright pulse every 3s), PowerCell/FuseBox intermittent spark, DataCore counter-rotating wireframe cage, EvidenceTrace scale pulse + layered float
+- **Sprint V73 — Corridor steam vents**: Occasional additive steam puff sprites near player in corridors (1.5-4.5s interval), drift upward, expand, and fade. Atmospheric broken-station detail
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

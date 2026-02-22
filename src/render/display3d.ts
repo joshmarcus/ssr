@@ -584,6 +584,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Particle systems
   private dustParticles: THREE.Points | null = null;
+  // Corridor steam vent sprites (pooled)
+  private _steamVentSprites: THREE.Sprite[] = [];
+  private _steamVentTimer: number = 0;
   private starfieldPoints: THREE.Points | null = null;
 
   // Hazard visual effects (sprites at hazardous tile positions)
@@ -2573,6 +2576,47 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Particle animations
     this.animateParticles(elapsed, delta);
+
+    // Corridor steam vent puffs — atmospheric detail near player
+    if (this.chaseCamActive && !this._currentRoom) {
+      this._steamVentTimer -= delta;
+      if (this._steamVentTimer <= 0) {
+        this._steamVentTimer = 1.5 + Math.random() * 3.0; // every 1.5-4.5 seconds
+        // Spawn a small steam puff near the player
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 1.5 + Math.random() * 2;
+        const sx = this.playerCurrentX + Math.cos(angle) * dist;
+        const sz = this.playerCurrentZ + Math.sin(angle) * dist;
+        const mat = new THREE.SpriteMaterial({
+          color: 0xaabbcc, transparent: true, opacity: 0.3,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(0.12, 0.12, 1);
+        sprite.position.set(sx, 0.3, sz);
+        (sprite as any)._life = 0;
+        (sprite as any)._maxLife = 0.8 + Math.random() * 0.5;
+        this.scene.add(sprite);
+        this._steamVentSprites.push(sprite);
+      }
+    }
+    // Animate active steam puffs
+    for (let i = this._steamVentSprites.length - 1; i >= 0; i--) {
+      const s = this._steamVentSprites[i];
+      (s as any)._life += delta;
+      const life = (s as any)._life;
+      const maxLife = (s as any)._maxLife;
+      if (life >= maxLife) {
+        this.scene.remove(s);
+        (s.material as THREE.SpriteMaterial).dispose();
+        this._steamVentSprites.splice(i, 1);
+        continue;
+      }
+      const t = life / maxLife;
+      s.position.y += delta * 0.4; // drift upward
+      s.scale.set(0.12 + t * 0.2, 0.12 + t * 0.2, 1); // expand
+      (s.material as THREE.SpriteMaterial).opacity = 0.3 * (1 - t); // fade
+    }
 
     // Distance culling: update every 5 frames to amortize cost
     this._cullFrame++;
