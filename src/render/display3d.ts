@@ -1703,6 +1703,42 @@ export class BrowserDisplay3D implements IGameDisplay {
     </div>`;
     el.className = `visible ${opts.type}`;
 
+    // 3D feedback effects based on deduction result
+    if (opts.type === "correct") {
+      // Correct: milestone celebration — green/gold burst + zoom + screen flash
+      this.triggerScreenFlash("milestone");
+      this.cameraZoomPulse = -1.0; // dramatic zoom-in
+      // Green sparkle burst
+      const px = this.playerCurrentX, pz = this.playerCurrentZ;
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const sMat = new THREE.SpriteMaterial({
+          color: 0x44ff88, transparent: true, opacity: 0.8,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const spark = new THREE.Sprite(sMat);
+        spark.scale.set(0.07, 0.07, 1);
+        spark.position.set(px, 0.5, pz);
+        (spark as any)._life = 0;
+        (spark as any)._maxLife = 1.0 + Math.random() * 0.5;
+        (spark as any)._driftY = 0.8 + Math.random() * 0.6;
+        (spark as any)._driftX = Math.cos(angle) * (1.2 + Math.random() * 0.6);
+        (spark as any)._driftZ = Math.sin(angle) * (1.2 + Math.random() * 0.6);
+        this.scene.add(spark);
+        this._discoverySparkles.push(spark);
+      }
+    } else if (opts.type === "wrong") {
+      // Wrong: warning shake + red tinge
+      this.triggerScreenFlash("damage");
+      this.cameraShakeIntensity = 0.08;
+      this.cameraShakeDecay = 4.0;
+    } else if (opts.type === "lockout") {
+      // Lockout: heavy shake + stun-like effect
+      this.triggerScreenFlash("stun");
+      this.cameraShakeIntensity = 0.15;
+      this.cameraShakeDecay = 2.5;
+    }
+
     // Dismiss handler
     if (this._deductionResultDismissHandler) {
       window.removeEventListener("keydown", this._deductionResultDismissHandler);
@@ -2601,6 +2637,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeCorridorArches(state);
     this.placeCorridorStripLights(state);
     this.placeCorridorJunctionBeacons(state);
+    this.placeCorridorLightShafts(state);
     this.placeCorridorWallProps(state);
     this.placeEmergencyWallStrips(state);
     this.placeCorridorFixtures(state);
@@ -4867,32 +4904,37 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Light shaft animation: pulse opacity, distance-based visibility
+    // Light shaft animation: pulse opacity, distance-based visibility, stress-reactive color
     for (let i = 0; i < this._lightShaftMeshes.length; i++) {
       const shaft = this._lightShaftMeshes[i];
       const dx = shaft.position.x - this.playerCurrentX;
       const dz = shaft.position.z - this.playerCurrentZ;
       const dist = Math.abs(dx) + Math.abs(dz);
-      // Only visible when nearby (within corridor view range + some margin)
-      if (dist > 8) {
-        shaft.visible = false;
-        continue;
-      }
+      if (dist > 8) { shaft.visible = false; continue; }
       shaft.visible = true;
       const mat = shaft.material as THREE.MeshBasicMaterial;
       const phase = elapsed * 1.0 + shaft.position.x * 5.3 + shaft.position.z * 7.1;
       const isHazard = shaft.userData.isHazard;
       if (isHazard) {
-        // Hazard shafts: erratic flicker, occasionally drop out
         const flick = Math.sin(phase * 3.5) * Math.sin(phase * 2.7);
         mat.opacity = flick > 0.2 ? 0.06 : 0.01;
       } else {
-        // Normal: gentle breathing
         mat.opacity = 0.03 + Math.sin(phase) * 0.015;
+        // Station stress: shift shaft color toward amber
+        if (this._stationStress > 0.15) {
+          const sf = Math.min(1, this._stationStress);
+          mat.color.setRGB(
+            (0x88 + (0xff - 0x88) * sf * 0.6) / 255,
+            (0xbb + (0x88 - 0xbb) * sf * 0.6) / 255,
+            (0xdd + (0x44 - 0xdd) * sf * 0.6) / 255,
+          );
+        }
       }
-      // Distance fade: dimmer further from player
-      const distFade = 1 - (dist / 8);
-      mat.opacity *= distFade;
+      // Power flux: dim shafts during power fluctuations
+      if (powerDimFactor < 0.95) {
+        mat.opacity *= powerDimFactor;
+      }
+      mat.opacity *= (1 - dist / 8);
     }
 
     // Floor light pool animation: subtle pulse synced with shafts
@@ -4910,7 +4952,17 @@ export class BrowserDisplay3D implements IGameDisplay {
         mat.opacity = Math.sin(phase * 3.5) > 0.2 ? 0.1 : 0.02;
       } else {
         mat.opacity = 0.06 + Math.sin(phase) * 0.02;
+        // Station stress: warm floor pool color
+        if (this._stationStress > 0.15) {
+          const sf = Math.min(1, this._stationStress);
+          mat.color.setRGB(
+            (0x88 + (0xff - 0x88) * sf * 0.6) / 255,
+            (0xbb + (0x88 - 0xbb) * sf * 0.6) / 255,
+            (0xdd + (0x44 - 0xdd) * sf * 0.6) / 255,
+          );
+        }
       }
+      if (powerDimFactor < 0.95) mat.opacity *= powerDimFactor;
       mat.opacity *= (1 - dist / 8);
     }
 
@@ -7753,6 +7805,76 @@ export class BrowserDisplay3D implements IGameDisplay {
         bucket.add(fixture);
 
         // Fixture PointLight disabled for performance — emissive material suffices
+      }
+    }
+  }
+
+  // ── Private: corridor light shafts + floor pools ────────────────
+
+  private _lightShaftTilesPlaced: Set<string> = new Set();
+
+  private placeCorridorLightShafts(state: GameState): void {
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored || tile.type !== TileType.Corridor) continue;
+
+        const key = `shaft_${x},${y}`;
+        if (this._lightShaftTilesPlaced.has(key)) continue;
+
+        // Place every 5th corridor tile
+        if ((x * 3 + y * 7) % 5 !== 0) continue;
+        this._lightShaftTilesPlaced.add(key);
+
+        // Check nearby hazards for tinting
+        let nearHeat = 0, nearSmoke = 0, lowPress = false;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const ny = y + dy, nx = x + dx;
+            if (ny < 0 || ny >= state.height || nx < 0 || nx >= state.width) continue;
+            const t = state.tiles[ny][nx];
+            if (t.heat > nearHeat) nearHeat = t.heat;
+            if (t.smoke > nearSmoke) nearSmoke = t.smoke;
+            if (t.pressure < 40) lowPress = true;
+          }
+        }
+
+        const isHazard = nearHeat > 40 || nearSmoke > 30 || lowPress;
+        const shaftColor = isHazard
+          ? (nearHeat > 40 ? 0xff6633 : lowPress ? 0x4488ff : 0x999966)
+          : 0x88bbdd;
+
+        // Volumetric light shaft: semi-transparent cylinder from ceiling
+        const shaftGeo = new THREE.CylinderGeometry(0.15, 0.25, 1.8, 8, 1, true);
+        const shaftMat = new THREE.MeshBasicMaterial({
+          color: shaftColor,
+          transparent: true,
+          opacity: isHazard ? 0.04 : 0.03,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        });
+        const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+        shaft.position.set(x, 1.1, y); // centered between floor and ceiling
+        shaft.userData.isHazard = isHazard;
+        this.getCorridorBucket(this.ceilingGroup, x, y).add(shaft);
+        this._lightShaftMeshes.push(shaft);
+
+        // Floor pool: glowing disc under the shaft
+        const poolGeo = new THREE.CircleGeometry(0.35, 12);
+        poolGeo.rotateX(-Math.PI / 2);
+        const poolMat = new THREE.MeshBasicMaterial({
+          color: shaftColor,
+          transparent: true,
+          opacity: isHazard ? 0.08 : 0.06,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        });
+        const pool = new THREE.Mesh(poolGeo, poolMat);
+        pool.position.set(x, 0.015, y);
+        pool.userData.isHazard = isHazard;
+        this.getCorridorBucket(this.decorationGroup, x, y).add(pool);
+        this._floorPoolMeshes.push(pool);
       }
     }
   }
