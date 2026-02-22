@@ -1228,10 +1228,27 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   flashTile(x: number, y: number, _color?: string): void {
     // 3D interaction flash: expanding ring + particle burst
+    // Determine ring color from entity at this position (if any)
+    let flashColor = 0x44ff88; // default green
+    let particleColor = 0x66ffaa;
+    for (const [, mesh] of this.entityMeshes) {
+      if (Math.abs(mesh.position.x - x) < 0.5 && Math.abs(mesh.position.z - y) < 0.5) {
+        const entType = mesh.userData.entityType;
+        if (entType && ENTITY_COLORS_3D[entType as EntityType]) {
+          flashColor = ENTITY_COLORS_3D[entType as EntityType];
+          // Brighten for particle color
+          const pr = Math.min(255, ((flashColor >> 16) & 0xff) + 60);
+          const pg = Math.min(255, ((flashColor >> 8) & 0xff) + 60);
+          const pb = Math.min(255, (flashColor & 0xff) + 60);
+          particleColor = (pr << 16) | (pg << 8) | pb;
+        }
+        break;
+      }
+    }
     const ringGeo = new THREE.TorusGeometry(0.2, 0.03, 6, 16);
     ringGeo.rotateX(Math.PI / 2);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x44ff88,
+      color: flashColor,
       transparent: true,
       opacity: 0.8,
     });
@@ -1247,7 +1264,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       const speed = 1.5 + Math.random() * 1.5;
       const pGeo = new THREE.SphereGeometry(0.03, 4, 4);
       const pMat = new THREE.MeshBasicMaterial({
-        color: 0x66ffaa,
+        color: particleColor,
         transparent: true,
         opacity: 1.0,
       });
