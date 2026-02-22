@@ -229,6 +229,21 @@ Room-focused rendering paradigm shift and atmosphere refinement:
 - **Transition effects need CSS overlay**: The room transition fade uses a simple fixed-position div with opacity animation. Simpler and faster than a Three.js post-processing pass.
 - **Map state to visual, don't store visual state**: Room haze meshes store hazard color but should derive it from game state each frame. Storing visual state leads to stale data when game state changes.
 
+## Sprint Learnings (V65-V74 Reflection)
+
+Entity personality and environmental storytelling through animation:
+
+- **Entity awareness sells the world**: CrewNPC facing the player, Drone eye tracking, RepairBot extending its arm — these tiny reactions (3-5 lines each) make entities feel conscious rather than static props. Use `atan2` for smooth face-player rotation with shortest-path lerp.
+- **Heartbeat/beacon rhythms > sine waves**: MedKit's double-beat pulse (`pow(sin,8) + pow(sin+offset,12)`) and EscapePod's beacon flash (modulo timing with narrow window) feel more organic than simple sine oscillations.
+- **Screen glow projection transforms rooms**: Adding a PointLight to Console/LogTerminal that casts colored light onto the floor creates the sci-fi control room look for free. Sync light intensity with material flicker for coherence.
+- **Volumetric light cones are cheap drama**: A semi-transparent ConeGeometry with additive blending on Sweepo's headlight costs one mesh but adds massive corridor atmosphere. Opacity 0.03-0.045 is the sweet spot.
+- **Room signatures = room identity**: A brief tinted CSS overlay on room entry (300-400ms fade) makes each room type feel distinct. Purple for Data Core, white for Med Bay — simple but effective.
+- **Damage state on the player model**: Antenna droop, ground glow color shift, body sparks — these visual cues communicate HP without UI. The stun jitter (random rotation) is immediately readable.
+- **Evacuation needs visual escalation**: Red ceiling emissive, klaxon ambient pulse, persistent hazard border — the endgame should feel dramatically different from exploration. Phase-reactive effects stack.
+- **Room exit transitions matter**: Going from room to corridor should feel like "leaving safety". Brief darkness pulse + FOV tighten creates the contrast needed.
+- **Corridor steam vents = atmospheric filler**: Occasional sprite puffs near the player fill the visual silence of corridor traversal. Pool and dispose to avoid memory leaks.
+- **Scan grid ripple gives feedback**: Floor grid squares that flash as the scan wave passes make scanning feel satisfying and tech-forward. Use additive blending for the glow-through-floor effect.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
