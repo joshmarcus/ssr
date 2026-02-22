@@ -3986,20 +3986,28 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.headlight.color.setHex(baseColor);
       }
 
-      // Volumetric cone: disabled — doesn't look convincing as a light cone
-      // Hide the cone mesh
+      // Volumetric cone: visible in corridors, subtle in rooms
       if (this.playerMesh) {
+        const coneInRoom = this._currentRoom !== null;
         this.playerMesh.traverse((child) => {
           if (child instanceof THREE.Mesh && child.userData?.isHeadlightCone) {
-            child.visible = false;
+            child.visible = true;
+            if (child.material instanceof THREE.MeshBasicMaterial) {
+              const coneTarget = coneInRoom ? 0.012 : 0.025;
+              child.material.opacity += (coneTarget - child.material.opacity) * 0.1;
+            }
           }
         });
       }
     }
 
-    // Headlight ground spot: disabled — station is well-lit and the circle doesn't read as light
+    // Headlight ground spot: corridor-focused floor illumination
     if (this._headlightSpot) {
-      this._headlightSpot.visible = false;
+      const spotInRoom = this._currentRoom !== null;
+      this._headlightSpot.visible = true;
+      const spotTarget = spotInRoom ? 0.04 : 0.10;
+      (this._headlightSpot.material as THREE.MeshBasicMaterial).opacity +=
+        (spotTarget - (this._headlightSpot.material as THREE.MeshBasicMaterial).opacity) * 0.08;
     }
 
     // Interaction indicator: bob, spin, and ring pulse
@@ -8169,6 +8177,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         mesh.position.y = Math.sin(elapsed * 0.8 + echo.pos.y * 2) * 0.03;
         // Slow rotation drift
         mesh.rotation.y = elapsed * 0.2 + echo.pos.x;
+        // Subtle scale pulse for ethereal presence
+        const scalePulse = 1.0 + Math.sin(elapsed * 0.7 + echo.pos.y * 2.5) * 0.05;
+        mesh.scale.set(scalePulse, scalePulse, scalePulse);
       } else if (echo.echoType === SceneEchoType.DamageMark) {
         // Discovered damage marks glow slightly brighter
         if (isRevealing && mesh instanceof THREE.Mesh) {
@@ -8176,11 +8187,16 @@ export class BrowserDisplay3D implements IGameDisplay {
           const mat = mesh.material as THREE.MeshBasicMaterial;
           mat.opacity = 0.6 + Math.sin(revealT * 4) * 0.3;
         }
+        // Subtle scale breathing for environmental presence
+        const breathe = 1.0 + Math.sin(elapsed * 0.5 + echo.pos.x * 1.7) * 0.03;
+        mesh.scale.set(breathe, 1, breathe);
       } else if (echo.echoType === SceneEchoType.SystemTrace) {
         // Flicker
         const flicker = Math.sin(elapsed * 8 + echo.pos.x * 5) > 0.3;
         mesh.visible = mesh.visible && flicker;
         mesh.rotation.y = elapsed * 2;
+        // Vertical bob
+        mesh.position.y = 0.5 + Math.sin(elapsed * 1.5 + echo.pos.y * 3) * 0.08;
       }
     }
 
