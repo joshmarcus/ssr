@@ -607,6 +607,10 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _vacuumWindTimer: number = 0;
   private _playerTilePressure: number = 100;
   private _nearestBreachDir: { x: number; z: number } = { x: 0, z: 0 };
+  // Heat shimmer sprites (rising on hot tiles)
+  private _heatShimmerSprites: THREE.Sprite[] = [];
+  private _heatShimmerTimer: number = 0;
+  private _playerTileHeat: number = 0;
   // Discovery sparkle: rooms visited this session for first-entry effects
   private _visitedRooms3D: Set<string> = new Set();
   private _discoverySparkles: THREE.Sprite[] = [];
@@ -2299,6 +2303,53 @@ export class BrowserDisplay3D implements IGameDisplay {
       (vw.material as THREE.SpriteMaterial).opacity = 0.12 * (1 - t);
       const s = 0.04 + t * 0.06;
       vw.scale.set(s, s, 1);
+    }
+
+    // Heat shimmer: rising wavering particles on hot tiles
+    if (this._playerTileHeat > 25 && this.chaseCamActive) {
+      this._heatShimmerTimer -= delta;
+      if (this._heatShimmerTimer <= 0) {
+        const intensity = Math.min(1, this._playerTileHeat / 80);
+        this._heatShimmerTimer = 0.1 + (1 - intensity) * 0.2;
+        const shimMat = new THREE.SpriteMaterial({
+          color: 0xff6622, transparent: true, opacity: 0.06 + intensity * 0.06,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const shim = new THREE.Sprite(shimMat);
+        shim.scale.set(0.15, 0.03, 1); // wide and thin (heat wave)
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 0.5 + Math.random() * 2;
+        shim.position.set(
+          this.playerCurrentX + Math.cos(angle) * dist,
+          0.05,
+          this.playerCurrentZ + Math.sin(angle) * dist
+        );
+        (shim as any)._life = 0;
+        (shim as any)._maxLife = 0.4 + Math.random() * 0.3;
+        (shim as any)._wavePhase = Math.random() * Math.PI * 2;
+        this.scene.add(shim);
+        this._heatShimmerSprites.push(shim);
+      }
+    }
+    // Animate heat shimmer
+    for (let i = this._heatShimmerSprites.length - 1; i >= 0; i--) {
+      const hs = this._heatShimmerSprites[i];
+      (hs as any)._life += delta;
+      const life = (hs as any)._life;
+      const maxLife = (hs as any)._maxLife;
+      if (life >= maxLife) {
+        this.scene.remove(hs);
+        (hs.material as THREE.SpriteMaterial).dispose();
+        this._heatShimmerSprites.splice(i, 1);
+        continue;
+      }
+      const t = life / maxLife;
+      hs.position.y += delta * 0.8; // rise fast
+      // Horizontal wave distortion
+      hs.position.x += Math.sin((hs as any)._wavePhase + life * 12) * delta * 0.3;
+      (hs.material as THREE.SpriteMaterial).opacity *= (1 - t * 0.5);
+      const sx = 0.15 + t * 0.1;
+      hs.scale.set(sx, 0.03 + t * 0.02, 1);
     }
 
     // Entity animations
@@ -6467,9 +6518,10 @@ export class BrowserDisplay3D implements IGameDisplay {
     this._playerHpPercent = state.player.hp / state.player.maxHp;
     this._playerStunned = state.player.stunTurns > 0;
 
-    // Track tile pressure + nearest breach direction for vacuum wind
+    // Track tile hazards for visual effects in animate loop
     const playerTile = state.tiles[py]?.[px];
     this._playerTilePressure = playerTile?.pressure ?? 100;
+    this._playerTileHeat = playerTile?.heat ?? 0;
     if (this._playerTilePressure < 60) {
       // Find nearest breach entity for wind direction
       let bestDist = Infinity;
