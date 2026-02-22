@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 90 (V213 completed — Mystery rework complete, visual polish)
+- **Phase**: Sprint 93 (V215 completed — Dynamic events + stress-reactive lighting)
 - **Test status**: 292 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -125,6 +125,23 @@
 - Fixed TypeScript narrowing invalidation in commitDeductionAnswer (state.mystery → local variable)
 - Entity type comparisons use EntityType enum instead of string literals
 - 292 tests passing across 24 test files
+
+## Sprint 91-93 Changes (V214-V215)
+
+### V214 — Dynamic Station Events + Corridor Hazard Tinting
+- **Power fluctuation system**: Periodic whole-station light dims (15-30s interval) with flutter envelope, intensity scales with station stress
+- **Hull groan events**: Low-frequency camera rumble with sine envelope decay
+- **Station ambient narrative**: 10 atmospheric messages ("A distant metallic groan reverberates...") fire every 12+ turns with 20% chance
+- **Corridor hazard tinting**: Floor + wall colors reflect nearby hazard state (heat→warm red-orange, vacuum→cold blue, smoke→desaturated grey)
+- **Station stress system**: Computed from overall hazard tile percentage, drives event frequency
+- **Fix: "unknown evidence" title**: Corridor traces now show "Corridor trace" instead of "Trace: unknown evidence"
+- **Unified hub deduction overlay**: Replaced old broadcast-overlay HTML with showDeductionResult()/showCaseClosed() matching V211 system
+
+### V215 — Stress-Reactive Lighting + Emergency Atmosphere
+- **Corridor light color shift**: Lights blend from blue-white toward amber as station stress rises (60% blend at max stress)
+- **Ambient light warming**: Global ambient shifts from cool blue-white toward warm amber proportionally to stress
+- **Station stress CSS overlay**: Subtle red edge vignette via radial gradient at high deterioration
+- **Hazard border at moderate stress**: Amber screen border activates even without local hazards when station-wide stress > 30%
 
 ## Sprint 73 Changes (In Progress)
 
