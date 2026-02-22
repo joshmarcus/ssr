@@ -273,6 +273,7 @@
 - **Sprint V111 — PowerCell/FuseBox spark particles**: 4 yellow-white sprites shoot outward during electrical spark phase (brief burst every ~4s). Reuses discovery sparkle pool with short lifetimes (0.2-0.4s). One-shot flag prevents multi-frame spawning
 - **Sprint V112 — SecurityTerminal surveillance lens**: Lens (child 2) tracks player when within 5 tiles with smooth rotation. Pulse rate increases on proximity (1.5Hz idle → 3Hz close). Color shifts red→deeper red. Idle sweep oscillation when no player nearby. Camera "watches you" personality
 - **Sprint V113 — Sweepo emotion eye**: Eye blinks every ~4s (Y-scale squish to 20%), squints when HP critical, widens on interaction (triggered from flashTile, decays over 0.5s). Gives Sweepo expressive personality beyond color changes
+- **Sprint V114 — MedKit heartbeat light**: Red PointLight pulses in sync with heartbeat rhythm (double-beat pattern). Casts pulsing red glow on surrounding floor/walls. Lazily created on first animation frame, intensity scales with heartbeat value
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

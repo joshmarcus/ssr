@@ -2664,6 +2664,14 @@ export class BrowserDisplay3D implements IGameDisplay {
             cross.material.color.setRGB(1.0, 0.13 + heartbeat * 0.2, 0.13 + heartbeat * 0.2);
           }
         }
+        // Heartbeat PointLight: casts red glow on surroundings
+        if (!mesh.userData._heartbeatLight) {
+          const hbLight = new THREE.PointLight(0xff2244, 0, 3);
+          hbLight.position.set(0, 0.3, 0);
+          mesh.add(hbLight);
+          mesh.userData._heartbeatLight = hbLight;
+        }
+        (mesh.userData._heartbeatLight as THREE.PointLight).intensity = heartbeat * 1.2;
       } else if (userData.entityType === EntityType.LogTerminal) {
         // Screen glow flicker + proximity activation + light pulse
         const termDx = this.playerCurrentX - mesh.position.x;
