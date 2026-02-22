@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 74 ongoing (Performance + Controls — V177 completed, V178 next)
+- **Phase**: Sprint 76 ongoing (V179 completed, V180 next — visual polish)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -340,6 +340,8 @@
   - Performance: Cache 8 DOM overlay elements, eliminate per-frame Color allocations, distance-cull corridor lights
   - Movement: Camera-relative arrow/WASD keys (up=forward, left=turn left, right=turn right, down=backward)
   - Ceiling fix: Walls repositioned y=0→y=1.0 (span 0→2.0), eliminating gap where space was visible through ceiling
+- **Sprint V178 — Light budget optimization**: Distance-cull fixture lights (50-80→~10 active), shadow map 512→256, sparser corridor/fixture lights (~33% fewer)
+- **Sprint V179 — Per-frame work reduction**: Throttle entity traverse loops (4x/2x), optimized breach suction, halved dust particle spawn rate
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
