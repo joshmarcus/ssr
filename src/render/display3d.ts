@@ -587,6 +587,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Corridor steam vent sprites (pooled)
   private _steamVentSprites: THREE.Sprite[] = [];
   private _steamVentTimer: number = 0;
+  // Corridor light shaft meshes (volumetric beams under corridor ceiling lights)
+  private _lightShaftMeshes: THREE.Mesh[] = [];
+  private _lightShaftTiles: Set<string> = new Set();
+  // Floor light pools under corridor lights
+  private _floorPoolMeshes: THREE.Mesh[] = [];
   private starfieldPoints: THREE.Points | null = null;
 
   // Hazard visual effects (sprites at hazardous tile positions)
@@ -2514,6 +2519,53 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Normal corridors: gentle subtle breathing
         cl.intensity = base * (0.85 + Math.sin(phase) * 0.15);
       }
+    }
+
+    // Light shaft animation: pulse opacity, distance-based visibility
+    for (let i = 0; i < this._lightShaftMeshes.length; i++) {
+      const shaft = this._lightShaftMeshes[i];
+      const dx = shaft.position.x - this.playerCurrentX;
+      const dz = shaft.position.z - this.playerCurrentZ;
+      const dist = Math.abs(dx) + Math.abs(dz);
+      // Only visible when nearby (within corridor view range + some margin)
+      if (dist > 8) {
+        shaft.visible = false;
+        continue;
+      }
+      shaft.visible = true;
+      const mat = shaft.material as THREE.MeshBasicMaterial;
+      const phase = elapsed * 1.0 + shaft.position.x * 5.3 + shaft.position.z * 7.1;
+      const isHazard = shaft.userData.isHazard;
+      if (isHazard) {
+        // Hazard shafts: erratic flicker, occasionally drop out
+        const flick = Math.sin(phase * 3.5) * Math.sin(phase * 2.7);
+        mat.opacity = flick > 0.2 ? 0.06 : 0.01;
+      } else {
+        // Normal: gentle breathing
+        mat.opacity = 0.03 + Math.sin(phase) * 0.015;
+      }
+      // Distance fade: dimmer further from player
+      const distFade = 1 - (dist / 8);
+      mat.opacity *= distFade;
+    }
+
+    // Floor light pool animation: subtle pulse synced with shafts
+    for (let i = 0; i < this._floorPoolMeshes.length; i++) {
+      const pool = this._floorPoolMeshes[i];
+      const dx = pool.position.x - this.playerCurrentX;
+      const dz = pool.position.z - this.playerCurrentZ;
+      const dist = Math.abs(dx) + Math.abs(dz);
+      if (dist > 8) { pool.visible = false; continue; }
+      pool.visible = true;
+      const mat = pool.material as THREE.MeshBasicMaterial;
+      const phase = elapsed * 1.0 + pool.position.x * 5.3 + pool.position.z * 7.1;
+      const isHazard = pool.userData.isHazard;
+      if (isHazard) {
+        mat.opacity = Math.sin(phase * 3.5) > 0.2 ? 0.1 : 0.02;
+      } else {
+        mat.opacity = 0.06 + Math.sin(phase) * 0.02;
+      }
+      mat.opacity *= (1 - dist / 8);
     }
 
     // Room hazard fog pulse animation
@@ -4746,6 +4798,36 @@ export class BrowserDisplay3D implements IGameDisplay {
         (corridorLight as any)._isHazard = tile.heat > 20 || tile.smoke > 30 || tile.pressure < 40;
         this.scene.add(corridorLight);
         this.corridorLightList.push(corridorLight);
+
+        // Light shaft: volumetric beam from ceiling light to floor
+        const shaftKey = `shaft_${x},${y}`;
+        if (!this._lightShaftTiles.has(shaftKey)) {
+          this._lightShaftTiles.add(shaftKey);
+          const shaftHeight = 1.8;
+          const shaftGeo = new THREE.CylinderGeometry(0.15, 0.35, shaftHeight, 8, 1, true);
+          const shaftMat = new THREE.MeshBasicMaterial({
+            color: lightColor, transparent: true, opacity: 0.04,
+            side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+          shaft.position.set(x, 0.9, y);
+          shaft.userData = { isLightShaft: true, baseColor: lightColor, isHazard: (corridorLight as any)._isHazard };
+          this.scene.add(shaft);
+          this._lightShaftMeshes.push(shaft);
+
+          // Floor light pool: glowing disc where the light hits the floor
+          const poolGeo = new THREE.CircleGeometry(0.5, 12);
+          const poolMat = new THREE.MeshBasicMaterial({
+            color: lightColor, transparent: true, opacity: 0.08,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const pool = new THREE.Mesh(poolGeo, poolMat);
+          pool.rotation.x = -Math.PI / 2;
+          pool.position.set(x, 0.02, y);
+          pool.userData = { isFloorPool: true, baseColor: lightColor, isHazard: (corridorLight as any)._isHazard };
+          this.scene.add(pool);
+          this._floorPoolMeshes.push(pool);
+        }
       }
     }
 
