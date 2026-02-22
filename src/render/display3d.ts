@@ -620,6 +620,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   private trailOpacities: Float32Array = new Float32Array(0);
   private static readonly TRAIL_LENGTH = 12;
 
+  // Cached tile walkability for chase cam wall avoidance (updated each render)
+  private _tileWalkable: boolean[][] = [];
+  private _tileWidth: number = 0;
+  private _tileHeight: number = 0;
+
   constructor(container: HTMLElement, mapWidth?: number, mapHeight?: number) {
     this.container = container;
     this.mapWidth = mapWidth ?? DEFAULT_MAP_WIDTH;
@@ -1158,6 +1163,25 @@ export class BrowserDisplay3D implements IGameDisplay {
   // ── Render game state into 3D scene ─────────────────────────────
 
   render(state: GameState): void {
+    // Cache tile walkability for chase cam wall collision
+    this._tileWidth = state.width;
+    this._tileHeight = state.height;
+    if (this._tileWalkable.length !== state.height) {
+      this._tileWalkable = [];
+      for (let y = 0; y < state.height; y++) {
+        this._tileWalkable[y] = [];
+        for (let x = 0; x < state.width; x++) {
+          this._tileWalkable[y][x] = state.tiles[y][x].walkable;
+        }
+      }
+    } else {
+      for (let y = 0; y < state.height; y++) {
+        for (let x = 0; x < state.width; x++) {
+          this._tileWalkable[y][x] = state.tiles[y][x].walkable;
+        }
+      }
+    }
+
     this.updateTiles(state);
     this.updateEntities(state);
     this.updatePlayer(state);
@@ -1527,10 +1551,22 @@ export class BrowserDisplay3D implements IGameDisplay {
         const lookDist = 2.0;
 
         // Target positions
-        const targetCamX = this.playerCurrentX - Math.sin(facing) * chaseDist;
-        const targetCamZ = this.playerCurrentZ - Math.cos(facing) * chaseDist;
+        let targetCamX = this.playerCurrentX - Math.sin(facing) * chaseDist;
+        let targetCamZ = this.playerCurrentZ - Math.cos(facing) * chaseDist;
         const targetLookX = this.playerCurrentX + Math.sin(facing) * lookDist;
         const targetLookZ = this.playerCurrentZ + Math.cos(facing) * lookDist;
+
+        // Wall collision avoidance: step back toward player if camera lands in a wall
+        if (this._tileWalkable.length > 0) {
+          const tx = Math.round(targetCamX);
+          const tz = Math.round(targetCamZ);
+          if (tx >= 0 && tx < this._tileWidth && tz >= 0 && tz < this._tileHeight &&
+              !this._tileWalkable[tz][tx]) {
+            // Pull camera closer to player (50% of distance) to avoid wall
+            targetCamX = this.playerCurrentX + (targetCamX - this.playerCurrentX) * 0.35;
+            targetCamZ = this.playerCurrentZ + (targetCamZ - this.playerCurrentZ) * 0.35;
+          }
+        }
 
         // Smooth interpolation (slower than player movement for cinematic lag)
         const camLerp = Math.min(1, 5 * delta);
@@ -1544,6 +1580,13 @@ export class BrowserDisplay3D implements IGameDisplay {
         const moveSpeed = Math.abs(this.playerTargetX - this.playerCurrentX) +
                           Math.abs(this.playerTargetZ - this.playerCurrentZ);
         const headBob = moveSpeed > 0.01 ? Math.sin(elapsed * 8) * 0.03 : 0;
+
+        // FOV breathing: subtle widening during movement for speed sensation
+        const baseFov = 60;
+        const fovBreath = moveSpeed > 0.01 ? 3.0 : 0;
+        const targetFov = baseFov + fovBreath + zoomOffset * 2;
+        this.chaseCamera.fov += (targetFov - this.chaseCamera.fov) * camLerp;
+        this.chaseCamera.updateProjectionMatrix();
 
         this.chaseCamera.position.set(
           this.chaseCamPosX + shakeX,
@@ -1559,6 +1602,15 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.orthoCamera.lookAt(this.cameraPosX, 0, this.cameraPosZ);
       }
       this.playerLight.position.set(this.playerCurrentX, 3, this.playerCurrentZ);
+
+      // Adjust fog based on camera mode: tighter for chase cam = moodier corridors
+      const fog = this.scene.fog as THREE.Fog;
+      if (fog) {
+        const targetNear = this.chaseCamActive ? 6 : 20;
+        const targetFar = this.chaseCamActive ? 18 : 40;
+        fog.near += (targetNear - fog.near) * 0.05;
+        fog.far += (targetFar - fog.far) * 0.05;
+      }
 
       // Update movement trail
       this.updateTrail(this.playerCurrentX, this.playerCurrentZ, delta);
