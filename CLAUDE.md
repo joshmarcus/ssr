@@ -127,8 +127,77 @@ All design docs live in `space_station_roguelike_docs_v10/`:
 ## Autonomous Development
 
 - **Keep going**: Continue developing, sprinting, and iterating without asking the user for input unless absolutely critical (e.g., destructive action, ambiguous architectural direction). Make design decisions independently.
+- **Continuous sprints**: After completing a sprint, immediately launch the next one. Never stop and wait — always pick up the next highest-priority work from the backlog. The development loop is: finish sprint → update STATUS.md → update backlog → consult design leads → start next sprint.
+- **Backlog maintenance**: Keep `space_station_roguelike_docs_v10/tasks/backlog.md` up to date as the living task queue. After each sprint, add new tasks discovered during development, reprioritize existing items, and remove completed work. The backlog should always reflect what's next.
+- **Sprint retrospective**: At the end of each sprint, consult the **game design lead** and the **visual design lead** (per `TEAM.md` roles) to set priorities for the next sprint. They should weigh in on what will most improve the game — whether that's visual polish, new mechanics, performance, model integration, or atmosphere. Their priorities drive the next sprint's scope.
+- **Sprint focus**: Autonomous sprints should prioritize **visual display/appearance** and **3D rendering optimization**. The game's visual identity is a top priority — keep pushing on lighting, materials, model integration, camera work, atmosphere, and performance.
+- **STATUS.md updates**: Always update `STATUS.md` after every sprint with what changed, what's new, and any issues found. This is the living record of project progress — keep it current.
 - **Playtesting**: Use `npx tsx playtest_bot.ts [seed]` for automated playtesting. The harness CLI is `npm run harness`. The Claude API driver is at `src/harness/claudeDriver.ts` (requires ANTHROPIC_API_KEY in .env).
-- **Commit frequently**: After each feature or fix that passes tests, commit and push immediately.
+- **Snapshots**: There is a tool/workflow for taking screenshots of the running application (saved as `review_v*.png` in the project root). Use these snapshots to review visual progress between sprints.
+- **Commit and push always**: After each feature or fix that passes tests, commit and push immediately. Never leave work uncommitted — every passing change should be pushed to the remote so progress is never lost.
+- **Sprint reflections**: Every 10 sprints, pause and reflect — add important learnings, patterns, and gotchas to CLAUDE.md so future sessions benefit from accumulated knowledge.
+
+## 3D Model Assets
+
+There is a significant collection of 3D models in `public/models/` (~300+ models) that should be progressively integrated into the 3D view. A full manifest is in `public/model-list.json`. Key collections:
+
+- **synty-space-gltf/**: Sci-fi space station pieces — walls, floors, ceilings, corridors, doorframes, props, consoles, beds, desks, characters, robots (`.glb`)
+- **synty-gltf/**: Industrial/sci-fi props — barrels, pipes, conveyors, panels, chairs, tables, machinery (`.glb`)
+- **kenney-space/**: Modular corridor/room pieces — corridors, corners, junctions, intersections, gates, rooms (`.glb`)
+- **kenney-chars/**: Character models
+- **kenney-blaster/**: Weapon models
+- **quaternius-robot/**: Robot character model
+- **Characters/**: Astronaut and mech character models (`.gltf`)
+- **Vehicles/**: Rovers and spaceships (`.gltf`)
+- **Items/**: Pickups — keycards, crates, health, etc. (`.gltf`)
+
+Priority for integration: station architecture (walls, floors, ceilings, corridors) → props and furniture → characters/robots → vehicles and items. Use `inspect-glb.cjs` to inspect model structure when needed.
+
+## 3D Renderer Architecture
+
+The 3D renderer lives in `src/render/display3d.ts` (~5500 lines). Key architecture notes:
+
+### Scene Structure
+- **Instanced meshes** for tiles: separate InstancedMesh for floor, corridor floor, walls, wall corners, doors, ceilings
+- **Procedural textures**: floor grid, wall panels, corridor grates, caution stripes — all generated via canvas
+- **Distance culling**: 12-tile Manhattan distance, corridor spatial buckets (6 tiles each), updated every 5 frames
+- **Room groups**: `roomTrimGroups`, `roomDecoGroups`, `roomCeilGroups` for per-room visibility control
+
+### Lighting Stack
+- **Global**: AmbientLight + 3 DirectionalLights (key/fill/rim) + HemisphereLight
+- **Player**: Green PointLight (follows player) + white fill light
+- **Room lights**: PointLights at room centers, colored by room type, red/amber for hazards (with emergency flicker)
+- **Corridor lights**: Dim blue every 5th tile along explored corridors
+- **Door lights**: Red (locked, pulsing) or green (open)
+- **Entity glow lights**: Per-entity PointLights with configured color/intensity/distance
+
+### Camera System
+- **Chase cam** (default, F2 toggle): Perspective, 2.5 units behind, 1.8 height, look-ahead 2.0, wall avoidance via walkability map, head-bob, FOV breathing (base 60 + 3 during movement)
+- **Ortho cam**: Top-down/isometric, adjustable frustum (wheel) and elevation
+
+### Visual Effects
+- **Fog**: THREE.Fog adjusting near/far per camera mode
+- **Fog-of-war**: Overlay planes — dark navy (unexplored, 0.92 opacity) vs blue-grey (memory, 0.45 opacity)
+- **Hazard sprites**: Smoke wisps (grey, upward drift), heat glow (orange pulse), vacuum frost (blue sparkle)
+- **Particles**: 400-star nebula backdrop with shader gradient, 120 ambient dust motes, 12-point movement trail
+- **Entity animations**: Per-type rotation, bob, pulse, hover, wobble
+- **Cel shading**: Toon gradient (4-step), OutlineEffect (F4 toggle), MeshStandardMaterial with roughness 0.7
+
+### Room Decoration Pipeline
+- `ROOM_DECORATIONS` lookup → GLTF models from Synty Space library
+- `placeRoomTrim()`: baseboard, edge glow, top rail, door frames
+- `placeRoomCeiling()`: cross-bracing beams every 3 tiles
+- `placeCorridorArches/Pipes/StripLights/WallProps()`: corridor architecture
+
+### Key Constants
+- `COLORS_3D`: floor 0xcccccc, wall 0xddeeee, door 0xeeaa55, corridor 0xbbbbbb, background 0x060610
+- Room wall tints: per-room-type vibrant colors (Power Relay = 0xffee88, Life Support = 0x99ddff, etc.)
+- Entity glow: DataCore 0xff44ff, Breach 0xff2200, EscapePod 0x44ffaa, Relay 0xffcc00, etc.
+
+### Screenshot Tool
+- `npm run screenshot` — Playwright-based headless Chromium capture
+- Flags: `--seed`, `--turns`, `--overlay`, `--out`
+- Saves to project root as `review_v*.png`
 
 ## Development Conventions
 

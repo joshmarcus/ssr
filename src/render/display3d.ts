@@ -615,6 +615,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   private stripDimIdx: number = 0;
   private static readonly MAX_TRIM_INSTANCES = 2000;
   private static readonly MAX_STRIP_INSTANCES = 600;
+  // InstancedMesh for emergency wall light strips (red/amber near hazards)
+  private emergencyStripInstanced: THREE.InstancedMesh | null = null;
+  private emergencyStripIdx: number = 0;
+  private static readonly MAX_EMERGENCY_STRIPS = 400;
+  private emergencyStripTiles: Set<string> = new Set();
 
   // Player movement trail
   private trailPoints: THREE.Points | null = null;
@@ -755,7 +760,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.wallCornerMesh.count = 0;
     this.scene.add(this.wallCornerMesh);
 
-    const doorGeo = new THREE.BoxGeometry(0.85, 1.6, 0.15);
+    const doorGeo = new THREE.BoxGeometry(0.85, 1.4, 0.15); // slightly shorter — gap at bottom for Sweepo
     const doorMat = makeToonMaterial({ color: 0xffffff, gradientMap: this.toonGradient });
     this.doorMesh = new THREE.InstancedMesh(doorGeo, doorMat, 200);
     this.doorMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1218,6 +1223,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeCorridorArches(state);
     this.placeCorridorStripLights(state);
     this.placeCorridorWallProps(state);
+    this.placeEmergencyWallStrips(state);
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
     this.updateRoomLabels(state);
@@ -1522,7 +1528,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
       this.playerMesh.position.x = this.playerCurrentX;
       this.playerMesh.position.z = this.playerCurrentZ;
-      this.playerMesh.position.y = 0.4 + Math.sin(elapsed * 2) * 0.05;
+      this.playerMesh.position.y = 0.02 + Math.sin(elapsed * 2) * 0.01; // Sweepo rides on the floor
 
       // Smooth rotation towards facing direction
       let targetRot = this.playerFacing;
@@ -1569,7 +1575,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         // 3rd-person chase cam: behind and above Sweepo, smoothly following
         const facing = this.playerMesh.rotation.y;
         const chaseDist = 2.5;
-        const chaseHeight = 1.8;
+        const chaseHeight = 0.9; // low angle — Sweepo is a ground-level bot
         const lookDist = 2.0;
 
         // Target positions
@@ -1615,7 +1621,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           this.chaseCamPosY + headBob,
           this.chaseCamPosZ + shakeZ
         );
-        this.chaseCamera.lookAt(this.chaseCamLookX, 0.6, this.chaseCamLookZ);
+        this.chaseCamera.lookAt(this.chaseCamLookX, 0.15, this.chaseCamLookZ); // look at ground-level Sweepo
       } else {
         // Orthographic top-down/isometric camera
         const camY = 4 + (1 - this.cameraElevation) * 12; // 4-16 range
@@ -1754,6 +1760,12 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Emergency wall strip pulse: slow red throb
+    if (this.emergencyStripInstanced && this.emergencyStripInstanced.count > 0) {
+      const mat = this.emergencyStripInstanced.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = 0.3 + Math.abs(Math.sin(elapsed * 2.5)) * 0.5;
+    }
+
     // Room lights: emergency flicker for red/amber lights
     for (const [, light] of this.roomLights) {
       const c = light.color.getHex();
@@ -1769,7 +1781,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Hazard sprite animations
     for (const child of this.hazardSprites.children) {
       if (!(child instanceof THREE.Sprite)) continue;
-      const ud = child.userData as { hazardType?: string; baseY?: number };
+      const ud = child.userData as { hazardType?: string; baseY?: number; baseX?: number; baseZ?: number };
       if (ud.hazardType === "smoke") {
         // Drift upward and fade
         child.position.y += delta * 0.15;
@@ -1790,6 +1802,17 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Gentle sparkle/flutter
         const mat = child.material as THREE.SpriteMaterial;
         mat.opacity = 0.15 + Math.sin(elapsed * 5 + child.position.x * 3 + child.position.z * 7) * 0.15;
+      } else if (ud.hazardType === "spark") {
+        // Electric sparks: rapid random flicker + jitter
+        const mat = child.material as THREE.SpriteMaterial;
+        const phase = elapsed * 12 + (ud.baseX ?? 0) * 7 + (ud.baseZ ?? 0) * 11;
+        const flicker = Math.sin(phase) * Math.sin(phase * 2.3) > 0.2;
+        mat.opacity = flicker ? 0.7 + Math.random() * 0.3 : 0.05;
+        const jitter = 0.04;
+        child.position.x = (ud.baseX ?? 0) + (Math.random() - 0.5) * jitter;
+        child.position.z = (ud.baseZ ?? 0) + (Math.random() - 0.5) * jitter;
+        const s = flicker ? 0.08 + Math.random() * 0.1 : 0.04;
+        child.scale.set(s, s, 1);
       }
     }
 
@@ -1877,7 +1900,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
           const doorColor = tile.type === TileType.LockedDoor ? COLORS_3D.lockedDoor : COLORS_3D.door;
-          this.dummy.position.set(x, 0, y);
+          this.dummy.position.set(x, 0.9, y); // raised — visible gap at bottom for Sweepo to roll through
           this.dummy.scale.set(1, 1, 1);
 
           // Orient door to face corridor direction (check horizontal vs vertical)
@@ -2594,6 +2617,19 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.stripDimInstanced = new THREE.InstancedMesh(BrowserDisplay3D._stripLightGeo!, dimMat, max);
     this.stripDimInstanced.count = 0;
     this.scene.add(this.stripDimInstanced);
+
+    // Emergency wall light strips — red emissive for hazardous areas
+    const emergGeo = new THREE.BoxGeometry(0.06, 0.8, 0.02); // vertical strip on wall
+    const emergMat = makeToonMaterial({
+      color: 0xff2200,
+      gradientMap: this.toonGradient,
+      emissive: 0xff2200,
+      emissiveIntensity: 0.7,
+    });
+    this.emergencyStripInstanced = new THREE.InstancedMesh(emergGeo, emergMat, BrowserDisplay3D.MAX_EMERGENCY_STRIPS);
+    this.emergencyStripInstanced.count = 0;
+    this.emergencyStripInstanced.frustumCulled = false;
+    this.scene.add(this.emergencyStripInstanced);
   }
 
   /** Get or create a per-room sub-group within a parent group for distance culling */
@@ -3453,6 +3489,70 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
   }
 
+  // ── Private: emergency wall light strips (red/amber near hazards) ──
+
+  private placeEmergencyWallStrips(state: GameState): void {
+    const dummy = this.dummy;
+    let changed = false;
+
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored || tile.type !== TileType.Corridor) continue;
+
+        const key = `emg_${x},${y}`;
+        if (this.emergencyStripTiles.has(key)) continue;
+
+        // Only place near hazards: check nearby tiles for heat, smoke, or low pressure
+        let maxHeat = 0, maxSmoke = 0, lowPressure = false;
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const ny = y + dy, nx = x + dx;
+            if (ny < 0 || ny >= state.height || nx < 0 || nx >= state.width) continue;
+            const t = state.tiles[ny][nx];
+            if (t.heat > maxHeat) maxHeat = t.heat;
+            if (t.smoke > maxSmoke) maxSmoke = t.smoke;
+            if (t.pressure < 40) lowPressure = true;
+          }
+        }
+
+        // Only place strips in hazardous corridors
+        if (maxHeat < 15 && maxSmoke < 20 && !lowPressure) continue;
+
+        // Place every other qualifying tile
+        if ((x + y) % 2 !== 0) continue;
+        this.emergencyStripTiles.add(key);
+
+        // Find adjacent walls to mount strips on
+        const wallN = y > 0 && state.tiles[y - 1][x].type === TileType.Wall;
+        const wallS = y < state.height - 1 && state.tiles[y + 1][x].type === TileType.Wall;
+        const wallE = x < state.width - 1 && state.tiles[y][x + 1].type === TileType.Wall;
+        const wallW = x > 0 && state.tiles[y][x - 1].type === TileType.Wall;
+
+        const addEmergStrip = (px: number, pz: number, rotY: number) => {
+          if (this.emergencyStripIdx >= BrowserDisplay3D.MAX_EMERGENCY_STRIPS) return;
+          dummy.position.set(px, 0.6, pz);
+          dummy.rotation.set(0, rotY, 0);
+          dummy.scale.set(1, 1, 1);
+          dummy.updateMatrix();
+          this.emergencyStripInstanced!.setMatrixAt(this.emergencyStripIdx, dummy.matrix);
+          this.emergencyStripIdx++;
+          changed = true;
+        };
+
+        if (wallN) addEmergStrip(x, y - 0.48, 0);
+        if (wallS) addEmergStrip(x, y + 0.48, 0);
+        if (wallE) addEmergStrip(x + 0.48, y, Math.PI / 2);
+        if (wallW) addEmergStrip(x - 0.48, y, Math.PI / 2);
+      }
+    }
+
+    if (changed) {
+      this.emergencyStripInstanced!.count = this.emergencyStripIdx;
+      this.emergencyStripInstanced!.instanceMatrix.needsUpdate = true;
+    }
+  }
+
   // ── Private: corridor wall-mounted GLTF props ──────────────────
 
   private corridorWallPropTiles: Set<string> = new Set();
@@ -3752,6 +3852,27 @@ export class BrowserDisplay3D implements IGameDisplay {
           frostSprite.userData = { hazardType: "vacuum", baseY: 0.1 };
           this.hazardSprites.add(frostSprite);
         }
+      }
+    }
+
+    // Spark particles near breach entities
+    for (const [id, ent] of state.entities) {
+      if (ent.type !== EntityType.Breach) continue;
+      const bx = ent.pos.x, by = ent.pos.y;
+      if (Math.abs(bx - px) > viewRange || Math.abs(by - py) > viewRange) continue;
+      // Add 2-3 spark sprites per breach
+      for (let i = 0; i < 3; i++) {
+        const sparkKey = `spark_${id}_${i}`;
+        if (this.hazardSpriteKeys.has(sparkKey)) continue;
+        this.hazardSpriteKeys.add(sparkKey);
+        const spark = this.createHazardSprite(0xffaa22, 0.12, 0.8);
+        spark.position.set(
+          bx + (Math.random() - 0.5) * 0.6,
+          0.2 + Math.random() * 0.8,
+          by + (Math.random() - 0.5) * 0.6
+        );
+        spark.userData = { hazardType: "spark", baseY: spark.position.y, baseX: spark.position.x, baseZ: spark.position.z };
+        this.hazardSprites.add(spark);
       }
     }
   }
@@ -4463,7 +4584,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       depthWrite: false,
     });
     const glowCircle = new THREE.Mesh(glowGeo, glowMat);
-    glowCircle.position.y = -0.38; // just above floor
+    glowCircle.position.y = -0.01; // just above floor
     group.add(glowCircle);
 
     return group;
