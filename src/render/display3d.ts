@@ -7547,14 +7547,20 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Entity types that get a small colored point light for visual emphasis
   // Key entities only (max ~8 lights active at a time for performance)
   private static readonly ENTITY_GLOW_LIGHTS: Partial<Record<string, { color: number; intensity: number; distance: number }>> = {
-    [EntityType.DataCore]: { color: 0xff44ff, intensity: 2.5, distance: 8 },
-    [EntityType.Breach]: { color: 0xff2200, intensity: 2.0, distance: 7 },
-    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 1.5, distance: 6 },
-    [EntityType.EvidenceTrace]: { color: 0xffaa00, intensity: 1.5, distance: 5 },
-    [EntityType.Relay]: { color: 0xffcc00, intensity: 1.5, distance: 6 },
-    [EntityType.SensorPickup]: { color: 0x00ffee, intensity: 1.2, distance: 5 },
-    [EntityType.CrewNPC]: { color: 0xffcc88, intensity: 1.0, distance: 5 },
-    [EntityType.LogTerminal]: { color: 0x66ccff, intensity: 0.8, distance: 4 },
+    [EntityType.DataCore]: { color: 0xff44ff, intensity: 3.0, distance: 8 },
+    [EntityType.Breach]: { color: 0xff2200, intensity: 2.5, distance: 7 },
+    [EntityType.EscapePod]: { color: 0x44ffaa, intensity: 2.0, distance: 7 },
+    [EntityType.EvidenceTrace]: { color: 0xffaa00, intensity: 2.0, distance: 6 },
+    [EntityType.Relay]: { color: 0xffcc00, intensity: 2.0, distance: 7 },
+    [EntityType.SensorPickup]: { color: 0x00ffee, intensity: 1.5, distance: 6 },
+    [EntityType.CrewNPC]: { color: 0xffcc88, intensity: 1.5, distance: 6 },
+    [EntityType.LogTerminal]: { color: 0x66ccff, intensity: 1.2, distance: 5 },
+    [EntityType.Console]: { color: 0x66aaff, intensity: 1.2, distance: 5 },
+    [EntityType.SecurityTerminal]: { color: 0xff6666, intensity: 1.0, distance: 5 },
+    [EntityType.RepairCradle]: { color: 0xaaff66, intensity: 1.0, distance: 5 },
+    [EntityType.MedKit]: { color: 0xff4444, intensity: 1.2, distance: 5 },
+    [EntityType.PowerCell]: { color: 0xffee44, intensity: 1.0, distance: 5 },
+    [EntityType.FuseBox]: { color: 0xff8800, intensity: 1.0, distance: 4 },
   };
 
   private createEntityMesh(entity: Entity): THREE.Object3D {
@@ -7585,17 +7591,17 @@ export class BrowserDisplay3D implements IGameDisplay {
         clone.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
             child.material.emissive = new THREE.Color(glowDef.color);
-            child.material.emissiveIntensity = 0.3;
+            child.material.emissiveIntensity = 0.45;
           }
         });
       } else {
-        // Non-glow entities still get a subtle emissive tint from their entity color
+        // Non-glow entities still get a visible emissive tint from their entity color
         const entityColor = ENTITY_COLORS_3D[entity.type];
         if (entityColor) {
           clone.traverse((child) => {
             if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
               child.material.emissive = new THREE.Color(entityColor);
-              child.material.emissiveIntensity = 0.08;
+              child.material.emissiveIntensity = 0.15;
             }
           });
         }
@@ -7625,7 +7631,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Fallback: styled primitive geometry with emissive toon glow
     const color = ENTITY_COLORS_3D[entity.type] ?? 0xffffff;
-    const glowMat = makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.3 });
+    const glowMat = makeToonMaterial({ color, gradientMap: this.toonGradient, emissive: color, emissiveIntensity: 0.5 });
     const group = new THREE.Group();
     let baseY = 0.3;
 
@@ -7999,8 +8005,8 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Ground ring — glowing circle on the floor beneath the entity
     const groundRing = new THREE.Mesh(
-      new THREE.RingGeometry(0.28, 0.38, 20),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })
+      new THREE.RingGeometry(0.28, 0.42, 20),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })
     );
     groundRing.rotation.x = -Math.PI / 2;
     groundRing.position.y = -baseY + 0.02; // sit at floor level
