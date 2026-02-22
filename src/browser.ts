@@ -2114,6 +2114,8 @@ function handleAction(action: Action): void {
       inputHandler.turnCallback = (dir: "left" | "right") => {
         if (display && 'turnPlayer' in display) {
           (display as any).turnPlayer(dir);
+          // Immediately sync facing so the next forward press uses the new angle
+          inputHandler.facingAngle = (display as any).getPlayerFacing();
         }
       };
     }

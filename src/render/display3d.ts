@@ -646,6 +646,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private bloomComposer: EffectComposer | null = null;
   private bloomPass: UnrealBloomPass | null = null;
   private bloomEnabled: boolean = true;
+  private _particlesEnabled: boolean = true;
 
   // Room lights (colored point lights at room centers)
   private roomLights: Map<string, THREE.PointLight> = new Map();
@@ -1183,6 +1184,16 @@ export class BrowserDisplay3D implements IGameDisplay {
         } else {
           this.bloomEnabled = true;
         }
+      } else if (e.key === "F5") {
+        e.preventDefault();
+        // Toggle shadow maps (major GPU cost)
+        this.renderer.shadowMap.enabled = !this.renderer.shadowMap.enabled;
+        console.log(`[SSR] Shadows: ${this.renderer.shadowMap.enabled ? "ON" : "OFF"}`);
+      } else if (e.key === "F6") {
+        e.preventDefault();
+        // Toggle all particle sprites (discovery sparkles, dust, breath, etc.)
+        this._particlesEnabled = !this._particlesEnabled;
+        console.log(`[SSR] Particles: ${this._particlesEnabled ? "ON" : "OFF"}`);
       }
     };
     window.addEventListener("keydown", this.boundKeyHandler);
@@ -1826,9 +1837,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     return this.chaseCamActive;
   }
 
-  /** Turn the player bot left or right by one octant (45°) without moving */
+  /** Turn the player bot left or right by 90° without moving */
   turnPlayer(direction: "left" | "right"): void {
-    const step = Math.PI / 4; // 45° per turn
+    const step = Math.PI / 2; // 90° per turn
     if (direction === "left") {
       this.playerFacing += step;
     } else {
@@ -3876,36 +3887,19 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.headlight.color.setHex(baseColor);
       }
 
-      // Volumetric cone visibility: brighter in corridors (dusty), dimmer in rooms
-      // Syncs with damage flicker via stored flicker ratio
+      // Volumetric cone: disabled — doesn't look convincing as a light cone
+      // Hide the cone mesh
       if (this.playerMesh) {
         this.playerMesh.traverse((child) => {
           if (child instanceof THREE.Mesh && child.userData?.isHeadlightCone) {
-            const targetOpacity = (inRoom ? 0.015 : 0.045) * this._headlightFlickerRatio;
-            const mat = child.material as THREE.MeshBasicMaterial;
-            mat.opacity += (targetOpacity - mat.opacity) * 0.1; // faster tracking for flicker
-            mat.color.copy(this.headlight!.color); // match headlight color
+            child.visible = false;
           }
         });
       }
     }
 
-    // Headlight ground spot: positioned 2-3 tiles ahead of player in facing direction
-    if (this._headlightSpot && this.chaseCamActive) {
-      const facing = this.playerMesh ? this.playerMesh.rotation.y : this.playerFacing;
-      const spotDist = 2.5; // tiles ahead
-      const spotX = this.playerCurrentX + Math.sin(facing) * spotDist;
-      const spotZ = this.playerCurrentZ + Math.cos(facing) * spotDist;
-      this._headlightSpot.position.set(spotX, 0.04, spotZ);
-      this._headlightSpot.rotation.z = -facing; // align elongation with facing
-      const spotMat = this._headlightSpot.material as THREE.MeshBasicMaterial;
-      const inRoom = this._currentRoom !== null;
-      const targetOpacity = (inRoom ? 0.06 : 0.12) * this._headlightFlickerRatio;
-      spotMat.opacity += (targetOpacity - spotMat.opacity) * 0.1;
-      // Match headlight color
-      if (this.headlight) spotMat.color.copy(this.headlight.color);
-      this._headlightSpot.visible = true;
-    } else if (this._headlightSpot) {
+    // Headlight ground spot: disabled — station is well-lit and the circle doesn't read as light
+    if (this._headlightSpot) {
       this._headlightSpot.visible = false;
     }
 
