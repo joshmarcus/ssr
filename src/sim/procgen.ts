@@ -1,6 +1,7 @@
 import * as ROT from "rot-js";
 import type { GameState, Entity, MysteryState, MysteryChoice } from "../shared/types.js";
-import { TileType, EntityType, SensorType, ObjectivePhase, IncidentArchetype, CrewFate, DoorKeyType, Difficulty } from "../shared/types.js";
+import { TileType, EntityType, SensorType, ObjectivePhase, IncidentArchetype, CrewFate, DoorKeyType, Difficulty, SceneEchoType, TimelinePhase } from "../shared/types.js";
+import type { SceneEcho, Room } from "../shared/types.js";
 import {
   DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, GLYPHS, PRESSURE_NORMAL,
   HEAT_SOURCE_CAP, DETERIORATION_INTERVAL, DIFFICULTY_SETTINGS,
@@ -180,6 +181,7 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
     cleaningDirective: true,
     roomCleanlinessGoal: 60,
     triggeredEchoes: new Set<string>(),
+    sceneEchoes: [],
   };
 
   placeEntities(state, rooms);
@@ -221,6 +223,9 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
 
   // Place archetype spatial signatures (distinctive navigation features)
   placeArchetypeSignatures(state, rooms, archetype);
+
+  // Generate scene echoes (environmental storytelling objects)
+  generateSceneEchoes(state);
 
   // Guarantee all deduction tags are covered by placed evidence
   ensureTagCoverage(state);
@@ -2929,4 +2934,153 @@ function placeTimedEvidence(state: GameState, rooms: DiggerRoom[]): void {
       [destroyTextKey]: config.destroyText,
     },
   });
+}
+
+// ── Scene Echo Generation ──────────────────────────────────────────
+// Places environmental storytelling objects: ghost silhouettes of crew,
+// damage marks from the incident, disturbed furniture, personal items.
+
+/** Map archetype to damage mark descriptions */
+const DAMAGE_MARK_BY_ARCHETYPE: Record<IncidentArchetype, { desc: string; phase: TimelinePhase }[]> = {
+  [IncidentArchetype.CoolantCascade]: [
+    { desc: "Frozen coolant streaks splay across the floor like a frozen river.", phase: TimelinePhase.Escalation },
+    { desc: "Ice crystals cling to the wall panels, refracting faint light.", phase: TimelinePhase.Collapse },
+  ],
+  [IncidentArchetype.HullBreach]: [
+    { desc: "Scorch marks radiate from a blast point, metal bent outward.", phase: TimelinePhase.Trigger },
+    { desc: "Deep gouges in the floor where debris was dragged by decompression.", phase: TimelinePhase.Escalation },
+  ],
+  [IncidentArchetype.ReactorScram]: [
+    { desc: "Radiation warning stickers have been hastily applied to the floor.", phase: TimelinePhase.Trigger },
+    { desc: "Melted plastic pooled around a fried junction box.", phase: TimelinePhase.Collapse },
+  ],
+  [IncidentArchetype.Sabotage]: [
+    { desc: "Biological residue stains the floor in an irregular pattern.", phase: TimelinePhase.Escalation },
+    { desc: "Scratches on the wall — someone tried to pry open a panel in a hurry.", phase: TimelinePhase.Collapse },
+  ],
+  [IncidentArchetype.SignalAnomaly]: [
+    { desc: "Strange concentric rings are etched into the floor surface.", phase: TimelinePhase.Trigger },
+    { desc: "A monitor face is permanently burned with a fractal waveform.", phase: TimelinePhase.Escalation },
+  ],
+  [IncidentArchetype.Mutiny]: [
+    { desc: "Overturned furniture — a table used as a barricade.", phase: TimelinePhase.Escalation },
+    { desc: "Dried bootprints suggest a panicked exit through this corridor.", phase: TimelinePhase.Collapse },
+  ],
+};
+
+/** Ghost echo descriptions per crew fate */
+const GHOST_DESCRIPTIONS: Record<string, (name: string, role: string) => string> = {
+  [CrewFate.Survived]: (name, role) => `A faint thermal silhouette of ${name} (${role}) — they were here, alive, moving with purpose.`,
+  [CrewFate.Dead]: (name, role) => `The thermal imprint of ${name} (${role}) lingers here — their last moments in this room.`,
+  [CrewFate.Missing]: (name, role) => `A ghostly trace of ${name} (${role}) fades in and out — they passed through here, then vanished.`,
+  [CrewFate.Escaped]: (name, role) => `${name} (${role}) left a clear thermal trail — they moved quickly, heading for the exit.`,
+  [CrewFate.InCryo]: (name, role) => `A barely-visible silhouette of ${name} (${role}) — the signal is too degraded to read more.`,
+};
+
+function generateSceneEchoes(state: GameState): void {
+  if (!state.mystery) return;
+  const mystery = state.mystery;
+  const echoes: SceneEcho[] = [];
+  let echoId = 0;
+
+  // 1. Ghost silhouettes: one per crew member at their last known room
+  for (const crew of mystery.crew) {
+    const room = state.rooms.find(r => r.name === crew.lastKnownRoom);
+    if (!room) continue;
+
+    // Place at a walkable tile in the room (offset from center for variety)
+    const cx = room.x + Math.floor(room.width / 2);
+    const cy = room.y + Math.floor(room.height / 2);
+    // Offset based on crew id hash
+    let hash = 0;
+    for (let i = 0; i < crew.id.length; i++) hash = ((hash << 5) - hash + crew.id.charCodeAt(i)) | 0;
+    const ox = (Math.abs(hash) % 3) - 1; // -1, 0, or 1
+    const oy = (Math.abs(hash >> 3) % 3) - 1;
+    let px = Math.max(room.x, Math.min(room.x + room.width - 1, cx + ox));
+    let py = Math.max(room.y, Math.min(room.y + room.height - 1, cy + oy));
+    // Ensure walkable
+    if (py >= 0 && py < state.height && px >= 0 && px < state.width && state.tiles[py][px].walkable) {
+      // OK
+    } else {
+      px = cx; py = cy; // fallback to center
+    }
+
+    // Phase based on crew fate
+    const phase = crew.fate === CrewFate.Dead ? TimelinePhase.Collapse
+      : crew.fate === CrewFate.Missing ? TimelinePhase.Aftermath
+      : crew.fate === CrewFate.Escaped ? TimelinePhase.Escalation
+      : TimelinePhase.NormalOps;
+
+    const roleName = crew.role.charAt(0).toUpperCase() + crew.role.slice(1).replace("_", " ");
+    const descFn = GHOST_DESCRIPTIONS[crew.fate] ?? GHOST_DESCRIPTIONS[CrewFate.InCryo];
+    const desc = descFn(`${crew.firstName} ${crew.lastName}`, roleName);
+
+    echoes.push({
+      id: `echo_ghost_${echoId++}`,
+      roomName: crew.lastKnownRoom,
+      pos: { x: px, y: py },
+      echoType: SceneEchoType.GhostSilhouette,
+      phase,
+      description: desc,
+      crewId: crew.id,
+      discovered: false,
+      sensorRequired: SensorType.Thermal,
+    });
+  }
+
+  // 2. Damage marks: 1-2 per timeline event location
+  const archetype = mystery.timeline.archetype;
+  const damagePool = DAMAGE_MARK_BY_ARCHETYPE[archetype] ?? [];
+  const eventRooms = new Set<string>();
+  for (const event of mystery.timeline.events) {
+    if (eventRooms.has(event.location)) continue;
+    eventRooms.add(event.location);
+    const room = state.rooms.find(r => r.name === event.location);
+    if (!room) continue;
+    // Pick a damage description matching closest phase
+    const mark = damagePool.find(d => d.phase === event.phase) ?? damagePool[0];
+    if (!mark) continue;
+
+    // Place near room edge for visual interest
+    const ex = room.x + 1 + (echoId % Math.max(1, room.width - 2));
+    const ey = room.y + 1 + ((echoId >> 2) % Math.max(1, room.height - 2));
+    if (ey < 0 || ey >= state.height || ex < 0 || ex >= state.width || !state.tiles[ey][ex].walkable) continue;
+
+    echoes.push({
+      id: `echo_damage_${echoId++}`,
+      roomName: event.location,
+      pos: { x: ex, y: ey },
+      echoType: SceneEchoType.DamageMark,
+      phase: event.phase,
+      description: mark.desc,
+      discovered: false,
+    });
+  }
+
+  // 3. System traces: flickering consoles in rooms with Escalation/Collapse events
+  for (const event of mystery.timeline.events) {
+    if (event.phase !== TimelinePhase.Escalation && event.phase !== TimelinePhase.Collapse) continue;
+    const room = state.rooms.find(r => r.name === event.location);
+    if (!room) continue;
+    // Only one system trace per room
+    if (echoes.some(e => e.echoType === SceneEchoType.SystemTrace && e.roomName === event.location)) continue;
+
+    const sx = room.x + Math.floor(room.width / 2);
+    const sy = room.y;
+    if (sy < 0 || sy >= state.height || sx < 0 || sx >= state.width) continue;
+
+    echoes.push({
+      id: `echo_system_${echoId++}`,
+      roomName: event.location,
+      pos: { x: sx, y: sy },
+      echoType: SceneEchoType.SystemTrace,
+      phase: event.phase,
+      description: event.phase === TimelinePhase.Collapse
+        ? "A console flickers with a frozen error display — the system crashed mid-operation."
+        : "Warning indicators on this panel are stuck in alarm state.",
+      discovered: false,
+    });
+  }
+
+  mystery.sceneEchoes = echoes;
 }

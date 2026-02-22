@@ -294,6 +294,27 @@ export interface Deduction {
   conclusionText?: string;   // shown after correct answer
 }
 
+// ── Scene Echoes (environmental storytelling) ────────────────
+export enum SceneEchoType {
+  GhostSilhouette = "ghost_silhouette",  // translucent crew figure at last known position
+  DamageMark = "damage_mark",            // scorch/frost/bio mark on floor/walls
+  DisturbedFurniture = "disturbed_furniture", // overturned chair, spilled items
+  PersonalItem = "personal_item",        // crew personal effect left behind
+  SystemTrace = "system_trace",          // flickering console, stuck door, sparking panel
+}
+
+export interface SceneEcho {
+  id: string;
+  roomName: string;       // room where this echo appears
+  pos: Position;          // tile position
+  echoType: SceneEchoType;
+  phase: TimelinePhase;   // timeline phase this echo represents (for color coding)
+  description: string;    // flavor text shown on discovery
+  crewId?: string;        // associated crew member (for ghosts)
+  discovered: boolean;    // whether the player has found this echo
+  sensorRequired?: SensorType; // sensor needed to see this echo (null = always visible)
+}
+
 export interface MysteryChoice {
   id: string;
   prompt: string;
@@ -356,6 +377,7 @@ export interface MysteryState {
   directiveOverrideTurn?: number; // turn when directive was overridden
   evacuation?: EvacuationState;
   triggeredEchoes: Set<string>; // crew IDs whose ghost echoes have been triggered
+  sceneEchoes: SceneEcho[];     // environmental storytelling objects placed during procgen
 }
 
 // ── What We Know (narrative summary) ─────────────────────────

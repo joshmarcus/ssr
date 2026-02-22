@@ -5,8 +5,8 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import type { GameState, Entity, Room } from "../shared/types.js";
-import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from "../shared/types.js";
+import type { GameState, Entity, Room, SceneEcho } from "../shared/types.js";
+import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase, SceneEchoType, TimelinePhase } from "../shared/types.js";
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
 import type { IGameDisplay, LogType, DisplayLogEntry } from "./displayInterface.js";
 import { getObjective as getObjectiveShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
@@ -549,6 +549,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   private entityMeshes: Map<string, THREE.Object3D> = new Map();
   private entityGroup: THREE.Group;
 
+  // Scene echo meshes (environmental storytelling)
+  private sceneEchoGroup: THREE.Group;
+  private sceneEchoMeshes: Map<string, THREE.Object3D> = new Map();
+  private sceneEchosBuilt = false;
+
   // Interaction indicator — floating diamond above nearby interactable
   private interactionIndicator: THREE.Mesh | null = null;
   private interactionTargetId: string = "";
@@ -1084,6 +1089,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     // ── Entity group ──
     this.entityGroup = new THREE.Group();
     this.scene.add(this.entityGroup);
+
+    this.sceneEchoGroup = new THREE.Group();
+    this.scene.add(this.sceneEchoGroup);
 
     // ── Interaction indicator (floating diamond above nearest interactable) ──
     const indicatorGeo = new THREE.OctahedronGeometry(0.18, 0);
@@ -1979,6 +1987,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeCorridorGuideStrips(state);
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
+    this.buildSceneEchoes(state);
     this.updateRoomLabels(state);
     this.updateWaypoint(state, this.clock.getElapsedTime());
     this.renderMinimap(state);
@@ -3888,6 +3897,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         ring.scale.set(s, 1, s);
       }
     }
+
+    // Animate scene echoes (ghosts, damage marks, system traces)
+    this.animateSceneEchoes(elapsed, delta, this._lastState);
 
     // Emergency wall strip pulse: slow red throb
     if (this.emergencyStripInstanced && this.emergencyStripInstanced.count > 0) {
@@ -7759,6 +7771,203 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else {
         this.interactionIndicator.visible = false;
         this.interactionTargetId = "";
+      }
+    }
+  }
+
+  // ── Scene Echoes: environmental storytelling visuals ─────────
+
+  /** Phase → ghost tint color */
+  private static readonly PHASE_COLORS: Record<string, number> = {
+    [TimelinePhase.NormalOps]: 0x4488ff,  // blue — peaceful
+    [TimelinePhase.Trigger]: 0xffaa44,    // amber — warning
+    [TimelinePhase.Escalation]: 0xff8822, // orange — danger
+    [TimelinePhase.Collapse]: 0xff3333,   // red — critical
+    [TimelinePhase.Aftermath]: 0xaa44ff,  // purple — mystery
+  };
+
+  /** Build/update scene echo meshes based on game state */
+  private buildSceneEchoes(state: GameState): void {
+    if (!state.mystery || this.sceneEchosBuilt) return;
+    const echoes = state.mystery.sceneEchoes;
+    if (!echoes || echoes.length === 0) return;
+
+    this.sceneEchosBuilt = true;
+
+    for (const echo of echoes) {
+      if (this.sceneEchoMeshes.has(echo.id)) continue;
+
+      let mesh: THREE.Object3D;
+
+      if (echo.echoType === SceneEchoType.GhostSilhouette) {
+        // Ghost silhouette: translucent humanoid shape
+        mesh = this.createGhostSilhouette(echo);
+      } else if (echo.echoType === SceneEchoType.DamageMark) {
+        // Damage mark: flat sprite on floor
+        mesh = this.createDamageMark(echo);
+      } else if (echo.echoType === SceneEchoType.SystemTrace) {
+        // System trace: flickering small cube
+        mesh = this.createSystemTrace(echo);
+      } else {
+        continue;
+      }
+
+      mesh.userData._echoId = echo.id;
+      mesh.userData._echoType = echo.echoType;
+      mesh.userData._echoPhase = echo.phase;
+      mesh.userData._sensorRequired = echo.sensorRequired;
+      mesh.visible = false; // hidden until conditions met
+      this.sceneEchoMeshes.set(echo.id, mesh);
+      this.sceneEchoGroup.add(mesh);
+    }
+  }
+
+  /** Create a ghost silhouette mesh (translucent humanoid) */
+  private createGhostSilhouette(echo: SceneEcho): THREE.Object3D {
+    const group = new THREE.Group();
+    const color = BrowserDisplay3D.PHASE_COLORS[echo.phase] ?? 0x8888ff;
+
+    // Simple humanoid shape: capsule body + sphere head
+    const bodyGeo = new THREE.CylinderGeometry(0.12, 0.15, 0.65, 8);
+    const headGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const mat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.25,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const body = new THREE.Mesh(bodyGeo, mat);
+    body.position.y = 0.35;
+    const head = new THREE.Mesh(headGeo, mat.clone());
+    head.position.y = 0.75;
+    group.add(body, head);
+
+    // Ground glow disc
+    const glowGeo = new THREE.CircleGeometry(0.3, 16);
+    glowGeo.rotateX(-Math.PI / 2);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.15,
+      depthWrite: false,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.y = 0.01;
+    group.add(glow);
+
+    group.position.set(echo.pos.x, 0, echo.pos.y);
+    return group;
+  }
+
+  /** Create a damage mark sprite (flat on floor) */
+  private createDamageMark(echo: SceneEcho): THREE.Object3D {
+    const color = BrowserDisplay3D.PHASE_COLORS[echo.phase] ?? 0xff8844;
+    // Create a simple canvas texture for the damage mark
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d")!;
+    const r = ((color >> 16) & 0xff);
+    const g = ((color >> 8) & 0xff);
+    const b = (color & 0xff);
+
+    // Radial gradient damage pattern
+    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 28);
+    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.8)`);
+    grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.3)`);
+    grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+
+    // Irregular edges (splatters)
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.5)`;
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const dist = 12 + (i * 7 % 10);
+      ctx.beginPath();
+      ctx.arc(32 + Math.cos(angle) * dist, 32 + Math.sin(angle) * dist, 4 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    const geo = new THREE.PlaneGeometry(0.8, 0.8);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(echo.pos.x, 0.015, echo.pos.y);
+    return mesh;
+  }
+
+  /** Create a system trace mesh (flickering console indicator) */
+  private createSystemTrace(echo: SceneEcho): THREE.Object3D {
+    const color = BrowserDisplay3D.PHASE_COLORS[echo.phase] ?? 0xff8844;
+    const geo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+    const mat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(echo.pos.x, 0.5, echo.pos.y);
+    return mesh;
+  }
+
+  /** Animate scene echoes: pulse, fade, visibility control */
+  private animateSceneEchoes(elapsed: number, delta: number, state: GameState | null): void {
+    if (!state?.mystery) return;
+    const echoes = state.mystery.sceneEchoes;
+    if (!echoes || echoes.length === 0) return;
+
+    const playerSensors = state.player.sensors;
+    const hasThermal = playerSensors.includes(SensorType.Thermal);
+
+    for (const echo of echoes) {
+      const mesh = this.sceneEchoMeshes.get(echo.id);
+      if (!mesh) continue;
+
+      // Check if tile is explored
+      const tile = state.tiles[echo.pos.y]?.[echo.pos.x];
+      if (!tile?.explored) { mesh.visible = false; continue; }
+
+      // Sensor gating: ghost silhouettes need thermal
+      if (echo.sensorRequired === SensorType.Thermal && !hasThermal) {
+        mesh.visible = false;
+        continue;
+      }
+
+      // View distance check
+      if (!this.isTileInView(echo.pos.x, echo.pos.y, state)) {
+        mesh.visible = false;
+        continue;
+      }
+
+      mesh.visible = true;
+
+      // Animate based on type
+      if (echo.echoType === SceneEchoType.GhostSilhouette) {
+        // Ghost pulse: slow breathing opacity
+        const baseOpacity = 0.2 + Math.sin(elapsed * 1.2 + echo.pos.x * 3) * 0.08;
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
+            child.material.opacity = baseOpacity;
+          }
+        });
+        // Gentle hover bob
+        mesh.position.y = Math.sin(elapsed * 0.8 + echo.pos.y * 2) * 0.03;
+        // Slow rotation drift
+        mesh.rotation.y = elapsed * 0.2 + echo.pos.x;
+      } else if (echo.echoType === SceneEchoType.SystemTrace) {
+        // Flicker
+        const flicker = Math.sin(elapsed * 8 + echo.pos.x * 5) > 0.3;
+        mesh.visible = mesh.visible && flicker;
+        mesh.rotation.y = elapsed * 2;
       }
     }
   }
