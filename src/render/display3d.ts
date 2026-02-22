@@ -6,6 +6,7 @@ import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase } from
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
 import type { IGameDisplay, LogType, DisplayLogEntry } from "./displayInterface.js";
 import { getObjective as getObjectiveShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
+import { getRunHistory } from "../sim/saveLoad.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
 
 // FBXLoader is not imported — Synty FBX files are pre-converted to GLTF at build time
@@ -1533,6 +1534,9 @@ export class BrowserDisplay3D implements IGameDisplay {
       ? `<div class="gameover-stat"><span class="stat-label">Decisions Made:</span> <span class="stat-value">${choicesMade}/${choices.length}</span></div>`
       : "";
 
+    // Run history
+    const runHistoryHtml = this.renderRunHistory(state.seed);
+
     overlay.innerHTML = `
       <div class="gameover-box ${titleClass}">
         <div class="gameover-title ${titleClass}">${title}</div>
@@ -1552,9 +1556,40 @@ export class BrowserDisplay3D implements IGameDisplay {
           <div class="gameover-stat"><span class="stat-label">Deductions:</span> <span class="stat-value ${deductionsCorrect === deductions.length ? 'good' : deductionsCorrect > 0 ? 'warn' : 'bad'}">${deductionsCorrect}/${deductions.length} correct</span></div>
           ${choicesHtml}
         </div>
+        ${runHistoryHtml}
         <div class="gameover-restart">Press [R] to restart</div>
       </div>`;
     overlay.classList.add("active");
+  }
+
+  private renderRunHistory(currentSeed: number): string {
+    const history = getRunHistory();
+    const pastRuns = history.filter(r => r.seed !== currentSeed || history.indexOf(r) > 0).slice(0, 5);
+    if (pastRuns.length <= 1) return "";
+
+    const archetypeShort: Record<string, string> = {
+      coolant_cascade: "WHISTLEBLOWER",
+      hull_breach: "MURDER",
+      reactor_scram: "ROGUE AI",
+      sabotage: "STOWAWAY",
+      signal_anomaly: "FIRST CONTACT",
+      mutiny: "THE DIVIDE",
+    };
+
+    const rows = pastRuns.slice(1).map(r => {
+      const result = r.victory
+        ? `<span style="color:#0f0">WIN</span>`
+        : `<span style="color:#f44">LOSS</span>`;
+      const rc = r.rating === "S" ? "#ff0" : r.rating === "A" ? "#0f0" : r.rating === "B" ? "#6cf" : r.rating === "C" ? "#fa0" : "#f44";
+      const arch = archetypeShort[r.archetype] || r.archetype;
+      return `<div style="font-size:10px;color:#888;font-family:monospace">${result} <span style="color:${rc}">${r.rating}</span> T${r.turns} · ${arch} · ${r.seed}</div>`;
+    });
+
+    if (rows.length === 0) return "";
+
+    return `<div style="margin:6px 0;border-top:1px solid #333;padding-top:6px">` +
+      `<div style="color:#556;font-size:10px;text-align:center;margin-bottom:3px">PREVIOUS RUNS</div>` +
+      rows.join("") + `</div>`;
   }
 
   async copyRunSummary(): Promise<boolean> {
