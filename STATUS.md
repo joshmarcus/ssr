@@ -263,6 +263,7 @@
 - **Sprint V101 — Minimap hazard warnings**: Room hazard icons on minimap — heat symbol for hot rooms, triangle for low pressure, cloud for smoke. Color-coded (red/blue/yellow) at room bottom-left. Helps players plan routes around danger zones
 - **Sprint V102 — Idle antenna sway**: Sweepo's antenna gently sways side-to-side when idle (dual-frequency oscillation: 1.2Hz + 0.7Hz). Stops when moving. Adds lifelike scanning personality to the bot
 - **Sprint V103 — Entity-colored interaction rings**: Flash ring and particle burst on interaction now use the entity's type color (from ENTITY_COLORS_3D) instead of uniform green. Particles brightened +60 per channel. Visual variety per entity type
+- **Sprint V104 — Headlight flicker sync**: Volumetric cone and ground spot now sync with headlight damage flicker via stored ratio. All three (SpotLight, cone mesh, ground ellipse) dim together for coherent failing-flashlight effect
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

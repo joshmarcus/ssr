@@ -611,6 +611,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _heatShimmerSprites: THREE.Sprite[] = [];
   private _heatShimmerTimer: number = 0;
   private _playerTileHeat: number = 0;
+  // Headlight damage flicker ratio (1.0 = normal, <1.0 when flickering)
+  private _headlightFlickerRatio: number = 1.0;
   // Pipe steam leak sprites (small puffs from corridor pipes)
   private _pipeLeakSprites: THREE.Sprite[] = [];
   private _pipeLeakTimer: number = 0;
@@ -2788,6 +2790,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         headlightIntensity *= (1 - flickerSeverity * 0.6) + flickerSeverity * 0.6 * flickerMult;
       }
       this.headlight.intensity = headlightIntensity;
+      this._headlightFlickerRatio = headlightIntensity / baseIntensity;
 
       // Headlight color reacts to room hazards
       if (this._currentRoom) {
@@ -2805,12 +2808,13 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
 
       // Volumetric cone visibility: brighter in corridors (dusty), dimmer in rooms
+      // Syncs with damage flicker via stored flicker ratio
       if (this.playerMesh) {
         this.playerMesh.traverse((child) => {
           if (child instanceof THREE.Mesh && child.userData?.isHeadlightCone) {
-            const targetOpacity = inRoom ? 0.015 : 0.045; // much more visible in corridors
+            const targetOpacity = (inRoom ? 0.015 : 0.045) * this._headlightFlickerRatio;
             const mat = child.material as THREE.MeshBasicMaterial;
-            mat.opacity += (targetOpacity - mat.opacity) * 0.05;
+            mat.opacity += (targetOpacity - mat.opacity) * 0.1; // faster tracking for flicker
             mat.color.copy(this.headlight!.color); // match headlight color
           }
         });
@@ -2827,8 +2831,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._headlightSpot.rotation.z = -facing; // align elongation with facing
       const spotMat = this._headlightSpot.material as THREE.MeshBasicMaterial;
       const inRoom = this._currentRoom !== null;
-      const targetOpacity = inRoom ? 0.03 : 0.08; // brighter in corridors
-      spotMat.opacity += (targetOpacity - spotMat.opacity) * 0.08;
+      const targetOpacity = (inRoom ? 0.03 : 0.08) * this._headlightFlickerRatio;
+      spotMat.opacity += (targetOpacity - spotMat.opacity) * 0.1;
       // Match headlight color
       if (this.headlight) spotMat.color.copy(this.headlight.color);
       this._headlightSpot.visible = true;
