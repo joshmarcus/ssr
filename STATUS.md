@@ -254,6 +254,7 @@
 - **Sprint V92 — Antenna signal pulse**: Sweepo's antenna tip glows brighter and pulses faster when near unexhausted entities (yellow within 2 tiles, green within 6). Acts as a proximity detector — idle dim green, signal strength scales with distance, pulse rate 2-8Hz
 - **Sprint V93 — Pipe steam leaks**: Small blue-white drips fall from overhead corridor pipes every 3-8s. Spawns at nearest pipe tile within 6 tiles, falls downward from ceiling height (y=1.7), stretches vertically while fading. Adds deteriorating-station atmosphere
 - **Sprint V94 — Minimap room names**: Abbreviated room names (first word, max 8 chars) drawn at room centers on minimap. Current room bright green, others dim grey. Improves navigation and spatial awareness
+- **Sprint V95 — Stun screen static**: Persistent TV-noise overlay while Sweepo is stunned. Randomized gradient lines at 12% opacity, mix-blend-mode screen, refreshed every frame for flickering static effect. Auto-hides when stun ends
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

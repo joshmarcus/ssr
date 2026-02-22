@@ -2031,10 +2031,30 @@ export class BrowserDisplay3D implements IGameDisplay {
           glowMat.opacity = 0.15;
         }
       }
-      // Stun jitter: rapid random rotation wobble
+      // Stun jitter: rapid random rotation wobble + screen static overlay
       if (this._playerStunned) {
         this.playerMesh.rotation.x += (Math.random() - 0.5) * 0.06;
         this.playerMesh.rotation.z += (Math.random() - 0.5) * 0.06;
+        // Screen static noise overlay
+        let stunOverlay = document.getElementById("stun-static-overlay");
+        if (!stunOverlay) {
+          stunOverlay = document.createElement("div");
+          stunOverlay.id = "stun-static-overlay";
+          stunOverlay.style.cssText =
+            "position:fixed;inset:0;pointer-events:none;z-index:88;opacity:0.12;mix-blend-mode:screen;";
+          document.body.appendChild(stunOverlay);
+        }
+        stunOverlay.style.display = "block";
+        // Randomize background position for noise effect each frame
+        const rx = Math.random() * 200;
+        const ry = Math.random() * 200;
+        stunOverlay.style.backgroundImage =
+          `repeating-linear-gradient(${Math.random()*360}deg,rgba(255,255,255,${0.1+Math.random()*0.3}) 0px,transparent 1px,transparent 2px)`;
+        stunOverlay.style.backgroundPosition = `${rx}px ${ry}px`;
+        stunOverlay.style.backgroundSize = "3px 3px";
+      } else {
+        const stunOverlay = document.getElementById("stun-static-overlay");
+        if (stunOverlay) stunOverlay.style.display = "none";
       }
 
       // Eye glow: state-reactive color + gentle pulse (child 5)
