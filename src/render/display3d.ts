@@ -562,6 +562,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   private ambientLight: THREE.AmbientLight | null = null;
   private keyLight: THREE.DirectionalLight | null = null;
   private currentPhase: string = "";
+  // 3D waypoint indicator
+  private waypointSprite: THREE.Sprite | null = null;
+  private waypointTargetX: number = 0;
+  private waypointTargetZ: number = 0;
+  private waypointVisible: boolean = false;
 
   // Synty texture atlas (loaded at startup, applied to models that lack embedded textures)
   private syntyAtlas: THREE.Texture | null = null;
@@ -891,6 +896,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Player movement trail ──
     this.createMovementTrail();
+
+    // ── 3D waypoint indicator (floating arrow pointing to objective) ──
+    this.createWaypointIndicator();
 
     // ── Player mesh (green cylinder + antenna box) ──
     this.playerMesh = this.createPlayerMesh();
@@ -1379,7 +1387,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateHazardVisuals(state);
     this.updateDoorLights(state);
     this.updateRoomLabels(state);
-    // Entity labels removed — sidebar already shows nearby entities
+    this.updateWaypoint(state, this.clock.getElapsedTime());
     this.renderMinimap(state);
 
     // Hazard screen border: red/amber edge glow when player is in danger
@@ -6284,6 +6292,112 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     this.dustParticles = new THREE.Points(dustGeo, dustMat);
     this.scene.add(this.dustParticles);
+  }
+
+  // ── 3D Waypoint indicator ──────────────────────────────────
+
+  private createWaypointIndicator(): void {
+    // Diamond-shaped sprite that points toward objectives
+    const canvas = document.createElement("canvas");
+    canvas.width = 64; canvas.height = 64;
+    const ctx = canvas.getContext("2d")!;
+    // Draw arrow/diamond
+    ctx.fillStyle = "#44ffaa";
+    ctx.beginPath();
+    ctx.moveTo(32, 4);   // top
+    ctx.lineTo(52, 32);  // right
+    ctx.lineTo(32, 56);  // bottom
+    ctx.lineTo(12, 32);  // left
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({
+      map: tex, transparent: true, opacity: 0.7,
+      depthWrite: false,
+    });
+    this.waypointSprite = new THREE.Sprite(mat);
+    this.waypointSprite.scale.set(0.4, 0.4, 1);
+    this.waypointSprite.visible = false;
+    this.scene.add(this.waypointSprite);
+  }
+
+  private updateWaypoint(state: GameState, elapsed: number): void {
+    if (!this.waypointSprite || !this.chaseCamActive) {
+      if (this.waypointSprite) this.waypointSprite.visible = false;
+      return;
+    }
+
+    const sensors = state.player.sensors ?? [];
+    const hasThermal = sensors.includes(SensorType.Thermal);
+    const hasAtmo = sensors.includes(SensorType.Atmospheric);
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+    const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
+
+    // Find best waypoint target
+    let bestDist = Infinity;
+    let targetX = 0, targetZ = 0;
+    let found = false;
+
+    for (const [, ent] of state.entities) {
+      const dx = ent.pos.x - px;
+      const dy = ent.pos.y - py;
+      const dist = Math.abs(dx) + Math.abs(dy);
+      if (dist < 3) continue; // too close, no need for waypoint
+
+      let isTarget = false;
+      if (hasThermal && ent.type === EntityType.Relay && ent.props["activated"] !== true && ent.props["locked"] !== true) {
+        isTarget = true;
+      }
+      if (hasAtmo && ent.type === EntityType.CrewNPC && ent.props["following"] !== true && ent.props["evacuated"] !== true) {
+        isTarget = true;
+      }
+      if (phase === ObjectivePhase.Evacuate && ent.type === EntityType.EscapePod) {
+        isTarget = true;
+      }
+      if (ent.type === EntityType.DataCore && ent.props["transmitted"] !== true) {
+        isTarget = true;
+      }
+
+      if (isTarget && dist < bestDist) {
+        bestDist = dist;
+        targetX = ent.pos.x;
+        targetZ = ent.pos.y;
+        found = true;
+      }
+    }
+
+    if (!found) {
+      this.waypointSprite.visible = false;
+      return;
+    }
+
+    this.waypointSprite.visible = true;
+
+    // Position waypoint 2 units ahead of player in the direction of target
+    const dx = targetX - px;
+    const dz = targetZ - py;
+    const angle = Math.atan2(dx, dz);
+    const dist = 2.5;
+    const wx = px + Math.sin(angle) * dist;
+    const wz = py + Math.cos(angle) * dist;
+
+    this.waypointSprite.position.set(wx, 1.0 + Math.sin(elapsed * 2) * 0.1, wz);
+
+    // Pulse opacity based on distance (closer target = brighter)
+    const mat = this.waypointSprite.material as THREE.SpriteMaterial;
+    mat.opacity = bestDist > 15 ? 0.3 : bestDist > 8 ? 0.5 : 0.7;
+
+    // Color based on target type
+    if (phase === ObjectivePhase.Evacuate) {
+      mat.color.setHex(0xff44ff); // magenta for evacuation
+    } else {
+      mat.color.setHex(0x44ffaa); // green for normal objectives
+    }
   }
 
   // ── Player movement trail ──────────────────────────────────
