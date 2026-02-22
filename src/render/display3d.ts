@@ -2737,10 +2737,24 @@ export class BrowserDisplay3D implements IGameDisplay {
             ceilMat.emissive.setHex(0xff1100);
             ceilMat.emissiveIntensity = klaxon * 0.15;
           }
+          // Evacuation screen-edge urgency pulse
+          let evacVig = document.getElementById("evac-urgency-vignette");
+          if (!evacVig) {
+            evacVig = document.createElement("div");
+            evacVig.id = "evac-urgency-vignette";
+            evacVig.style.cssText =
+              "position:fixed;inset:0;pointer-events:none;z-index:86;";
+            document.body.appendChild(evacVig);
+          }
+          evacVig.style.display = "block";
+          const evacuAlpha = (0.04 + klaxon * 0.08).toFixed(3);
+          evacVig.style.boxShadow = `inset 0 0 80px 30px rgba(255,20,0,${evacuAlpha})`;
         } else if (this.ceilingMesh.visible) {
-          // Non-evacuation: ensure ceiling emissive is off
+          // Non-evacuation: ensure ceiling emissive is off + hide evac vignette
           const ceilMat = this.ceilingMesh.material as THREE.MeshStandardMaterial;
           if (ceilMat.emissiveIntensity > 0) ceilMat.emissiveIntensity = 0;
+          const evacVig = document.getElementById("evac-urgency-vignette");
+          if (evacVig) evacVig.style.display = "none";
         }
       }
 

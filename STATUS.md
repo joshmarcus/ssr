@@ -312,6 +312,7 @@
 - **Sprint V150 — Minimap sensor border**: Colored frame and 3-letter sensor label (THM/ATM/CLN) drawn on minimap when sensor mode is active. Red for thermal, blue for atmospheric, green for cleanliness. Reinforces sensor state at a glance
 - **Sprint V151 — Stun reboot text overlay**: "SYSTEM REBOOT", "RECALIBRATING...", "SIGNAL LOST", "RECONNECTING..." messages cycle during stun with pulsing opacity and animated dots. Reinforces terminal-link narrative during stun state
 - **Sprint V152 — Entity spawn bounce-in**: New entities scale from 0 to 1 with overshoot bounce (115% → settle) over ~0.3s instead of instant pop-in. Smooth ease-out-back curve. Removes visual jarring when exploring new areas
+- **Sprint V153 — Evacuation urgency vignette**: Pulsing red screen-edge vignette during evacuation phase, synced with existing klaxon ambient light pulse. Creates visceral urgency during the final rescue phase
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
