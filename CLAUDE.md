@@ -324,6 +324,19 @@ Particle physics, 2D-3D parity, and cinematic polish:
 - **2D-3D parity via Explore agent**: When feature novelty runs dry, systematic gap analysis between display.ts and display3d.ts (V139-V140) identifies high-value ports. Scanner compass and turn warning are gameplay-impactful, not just visual polish.
 - **Avoiding duplicate indicators**: Always search existing code for similar functionality before adding new indicators. V140 initially added a deduction-ready indicator that duplicated existing `[NEW]` tag — caught by code review before commit.
 
+## Sprint Learnings (V141-V150 Reflection)
+
+Screen-space effects, camera expressiveness, and environmental storytelling:
+
+- **Directional sprites for sensor visualization**: Air flow arrows (V141) use a pool of sprites repositioned each frame based on tile pressure gradients. Canvas-drawn arrow texture, sprite `.material.rotation` for direction. Pool pattern: lazily grow, hide unused, avoid per-frame allocation.
+- **Signal glitch as damage feedback**: RGB block corruption (V144) on a tiny 64x48 canvas with `image-rendering: pixelated` creates authentic low-res digital interference. Double-pulse on stun (second lighter pulse 50ms after primary) adds depth. Canvas is nearly free to render.
+- **CRT scanlines via CSS gradient**: `repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)` creates period-perfect scanlines (V145). Scrolling via `backgroundPositionY` at 8px/s. Almost zero performance cost.
+- **Room ambient particles via sparkle pool**: Reuse existing `_discoverySparkles` array (V146) with `_isAmbient` flag for counter tracking. 10 room types get unique configs (color, drift speed, lifetime). Per-room-type personality through particle behavior.
+- **Floor trail decals as breadcrumbs**: Oriented sprites at y=0.011 (V147) — just above floor to avoid z-fighting. FIFO cap at 50 with quadratic opacity decay (0.12 * (1 - t²)) gives natural fade-away. Rotation matches player facing direction.
+- **Camera tilt for hazard awareness**: Roll (Z-rotation) toward breaches (V148) converts world-space threat direction to screen-space via player rotation matrix. Max ±0.06 rad is barely perceptible but creates subconscious unease. Heat tiles get sin-wave wobble instead.
+- **Time-stretch for milestone emphasis**: Relay activation (V149) slows camera lerp to 30% for 0.4s — not actual time slowdown but perceived pause. Combined with zoom-in punch + golden sparks for layered celebration.
+- **Minimap as sensor status indicator**: Colored border + 3-letter label (V150) communicates sensor state without reading the sidebar. Same minimap canvas, just 3 additional draw calls (strokeRect + fillText).
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
