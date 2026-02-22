@@ -275,6 +275,7 @@
 - **Sprint V113 — Sweepo emotion eye**: Eye blinks every ~4s (Y-scale squish to 20%), squints when HP critical, widens on interaction (triggered from flashTile, decays over 0.5s). Gives Sweepo expressive personality beyond color changes
 - **Sprint V114 — MedKit heartbeat light**: Red PointLight pulses in sync with heartbeat rhythm (double-beat pattern). Casts pulsing red glow on surrounding floor/walls. Lazily created on first animation frame, intensity scales with heartbeat value
 - **Sprint V115 — Drone propwash floor rings**: Spinning additive-blend ring beneath Drone (blue-white, 6 rad/s) and PatrolDrone (orange, 8 rad/s). Ring follows entity position, opacity pulses with hover rhythm. Visual downwash suggests antigravity propulsion
+- **Sprint V116 — Cleaning sparkle trail**: Green sparkles rise from floor when Sweepo moves over dirty tiles (dirt>30). Intensity scales with dirt level. Reuses sparkle pool with upward drift. Visual reward for the core cleaning loop
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

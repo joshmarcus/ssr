@@ -611,6 +611,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _heatShimmerSprites: THREE.Sprite[] = [];
   private _heatShimmerTimer: number = 0;
   private _playerTileHeat: number = 0;
+  private _playerTileDirt: number = 0;
+  // Cleaning sparkle sprites (green sparkles when moving over dirty tiles)
+  private _cleanSparkleTimer: number = 0;
   // Headlight damage flicker ratio (1.0 = normal, <1.0 when flickering)
   private _headlightFlickerRatio: number = 1.0;
   // Pipe steam leak sprites (small puffs from corridor pipes)
@@ -2380,6 +2383,31 @@ export class BrowserDisplay3D implements IGameDisplay {
           (dust as any)._maxLife = 0.4 + Math.random() * 0.3;
           this.scene.add(dust);
           this._dustKickSprites.push(dust);
+        }
+      }
+
+      // Cleaning sparkles: green sparkles when moving over dirty tiles
+      if (isMoving && this._playerTileDirt > 30 && this.chaseCamActive) {
+        this._cleanSparkleTimer -= delta;
+        if (this._cleanSparkleTimer <= 0) {
+          this._cleanSparkleTimer = 0.12;
+          const intensity = Math.min(1, this._playerTileDirt / 80);
+          const csMat = new THREE.SpriteMaterial({
+            color: 0x44ff88, transparent: true, opacity: 0.3 + intensity * 0.3,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          });
+          const cs = new THREE.Sprite(csMat);
+          cs.scale.set(0.07, 0.07, 1);
+          cs.position.set(
+            this.playerCurrentX + (Math.random() - 0.5) * 0.4,
+            0.05 + Math.random() * 0.15,
+            this.playerCurrentZ + (Math.random() - 0.5) * 0.4,
+          );
+          (cs as any)._life = 0;
+          (cs as any)._maxLife = 0.5 + Math.random() * 0.3;
+          (cs as any)._driftY = 0.4 + Math.random() * 0.3;
+          this.scene.add(cs);
+          this._discoverySparkles.push(cs);
         }
       }
 
@@ -7019,6 +7047,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     const playerTile = state.tiles[py]?.[px];
     this._playerTilePressure = playerTile?.pressure ?? 100;
     this._playerTileHeat = playerTile?.heat ?? 0;
+    this._playerTileDirt = playerTile?.dirt ?? 0;
     if (this._playerTilePressure < 60) {
       // Find nearest breach entity for wind direction
       let bestDist = Infinity;
