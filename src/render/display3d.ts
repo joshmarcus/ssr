@@ -7853,6 +7853,26 @@ export class BrowserDisplay3D implements IGameDisplay {
     ctx.lineTo(ppx + adx - Math.sin(facing - headAngle) * headLen, ppy + ady - Math.cos(facing - headAngle) * headLen);
     ctx.stroke();
 
+    // Exploration percentage indicator at bottom of minimap
+    let walkableCount = 0;
+    let exploredCount = 0;
+    for (let my = 0; my < state.height; my++) {
+      for (let mx = 0; mx < state.width; mx++) {
+        if (state.tiles[my][mx].walkable) {
+          walkableCount++;
+          if (state.tiles[my][mx].explored) exploredCount++;
+        }
+      }
+    }
+    if (walkableCount > 0) {
+      const pct = Math.round((exploredCount / walkableCount) * 100);
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = pct >= 100 ? "rgba(68,255,136,0.9)" : "rgba(180,200,220,0.6)";
+      ctx.fillText(`${pct}%`, w / 2, h - 2);
+    }
+
     // Render compass
     this.renderCompass();
   }

@@ -266,6 +266,7 @@
 - **Sprint V104 — Headlight flicker sync**: Volumetric cone and ground spot now sync with headlight damage flicker via stored ratio. All three (SpotLight, cone mesh, ground ellipse) dim together for coherent failing-flashlight effect
 - **Sprint V105 — Door proximity lighting**: Unlocked door lights brighten as player approaches (motion-sensor effect). Intensity +0.8 within 2 tiles, +0.3 within 4. Locked doors keep pulsing red warning. Creates welcoming-vs-forbidden contrast
 - **Sprint V106 — Following crew glow**: Crew NPCs that are following the player emit a pulsing green emissive glow (0.2 + sin*0.1 intensity). Tracked via entity `following` prop. Visual confirmation that crew are in your rescue party
+- **Sprint V107 — Minimap exploration percentage**: Walkable tile exploration percentage shown at bottom of minimap. Green when 100%, dim grey otherwise. Motivates thorough exploration
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
