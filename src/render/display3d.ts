@@ -611,6 +611,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _roomTransitionFade: number = 0; // 1.0 = full black, fades to 0
   private static readonly CORRIDOR_VIEW_RANGE = 5; // tiles of corridor visible from player
   private _corridorDimFactor: number = 1.0; // ambient light dimming (1.0 = full, 0.35 = corridor)
+  private _roomTintBlend: number = 0; // 0 = base ambient color, ~0.3 = room-tinted
+  private _roomTintTarget: THREE.Color = new THREE.Color(0xccddff);
   private _roomCenterGlow: THREE.PointLight | null = null; // warm glow at current room center
   private cameraFrustumSize: number = CAMERA_FRUSTUM_SIZE_DEFAULT; // current zoom level (mouse wheel adjustable)
   private cameraElevation: number = 0.5; // 0 = top-down, 1 = side-on. Default = mid-angle
@@ -2853,6 +2855,22 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (phase === ObjectivePhase.Evacuate) baseIntensity = 1.2;
         else if (phase === ObjectivePhase.Recover) baseIntensity = 1.5;
         this.ambientLight.intensity = baseIntensity * this._corridorDimFactor;
+
+        // Room-type ambient tint: blend ambient color toward room's light color when inside
+        if (phase !== ObjectivePhase.Evacuate) {
+          const targetBlend = inRoom ? 0.3 : 0;
+          this._roomTintBlend += (targetBlend - this._roomTintBlend) * 0.06;
+          if (this._currentRoom) {
+            const roomHex = ROOM_LIGHT_COLORS[this._currentRoom.name] ?? 0xccddff;
+            this._roomTintTarget.lerp(new THREE.Color(roomHex), 0.08);
+          }
+          if (this._roomTintBlend > 0.01) {
+            const baseColor = phase === ObjectivePhase.Recover ? 0xddc8a0 : 0xccddff;
+            const bc = new THREE.Color(baseColor);
+            bc.lerp(this._roomTintTarget, this._roomTintBlend);
+            this.ambientLight.color.copy(bc);
+          }
+        }
 
         // Evacuation phase: pulsing red ambient for emergency klaxon feel
         if (phase === ObjectivePhase.Evacuate) {
