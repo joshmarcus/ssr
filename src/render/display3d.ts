@@ -767,6 +767,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.wallCornerMesh = new THREE.InstancedMesh(cornerGeo, cornerMat, this.maxTiles);
     this.wallCornerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.wallCornerMesh.frustumCulled = false;
+    this.wallCornerMesh.castShadow = true;
+    this.wallCornerMesh.receiveShadow = true;
     this.wallCornerMesh.count = 0;
     this.scene.add(this.wallCornerMesh);
 
@@ -790,6 +792,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.ceilingMesh = new THREE.InstancedMesh(ceilGeo, ceilMat, this.maxTiles);
     this.ceilingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.ceilingMesh.frustumCulled = false;
+    this.ceilingMesh.receiveShadow = true;
     this.ceilingMesh.count = 0;
     this.scene.add(this.ceilingMesh);
     this.ceilingMesh.visible = this.chaseCamActive; // only show ceiling in chase cam
@@ -870,6 +873,13 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // ── Player mesh (green cylinder + antenna box) ──
     this.playerMesh = this.createPlayerMesh();
+    // Sweepo casts shadows from directional/room lights
+    this.playerMesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
     this.scene.add(this.playerMesh);
 
     // ── Resize ──
@@ -4261,6 +4271,13 @@ export class BrowserDisplay3D implements IGameDisplay {
 
       if (!mesh) {
         mesh = this.createEntityMesh(entity);
+        // Enable shadow casting on entity meshes for headlight shadows
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
         this.entityMeshes.set(id, mesh);
         this.entityGroup.add(mesh);
       }
