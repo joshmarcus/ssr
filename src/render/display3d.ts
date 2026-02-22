@@ -1991,6 +1991,26 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.playerMesh.rotation.z += (Math.random() - 0.5) * 0.06;
       }
 
+      // Eye glow: state-reactive color + gentle pulse (child 5)
+      const sweepoEye = this.playerMesh.children[5];
+      if (sweepoEye instanceof THREE.Mesh) {
+        const eyeMat = sweepoEye.material as THREE.MeshBasicMaterial;
+        const pulse = 0.7 + Math.sin(elapsed * 3) * 0.15;
+        if (this._playerStunned) {
+          eyeMat.color.setHex(0xff2222); // red when stunned
+          eyeMat.opacity = 0.4 + Math.random() * 0.5; // erratic
+        } else if (this._playerHpPercent < 0.4) {
+          eyeMat.color.setHex(0xff6622); // orange when critical
+          eyeMat.opacity = pulse * 0.6;
+        } else if (this._playerHpPercent < 0.8) {
+          eyeMat.color.setHex(0xffcc44); // amber when damaged
+          eyeMat.opacity = pulse * 0.8;
+        } else {
+          eyeMat.color.setHex(0x44ff88); // green when healthy
+          eyeMat.opacity = pulse;
+        }
+      }
+
       // Smoothly move camera and light to follow
       this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
       this.cameraPosZ += (this.cameraTargetZ - this.cameraPosZ) * lerpFactor;
@@ -6190,6 +6210,15 @@ export class BrowserDisplay3D implements IGameDisplay {
     const glowCircle = new THREE.Mesh(glowGeo, glowMat);
     glowCircle.position.y = -0.01; // just above floor
     group.add(glowCircle);
+
+    // Eye light: small emissive sphere on front of body (child 5)
+    const eyeGeo = new THREE.SphereGeometry(0.04, 6, 4);
+    const eyeMat = new THREE.MeshBasicMaterial({
+      color: 0x44ff88, transparent: true, opacity: 0.9,
+    });
+    const eye = new THREE.Mesh(eyeGeo, eyeMat);
+    eye.position.set(0, 0.1, 0.27); // front of body
+    group.add(eye);
 
     // Headlight: forward-facing spotlight for corridor exploration
     this.headlightTarget = new THREE.Object3D();
