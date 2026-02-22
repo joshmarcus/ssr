@@ -311,6 +311,19 @@ Interaction feedback, atmospheric layers, and animation lifecycle management:
 - **Relay pulse wave as chain reaction visual**: Pulse waves (V129) spawn from activated relay position, travel along all connected curves at 4.5x normal dot speed. Pending pulse queue bridges the gap between activation detection and curve rebuilding.
 - **Collection fly-to-player animation**: Instead of instant entity removal (V130), pickup entities arc toward player with ease-in acceleration, spin, shrink, and opacity fade. Reparent from entityGroup to scene so they stay visible during animation. Traverse children for opacity since GLTF models have nested meshes.
 
+## Sprint Learnings (V131-V140 Reflection)
+
+Particle physics, 2D-3D parity, and cinematic polish:
+
+- **Breach vacuum suction on particles**: Inverse-square gravitational pull (V131) applied to sparkles, dust kicks, and breath puffs toward unsealed breaches. Range-limited (4 tiles) with `pull = delta * 2.0 / (dist² + 0.5)` prevents division-by-zero. Reuse `_breachPositions` array across all particle loops to avoid recomputing.
+- **Sparkle pool drift extensions**: Adding `_driftX`/`_driftZ` (V132) to the existing sparkle pool lets radial airlock wind streaks reuse the same particle system. Check with `if ((sp as any)._driftX)` avoids adding properties to all sprites — only wind streak sprites carry drift.
+- **HP-reactive lighting as body language**: Headlight color shift (V133) tells the player about bot health without UI reading. Four tiers map cleanly to color temperature: cool white → warm → amber → red-orange. Room hazard tints override to prevent conflicting signals.
+- **Damped spring for appendage physics**: Antenna wobble (V134) uses `sin(t * freq) * amp * exp(-decay)` for natural bounce during movement. Two frequencies (14Hz Z, 11Hz X) prevent symmetry. Idle uses slower sinusoidal sway with 0.9 exponential decay on cross-axis.
+- **Minimap as information canvas**: Fog border (V135), turn counter (V136), and player trail (V128) transform the minimap from passive map to active dashboard. Each feature uses minimal canvas operations — the fog border is just one `fillRect` per frontier tile.
+- **Game over orbit camera**: Simple `sin/cos * radius` orbit (V138) creates cinematic end-of-game feel. Initial angle from player facing prevents jarring camera jump. Only 4 lines of math in the animate loop.
+- **2D-3D parity via Explore agent**: When feature novelty runs dry, systematic gap analysis between display.ts and display3d.ts (V139-V140) identifies high-value ports. Scanner compass and turn warning are gameplay-impactful, not just visual polish.
+- **Avoiding duplicate indicators**: Always search existing code for similar functionality before adding new indicators. V140 initially added a deduction-ready indicator that duplicated existing `[NEW]` tag — caught by code review before commit.
+
 ## Development Conventions
 
 - **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
