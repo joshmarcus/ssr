@@ -227,7 +227,7 @@
     }
     .mode-3d #compass-canvas {
       position: absolute;
-      top: 140px;
+      top: 220px;
       right: 10px;
       z-index: 10;
       border: 1px solid rgba(68, 255, 136, 0.2);
@@ -672,6 +672,43 @@
     .revelation-overlay-box.correct { border-color: #553; }
     .revelation-overlay-box.incorrect { border-color: #433; }
 
+    /* ── Fullscreen minimap overlay ──────────────────────── */
+    #minimap-fullscreen {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 85;
+      background: rgba(0, 0, 0, 0.8);
+      pointer-events: auto;
+    }
+    #minimap-fullscreen.active { display: flex; }
+    #minimap-fullscreen canvas {
+      border: 1px solid rgba(68, 255, 136, 0.4);
+      border-radius: 4px;
+      image-rendering: pixelated;
+    }
+    /* ── Autoplay badge ───────────────────────────────────── */
+    #autoplay-badge {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 160, 0, 0.15);
+      color: #fa0;
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      padding: 4px 16px;
+      border: 1px solid rgba(255, 160, 0, 0.3);
+      border-radius: 2px;
+      z-index: 10;
+      display: none;
+      animation: auto-pulse 1.5s ease-in-out infinite;
+    }
+    #autoplay-badge.active { display: block; }
     /* ── Auto-explore badge ─────────────────────────────── */
     #auto-explore-badge {
       position: absolute;
@@ -699,6 +736,8 @@
   <div id="damage-flash"></div>
   <div id="hazard-border"></div>
   <div id="room-banner"></div>
+  <div id="minimap-fullscreen"></div>
+  <div id="autoplay-badge">AUTOPLAY</div>
   <div id="gameover-overlay"></div>
   <div id="broadcast-overlay"></div>
   <div id="journal-overlay"></div>
@@ -706,7 +745,7 @@
   <div id="game-container">
     <div id="ui-panel"></div>
     <div id="map-column">
-      <div id="rot-display"><canvas id="minimap-canvas" width="120" height="120" style="display:none"></canvas><canvas id="compass-canvas" width="60" height="60" style="display:none"></canvas></div>
+      <div id="rot-display"><canvas id="minimap-canvas" width="200" height="200" style="display:none"></canvas><canvas id="compass-canvas" width="60" height="60" style="display:none"></canvas></div>
       <div id="map-legend"></div>
     </div>
   </div>

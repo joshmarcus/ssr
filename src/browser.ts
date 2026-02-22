@@ -44,7 +44,7 @@ import {
   PACING_NUDGE_CLEAN, PACING_NUDGE_INVESTIGATE, PACING_NUDGE_RECOVER, PACING_NUDGE_EVACUATE,
   CORVUS_WITNESS_COMMENTARY,
 } from "./data/narrative.js";
-import type { Action, MysteryChoice, Deduction, CrewMember } from "./shared/types.js";
+import type { Action, MysteryChoice, Deduction, CrewMember, Entity } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
 import { computeChoiceEndings, computeBranchedEpilogue } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction, validateEvidenceLink, linkEvidence, getTagExplanation } from "./sim/deduction.js";
@@ -428,6 +428,220 @@ function autoExploreStep(): void {
 
   // Schedule next step
   autoExploreTimer = setTimeout(autoExploreStep, AUTO_EXPLORE_DELAY);
+}
+
+// ── Autoplay mode (bot plays the game) ──────────────────────────
+let autoplayActive = false;
+let autoplayTimer: ReturnType<typeof setTimeout> | null = null;
+let autoplayDriving = false; // true when the autoplay bot is driving an action
+const AUTOPLAY_DELAY = 400; // ms between bot actions
+
+/** Stop autoplay mode. */
+function stopAutoplay(): void {
+  autoplayActive = false;
+  if (autoplayTimer) {
+    clearTimeout(autoplayTimer);
+    autoplayTimer = null;
+  }
+  const badge = document.getElementById("autoplay-badge");
+  if (badge) badge.classList.remove("active");
+  // Also stop auto-explore if running
+  stopAutoExplore();
+}
+
+/** Get the best adjacent interactable entity (not exhausted). */
+function getBestAdjacentEntity(): Entity | null {
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  const deltas = [
+    { x: 0, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 },
+    { x: -1, y: 0 }, { x: 1, y: 0 },
+  ];
+  let best: Entity | null = null;
+  let bestScore = -1;
+  for (const [id, ent] of state.entities) {
+    if (id === "player") continue;
+    let adjacent = false;
+    for (const d of deltas) {
+      if (ent.pos.x === px + d.x && ent.pos.y === py + d.y) { adjacent = true; break; }
+    }
+    if (!adjacent) continue;
+    if (isEntityExhausted(ent)) continue;
+    // Score entities by priority
+    const PRIORITY: Partial<Record<EntityType, number>> = {
+      [EntityType.SensorPickup]: 100,
+      [EntityType.ToolPickup]: 95,
+      [EntityType.UtilityPickup]: 90,
+      [EntityType.MedKit]: 85,
+      [EntityType.Relay]: 80,
+      [EntityType.LogTerminal]: 70,
+      [EntityType.EvidenceTrace]: 65,
+      [EntityType.CrewItem]: 60,
+      [EntityType.Console]: 55,
+      [EntityType.SecurityTerminal]: 50,
+      [EntityType.PowerCell]: 45,
+      [EntityType.FuseBox]: 40,
+      [EntityType.PressureValve]: 35,
+      [EntityType.Breach]: 30,
+      [EntityType.RepairCradle]: 25,
+      [EntityType.ClosedDoor]: 10,
+      [EntityType.CrewNPC]: 200,
+      [EntityType.EscapePod]: 180,
+      [EntityType.DataCore]: 1000,
+    };
+    const score = PRIORITY[ent.type] ?? 5;
+    if (score > bestScore) { bestScore = score; best = ent; }
+  }
+  return best;
+}
+
+/** Execute one autoplay step — the bot picks and executes an action. */
+function autoplayStep(): void {
+  if (!autoplayActive || state.gameOver) {
+    stopAutoplay();
+    return;
+  }
+
+  autoplayDriving = true;
+
+  // Priority 1: Interact with adjacent entity
+  const target = getBestAdjacentEntity();
+  if (target) {
+    handleAction({ type: ActionType.Interact, targetId: target.id });
+    autoplayDriving = false;
+    if (!autoplayActive || state.gameOver) return;
+    autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
+    return;
+  }
+
+  // Priority 2: Scan if we have sensors and there might be hidden things
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  if (state.player.sensors.length > 1 && state.turn % 8 === 0) {
+    handleAction({ type: ActionType.Scan });
+    autoplayDriving = false;
+    if (!autoplayActive || state.gameOver) return;
+    autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
+    return;
+  }
+
+  // Priority 3: Clean if tile is dirty
+  if (py >= 0 && py < state.height && px >= 0 && px < state.width) {
+    if (state.tiles[py][px].dirt > 30) {
+      handleAction({ type: ActionType.Clean });
+      autoplayDriving = false;
+      if (!autoplayActive || state.gameOver) return;
+      autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
+      return;
+    }
+  }
+
+  // Priority 4: Move toward nearest entity we haven't interacted with
+  const entityDir = autoplayBFSToEntity();
+  if (entityDir) {
+    handleAction({ type: ActionType.Move, direction: entityDir });
+    autoplayDriving = false;
+    if (!autoplayActive || state.gameOver) return;
+    autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
+    return;
+  }
+
+  // Priority 5: Explore unexplored tiles
+  const dir = autoExploreBFS();
+  if (dir) {
+    handleAction({ type: ActionType.Move, direction: dir });
+    autoplayDriving = false;
+    if (!autoplayActive || state.gameOver) return;
+    autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
+    return;
+  }
+
+  // Priority 6: Wait
+  handleAction({ type: ActionType.Wait });
+  autoplayDriving = false;
+  autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY * 2);
+}
+
+/** BFS to find direction toward the nearest non-exhausted entity. */
+function autoplayBFSToEntity(): Direction | null {
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  const key = (x: number, y: number) => `${x},${y}`;
+
+  // Build set of entity positions that are not exhausted
+  const targets = new Set<string>();
+  for (const [id, ent] of state.entities) {
+    if (id === "player") continue;
+    if (isEntityExhausted(ent)) continue;
+    targets.add(key(ent.pos.x, ent.pos.y));
+    // Also target tiles adjacent to entity
+    for (const d of [{x:0,y:-1},{x:0,y:1},{x:-1,y:0},{x:1,y:0}]) {
+      targets.add(key(ent.pos.x + d.x, ent.pos.y + d.y));
+    }
+  }
+  if (targets.size === 0) return null;
+
+  const visited = new Set<string>();
+  const queue: { x: number; y: number; firstDir: Direction }[] = [];
+  const dirs: { dx: number; dy: number; dir: Direction }[] = [
+    { dx: 0, dy: -1, dir: Direction.North },
+    { dx: 0, dy: 1, dir: Direction.South },
+    { dx: -1, dy: 0, dir: Direction.West },
+    { dx: 1, dy: 0, dir: Direction.East },
+  ];
+
+  visited.add(key(px, py));
+  for (const { dx, dy, dir } of dirs) {
+    const nx = px + dx;
+    const ny = py + dy;
+    if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
+    if (!state.tiles[ny][nx].walkable) continue;
+    if (targets.has(key(nx, ny))) return dir;
+    visited.add(key(nx, ny));
+    queue.push({ x: nx, y: ny, firstDir: dir });
+  }
+
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    if (targets.has(key(node.x, node.y))) return node.firstDir;
+    for (const { dx, dy } of dirs) {
+      const nx = node.x + dx;
+      const ny = node.y + dy;
+      const k = key(nx, ny);
+      if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
+      if (visited.has(k)) continue;
+      if (!state.tiles[ny][nx].walkable) continue;
+      visited.add(k);
+      queue.push({ x: nx, y: ny, firstDir: node.firstDir });
+    }
+  }
+  return null;
+}
+
+// ── Minimap fullscreen toggle ───────────────────────────────────
+let minimapFullscreen = false;
+
+function toggleMinimapFullscreen(): void {
+  minimapFullscreen = !minimapFullscreen;
+  const overlay = document.getElementById("minimap-fullscreen");
+  if (!overlay) return;
+  if (minimapFullscreen) {
+    // Create a large canvas copy
+    overlay.innerHTML = "";
+    const bigCanvas = document.createElement("canvas");
+    bigCanvas.width = 500;
+    bigCanvas.height = 500;
+    bigCanvas.id = "minimap-fs-canvas";
+    overlay.appendChild(bigCanvas);
+    overlay.classList.add("active");
+    // Render the minimap at large size
+    if (display && "renderMinimapToCanvas" in display) {
+      (display as any).renderMinimapToCanvas(bigCanvas);
+    }
+  } else {
+    overlay.classList.remove("active");
+    overlay.innerHTML = "";
+  }
 }
 
 /** Flicker the ROT.js canvas visibility before showing the game-over overlay. */
@@ -897,6 +1111,29 @@ function initGame(): void {
       renderAll();
       return;
     }
+    // F7 toggles autoplay mode (bot plays the game)
+    if (e.key === "F7") {
+      e.preventDefault();
+      if (autoplayActive) {
+        stopAutoplay();
+        display.addLog("[AUTOPLAY OFF] Manual control restored.", "system");
+      } else {
+        autoplayActive = true;
+        stopAutoExplore(); // stop auto-explore if running
+        const badge = document.getElementById("autoplay-badge");
+        if (badge) badge.classList.add("active");
+        display.addLog("[AUTOPLAY ON] Bot is playing. Press F7 to stop.", "milestone");
+        autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
+      }
+      renderAll();
+      return;
+    }
+    // M toggles fullscreen minimap overlay
+    if ((e.key === "m" || e.key === "M") && !journalOpen && !state.gameOver) {
+      e.preventDefault();
+      toggleMinimapFullscreen();
+      return;
+    }
     // Any non-Escape key cancels restart prompt
     if (restartPending) {
       restartPending = false;
@@ -1159,6 +1396,11 @@ function handleAction(action: Action): void {
   // Any non-auto-explore action stops auto-explore
   if (autoExploring && action.type !== ActionType.AutoExplore && action.type !== ActionType.Move) {
     stopAutoExplore();
+  }
+  // Manual action stops autoplay (but not when autoplay is driving)
+  if (autoplayActive && !autoplayDriving) {
+    stopAutoplay();
+    display.addLog("[AUTOPLAY OFF] Manual control restored.", "system");
   }
 
   // Auto-explore: start walking toward nearest unexplored tile
