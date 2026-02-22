@@ -246,6 +246,7 @@
 - **Sprint V84 — Relay energy dots**: Bright yellow sprites travel along relay power line curves between activated relays. Each dot follows the bezier arc at 0.4 speed with pulsing opacity. Satisfying puzzle-progress feedback
 - **Sprint V85 — Minimap entity icons**: Distinct shapes per entity type on minimap — diamond (DataCore), circle (EscapePod), triangle (CrewNPC), plus sign (Relay), squares for others. Improved map readability and entity identification at a glance
 - **Sprint V86 — Minimap facing arrow**: Player dot on minimap shows facing direction with an arrow line + arrowhead. Combined with compass, gives full spatial orientation awareness during chase cam exploration
+- **Sprint V87 — Phase transition flash**: Full-screen color pulse on story phase transitions (orange=Investigation, red=Recovery, magenta=Evacuation). CSS overlay with 0.8s fade-out marks major story beats with dramatic visual impact
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

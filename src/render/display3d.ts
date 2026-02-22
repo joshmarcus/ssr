@@ -1528,7 +1528,26 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Phase-reactive global lighting
     const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
     if (phase !== this.currentPhase) {
+      const prevPhase = this.currentPhase;
       this.currentPhase = phase;
+
+      // Phase transition flash: dramatic full-screen color pulse
+      if (prevPhase !== "") {
+        const flashColors: Record<string, string> = {
+          [ObjectivePhase.Investigate]: "rgba(255,170,0,0.15)",
+          [ObjectivePhase.Recover]: "rgba(255,80,40,0.18)",
+          [ObjectivePhase.Evacuate]: "rgba(255,0,50,0.25)",
+        };
+        const flashColor = flashColors[phase];
+        if (flashColor) {
+          const flashDiv = document.createElement("div");
+          flashDiv.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:${flashColor};pointer-events:none;z-index:100;transition:opacity 0.8s ease-out;`;
+          document.body.appendChild(flashDiv);
+          requestAnimationFrame(() => { flashDiv.style.opacity = "0"; });
+          setTimeout(() => { flashDiv.remove(); }, 900);
+        }
+      }
+
       if (phase === ObjectivePhase.Evacuate && this.ambientLight && this.keyLight) {
         // RED ALERT: shift ambient and key light to emergency red
         this.ambientLight.color.setHex(0xff8888);
