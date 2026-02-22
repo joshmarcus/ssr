@@ -502,6 +502,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private playerFacing: number = 0; // radians — 0 = facing camera (+Z)
   private lastPlayerX: number = -1;
   private lastPlayerY: number = -1;
+  // Player damage state for visual effects
+  private _playerHpPercent: number = 1.0; // 0-1 range
+  private _playerStunned: boolean = false;
 
   // Smooth movement interpolation
   private playerTargetX: number = 0;
@@ -1844,6 +1847,58 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Smooth tilt
       this.playerMesh.rotation.x += (targetTiltX - this.playerMesh.rotation.x) * 0.15;
       this.playerMesh.rotation.z += (targetTiltZ - this.playerMesh.rotation.z) * 0.15;
+
+      // Damage state visualization on Sweepo model
+      if (this._playerHpPercent < 1.0) {
+        // Antenna droop when damaged (child 2 = antenna cylinder)
+        const antenna = this.playerMesh.children[2];
+        if (antenna) {
+          const droopAngle = (1 - this._playerHpPercent) * 0.5; // max 0.5 rad droop at 0 HP
+          antenna.rotation.z = droopAngle + Math.sin(elapsed * 3) * droopAngle * 0.3;
+        }
+        // Ground glow flickers/dims when low HP (child 4 = glow circle)
+        const groundGlow = this.playerMesh.children[4];
+        if (groundGlow instanceof THREE.Mesh) {
+          const glowMat = groundGlow.material as THREE.MeshBasicMaterial;
+          if (this._playerHpPercent < 0.3) {
+            // Critical: red glow, flicker
+            glowMat.color.setHex(0xff2222);
+            glowMat.opacity = 0.1 + Math.random() * 0.08; // unstable flicker
+          } else if (this._playerHpPercent < 0.6) {
+            // Damaged: amber glow
+            glowMat.color.setHex(0xffaa22);
+            glowMat.opacity = 0.12;
+          } else {
+            glowMat.color.setHex(0x22ff66); // healthy green
+            glowMat.opacity = 0.15;
+          }
+        }
+        // Body emissive flash at low HP — sparking effect
+        if (this._playerHpPercent < 0.4) {
+          const body = this.playerMesh.children[0];
+          if (body instanceof THREE.Mesh && body.material instanceof THREE.MeshStandardMaterial) {
+            const spark = Math.sin(elapsed * 12) > 0.7 ? 0.3 : 0;
+            body.material.emissiveIntensity = spark;
+            body.material.emissive = body.material.emissive || new THREE.Color(0xff4400);
+            if (spark > 0) body.material.emissive.setHex(0xff4400);
+          }
+        }
+      } else {
+        // Healthy: reset antenna, glow
+        const antenna = this.playerMesh.children[2];
+        if (antenna) antenna.rotation.z = 0;
+        const groundGlow = this.playerMesh.children[4];
+        if (groundGlow instanceof THREE.Mesh) {
+          const glowMat = groundGlow.material as THREE.MeshBasicMaterial;
+          glowMat.color.setHex(0x22ff66);
+          glowMat.opacity = 0.15;
+        }
+      }
+      // Stun jitter: rapid random rotation wobble
+      if (this._playerStunned) {
+        this.playerMesh.rotation.x += (Math.random() - 0.5) * 0.06;
+        this.playerMesh.rotation.z += (Math.random() - 0.5) * 0.06;
+      }
 
       // Smoothly move camera and light to follow
       this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
@@ -5832,6 +5887,10 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.cameraTargetX = px;
     this.cameraTargetZ = py;
     // Rotation is smoothly interpolated in the animate loop
+
+    // Track damage state for visual effects in animate loop
+    this._playerHpPercent = state.player.hp / state.player.maxHp;
+    this._playerStunned = state.player.stunTurns > 0;
 
     // On first render, snap immediately (no lerp from origin)
     if (isFirstRender) {

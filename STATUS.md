@@ -229,6 +229,7 @@
 - **Sprint V67 — Screen glow projection**: Console/LogTerminal cast colored PointLights onto the floor with proximity-reactive intensity, SecurityTerminal red LED glow, floor glow discs, synced light+material flicker
 - **Sprint V68 — Volumetric headlight beam**: Semi-transparent cone mesh on Sweepo matching SpotLight angle, additive blending, brighter in corridors (0.045 opacity) than rooms (0.015), color-synced with hazard-reactive headlight
 - **Sprint V69 — Room entry signatures**: 13 room types get a distinct tinted screen flash on entry (purple Data Core, white Med Bay, red Armory, green Research Lab, etc.), brief fade-out overlay for visual room identity
+- **Sprint V70 — Sweepo damage state**: Antenna droops with damage, ground glow shifts green→amber→red, body sparks at <40% HP, stun causes rapid jitter. Visual storytelling of bot condition
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
