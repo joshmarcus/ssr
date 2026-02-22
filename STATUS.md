@@ -270,6 +270,7 @@
 - **Sprint V108 — Breach danger ring**: Unsealed breaches get a large pulsing red ring on the floor (additive blend, 4Hz pulse). Ring removed when breach is sealed. Clear visual warning of active environmental hazard
 - **Sprint V109 — Relay activation sparks**: 8 golden sprites shoot upward when a relay is first activated. Uses discovery sparkle pool with fast upward drift (2-3.5 units/s). Brief celebratory burst rewards successful relay rerouting
 - **Sprint V110 — Animate remaining static entities**: PressureValve (slow wheel rotation + pressure-reactive red glow when critical), RepairCradle (oscillating arm clamp + subtle green hum), ClosedDoor (proximity tremor jitter), Airlock (proximity teal glow pulse). All 4 previously-static entity types now animated
+- **Sprint V111 — PowerCell/FuseBox spark particles**: 4 yellow-white sprites shoot outward during electrical spark phase (brief burst every ~4s). Reuses discovery sparkle pool with short lifetimes (0.2-0.4s). One-shot flag prevents multi-frame spawning
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

@@ -2679,6 +2679,30 @@ export class BrowserDisplay3D implements IGameDisplay {
             if (isSparking) child.material.emissive.setHex(0xffee44);
           }
         });
+        // Spawn spark particles during spark phase (once per cycle)
+        if (isSparking && !mesh.userData._sparkSpawned) {
+          mesh.userData._sparkSpawned = true;
+          for (let sp = 0; sp < 4; sp++) {
+            const sMat = new THREE.SpriteMaterial({
+              color: 0xffee44, transparent: true, opacity: 0.8,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const sSpr = new THREE.Sprite(sMat);
+            sSpr.scale.set(0.05, 0.05, 1);
+            sSpr.position.set(
+              mesh.position.x + (Math.random() - 0.5) * 0.3,
+              (mesh.userData.baseY as number ?? 0.3) + Math.random() * 0.2,
+              mesh.position.z + (Math.random() - 0.5) * 0.3,
+            );
+            (sSpr as any)._life = 0;
+            (sSpr as any)._maxLife = 0.2 + Math.random() * 0.2;
+            (sSpr as any)._driftY = 0.5 + Math.random() * 1.0;
+            this.scene.add(sSpr);
+            this._discoverySparkles.push(sSpr);
+          }
+        } else if (!isSparking) {
+          mesh.userData._sparkSpawned = false;
+        }
       } else if (userData.entityType === EntityType.EvidenceTrace) {
         // Float and spin — attention-grabbing mystery marker with variable speed
         const ud = mesh.userData as { baseY?: number };
