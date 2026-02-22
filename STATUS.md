@@ -255,6 +255,7 @@
 - **Sprint V93 — Pipe steam leaks**: Small blue-white drips fall from overhead corridor pipes every 3-8s. Spawns at nearest pipe tile within 6 tiles, falls downward from ceiling height (y=1.7), stretches vertically while fading. Adds deteriorating-station atmosphere
 - **Sprint V94 — Minimap room names**: Abbreviated room names (first word, max 8 chars) drawn at room centers on minimap. Current room bright green, others dim grey. Improves navigation and spatial awareness
 - **Sprint V95 — Stun screen static**: Persistent TV-noise overlay while Sweepo is stunned. Randomized gradient lines at 12% opacity, mix-blend-mode screen, refreshed every frame for flickering static effect. Auto-hides when stun ends
+- **Sprint V96 — Low HP warning vignette**: Pulsing red inset box-shadow around screen edges when Sweepo HP <40%. Severity-scaled spread (60-100px) and opacity pulse (2.5Hz). Classic danger feedback for critical health states
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

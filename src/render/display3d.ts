@@ -2107,6 +2107,27 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // Low HP warning vignette: pulsing red screen edges when damaged
+      {
+        let hpVig = document.getElementById("hp-warning-vignette");
+        if (this._playerHpPercent < 0.4 && !this._playerStunned) {
+          if (!hpVig) {
+            hpVig = document.createElement("div");
+            hpVig.id = "hp-warning-vignette";
+            hpVig.style.cssText =
+              "position:fixed;inset:0;pointer-events:none;z-index:87;";
+            document.body.appendChild(hpVig);
+          }
+          const severity = 1 - this._playerHpPercent / 0.4; // 0 at 40%, 1 at 0%
+          const pulse = 0.5 + Math.sin(elapsed * 2.5) * 0.5;
+          const alpha = (0.08 + severity * 0.12) * (0.6 + pulse * 0.4);
+          hpVig.style.display = "block";
+          hpVig.style.boxShadow = `inset 0 0 ${60 + severity * 40}px ${20 + severity * 20}px rgba(255,30,0,${alpha.toFixed(3)})`;
+        } else if (hpVig) {
+          hpVig.style.display = "none";
+        }
+      }
+
       // Smoothly move camera and light to follow
       this.cameraPosX += (this.cameraTargetX - this.cameraPosX) * lerpFactor;
       this.cameraPosZ += (this.cameraTargetZ - this.cameraPosZ) * lerpFactor;
