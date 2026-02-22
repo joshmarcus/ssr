@@ -5897,7 +5897,7 @@ export class BrowserDisplay3D implements IGameDisplay {
             color: frameColor,
             gradientMap: this.toonGradient,
             emissive: frameEmissive,
-            emissiveIntensity: 0.3,
+            emissiveIntensity: 0.55,
           });
 
           // Determine door orientation (horizontal or vertical)
@@ -6984,7 +6984,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (!this.doorLights.has(key)) {
           // First placement
           const lightColor = isLocked ? 0xff3333 : 0x44cc66;
-          const light = new THREE.PointLight(lightColor, isLocked ? 0.6 : 0.4, 3);
+          const light = new THREE.PointLight(lightColor, isLocked ? 1.0 : 0.8, 4);
           light.position.set(x, 1.2, y);
           this.scene.add(light);
           this.doorLights.set(key, light);
