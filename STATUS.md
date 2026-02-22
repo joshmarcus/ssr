@@ -313,6 +313,7 @@
 - **Sprint V151 — Stun reboot text overlay**: "SYSTEM REBOOT", "RECALIBRATING...", "SIGNAL LOST", "RECONNECTING..." messages cycle during stun with pulsing opacity and animated dots. Reinforces terminal-link narrative during stun state
 - **Sprint V152 — Entity spawn bounce-in**: New entities scale from 0 to 1 with overshoot bounce (115% → settle) over ~0.3s instead of instant pop-in. Smooth ease-out-back curve. Removes visual jarring when exploring new areas
 - **Sprint V153 — Evacuation urgency vignette**: Pulsing red screen-edge vignette during evacuation phase, synced with existing klaxon ambient light pulse. Creates visceral urgency during the final rescue phase
+- **Sprint V154 — Breach seal celebration**: 10 cyan inward-rushing particles + milestone screen flash when a breach is sealed. Particles drift toward breach center simulating air rushing back. Satisfying feedback for major repair event
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

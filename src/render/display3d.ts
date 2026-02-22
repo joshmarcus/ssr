@@ -7330,6 +7330,31 @@ export class BrowserDisplay3D implements IGameDisplay {
               child.material.color.multiplyScalar(0.6);
             }
           });
+          // Celebration: inward particle burst (air rushing back in)
+          for (let si = 0; si < 10; si++) {
+            const angle = (si / 10) * Math.PI * 2;
+            const radius = 1.5 + Math.random() * 1.0;
+            const sparkMat = new THREE.SpriteMaterial({
+              color: 0x44ccff, transparent: true, opacity: 0.7,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const spark = new THREE.Sprite(sparkMat);
+            spark.scale.set(0.06, 0.06, 1);
+            spark.position.set(
+              entity.pos.x + Math.cos(angle) * radius,
+              0.3 + Math.random() * 0.5,
+              entity.pos.y + Math.sin(angle) * radius,
+            );
+            // Drift inward toward breach position
+            (spark as any)._life = 0;
+            (spark as any)._maxLife = 0.5 + Math.random() * 0.3;
+            (spark as any)._driftX = -Math.cos(angle) * 3.0;
+            (spark as any)._driftZ = -Math.sin(angle) * 3.0;
+            (spark as any)._driftY = 0.5;
+            this.scene.add(spark);
+            this._discoverySparkles.push(spark);
+          }
+          this.triggerScreenFlash("milestone");
         }
       }
     }
