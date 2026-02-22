@@ -203,6 +203,7 @@
 - **Sprint V41 — Comprehensive shadows**: Wall corners, ceiling, Sweepo, entities all cast/receive shadows. Headlight creates dramatic silhouettes of props against walls and floor
 - **Sprint V42 — Post-processing**: Enhanced vignette with green tint, CRT scanline overlay (4px pitch), hazard screen border (red glow in danger, amber in warning zones), CSS-composited screen effects
 - **Sprint V43 — Crew variety + corridor atmosphere**: 5 crew NPC model variants (Male, Female, Captain M/F, Medic) via position hash, RepairBot upgraded to Synty repair drone, hazard-reactive corridor lights (red/amber/blue), corridor light flicker animation with hazard-zone dropout
+- **Sprint V44 — Dynamic hazard room fog**: Room haze reacts to hazard state (red for heat, grey for smoke, blue for vacuum), opacity scales with severity, pulsing/swirl/shimmer animations per hazard type
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
