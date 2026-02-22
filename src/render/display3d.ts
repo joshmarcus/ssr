@@ -602,6 +602,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Corridor breath puff (cold air visualization)
   private _breathPuffSprites: THREE.Sprite[] = [];
   private _breathPuffTimer: number = 0;
+  // Vacuum wind particles (drift toward nearest breach)
+  private _vacuumWindSprites: THREE.Sprite[] = [];
+  private _vacuumWindTimer: number = 0;
+  private _playerTilePressure: number = 100;
+  private _nearestBreachDir: { x: number; z: number } = { x: 0, z: 0 };
   // Discovery sparkle: rooms visited this session for first-entry effects
   private _visitedRooms3D: Set<string> = new Set();
   private _discoverySparkles: THREE.Sprite[] = [];
@@ -2244,6 +2249,56 @@ export class BrowserDisplay3D implements IGameDisplay {
           this._breathPuffSprites.push(puff);
         }
       }
+    }
+
+    // Vacuum wind particles: drift toward nearest breach on low-pressure tiles
+    if (this._playerTilePressure < 60 && this.chaseCamActive) {
+      this._vacuumWindTimer -= delta;
+      if (this._vacuumWindTimer <= 0) {
+        this._vacuumWindTimer = 0.15 + Math.random() * 0.2;
+        const windMat = new THREE.SpriteMaterial({
+          color: 0x6688cc, transparent: true, opacity: 0.12,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const wind = new THREE.Sprite(windMat);
+        wind.scale.set(0.04, 0.04, 1);
+        // Spawn around player
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 0.3 + Math.random() * 1.5;
+        wind.position.set(
+          this.playerCurrentX + Math.cos(angle) * dist,
+          0.1 + Math.random() * 0.6,
+          this.playerCurrentZ + Math.sin(angle) * dist
+        );
+        (wind as any)._life = 0;
+        (wind as any)._maxLife = 0.5 + Math.random() * 0.4;
+        (wind as any)._dirX = this._nearestBreachDir.x * 2;
+        (wind as any)._dirZ = this._nearestBreachDir.z * 2;
+        this.scene.add(wind);
+        this._vacuumWindSprites.push(wind);
+      }
+    }
+    // Animate vacuum wind particles
+    for (let i = this._vacuumWindSprites.length - 1; i >= 0; i--) {
+      const vw = this._vacuumWindSprites[i];
+      (vw as any)._life += delta;
+      const life = (vw as any)._life;
+      const maxLife = (vw as any)._maxLife;
+      if (life >= maxLife) {
+        this.scene.remove(vw);
+        (vw.material as THREE.SpriteMaterial).dispose();
+        this._vacuumWindSprites.splice(i, 1);
+        continue;
+      }
+      const t = life / maxLife;
+      vw.position.x += (vw as any)._dirX * delta;
+      vw.position.z += (vw as any)._dirZ * delta;
+      // Accelerate toward breach
+      (vw as any)._dirX *= 1.02;
+      (vw as any)._dirZ *= 1.02;
+      (vw.material as THREE.SpriteMaterial).opacity = 0.12 * (1 - t);
+      const s = 0.04 + t * 0.06;
+      vw.scale.set(s, s, 1);
     }
 
     // Entity animations
@@ -6411,6 +6466,25 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Track damage state for visual effects in animate loop
     this._playerHpPercent = state.player.hp / state.player.maxHp;
     this._playerStunned = state.player.stunTurns > 0;
+
+    // Track tile pressure + nearest breach direction for vacuum wind
+    const playerTile = state.tiles[py]?.[px];
+    this._playerTilePressure = playerTile?.pressure ?? 100;
+    if (this._playerTilePressure < 60) {
+      // Find nearest breach entity for wind direction
+      let bestDist = Infinity;
+      for (const [, entity] of state.entities) {
+        if (entity.type !== EntityType.Breach) continue;
+        const bd = Math.abs(entity.pos.x - px) + Math.abs(entity.pos.y - py);
+        if (bd < bestDist) {
+          bestDist = bd;
+          const dx = entity.pos.x - px;
+          const dy = entity.pos.y - py;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          this._nearestBreachDir = { x: dx / len, z: dy / len };
+        }
+      }
+    }
 
     // On first render, snap immediately (no lerp from origin)
     if (isFirstRender) {
