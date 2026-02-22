@@ -628,6 +628,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _eyeWidenTimer: number = 0;
   // Floating interact indicator sprite
   private _interactIndicator: THREE.Sprite | null = null;
+  // Corridor forward scout light
+  private _scoutLight: THREE.PointLight | null = null;
   // DataCore holographic ring
   private _dataCoreHoloRing: THREE.Mesh | null = null;
   // Discovery sparkle: rooms visited this session for first-entry effects
@@ -2587,6 +2589,26 @@ export class BrowserDisplay3D implements IGameDisplay {
       (hs.material as THREE.SpriteMaterial).opacity *= (1 - t * 0.5);
       const sx = 0.15 + t * 0.1;
       hs.scale.set(sx, 0.03 + t * 0.02, 1);
+    }
+
+    // Corridor forward scout light: moves ahead of player facing direction
+    if (this.chaseCamActive && !this._currentRoom) {
+      if (!this._scoutLight) {
+        this._scoutLight = new THREE.PointLight(0x4466aa, 0, 3.5);
+        this.scene.add(this._scoutLight);
+      }
+      const facing = this.playerMesh ? this.playerMesh.rotation.y : this.playerFacing;
+      const scoutDist = 3.0;
+      const targetX = this.playerCurrentX + Math.sin(facing) * scoutDist;
+      const targetZ = this.playerCurrentZ + Math.cos(facing) * scoutDist;
+      // Smooth follow
+      this._scoutLight.position.x += (targetX - this._scoutLight.position.x) * 0.05;
+      this._scoutLight.position.z += (targetZ - this._scoutLight.position.z) * 0.05;
+      this._scoutLight.position.y = 1.5;
+      this._scoutLight.intensity = 0.4 + Math.sin(elapsed * 1.5) * 0.1;
+      this._scoutLight.visible = true;
+    } else if (this._scoutLight) {
+      this._scoutLight.visible = false;
     }
 
     // Smoke wisps: drifting grey sprites on smoky tiles near player
