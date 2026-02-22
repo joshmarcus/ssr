@@ -190,6 +190,9 @@
 - **Sprint V28 — Head-bob**: Subtle vertical camera oscillation during movement in chase cam mode
 - **Sprint V29 — Distance culling**: Per-room sub-groups for trim/decorations/ceiling, spatial bucket groups for corridor elements, manhattan distance culling (12 tiles), chase cam now default, F4 outline toggle
 - **Sprint V30 — InstancedMesh optimization**: Room trim (baseboard, edge glow, top rail) converted to 3 InstancedMesh with per-instance color (~900 meshes → 3 draw calls). Corridor strip lights converted to 2 InstancedMesh (~300 meshes → 2 draw calls). Combined with distance culling, ~60-70% total draw call reduction
+- **Sprint V31 — Chase cam polish**: Wall collision avoidance (camera pulls closer when behind wall), FOV breathing (+3° during movement), dynamic fog (tighter 6-18 in chase cam vs 20-40 in ortho)
+- **Sprint V32 — Ceiling panels**: InstancedMesh ceiling panels above all explored tiles at y=2.05, dark metallic coloring, only visible in chase cam for enclosed corridor atmosphere
+- **Sprint V33 — Entity visibility**: Fill light at eye level for chase cam, player light range 18→22, proximity entity highlight (emissive boost within 2/4 tiles in chase cam)
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
