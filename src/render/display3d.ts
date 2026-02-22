@@ -2638,6 +2638,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeCorridorStripLights(state);
     this.placeCorridorJunctionBeacons(state);
     this.placeCorridorLightShafts(state);
+    this.placeWallDamageDecals(state);
     this.placeCorridorWallProps(state);
     this.placeEmergencyWallStrips(state);
     this.placeCorridorFixtures(state);
@@ -7901,6 +7902,84 @@ export class BrowserDisplay3D implements IGameDisplay {
         pool.userData.isHazard = isHazard;
         this.getCorridorBucket(this.decorationGroup, x, y).add(pool);
         this._floorPoolMeshes.push(pool);
+      }
+    }
+  }
+
+  // ── Private: wall damage decals (environmental storytelling) ──
+
+  private _wallDamageTiles: Set<string> = new Set();
+
+  private placeWallDamageDecals(state: GameState): void {
+    for (let y = 1; y < state.height - 1; y++) {
+      for (let x = 1; x < state.width - 1; x++) {
+        const tile = state.tiles[y][x];
+        if (!tile.explored || !tile.walkable) continue;
+
+        const key = `dmg_${x},${y}`;
+        if (this._wallDamageTiles.has(key)) continue;
+
+        // Only place damage near hazards
+        const hasHeat = tile.heat > 50;
+        const hasVacuum = tile.pressure < 40;
+        const hasSmoke = tile.smoke > 40;
+        if (!hasHeat && !hasVacuum && !hasSmoke) continue;
+
+        // Sparse placement: ~30% of eligible tiles
+        if (((x * 13 + y * 29) & 0xf) > 4) continue;
+        this._wallDamageTiles.add(key);
+
+        // Find adjacent walls to place decals on
+        const walls: { wx: number; wz: number; rotY: number }[] = [];
+        if (state.tiles[y - 1][x].type === TileType.Wall) walls.push({ wx: x, wz: y - 0.47, rotY: 0 });
+        if (state.tiles[y + 1][x].type === TileType.Wall) walls.push({ wx: x, wz: y + 0.47, rotY: Math.PI });
+        if (state.tiles[y][x + 1].type === TileType.Wall) walls.push({ wx: x + 0.47, wz: y, rotY: -Math.PI / 2 });
+        if (state.tiles[y][x - 1].type === TileType.Wall) walls.push({ wx: x - 0.47, wz: y, rotY: Math.PI / 2 });
+
+        if (walls.length === 0) continue;
+        const wall = walls[((x * 7 + y * 3) & 0xff) % walls.length];
+
+        // Decal type based on hazard
+        let decalColor: number;
+        let decalOpacity: number;
+        if (hasHeat) {
+          decalColor = 0x221100; // dark scorch
+          decalOpacity = 0.4;
+        } else if (hasVacuum) {
+          decalColor = 0xaaddff; // frost
+          decalOpacity = 0.25;
+        } else {
+          decalColor = 0x222211; // smoke stain
+          decalOpacity = 0.3;
+        }
+
+        // Wall-mounted sprite decal
+        const decalMat = new THREE.SpriteMaterial({
+          color: decalColor,
+          transparent: true,
+          opacity: decalOpacity,
+          depthWrite: false,
+        });
+        const decal = new THREE.Sprite(decalMat);
+        const size = 0.3 + ((x * 11 + y * 23) % 5) * 0.08; // vary size
+        decal.scale.set(size, size, 1);
+        decal.position.set(wall.wx, 0.3 + ((x + y) % 3) * 0.25, wall.wz);
+
+        const bucket = tile.type === TileType.Corridor
+          ? this.getCorridorBucket(this.decorationGroup, x, y)
+          : this.decorationGroup;
+        // For room tiles, check if we have a room group
+        let added = false;
+        if (tile.type !== TileType.Corridor) {
+          for (const room of state.rooms) {
+            if (x >= room.x && x < room.x + room.width && y >= room.y && y < room.y + room.height) {
+              const rGroup = this.roomDecoGroups.get(room.id);
+              if (rGroup) { rGroup.add(decal); added = true; }
+              break;
+            }
+          }
+        }
+        if (!added) bucket.add(decal);
       }
     }
   }
