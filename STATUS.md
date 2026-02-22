@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 76 ongoing (V179 completed, V180 next — visual polish)
+- **Phase**: Sprint 80 (V190 completed, V191+ next — continued visual/mystery polish)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -65,6 +65,9 @@
 - Context-sensitive action bar: shows available actions with key bindings, grays out unavailable actions
 - Run history: localStorage-persisted records of previous runs (seed, archetype, difficulty, rating)
 - Ghost echoes: scan-triggered crew traces in rooms where crew members were last known (thermal sensor required)
+- **Scene echoes**: Environmental storytelling objects (ghost silhouettes, damage marks, system traces) placed during procgen, phase-colored, discoverable
+- **Evidence connections**: Auto-detected shared tags between journal entries, Case Board UI with insight progress tracking
+- **Autoplay mode**: F7 toggles AI bot control with priority-based action selection and BFS pathfinding
 - Crew questioning: following crew NPCs give one-time archetype-specific testimony when re-interacted with
 - Per-archetype Arrival Bay traces: each archetype shows unique atmosphere text on entering the first room
 - Tutorial hints: context-sensitive tips at early turns and on first-time events
@@ -342,6 +345,35 @@
   - Ceiling fix: Walls repositioned y=0→y=1.0 (span 0→2.0), eliminating gap where space was visible through ceiling
 - **Sprint V178 — Light budget optimization**: Distance-cull fixture lights (50-80→~10 active), shadow map 512→256, sparser corridor/fixture lights (~33% fewer)
 - **Sprint V179 — Per-frame work reduction**: Throttle entity traverse loops (4x/2x), optimized breach suction, halved dust particle spawn rate
+- **Sprint V180-V183 — Tank controls + perf toggles**: Turn-then-move stale angle fix, 90° turns, performance toggles (bloom/shadows/particles via F-keys), ground glow fix, GPU performance hints
+- **Sprint V184 — Default performance profile**: Bloom, shadows, and particles disabled by default for better baseline performance
+- **Sprint V185 — Display optimization**: Antialiasing disabled, pixel ratio capped at 1x
+- **Sprint V186 — Light budget elimination**: Removed 100+ PointLights, gated all particle spawning behind performance toggle
+
+### Visual Sprints (V187-V190)
+- **Sprint V187a — Entity + corridor fixes**: Per-type entity baseY lookup (ground entities at y=0), corridor dimming 75% (not 30%), 45-degree turn increments
+- **Sprint V187b — Camera Z-tilt removal**: Removed hazard-reactive camera roll system, camera Z-rotation now always lerps to 0. Keeps head-bob, idle sway, FOV breathing
+- **Sprint V187c — Sweepo 180° flip**: Added Math.PI to player model targetRot — brushes now face the camera (front visible) instead of the back
+- **Sprint V187d — Minimap enlargement + fullscreen**: Minimap canvas 120x120→200x200, M key toggles fullscreen minimap overlay (400x400 centered), compass repositioned below enlarged minimap
+- **Sprint V187e — Compass update on turn**: Compass now refreshes when `turnPlayer()` is called, not just on game actions. Immediate directional feedback
+- **Sprint V187f — Entity baseY fix**: `rebuildEntityMeshes()` uses per-type baseY lookup instead of flat 0.3. Ground entities (Breach, EvidenceTrace, etc.) sit at y=0
+- **Sprint V187g — Autoplay mode**: F7 toggles autoplay — imports playtest bot logic (priority-based: interact > scan > clean > navigate > explore), BFS pathfinding to entities, 400ms delay between actions, "AUTOPLAY" badge on screen, any manual input stops autoplay
+- **Sprint V188 — Scene Echoes (environmental storytelling)**:
+  - SceneEcho data model: GhostSilhouette, DamageMark, DisturbedFurniture, PersonalItem, SystemTrace types
+  - `generateSceneEchoes()` in procgen: ghost silhouettes at crew last-known positions, damage marks by archetype (scorch/frost/cracks/bio/static/barricade), system traces in themed rooms
+  - 3D rendering: translucent humanoid ghosts (phase-colored, 0.3 opacity, pulsing), canvas-textured damage marks on floor, flickering system trace sprites
+  - Discovery: scan near ghost → journal entry + glow animation, walk over damage mark → flavor text
+  - Phase color coding: NormalOps=blue, Trigger=amber, Escalation=orange, Collapse=red, Aftermath=purple
+- **Sprint V189 — Investigation Board rework**:
+  - EvidenceConnection type: source/target journal IDs, shared tags, discovered flag
+  - Insight type: wraps deductions with connection progress tracking
+  - Auto-connection detection: new journal entries auto-compared for 2+ shared tags with existing entries
+  - Case Board UI in CONNECTIONS tab: insight progress bars, recent connections list, evidence card summaries
+  - CSS notifications for new connections and insight reveals
+- **Sprint V190 — Discovery moments**:
+  - Ghost revelation effects: opacity flash to 0.8 on discovery, scale pulse, insight-triggered mass reveals
+  - Unread LogTerminal brightness pulse: cyan glow cycles (0.2 + sin*0.15) on terminals with unread logs
+  - All V187-V190 changes committed and pushed
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
