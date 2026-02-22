@@ -202,6 +202,7 @@
 - **Sprint V40 — Dynamic camera**: Context-aware chase cam — rooms: wider FOV (65°), higher (1.2), further back (3.0); corridors: tighter FOV (55°), lower (0.7), closer (2.2). Smooth interpolation for dramatic room-corridor contrast
 - **Sprint V41 — Comprehensive shadows**: Wall corners, ceiling, Sweepo, entities all cast/receive shadows. Headlight creates dramatic silhouettes of props against walls and floor
 - **Sprint V42 — Post-processing**: Enhanced vignette with green tint, CRT scanline overlay (4px pitch), hazard screen border (red glow in danger, amber in warning zones), CSS-composited screen effects
+- **Sprint V43 — Crew variety + corridor atmosphere**: 5 crew NPC model variants (Male, Female, Captain M/F, Medic) via position hash, RepairBot upgraded to Synty repair drone, hazard-reactive corridor lights (red/amber/blue), corridor light flicker animation with hazard-zone dropout
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
