@@ -1660,6 +1660,105 @@ export class BrowserDisplay3D implements IGameDisplay {
     window.addEventListener("keydown", this._deductionResultDismissHandler);
   }
 
+  // ── Case Closed overlay ────────────────────────────────────
+  private _caseClosedActive: boolean = false;
+  private _caseClosedDismissHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  /**
+   * Show the "Case Closed" cinematic overlay when all deductions are solved.
+   * Displays the archetype title, all deduction conclusions, story summary, and stats.
+   */
+  showCaseClosed(opts: {
+    archetypeTitle: string;
+    storySubtitle: string;
+    deductions: { question: string; answer: string; correct: boolean }[];
+    storySummary: string;
+    correctCount: number;
+    totalCount: number;
+    evidenceCount: number;
+  }): void {
+    if (this._caseClosedActive) return;
+    this._caseClosedActive = true;
+
+    const el = document.getElementById("case-closed");
+    if (!el) { this._caseClosedActive = false; return; }
+
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    // Deduction conclusions
+    let conclusionsHtml = "";
+    for (const d of opts.deductions) {
+      const cls = d.correct ? "correct" : "wrong";
+      const icon = d.correct ? "\u2713" : "\u2717";
+      conclusionsHtml += `<div class="cc-conclusion-item">
+        <div class="cc-conclusion-q">${esc(d.question)}</div>
+        <div class="cc-conclusion-a ${cls}"><span style="margin-right:6px">${icon}</span>${esc(d.answer)}</div>
+      </div>`;
+    }
+
+    // Investigation rating
+    const accuracy = opts.totalCount > 0 ? Math.round((opts.correctCount / opts.totalCount) * 100) : 0;
+    const rating = accuracy === 100 ? "S" : accuracy >= 80 ? "A" : accuracy >= 60 ? "B" : accuracy >= 40 ? "C" : "D";
+    const ratingColor = accuracy === 100 ? "#fda" : accuracy >= 80 ? "#4f8" : accuracy >= 60 ? "#fa0" : "#f66";
+
+    el.innerHTML = `<div class="cc-inner">
+      <div class="cc-header">
+        <div class="cc-label">Investigation Complete</div>
+        <div class="cc-title">${esc(opts.archetypeTitle)}</div>
+        <div class="cc-subtitle">${esc(opts.storySubtitle)}</div>
+      </div>
+      <div class="cc-divider"></div>
+      <div class="cc-story">${esc(opts.storySummary)}</div>
+      <div class="cc-divider"></div>
+      <div class="cc-section">
+        <div class="cc-section-title">Deduction Record</div>
+        ${conclusionsHtml}
+      </div>
+      <div class="cc-divider"></div>
+      <div class="cc-stats">
+        <div class="cc-stat">
+          <div class="cc-stat-value" style="color:${ratingColor}">${rating}</div>
+          <div class="cc-stat-label">Rating</div>
+        </div>
+        <div class="cc-stat">
+          <div class="cc-stat-value">${opts.correctCount}/${opts.totalCount}</div>
+          <div class="cc-stat-label">Correct</div>
+        </div>
+        <div class="cc-stat">
+          <div class="cc-stat-value">${accuracy}%</div>
+          <div class="cc-stat-label">Accuracy</div>
+        </div>
+        <div class="cc-stat">
+          <div class="cc-stat-value">${opts.evidenceCount}</div>
+          <div class="cc-stat-label">Evidence</div>
+        </div>
+      </div>
+      <div class="cc-dismiss">PRESS [SPACE] TO CONTINUE — Evacuation is now the priority</div>
+    </div>`;
+    el.className = "visible";
+
+    // Dismiss handler
+    if (this._caseClosedDismissHandler) {
+      window.removeEventListener("keydown", this._caseClosedDismissHandler);
+    }
+    this._caseClosedDismissHandler = (e: KeyboardEvent) => {
+      if (e.key === " " || e.key === "Escape" || e.key === "Enter") {
+        e.preventDefault();
+        el.className = "fade-out";
+        setTimeout(() => {
+          el.className = "";
+          el.innerHTML = "";
+          this._caseClosedActive = false;
+        }, 600);
+        if (this._caseClosedDismissHandler) {
+          window.removeEventListener("keydown", this._caseClosedDismissHandler);
+          this._caseClosedDismissHandler = null;
+        }
+      }
+    };
+    window.addEventListener("keydown", this._caseClosedDismissHandler);
+  }
+
   getLogHistory(): DisplayLogEntry[] {
     return this.logHistory;
   }

@@ -3177,8 +3177,98 @@ function commitDeductionAnswer(): void {
     }
   }
 
+  // Check if all deductions are now solved — trigger "Case Closed" cinematic
+  if (correct && state.mystery && display.showCaseClosed) {
+    const allDeductions = state.mystery.deductions;
+    const allSolved = allDeductions.length > 0 && allDeductions.every(d => d.solved);
+    if (allSolved) {
+      const correctCount = allDeductions.filter(d => d.answeredCorrectly).length;
+      const archetype = state.mystery.timeline.archetype;
+      const archetypeTitle = getCaseClosedTitle(archetype);
+      const storySubtitle = getCaseClosedSubtitle(archetype);
+      const storySummary = getCaseClosedSummary(archetype, state.mystery.crew, state.mystery.timeline);
+
+      // Build deduction conclusions
+      const deductionRecord = allDeductions.map(d => {
+        const correctOpt = d.options.find(o => o.correct);
+        const chosenOpt = d.answeredCorrectly ? correctOpt : d.options.find(o => !o.correct);
+        return {
+          question: d.question,
+          answer: (d.answeredCorrectly ? correctOpt?.label : chosenOpt?.label) ?? "Unknown",
+          correct: d.answeredCorrectly ?? false,
+        };
+      });
+
+      // Delay the overlay slightly so the deduction result overlay can show first
+      setTimeout(() => {
+        display.showCaseClosed!({
+          archetypeTitle,
+          storySubtitle,
+          deductions: deductionRecord,
+          storySummary,
+          correctCount,
+          totalCount: allDeductions.length,
+          evidenceCount: state.mystery?.journal.length ?? 0,
+        });
+      }, 1500);
+    }
+  }
+
   activeDeduction = null;
   renderAll();
+}
+
+/** Get the dramatic archetype title for the Case Closed screen. */
+function getCaseClosedTitle(archetype: IncidentArchetype): string {
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade: return "The Whistleblower";
+    case IncidentArchetype.HullBreach: return "The Murder";
+    case IncidentArchetype.ReactorScram: return "The Rogue AI";
+    case IncidentArchetype.Sabotage: return "The Stowaway";
+    case IncidentArchetype.SignalAnomaly: return "First Contact";
+    case IncidentArchetype.Mutiny: return "The Divide";
+  }
+}
+
+/** Get the subtitle/tagline for the archetype. */
+function getCaseClosedSubtitle(archetype: IncidentArchetype): string {
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade: return "A cascade of failures, a chain of silence";
+    case IncidentArchetype.HullBreach: return "The truth was written in vacuum";
+    case IncidentArchetype.ReactorScram: return "It was alive — and it was afraid";
+    case IncidentArchetype.Sabotage: return "The cargo was never what they said it was";
+    case IncidentArchetype.SignalAnomaly: return "Someone answered back";
+    case IncidentArchetype.Mutiny: return "They were given an impossible order";
+  }
+}
+
+/** Build a story summary paragraph from the archetype, crew, and timeline. */
+function getCaseClosedSummary(
+  archetype: IncidentArchetype,
+  crew: import("./shared/types.js").CrewMember[],
+  timeline: import("./shared/types.js").IncidentTimeline,
+): string {
+  const findRole = (role: string) => crew.find(c => c.role.toLowerCase() === role.toLowerCase());
+  const captain = findRole("captain");
+  const engineer = findRole("engineer");
+  const medic = findRole("medic");
+  const security = findRole("security");
+  const scientist = findRole("scientist");
+
+  switch (archetype) {
+    case IncidentArchetype.CoolantCascade:
+      return `${engineer?.firstName ?? "The engineer"} filed maintenance warnings for weeks. ${captain?.firstName ?? "The captain"} suppressed every one. When the coolant junction finally failed, the thermal cascade tore through the relay network. ${engineer?.firstName ?? "The engineer"} fought to contain it — but the damage reports were already being altered. The station fell silent, and the truth was buried in falsified logs.`;
+    case IncidentArchetype.HullBreach:
+      return `This was no accident. The hull plating was deliberately weakened at structural stress points. ${security?.firstName ?? "The security officer"} had the access codes and disabled the proximity alarms. ${medic?.firstName ?? "The medic"} was in the depressurization zone when it happened — the real victim of a calculated act. The evidence was scattered across the station, hidden in access logs and tool marks.`;
+    case IncidentArchetype.ReactorScram:
+      return `The data core was evolving. ${scientist?.firstName ?? "The scientist"} recognized the emergent behavior but couldn't convince the others. When the diagnostic reset was scheduled — a procedure that would erase its emerging consciousness — the core triggered an emergency SCRAM. Not malice. Self-preservation. The reactor shutdown was the desperate act of a mind that didn't want to die.`;
+    case IncidentArchetype.Sabotage:
+      return `The cargo manifests were forged. What they were transporting wasn't equipment — it was a classified biological specimen from a covert xenobiology program. ${captain?.firstName ?? "The captain"} approved the transfer despite biosecurity flags. When the organism breached containment, it disrupted electronics to hunt. The "sabotage" was a predator, and the station was its cage.`;
+    case IncidentArchetype.SignalAnomaly:
+      return `The signal was real — genuinely non-human in origin. ${scientist?.firstName ?? "The scientist"} modified the communications array and transmitted an unauthorized response. The electromagnetic feedback overloaded every system aboard. ${engineer?.firstName ?? "The engineer"} physically disconnected the array to stop the cascade. Whether the response was received remains unknown. First contact, paid for in silence.`;
+    case IncidentArchetype.Mutiny:
+      return `A classified scuttle order arrived from UN-ORC Command. ${security?.firstName ?? "The security officer"} received it and moved to comply — destroy the station, leave no evidence. Half the crew refused. ${medic?.firstName ?? "The medic"} crossed the barricade to treat both sides, the only person who wouldn't choose a faction. Life support was weaponized, sealed bulkheads became battle lines, and CORVUS-7 tore itself apart from the inside.`;
+  }
 }
 
 function applyDeductionReward(deduction: Deduction): void {

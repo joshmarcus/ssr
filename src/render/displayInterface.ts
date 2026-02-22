@@ -47,4 +47,13 @@ export interface IGameDisplay {
     hintText?: string;
     nextDeductionTeaser?: string;
   }): void;
+  showCaseClosed?(opts: {
+    archetypeTitle: string;
+    storySubtitle: string;
+    deductions: { question: string; answer: string; correct: boolean }[];
+    storySummary: string;
+    correctCount: number;
+    totalCount: number;
+    evidenceCount: number;
+  }): void;
 }
