@@ -645,8 +645,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private toonGradient: THREE.DataTexture;
   private bloomComposer: EffectComposer | null = null;
   private bloomPass: UnrealBloomPass | null = null;
-  private bloomEnabled: boolean = true;
-  private _particlesEnabled: boolean = true;
+  private bloomEnabled: boolean = false; // off by default for performance
+  private _particlesEnabled: boolean = false; // off by default for performance
 
   // Room lights (colored point lights at room centers)
   private roomLights: Map<string, THREE.PointLight> = new Map();
@@ -861,8 +861,8 @@ export class BrowserDisplay3D implements IGameDisplay {
     });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(COLORS_3D.background);
-    // Enable shadow maps for dramatic headlight shadows
-    this.renderer.shadowMap.enabled = true;
+    // Shadow maps off by default for performance (F5 to toggle)
+    this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
