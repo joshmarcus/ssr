@@ -2956,6 +2956,32 @@ export class BrowserDisplay3D implements IGameDisplay {
         // Scale pulse — "calling out" effect
         const tracePulse = 1 + Math.sin(elapsed * 3 + mesh.position.x) * 0.08;
         mesh.scale.set(tracePulse, tracePulse, tracePulse);
+        // Discovery burst: one-time golden sparkle when player first gets within 3 tiles
+        const etDx = this.playerCurrentX - mesh.position.x;
+        const etDz = this.playerCurrentZ - mesh.position.z;
+        const etDist = Math.abs(etDx) + Math.abs(etDz);
+        if (etDist < 3 && !mesh.userData._discoveryBurst && this.chaseCamActive) {
+          mesh.userData._discoveryBurst = true;
+          for (let ei = 0; ei < 6; ei++) {
+            const eAngle = (ei / 6) * Math.PI * 2;
+            const eMat = new THREE.SpriteMaterial({
+              color: 0xffcc44, transparent: true, opacity: 0.7,
+              depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const eSpr = new THREE.Sprite(eMat);
+            eSpr.scale.set(0.06, 0.06, 1);
+            eSpr.position.set(
+              mesh.position.x + Math.cos(eAngle) * 0.2,
+              mesh.position.y,
+              mesh.position.z + Math.sin(eAngle) * 0.2,
+            );
+            (eSpr as any)._life = 0;
+            (eSpr as any)._maxLife = 0.4 + Math.random() * 0.3;
+            (eSpr as any)._driftY = 0.6 + Math.random() * 0.4;
+            this.scene.add(eSpr);
+            this._discoverySparkles.push(eSpr);
+          }
+        }
       } else if (userData.entityType === EntityType.CrewItem) {
         // Gentle glow pulse
         const ud = mesh.userData as { baseY?: number };

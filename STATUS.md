@@ -284,6 +284,7 @@
 - **Sprint V122 — Smoke wisps near player**: Drifting grey sprites spawn around player on smoky tiles (smoke>25). Larger and slower than heat shimmer, with long lifetimes (1-2s). Frequency scales with smoke intensity. Completes the hazard particle trifecta (heat shimmer + vacuum wind + smoke)
 - **Sprint V123 — Room atmosphere color grade**: Persistent subtle room-colored tint while in any room (mix-blend-mode:soft-light, 4% opacity). Uses ROOM_WALL_TINTS_3D for per-room color. Hidden in corridors and overhead view. Subliminal room personality
 - **Sprint V124 — Corridor forward scout light**: Blue PointLight moves 3 tiles ahead of player facing direction in corridors. Smooth follow with 5% lerp factor. Creates "motion sensor activation" feel — lights activate before you reach them. Hidden in rooms
+- **Sprint V125 — EvidenceTrace discovery burst**: One-time golden sparkle burst (6 sprites in radial pattern) when player first gets within 3 tiles of an EvidenceTrace. _discoveryBurst flag prevents repeat triggering. Rewards clue discovery with celebratory particles
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
