@@ -287,6 +287,7 @@
 - **Sprint V125 — EvidenceTrace discovery burst**: One-time golden sparkle burst (6 sprites in radial pattern) when player first gets within 3 tiles of an EvidenceTrace. _discoveryBurst flag prevents repeat triggering. Rewards clue discovery with celebratory particles
 - **Sprint V126 — Sweepo eye look direction**: Eye position shifts toward nearest entity within 4 tiles (±0.04 in local X). Converts world direction to local space using player rotation. Gives Sweepo spatial awareness — the eye "looks at" nearby things
 - **Sprint V127 — Victory confetti celebration**: 30 multi-colored confetti sprites spawn around player on victory. 5 color cycle (gold, orange, green, blue, magenta). Mixed drift directions (some float up, some down). Long lifetime (1.5-3s). Celebratory reward for completing the game
+- **Sprint V128 — Minimap player trail**: Fading green dots on minimap showing recent player path (up to 40 positions). Each dot fades over time (age 0→1 with linear alpha decay). Records every 1+ tile of movement. Helps players retrace steps and stay oriented
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

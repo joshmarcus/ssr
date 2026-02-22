@@ -630,6 +630,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _interactIndicator: THREE.Sprite | null = null;
   // Corridor forward scout light
   private _scoutLight: THREE.PointLight | null = null;
+  // Minimap trail: recent player positions for path visualization
+  private _minimapTrail: { x: number; y: number; age: number }[] = [];
   // DataCore holographic ring
   private _dataCoreHoloRing: THREE.Mesh | null = null;
   // Discovery sparkle: rooms visited this session for first-entry effects
@@ -8335,6 +8337,25 @@ export class BrowserDisplay3D implements IGameDisplay {
                         centerTile.pressure < 40 ? "rgba(60,120,255,0.8)" :
                         "rgba(180,180,100,0.7)";
         ctx.fillText(hazards.join(""), rx, ry);
+      }
+    }
+
+    // Minimap trail: record and render recent player positions
+    {
+      const px = state.player.entity.pos.x;
+      const py = state.player.entity.pos.y;
+      const lastT = this._minimapTrail[this._minimapTrail.length - 1];
+      if (!lastT || Math.abs(lastT.x - px) + Math.abs(lastT.y - py) >= 1) {
+        this._minimapTrail.push({ x: px, y: py, age: 0 });
+        if (this._minimapTrail.length > 40) this._minimapTrail.shift();
+      }
+      for (let ti = this._minimapTrail.length - 1; ti >= 0; ti--) {
+        const tp = this._minimapTrail[ti];
+        tp.age += 0.02;
+        if (tp.age > 1) { this._minimapTrail.splice(ti, 1); continue; }
+        const alpha = 0.3 * (1 - tp.age);
+        ctx.fillStyle = `rgba(68,255,136,${alpha.toFixed(2)})`;
+        ctx.fillRect(Math.floor(tp.x * scale) - 1, Math.floor(tp.y * scale) - 1, 3, 3);
       }
     }
 
