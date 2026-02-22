@@ -210,6 +210,8 @@
 - **Sprint V48 — Relay power visualization**: Activated relays spin 3x faster with yellow glow, curved energy lines between activated relays, sealed breaches dim to muted green
 - **Sprint V49 — Ambient station life**: Edge glow pulse, room light generator hum, relay power line opacity pulse, starfield breathing + rotation
 - **Sprint V50 — Phase-reactive lighting**: Evacuation = red alert (red ambient, orange key, red player light, dark fog), Recovery = amber tint, automatic phase transition shifts
+- **Sprint V51 — 3D objective waypoint**: Floating diamond sprite pointing toward nearest objective, sensor-gated targets (Thermal→relays, Atmospheric→crew/breaches), magenta during evacuation
+- **Sprint V52 — Full-height sliding doors**: Doors fill entire wall opening (2.0 height), smooth sideways slide when player approaches within 1 tile, locked doors stay closed, ceiling flush with walls
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

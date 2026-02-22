@@ -525,6 +525,12 @@ export class BrowserDisplay3D implements IGameDisplay {
   private showTrail = false;
   private cameraZoomPulse: number = 0; // >0 = zooming out briefly on room transition
   private roomLightBoost: number = 0; // >0 = room entry light boost (decays over time)
+
+  // Room-focused rendering: only show current room + connecting corridors
+  private _visibleRoomIds: Set<string> = new Set();
+  private _currentRoom: Room | null = null;
+  private _roomTransitionFade: number = 0; // 1.0 = full black, fades to 0
+  private static readonly CORRIDOR_VIEW_RANGE = 5; // tiles of corridor visible from player
   private cameraFrustumSize: number = CAMERA_FRUSTUM_SIZE_DEFAULT; // current zoom level (mouse wheel adjustable)
   private cameraElevation: number = 0.5; // 0 = top-down, 1 = side-on. Default = mid-angle
 
@@ -1069,6 +1075,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   updateRoomFlash(state: GameState): void {
     const room = this.getPlayerRoom(state);
     const roomId = room ? room.id : "";
+
+    // Update room-focused rendering state
+    this._currentRoom = room;
+    this.computeVisibleRooms(state);
+
     if (roomId && roomId !== this.lastRoomId) {
       this.roomFlashMessage = room!.name;
       if (this.roomFlashTimer) clearTimeout(this.roomFlashTimer);
@@ -1077,6 +1088,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.cameraZoomPulse = 1.0;
       // Room light boost — "lights come on" effect
       this.roomLightBoost = 1.5;
+      // Room transition fade — brief darken then brighten
+      this._roomTransitionFade = 0.6;
 
       // Show room name banner on the 3D viewport
       const banner = document.getElementById("room-banner");
@@ -1392,6 +1405,16 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateRoomLabels(state);
     this.updateWaypoint(state, this.clock.getElapsedTime());
     this.renderMinimap(state);
+
+    // Room transition fade overlay
+    let fadeOverlay = document.getElementById("room-transition-fade");
+    if (!fadeOverlay) {
+      fadeOverlay = document.createElement("div");
+      fadeOverlay.id = "room-transition-fade";
+      fadeOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:#000;pointer-events:none;z-index:90;transition:none;";
+      document.body.appendChild(fadeOverlay);
+    }
+    fadeOverlay.style.opacity = String(this._roomTransitionFade);
 
     // Hazard screen border: red/amber edge glow when player is in danger
     const hazBorder = document.getElementById("hazard-border");
@@ -1975,8 +1998,21 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.roomLightBoost = 0;
     }
 
+    // Room transition fade: decay from black to clear
+    if (this._roomTransitionFade > 0.01) {
+      this._roomTransitionFade *= Math.max(0, 1 - delta * 3.0); // fade over ~0.3s
+    } else {
+      this._roomTransitionFade = 0;
+    }
+
     // Room lights: emergency flicker for red/amber lights, + room entry boost
+    // Also hide lights for rooms not in view
     for (const [roomId, light] of this.roomLights) {
+      if (!this._visibleRoomIds.has(roomId)) {
+        light.visible = false;
+        continue;
+      }
+      light.visible = true;
       const c = light.color.getHex();
       if (c === 0xff2200) {
         // Red emergency strobe — fast harsh pulse
@@ -2137,6 +2173,9 @@ export class BrowserDisplay3D implements IGameDisplay {
 
         // Skip unexplored tiles (fog covers them)
         if (!tile.explored) continue;
+
+        // Room-focused rendering: skip tiles outside current view
+        if (!this.isTileInView(x, y, state)) continue;
 
         // Determine base color with sensor overlays
         let baseColor: number = COLORS_3D.floor;
@@ -2974,29 +3013,26 @@ export class BrowserDisplay3D implements IGameDisplay {
     return g;
   }
 
-  /** Distance culling: toggle visibility of per-room/bucket groups based on player distance */
+  /** Room-focused culling: only show current room + nearby corridor elements */
   private updateDistanceCulling(): void {
     const px = this.playerCurrentX;
     const pz = this.playerCurrentZ;
-    const maxDist = BrowserDisplay3D.CULL_DISTANCE;
+    const corridorRange = BrowserDisplay3D.CORRIDOR_VIEW_RANGE + 2;
 
-    // Cull room-based groups
+    // Cull room-based groups — only show rooms in visible set
     const roomMaps = [this.roomTrimGroups, this.roomDecoGroups, this.roomCeilGroups];
     for (const map of roomMaps) {
       for (const [roomId, group] of map) {
-        const center = this.roomCenters.get(roomId);
-        if (!center) continue;
-        const dist = Math.abs(px - center.x) + Math.abs(pz - center.z);
-        group.visible = dist <= maxDist;
+        group.visible = this._visibleRoomIds.has(roomId);
       }
     }
 
-    // Cull corridor buckets
+    // Cull corridor buckets — only show those near player
     for (const [, group] of this.corridorBuckets) {
       const cx = group.userData.bucketCX as number;
       const cz = group.userData.bucketCZ as number;
       const dist = Math.abs(px - cx) + Math.abs(pz - cz);
-      group.visible = dist <= maxDist;
+      group.visible = dist <= corridorRange;
     }
   }
 
@@ -4560,6 +4596,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   private updateRoomLabels(state: GameState): void {
+    // Hide/show labels based on room-focused visibility
+    for (const [roomId, sprite] of this.roomLabels3D) {
+      sprite.visible = this._visibleRoomIds.has(roomId);
+    }
+
     for (const room of state.rooms) {
       if (this.roomLabels3D.has(room.id)) continue;
       const cx = room.x + Math.floor(room.width / 2);
@@ -4683,6 +4724,14 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Hidden crew items
       if (entity.type === EntityType.CrewItem && entity.props["hidden"] === true) {
         if (this.sensorMode !== SensorType.Cleanliness) continue;
+      }
+
+      // Room-focused rendering: skip entities outside current view
+      if (!this.isTileInView(entity.pos.x, entity.pos.y, state)) {
+        const existing = this.entityMeshes.get(id);
+        if (existing) existing.visible = false;
+        activeIds.add(id);
+        continue;
       }
 
       // Only show on visible tiles
@@ -6025,6 +6074,62 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
     return null;
+  }
+
+  /** Compute which rooms should be rendered (current room + rooms visible through doors) */
+  private computeVisibleRooms(state: GameState): void {
+    this._visibleRoomIds.clear();
+    const currentRoom = this._currentRoom;
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+
+    if (currentRoom) {
+      this._visibleRoomIds.add(currentRoom.id);
+
+      // Find rooms connected via doors within a few tiles of current room boundary
+      for (const room of state.rooms) {
+        if (room.id === currentRoom.id) continue;
+        const gapX = Math.max(0, Math.max(room.x - (currentRoom.x + currentRoom.width),
+                                           currentRoom.x - (room.x + room.width)));
+        const gapY = Math.max(0, Math.max(room.y - (currentRoom.y + currentRoom.height),
+                                           currentRoom.y - (room.y + room.height)));
+        if (gapX + gapY <= 4) {
+          this._visibleRoomIds.add(room.id);
+        }
+      }
+    } else {
+      // Player in corridor — show rooms whose boundary is within corridor view range
+      for (const room of state.rooms) {
+        const nearestX = Math.max(room.x, Math.min(px, room.x + room.width - 1));
+        const nearestY = Math.max(room.y, Math.min(py, room.y + room.height - 1));
+        const dist = Math.abs(px - nearestX) + Math.abs(py - nearestY);
+        if (dist <= BrowserDisplay3D.CORRIDOR_VIEW_RANGE) {
+          this._visibleRoomIds.add(room.id);
+        }
+      }
+    }
+  }
+
+  /** Check if a tile should be rendered in room-focused mode */
+  private isTileInView(x: number, y: number, state: GameState): boolean {
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+
+    // Always show tiles within corridor view range of player
+    const dist = Math.abs(x - px) + Math.abs(y - py);
+    if (dist <= BrowserDisplay3D.CORRIDOR_VIEW_RANGE) return true;
+
+    // Show tiles in visible rooms
+    for (const room of state.rooms) {
+      if (!this._visibleRoomIds.has(room.id)) continue;
+      if (x >= room.x && x < room.x + room.width &&
+          y >= room.y && y < room.y + room.height) return true;
+      // Also show walls bordering visible rooms (1 tile outside)
+      if (x >= room.x - 1 && x <= room.x + room.width &&
+          y >= room.y - 1 && y <= room.y + room.height) return true;
+    }
+
+    return false;
   }
 
   private getAdjacentInteractables(state: GameState): Entity[] {
