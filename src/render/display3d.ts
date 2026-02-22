@@ -1848,6 +1848,66 @@ export class BrowserDisplay3D implements IGameDisplay {
       interactHint +
       `</div>`;
 
+    // Objective Scanner — sensor-gated directional hints
+    let scannerHtml = "";
+    if (!state.gameOver) {
+      const sensors = state.player.sensors ?? [];
+      const hasThermal = sensors.includes(SensorType.Thermal);
+      const hasAtmo = sensors.includes(SensorType.Atmospheric);
+      const spx = state.player.entity.pos.x;
+      const spy = state.player.entity.pos.y;
+      const dirLabel = (dx: number, dy: number): string => {
+        const ns = dy < 0 ? "N" : dy > 0 ? "S" : "";
+        const ew = dx < 0 ? "W" : dx > 0 ? "E" : "";
+        return ns + ew || "here";
+      };
+      const scanTargets: { glyph: string; label: string; dist: number; dir: string; color: string; priority: number }[] = [];
+      for (const [, ent] of state.entities) {
+        const dx = ent.pos.x - spx;
+        const dy = ent.pos.y - spy;
+        const dist = Math.abs(dx) + Math.abs(dy);
+        if (dist < 2) continue;
+        if (hasThermal && ent.type === EntityType.Relay && ent.props["activated"] !== true && ent.props["locked"] !== true) {
+          scanTargets.push({ glyph: "\u26a1", label: "Relay", dist, dir: dirLabel(dx, dy), color: "#fa0", priority: 1 });
+        }
+        if (hasAtmo && ent.type === EntityType.CrewNPC && ent.props["following"] !== true && ent.props["evacuated"] !== true) {
+          scanTargets.push({ glyph: "\ud83d\ude4b", label: "Life Signs", dist, dir: dirLabel(dx, dy), color: "#f0f", priority: 0 });
+        }
+        if (hasAtmo && ent.type === EntityType.Breach && ent.props["sealed"] !== true) {
+          scanTargets.push({ glyph: "\ud83d\udca8", label: "Breach", dist, dir: dirLabel(dx, dy), color: "#4af", priority: 2 });
+        }
+        if (state.mystery?.objectivePhase === ObjectivePhase.Evacuate && ent.type === EntityType.EscapePod && ent.props["powered"] !== true) {
+          scanTargets.push({ glyph: "\u2b21", label: "Pod", dist, dir: dirLabel(dx, dy), color: "#8f8", priority: 0 });
+        }
+      }
+      if (visitedRoomIds && state.rooms.length > 0) {
+        let nearestUnexplored: { name: string; dist: number; dir: string } | null = null;
+        for (const room of state.rooms) {
+          if (visitedRoomIds.has(room.id)) continue;
+          const cx = room.x + Math.floor(room.width / 2);
+          const cy = room.y + Math.floor(room.height / 2);
+          const dx = cx - spx;
+          const dy = cy - spy;
+          const dist = Math.abs(dx) + Math.abs(dy);
+          if (!nearestUnexplored || dist < nearestUnexplored.dist) {
+            nearestUnexplored = { name: room.name, dist, dir: dirLabel(dx, dy) };
+          }
+        }
+        if (nearestUnexplored) {
+          scanTargets.push({ glyph: "?", label: nearestUnexplored.name, dist: nearestUnexplored.dist, dir: nearestUnexplored.dir, color: "#666", priority: 5 });
+        }
+      }
+      scanTargets.sort((a, b) => a.priority - b.priority || a.dist - b.dist);
+      const shown = scanTargets.slice(0, 2);
+      if (shown.length > 0) {
+        const items = shown.map(t =>
+          `<span style="color:${t.color}">${t.glyph} ${this.escapeHtml(t.label)}</span> <span class="label">${t.dist} ${t.dir}</span>`
+        );
+        scannerHtml = `<div style="color:#8ac;font-size:11px;padding:2px 0;border-bottom:1px solid #222">` +
+          `<span style="color:#556;font-weight:bold">SCANNER:</span> ${items.join(" &middot; ")}</div>`;
+      }
+    }
+
     // Room list
     const cameraRevealedRoomIds = new Set<string>();
     for (let ri = 0; ri < state.rooms.length; ri++) {
@@ -1918,7 +1978,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     const logHtml = `<div class="log-panel">${logEntries}</div>`;
 
-    const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${statusHtml}${proximityHtml}${roomListHtml}${infoHtml}</div>`;
+    const bottomHtml = `<div class="ui-bottom">${objectiveHtml}${scannerHtml}${statusHtml}${proximityHtml}${roomListHtml}${infoHtml}</div>`;
     panel.innerHTML = logHtml + bottomHtml;
 
     const logPanel = panel.querySelector(".log-panel");
