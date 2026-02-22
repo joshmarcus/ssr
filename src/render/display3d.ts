@@ -2592,6 +2592,25 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
       }
 
+      // Global film color grade: cool-blue desaturation for cinematic sci-fi look
+      {
+        let filmGrade = document.getElementById("film-color-grade");
+        if (this.chaseCamActive) {
+          if (!filmGrade) {
+            filmGrade = document.createElement("div");
+            filmGrade.id = "film-color-grade";
+            filmGrade.style.cssText =
+              "position:fixed;inset:0;pointer-events:none;z-index:83;" +
+              "background:linear-gradient(180deg,rgba(10,20,40,0.06) 0%,rgba(5,10,25,0.03) 50%,rgba(10,20,40,0.06) 100%);" +
+              "mix-blend-mode:color;";
+            document.body.appendChild(filmGrade);
+          }
+          filmGrade.style.display = "block";
+        } else if (filmGrade) {
+          filmGrade.style.display = "none";
+        }
+      }
+
       // Room atmosphere color grade: persistent subtle tint while in a room
       {
         let roomTint = document.getElementById("room-atmosphere-tint");
