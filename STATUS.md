@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 73 ongoing (3D Visual Mode — V91 completed, V92 next)
+- **Phase**: Sprint 73 ongoing (3D Visual Mode — V100 completed, V101 next)
 - **Test status**: 290 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -259,6 +259,7 @@
 - **Sprint V97 — Sweepo cleaning brushes**: Two small rotating cylinders on Sweepo's underside. Spin fast (15 rad/s) when moving, slow idle rotation. Counter-rotating pair reinforces Sweepo's identity as a cleaning bot
 - **Sprint V98 — Minimap room checkmarks**: Green checkmark on minimap for rooms where all entities are exhausted. Helps players track which rooms still need attention and which are fully explored
 - **Sprint V99 — Sensor visor tint**: Subtle full-screen color wash when sensor overlay is active (warm for Thermal, cool for Atmospheric, green for Cleanliness). 6% opacity with breathing animation. Creates "scanning visor" immersion
+- **Sprint V100 — Headlight damage flicker**: Sweepo's headlight flickers irregularly when HP <60%. Multi-frequency sine pattern creates naturalistic failing-electronics feel. Severity scales with damage — slight stutter at 50% HP, dramatic cuts at critical. Combined with HP vignette and body sparks for full "systems failing" atmosphere
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore

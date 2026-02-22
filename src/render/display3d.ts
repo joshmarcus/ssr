@@ -2753,11 +2753,21 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.playerLight.intensity = baseIntensity + bloom;
     }
 
-    // Headlight: intensity flutter, hazard-reactive color, corridor brightness
+    // Headlight: intensity flutter, hazard-reactive color, corridor brightness, damage flicker
     if (this.headlight) {
       const inRoom = this._currentRoom !== null;
       const baseIntensity = inRoom ? 1.8 : 2.8;
-      this.headlight.intensity = baseIntensity + Math.sin(elapsed * 3.7) * 0.2 + Math.sin(elapsed * 7.3) * 0.1;
+      let headlightIntensity = baseIntensity + Math.sin(elapsed * 3.7) * 0.2 + Math.sin(elapsed * 7.3) * 0.1;
+      // Damage flicker: headlight flickers when HP is low
+      if (this._playerHpPercent < 0.6) {
+        const flickerSeverity = 1 - this._playerHpPercent / 0.6; // 0 at 60%, 1 at 0%
+        // Multi-frequency flicker for irregular pattern
+        const flick1 = Math.sin(elapsed * 13.7 + 2.1) > (0.4 + flickerSeverity * 0.4) ? 0 : 1;
+        const flick2 = Math.sin(elapsed * 7.3 + 0.5) > (0.6 + flickerSeverity * 0.2) ? 0 : 1;
+        const flickerMult = 0.3 + 0.7 * Math.min(flick1, flick2);
+        headlightIntensity *= (1 - flickerSeverity * 0.6) + flickerSeverity * 0.6 * flickerMult;
+      }
+      this.headlight.intensity = headlightIntensity;
 
       // Headlight color reacts to room hazards
       if (this._currentRoom) {
