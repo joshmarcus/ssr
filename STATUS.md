@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 81 (V201 completed — mystery deduction redesign)
+- **Phase**: Sprint 87 (V207 completed — Alan Wake mystery rework in progress)
 - **Test status**: 292 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -44,10 +44,14 @@
   - Post-answer narrative overlay (correct: revelation + reward + next unlock, incorrect: penalty + attempts remaining)
   - ~100 authored revelation/synthesis/conclusion strings across 5 archetypes x 5-6 deduction tiers
 - Narrative threads grouping evidence
-- **Investigation Hub [r/v]**: unified 3-section overlay
+- **Investigation Hub [r/v]**: unified 4-section overlay
   - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, thread)
   - CONNECTIONS: deduction list with evidence-count progress → detail view with evidence log + answer selection
+  - CREW: crew profiling with name/role/fate/personality/relationships, linked evidence, profiling insights (2+ evidence unlocks analysis)
   - WHAT WE KNOW: auto-generated narrative prose summarizing investigation progress
+- **Evidence card overlay (V205)**: Important discoveries show as full-screen data file cards with category, title, description, location, crew mentions. Queued with keypress dismiss.
+- **Predictive logs (V206)**: 8 "manuscript page" foreshadowing templates reference rooms by name. On entering a foreshadowed room, "MANUSCRIPT ECHO" milestone fires.
+- **Subtitle queue (V204b)**: Subtitles queue instead of overwriting. Priority messages (sensor/milestone/critical) go to front.
 - Crew relationships displayed in evidence detail and connection linking views
 - Evidence minimap: proportional ASCII room map showing where evidence was found
 - Developer mode (?dev=1 or F5): clue graph annotations, full tag requirements, correct answers
