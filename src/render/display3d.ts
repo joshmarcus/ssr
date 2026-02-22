@@ -4286,22 +4286,119 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
   }
 
+  // Track previous door lock state for unlock effect triggering
+  private doorLockState: Map<string, boolean> = new Map();
+
   private updateDoorLights(state: GameState): void {
     for (let y = 0; y < state.height; y++) {
       for (let x = 0; x < state.width; x++) {
         const tile = state.tiles[y][x];
         if ((tile.type !== TileType.Door && tile.type !== TileType.LockedDoor) || !tile.explored) continue;
         const key = `door_${x},${y}`;
-        if (this.doorLights.has(key)) continue;
-
         const isLocked = tile.type === TileType.LockedDoor;
-        const lightColor = isLocked ? 0xff3333 : 0x44cc66;
-        const light = new THREE.PointLight(lightColor, isLocked ? 0.6 : 0.4, 3);
-        light.position.set(x, 1.2, y);
-        this.scene.add(light);
-        this.doorLights.set(key, light);
+        const wasLocked = this.doorLockState.get(key);
+
+        if (!this.doorLights.has(key)) {
+          // First placement
+          const lightColor = isLocked ? 0xff3333 : 0x44cc66;
+          const light = new THREE.PointLight(lightColor, isLocked ? 0.6 : 0.4, 3);
+          light.position.set(x, 1.2, y);
+          this.scene.add(light);
+          this.doorLights.set(key, light);
+          this.doorLockState.set(key, isLocked);
+        } else if (wasLocked === true && !isLocked) {
+          // Door just unlocked! Update light color and trigger effect
+          const light = this.doorLights.get(key)!;
+          light.color.setHex(0x44cc66);
+          light.intensity = 1.5; // bright flash then fades
+          this.doorLockState.set(key, false);
+          this.triggerDoorUnlockEffect(x, y);
+
+          // Fade intensity back to normal over time
+          const startTime = this.clock.getElapsedTime();
+          const fadeLight = () => {
+            const t = this.clock.getElapsedTime() - startTime;
+            if (t > 1.5) { light.intensity = 0.4; return; }
+            light.intensity = 0.4 + 1.1 * Math.max(0, 1 - t / 1.5);
+            requestAnimationFrame(fadeLight);
+          };
+          requestAnimationFrame(fadeLight);
+        }
       }
     }
+  }
+
+  /** Visual effect when a locked door unlocks: green energy burst */
+  private triggerDoorUnlockEffect(x: number, y: number): void {
+    // Vertical green energy column
+    const colGeo = new THREE.CylinderGeometry(0.2, 0.2, 2.5, 8, 1, true);
+    const colMat = new THREE.MeshBasicMaterial({
+      color: 0x44ff88, transparent: true, opacity: 0.5,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const col = new THREE.Mesh(colGeo, colMat);
+    col.position.set(x, 1.25, y);
+    this.scene.add(col);
+
+    // Expanding ground ring
+    const ringGeo = new THREE.TorusGeometry(0.3, 0.04, 6, 16);
+    ringGeo.rotateX(Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x44ff88, transparent: true, opacity: 0.9,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(x, 0.05, y);
+    this.scene.add(ring);
+
+    // 6 upward sparks
+    const sparks: THREE.Mesh[] = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const sGeo = new THREE.SphereGeometry(0.025, 4, 4);
+      const sMat = new THREE.MeshBasicMaterial({
+        color: 0x88ffcc, transparent: true, opacity: 1.0,
+      });
+      const spark = new THREE.Mesh(sGeo, sMat);
+      spark.position.set(x + Math.cos(angle) * 0.2, 0.3, y + Math.sin(angle) * 0.2);
+      (spark as any)._vx = Math.cos(angle) * 0.5;
+      (spark as any)._vz = Math.sin(angle) * 0.5;
+      (spark as any)._vy = 2.0 + Math.random();
+      this.scene.add(spark);
+      sparks.push(spark);
+    }
+
+    const startTime = this.clock.getElapsedTime();
+    const duration = 1.0;
+    const animate = () => {
+      const t = (this.clock.getElapsedTime() - startTime) / duration;
+      if (t >= 1) {
+        this.scene.remove(col); colGeo.dispose(); colMat.dispose();
+        this.scene.remove(ring); ringGeo.dispose(); ringMat.dispose();
+        for (const s of sparks) {
+          this.scene.remove(s);
+          (s.geometry as THREE.BufferGeometry).dispose();
+          (s.material as THREE.MeshBasicMaterial).dispose();
+        }
+        return;
+      }
+      // Column fades
+      colMat.opacity = 0.5 * Math.max(0, 1 - t * 2);
+      // Ring expands
+      const rScale = 1 + t * 4;
+      ring.scale.set(rScale, 1, rScale);
+      ringMat.opacity = 0.9 * (1 - t);
+      // Sparks rise and fade
+      const dt = 0.016;
+      for (const s of sparks) {
+        s.position.x += (s as any)._vx * dt;
+        s.position.z += (s as any)._vz * dt;
+        s.position.y += (s as any)._vy * dt;
+        (s as any)._vy -= 2.0 * dt;
+        (s.material as THREE.MeshBasicMaterial).opacity = 1 - t;
+      }
+      requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
   }
 
   private updateRoomLabels(state: GameState): void {
