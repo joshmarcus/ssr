@@ -7610,6 +7610,24 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
+    // Room name labels on minimap — tiny text at room centers
+    ctx.font = "bold 7px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const room of state.rooms) {
+      const rcx = room.x + Math.floor(room.width / 2);
+      const rcy = room.y + Math.floor(room.height / 2);
+      if (rcy >= 0 && rcy < state.height && rcx >= 0 && rcx < state.width && state.tiles[rcy][rcx].explored) {
+        const lx = Math.floor((room.x + room.width / 2) * scale);
+        const ly = Math.floor((room.y + room.height / 2) * scale);
+        const isCurrent = this._currentRoom?.id === room.id;
+        // Abbreviate room name: take first word, max 8 chars
+        const abbr = room.name.split(/[\s-]/)[0].slice(0, 8);
+        ctx.fillStyle = isCurrent ? "rgba(68,255,136,0.8)" : "rgba(180,200,220,0.45)";
+        ctx.fillText(abbr, lx, ly);
+      }
+    }
+
     // Player: bright green dot with facing direction arrow
     const ppx = Math.floor(state.player.entity.pos.x * scale);
     const ppy = Math.floor(state.player.entity.pos.y * scale);

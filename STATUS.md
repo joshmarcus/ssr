@@ -253,6 +253,7 @@
 - **Sprint V91 — Entity interaction feedback**: Entity meshes scale-bump and emissive-boost on interaction (set via flashTile, decays over ~0.3s). Satisfying tactile response when activating relays, terminals, and other interactables
 - **Sprint V92 — Antenna signal pulse**: Sweepo's antenna tip glows brighter and pulses faster when near unexhausted entities (yellow within 2 tiles, green within 6). Acts as a proximity detector — idle dim green, signal strength scales with distance, pulse rate 2-8Hz
 - **Sprint V93 — Pipe steam leaks**: Small blue-white drips fall from overhead corridor pipes every 3-8s. Spawns at nearest pipe tile within 6 tiles, falls downward from ceiling height (y=1.7), stretches vertically while fading. Adds deteriorating-station atmosphere
+- **Sprint V94 — Minimap room names**: Abbreviated room names (first word, max 8 chars) drawn at room centers on minimap. Current room bright green, others dim grey. Improves navigation and spatial awareness
 
 ### Branding
 - **Sweepo rename**: "Janitor Rover A3" → "cleaning bot Sweepo" across all game text and lore
