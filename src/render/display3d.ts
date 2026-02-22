@@ -1481,6 +1481,49 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (!this._evidenceCardActive) {
       this.showNextEvidenceCard();
     }
+    // Evidence discovery 3D burst: golden particles + camera zoom + screen flash
+    this.triggerEvidenceDiscoveryBurst();
+  }
+
+  private triggerEvidenceDiscoveryBurst(): void {
+    // Camera zoom-in for "discovery" emphasis
+    if (this.chaseCamActive) {
+      this.cameraZoomPulse = -0.6; // zoom in toward subject
+    }
+    // Golden screen flash
+    let evidenceFlash = document.getElementById("evidence-discovery-flash");
+    if (!evidenceFlash) {
+      evidenceFlash = document.createElement("div");
+      evidenceFlash.id = "evidence-discovery-flash";
+      evidenceFlash.style.cssText =
+        "position:fixed;inset:0;pointer-events:none;z-index:88;" +
+        "background:radial-gradient(ellipse at center, rgba(255,220,100,0.15) 0%, transparent 70%);" +
+        "opacity:0;transition:opacity 0.15s;";
+      document.body.appendChild(evidenceFlash);
+    }
+    evidenceFlash.style.opacity = "1";
+    setTimeout(() => { evidenceFlash!.style.opacity = "0"; }, 400);
+
+    // 3D golden particle burst from player position
+    const px = this.playerCurrentX;
+    const pz = this.playerCurrentZ;
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 + Math.random() * 0.4;
+      const sMat = new THREE.SpriteMaterial({
+        color: 0xffdd44, transparent: true, opacity: 0.7,
+        depthWrite: false, blending: THREE.AdditiveBlending,
+      });
+      const spark = new THREE.Sprite(sMat);
+      spark.scale.set(0.06, 0.06, 1);
+      spark.position.set(px, 0.4, pz);
+      (spark as any)._life = 0;
+      (spark as any)._maxLife = 0.8 + Math.random() * 0.5;
+      (spark as any)._driftY = 1.0 + Math.random() * 0.8;
+      (spark as any)._driftX = Math.cos(angle) * (0.8 + Math.random() * 0.5);
+      (spark as any)._driftZ = Math.sin(angle) * (0.8 + Math.random() * 0.5);
+      this.scene.add(spark);
+      this._discoverySparkles.push(spark);
+    }
   }
 
   private showNextEvidenceCard(): void {
@@ -3620,15 +3663,16 @@ export class BrowserDisplay3D implements IGameDisplay {
           this._lastTrailX = this.playerCurrentX;
           this._lastTrailZ = this.playerCurrentZ;
           const trailMat = new THREE.SpriteMaterial({
-            color: 0x556666, transparent: true, opacity: 0.12,
+            color: 0x55aa88, transparent: true, opacity: 0.18,
             depthWrite: false, depthTest: true,
+            blending: THREE.AdditiveBlending,
           });
           const decal = new THREE.Sprite(trailMat);
-          decal.scale.set(0.25, 0.15, 1);
-          decal.position.set(this.playerCurrentX, 0.011, this.playerCurrentZ);
+          decal.scale.set(0.22, 0.13, 1);
+          decal.position.set(this.playerCurrentX, 0.012, this.playerCurrentZ);
           decal.material.rotation = -this.playerFacing + Math.PI / 2;
           (decal as any)._life = 0;
-          (decal as any)._maxLife = 12 + Math.random() * 4;
+          (decal as any)._maxLife = 15 + Math.random() * 5;
           this.scene.add(decal);
           this._trailDecals.push(decal);
           // Cap total decals
@@ -5274,7 +5318,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         continue;
       }
       const t = life / maxLife;
-      (decal.material as THREE.SpriteMaterial).opacity = 0.12 * (1 - t * t);
+      // Recent trails glow brighter, then fade with quadratic decay
+      const freshBoost = t < 0.1 ? 1.5 : 1.0;
+      (decal.material as THREE.SpriteMaterial).opacity = 0.18 * freshBoost * (1 - t * t);
     }
 
     // Room ambient particles: subtle floating motes per room type
