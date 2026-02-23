@@ -148,14 +148,34 @@
 
 ## Sprint 6 — Investigation Hub UI + Moral Dimension
 
-**Status**: PLANNED
+**Status**: IN PROGRESS
 
 **Goal**: Update the Investigation Hub overlay rendering for the new mystery systems, add moral dimension and endgame.
 
 ### Tasks
-- [ ] Update Investigation Hub overlay to show room scenes, clue examination, scene processing UI
-- [ ] Add dossier wall display (3-band: identified/partial/unknown)
-- [ ] Add incident board timeline display
-- [ ] Add evidence accumulation + crack moment visual feedback
+- [x] Update Investigation Hub overlay to show room scenes, clue examination, scene processing UI
+- [x] Add incident board timeline display (in SCENES tab sidebar)
+- [x] Add evidence accumulation + crack moment visual feedback (in SCENES tab sidebar)
+- [x] Add dossier progress summary (in SCENES tab sidebar)
+- [ ] Add dossier wall display (3-band: identified/partial/unknown) — enhance CREW tab
 - [ ] Add moral choice + scoring + endgame summary
 - [ ] Playtest full mystery flow end-to-end
+
+### Changes Made
+- **`src/browser.ts`**: Major Investigation Hub expansion
+  - New SCENES tab (5th tab) with scene list, detail view, and processing UI
+  - Scene list shows: room name, clue count (examined/total/sensor-gated), evidence category, processing status
+  - Evidence accumulation summary: confirming/ambiguous/contradicting counts + crack moment indicator
+  - Incident board timeline display: 5 phases with status icons (locked/unlocked/proposed/confirmed)
+  - Dossier progress summary: identified/total crew count
+  - Scene detail view: all clues with type, text, crew links, evidence categories, sensor requirements
+  - Scene process view: 3-column WHO/WHAT/OUTCOME picker with keyboard navigation
+    - WHO: select from crew list (identified names or "Crew #N")
+    - WHAT: 12 SceneActivity options
+    - OUTCOME: 7 SceneOutcome options
+    - Arrow keys navigate within column, Left/Right switch columns, Enter submits with Y/N confirm
+  - Dev mode: shows ground truth WHO/WHAT/OUTCOME for debugging
+  - State variables: hubSceneDetail, hubSceneSubView, hubSceneWhoIdx, hubSceneWhatIdx, hubSceneOutcomeIdx, hubSceneConfirming
+  - [x] key binding: ExamineScene in current room
+  - Scene notification on room entry: "SCENE: N physical clues detected. Press [x] to examine."
+- New imports: SceneActivity, SceneOutcome, TimelinePhase, CrewDossier, RoomScene

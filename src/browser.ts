@@ -44,8 +44,8 @@ import {
   PACING_NUDGE_CLEAN, PACING_NUDGE_INVESTIGATE, PACING_NUDGE_RECOVER, PACING_NUDGE_EVACUATE,
   CORVUS_WITNESS_COMMENTARY,
 } from "./data/narrative.js";
-import type { Action, MysteryChoice, Deduction, CrewMember, Entity } from "./shared/types.js";
-import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType } from "./shared/types.js";
+import type { Action, MysteryChoice, Deduction, CrewMember, Entity, CrewDossier, RoomScene } from "./shared/types.js";
+import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType, SceneActivity, SceneOutcome, TimelinePhase } from "./shared/types.js";
 import { computeChoiceEndings, computeBranchedEpilogue } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
@@ -224,11 +224,18 @@ let incidentCardOpen = false;
 let logReviewOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
 let investigationHubOpen = false;
-let hubSection: "evidence" | "connections" | "crew" | "whatweknow" = "evidence";
+let hubSection: "evidence" | "connections" | "crew" | "whatweknow" | "scenes" = "evidence";
 let hubIdx = 0;                       // selected item index within current section
 let hubOptionIdx = 0;                 // selected option within a deduction/choice
 let hubDetailDeduction: string | null = null; // deduction ID in detail/answer mode
 let hubConfirming = false;            // Y/N confirmation for deduction answer
+// Scene processing sub-state
+let hubSceneDetail: string | null = null; // room ID of scene being viewed in detail
+let hubSceneSubView: "clues" | "process" = "clues"; // sub-tab within scene detail
+let hubSceneWhoIdx = 0;     // selected crew index for WHO answer
+let hubSceneWhatIdx = 0;    // selected activity for WHAT answer
+let hubSceneOutcomeIdx = 0; // selected outcome for OUTCOME answer
+let hubSceneConfirming = false; // Y/N confirmation for scene processing
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
 let pendingCeremonyDeduction: { id: string; correct: boolean } | null = null; // for post-overlay CORVUS-7 commentary
 let lastWwkJournalCount = 0; // journal count when WHAT WE KNOW was last viewed
@@ -875,6 +882,20 @@ function checkRoomEntry(): void {
       }
     }
 
+    // Scene notification — tell the player about physical clues in the room
+    if (state.mystery?.roomScenes) {
+      const roomScene = state.mystery.roomScenes.find(s => s.roomName === currentRoom.name);
+      if (roomScene && !roomScene.processed) {
+        const unexamined = roomScene.physicalClues.filter(c => !c.examined && !c.sensorRequired).length;
+        const sensorGated = roomScene.physicalClues.filter(c => !c.examined && c.sensorRequired).length;
+        if (unexamined > 0) {
+          display.addLog(`SCENE: ${unexamined} physical clue${unexamined > 1 ? "s" : ""} detected. Press [x] to examine.${sensorGated > 0 ? ` (${sensorGated} more require sensor upgrades)` : ""}`, "milestone");
+        } else if (sensorGated > 0) {
+          display.addLog(`SCENE: ${sensorGated} clue${sensorGated > 1 ? "s" : ""} require sensor upgrades to examine.`, "sensor");
+        }
+      }
+    }
+
     // Tension-based room entry flavor — fires on every room change (not just first visit)
     // Only after turn 100, escalating frequency with turn count
     if (state.turn >= 100) {
@@ -1206,6 +1227,25 @@ function initGame(): void {
       display.setHubMode?.(true);
       document.getElementById("game-container")?.classList.add("hub-open");
       renderInvestigationHub();
+      return;
+    }
+    // X key examines scene clues in current room
+    if (e.key === "x" && !journalOpen && !state.gameOver) {
+      e.preventDefault();
+      // Find scene for player's current room
+      const playerRoom = state.rooms.find(r =>
+        state.player.entity.pos.x >= r.x && state.player.entity.pos.x < r.x + r.width &&
+        state.player.entity.pos.y >= r.y && state.player.entity.pos.y < r.y + r.height
+      );
+      if (playerRoom && state.mystery?.roomScenes) {
+        const roomScene = state.mystery.roomScenes.find(s => s.roomName === playerRoom.name);
+        if (roomScene) {
+          handleAction({ type: ActionType.ExamineScene, sceneRoomId: roomScene.roomId });
+          return;
+        }
+      }
+      display.addLog("No scene to examine here.", "system");
+      renderAll();
       return;
     }
     // ? key toggles help
@@ -3539,12 +3579,15 @@ function renderInvestigationHub(): void {
   const journal = state.mystery.journal;
 
   // Tab bar
-  const tabs: Array<"evidence" | "connections" | "crew" | "whatweknow"> = ["evidence", "connections", "crew", "whatweknow"];
+  const tabs: Array<"evidence" | "connections" | "crew" | "whatweknow" | "scenes"> = ["evidence", "scenes", "connections", "crew", "whatweknow"];
   const newEvidenceCount = entries.length - lastEvidenceViewCount;
   const newBadge = newEvidenceCount > 0 && hubSection !== "evidence"
     ? ` <span style="color:#0f0;font-size:10px">+${newEvidenceCount} new</span>` : "";
+  const scenes = state.mystery?.roomScenes ?? [];
+  const processedScenes = scenes.filter(s => s.processed).length;
   const tabLabels: Record<string, string> = {
     evidence: `EVIDENCE (${entries.length})${newBadge}`,
+    scenes: `SCENES (${processedScenes}/${scenes.length})`,
     connections: `CONNECTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`,
     crew: `CREW (${state.mystery?.crew.length ?? 0})`,
     whatweknow: "WHAT WE KNOW",
@@ -3563,6 +3606,8 @@ function renderInvestigationHub(): void {
 
   if (hubSection === "evidence") {
     bodyHtml = renderHubEvidence(entries);
+  } else if (hubSection === "scenes") {
+    bodyHtml = renderHubScenes();
   } else if (hubSection === "connections") {
     bodyHtml = renderHubConnections(deductions, journal);
   } else if (hubSection === "crew") {
@@ -3573,6 +3618,10 @@ function renderInvestigationHub(): void {
 
   const controlsText = hubDetailDeduction
     ? "[&uarr;/&darr;] Navigate  [Enter] Answer  [Esc] Back"
+    : hubSceneDetail && hubSceneSubView === "process"
+    ? "[&uarr;/&darr;] Navigate  [&larr;/&rarr;] Switch field  [Enter] Submit  [Esc] Back"
+    : hubSceneDetail
+    ? "[&uarr;/&darr;] Scroll clues  [p] Process scene  [Esc] Back"
     : "[&uarr;/&darr;] Navigate  [Tab] Next section  [Enter] Select  [Esc] Close";
 
   overlay.innerHTML = `
@@ -4053,6 +4102,412 @@ function getCrewProfileInsight(crew: import("./shared/types.js").CrewMember, men
   return parts.slice(0, 3).join(" ");
 }
 
+/** SCENES section — room scene investigation with WHO/WHAT/OUTCOME processing. */
+function renderHubScenes(): string {
+  if (!state.mystery?.roomScenes || state.mystery.roomScenes.length === 0) {
+    return `<div class="journal-body"><div class="journal-list"><div class="journal-empty">No room scenes detected yet.<br>Explore the station to discover scenes.</div></div><div class="journal-detail"><div class="journal-empty">Room scenes appear as you explore.</div></div></div>`;
+  }
+
+  const scenes = state.mystery.roomScenes;
+  const crew = state.mystery.crew;
+  const dossiers = state.mystery.dossiers ?? [];
+  const accumulation = state.mystery.evidenceAccumulation;
+
+  // If viewing a specific scene in detail
+  if (hubSceneDetail) {
+    const scene = scenes.find(s => s.roomId === hubSceneDetail);
+    if (scene) {
+      if (hubSceneSubView === "process") {
+        return renderHubSceneProcess(scene, crew, dossiers);
+      }
+      return renderHubSceneDetail(scene, crew, dossiers);
+    }
+    hubSceneDetail = null;
+  }
+
+  // Clamp index
+  if (hubIdx >= scenes.length) hubIdx = scenes.length - 1;
+  if (hubIdx < 0) hubIdx = 0;
+
+  // Scene list (left panel)
+  let listHtml = "";
+
+  // Evidence accumulation summary at top
+  if (accumulation) {
+    const total = accumulation.confirming_found + accumulation.ambiguous_found + accumulation.contradicting_found;
+    const crackIcon = accumulation.crack_moment_fired ? ' <span style="color:#f44">CRACK MOMENT</span>' : "";
+    listHtml += `<div style="padding:6px 10px;border-bottom:1px solid #333;margin-bottom:4px">`;
+    listHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px">EVIDENCE ACCUMULATION</div>`;
+    listHtml += `<div style="font-size:11px;margin-top:3px">`;
+    listHtml += `<span style="color:#4a4">\u25A0 ${accumulation.confirming_found} confirming</span>  `;
+    listHtml += `<span style="color:#ca8">\u25A0 ${accumulation.ambiguous_found} ambiguous</span>  `;
+    listHtml += `<span style="color:#f44">\u25A0 ${accumulation.contradicting_found} contradicting</span>`;
+    listHtml += `</div>`;
+    listHtml += `<div style="font-size:10px;color:#667;margin-top:2px">Total: ${total}${crackIcon}</div>`;
+    listHtml += `</div>`;
+  }
+
+  // Incident board summary
+  const board = state.mystery?.incidentBoard;
+  if (board) {
+    listHtml += `<div style="padding:6px 10px;border-bottom:1px solid #333;margin-bottom:4px">`;
+    listHtml += `<div style="color:#fa0;font-size:10px;letter-spacing:1.5px">INCIDENT TIMELINE</div>`;
+    const phaseLabels: Record<string, string> = {
+      normal_ops: "Normal Ops", trigger: "Trigger", escalation: "Escalation",
+      collapse: "Collapse", aftermath: "Aftermath",
+    };
+    for (const slot of board.slots) {
+      const label = phaseLabels[slot.phase] ?? slot.phase;
+      let icon: string, color: string;
+      if (slot.status === "confirmed") { icon = "\u2713"; color = "#4a4"; }
+      else if (slot.status === "proposed") { icon = "?"; color = "#fa0"; }
+      else if (slot.status === "unlocked") { icon = "\u25cb"; color = "#ca8"; }
+      else { icon = "\u25cb"; color = "#555"; }
+      listHtml += `<div style="font-size:11px;padding:2px 0"><span style="color:${color}">[${icon}]</span> <span style="color:${slot.status === "confirmed" ? "#bbc" : "#667"}">${esc(label)}</span>`;
+      if (slot.status === "confirmed" && slot.confirmedCard) {
+        listHtml += ` <span style="color:#4a4;font-size:10px">— ${esc(slot.confirmedCard.event.slice(0, 30))}</span>`;
+      }
+      listHtml += `</div>`;
+    }
+    if (board.wrongConfirmations > 0) {
+      listHtml += `<div style="color:#f44;font-size:10px;margin-top:2px">${board.wrongConfirmations} wrong confirmation${board.wrongConfirmations !== 1 ? "s" : ""}</div>`;
+    }
+    listHtml += `</div>`;
+  }
+
+  // Dossier progress summary
+  const dossiersData = state.mystery?.dossiers;
+  if (dossiersData && dossiersData.length > 0) {
+    const identified = dossiersData.filter(d => d.confirmed.name).length;
+    listHtml += `<div style="padding:6px 10px;border-bottom:1px solid #333;margin-bottom:4px">`;
+    listHtml += `<div style="color:#6cf;font-size:10px;letter-spacing:1.5px">CREW DOSSIERS</div>`;
+    listHtml += `<div style="font-size:11px;color:#889">${identified}/${dossiersData.length} identified</div>`;
+    listHtml += `</div>`;
+  }
+
+  for (let i = 0; i < scenes.length; i++) {
+    const s = scenes[i];
+    const selected = i === hubIdx;
+    const examined = s.physicalClues.filter(c => c.examined).length;
+    const total = s.physicalClues.length;
+    const sensorGated = s.physicalClues.filter(c => !c.examined && c.sensorRequired).length;
+
+    let statusIcon: string;
+    let statusColor: string;
+    if (s.processed) {
+      statusIcon = "\u2713"; statusColor = "#4a4";
+    } else if (examined === total) {
+      statusIcon = "\u25c7"; statusColor = "#fa0"; // all examined, ready to process
+    } else if (examined > 0) {
+      statusIcon = "\u25cb"; statusColor = "#ca8"; // partially examined
+    } else {
+      statusIcon = "\u25cb"; statusColor = "#555"; // not started
+    }
+
+    const bg = selected ? "background:rgba(68,204,255,0.12);border-left:2px solid #4cf" : "border-left:2px solid transparent";
+    const catColor = s.evidenceCategory === "confirming" ? "#4a4" : s.evidenceCategory === "contradicting" ? "#f44" : "#ca8";
+
+    listHtml += `<div style="padding:6px 10px;${bg};margin:1px 0">`;
+    listHtml += `<div style="color:${selected ? "#eef" : "#aab"};font-weight:${selected ? "bold" : "normal"};font-size:13px">`;
+    listHtml += `<span style="color:${statusColor}">[${statusIcon}]</span> ${esc(s.roomName)}</div>`;
+    listHtml += `<div style="font-size:10px;color:#667">`;
+    listHtml += `Clues: ${examined}/${total}${sensorGated > 0 ? ` (+${sensorGated} sensor-gated)` : ""}`;
+    listHtml += ` \u00B7 <span style="color:${catColor}">${s.evidenceCategory}</span>`;
+    if (s.processed) listHtml += ` \u00B7 <span style="color:#4a4">PROCESSED</span>`;
+    listHtml += `</div></div>`;
+  }
+
+  // Detail panel for selected scene (right side)
+  const sel = scenes[hubIdx];
+  let detailHtml = `<div style="padding:12px">`;
+  detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:2px;margin-bottom:8px">SCENE OVERVIEW</div>`;
+  detailHtml += `<div style="color:#eef;font-size:16px;font-weight:bold;margin-bottom:4px">${esc(sel.roomName)}</div>`;
+
+  // Environmental state
+  const env = sel.environmentalState;
+  if (env.damageType !== "none") {
+    const dmgColors: Record<string, string> = { thermal: "#f80", pressure: "#4af", electrical: "#ff0", biological: "#0f8" };
+    detailHtml += `<div style="color:${dmgColors[env.damageType] ?? "#aaa"};font-size:11px;margin-bottom:6px">`;
+    detailHtml += `${env.damageType.toUpperCase()} DAMAGE (level ${env.damageLevel})`;
+    if (env.hasBarricade) detailHtml += ` \u00B7 BARRICADED`;
+    if (env.sealState !== "open") detailHtml += ` \u00B7 ${env.sealState.replace(/_/g, " ").toUpperCase()}`;
+    detailHtml += `</div>`;
+  }
+
+  // Clue summary
+  const examined = sel.physicalClues.filter(c => c.examined);
+  const unexamined = sel.physicalClues.filter(c => !c.examined && !c.sensorRequired);
+  const sensorGated = sel.physicalClues.filter(c => !c.examined && c.sensorRequired);
+
+  detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:10px">`;
+  detailHtml += `${examined.length} examined \u00B7 ${unexamined.length} unexamined`;
+  if (sensorGated.length > 0) {
+    const sensorNames = [...new Set(sensorGated.map(c => c.sensorRequired))].join(", ");
+    detailHtml += ` \u00B7 ${sensorGated.length} need sensor (${sensorNames})`;
+  }
+  detailHtml += `</div>`;
+
+  // Show examined clues
+  if (examined.length > 0) {
+    detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin:8px 0 4px">EXAMINED CLUES</div>`;
+    for (const c of examined) {
+      const typeColor = c.type === "badge" || c.type === "personal_effect" ? "#6cf" : c.type === "terminal_log" || c.type === "access_log" ? "#fa0" : "#aab";
+      detailHtml += `<div style="margin:4px 0;padding:4px 8px;background:rgba(68,204,255,0.05);border-left:2px solid ${typeColor};font-size:11px">`;
+      detailHtml += `<div style="color:${typeColor};font-size:10px">${c.type.replace(/_/g, " ").toUpperCase()}</div>`;
+      detailHtml += `<div style="color:#bbc">${esc(c.text)}</div>`;
+      if (c.crewLinked) {
+        const linked = state.mystery?.crew.find(cr => cr.id === c.crewLinked);
+        if (linked) detailHtml += `<div style="color:#6cf;font-size:10px">Linked to: ${esc(linked.firstName)} ${esc(linked.lastName)}</div>`;
+      }
+      detailHtml += `</div>`;
+    }
+  }
+
+  // Processing status
+  if (sel.processed) {
+    detailHtml += `<div style="color:#4a4;font-size:12px;margin-top:12px;padding:8px;background:rgba(68,255,136,0.05);border:1px solid rgba(68,255,136,0.2)">\u2713 Scene processed (${sel.processAttempts} attempt${sel.processAttempts !== 1 ? "s" : ""})</div>`;
+  } else if (examined.length > 0) {
+    detailHtml += `<div style="color:#fa0;font-size:12px;margin-top:12px;padding:8px;background:rgba(255,170,0,0.05);border:1px solid rgba(255,170,0,0.2)">Press [Enter] to investigate this scene in detail</div>`;
+  } else {
+    detailHtml += `<div style="color:#555;font-size:11px;margin-top:12px;font-style:italic">Examine clues first by pressing [x] in this room.</div>`;
+  }
+
+  detailHtml += `</div>`;
+
+  return `<div class="journal-body"><div class="journal-list" style="overflow-y:auto;max-height:420px">${listHtml}</div><div class="journal-detail" style="overflow-y:auto;max-height:420px">${detailHtml}</div></div>`;
+}
+
+/** Scene detail view — shows all clues and allows entering process mode. */
+function renderHubSceneDetail(scene: RoomScene, crew: import("./shared/types.js").CrewMember[], dossiers: CrewDossier[]): string {
+  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:12px 16px">`;
+  html += `<div style="color:#4cf;font-size:10px;letter-spacing:2px;margin-bottom:8px">SCENE INVESTIGATION: ${esc(scene.roomName.toUpperCase())}</div>`;
+
+  // Environmental state header
+  const env = scene.environmentalState;
+  if (env.damageType !== "none") {
+    const dmgColors: Record<string, string> = { thermal: "#f80", pressure: "#4af", electrical: "#ff0", biological: "#0f8" };
+    html += `<div style="color:${dmgColors[env.damageType] ?? "#aaa"};font-size:11px;margin-bottom:8px;padding:4px 8px;background:rgba(255,255,255,0.03)">`;
+    html += `Environmental: ${env.damageType.toUpperCase()} damage (level ${env.damageLevel})`;
+    if (env.hasBarricade) html += ` \u00B7 Barricade present`;
+    if (env.sealState !== "open") html += ` \u00B7 ${env.sealState.replace(/_/g, " ")}`;
+    html += `</div>`;
+  }
+
+  // All clues listed
+  const clues = scene.physicalClues;
+  for (let i = 0; i < clues.length; i++) {
+    const c = clues[i];
+    const selected = i === hubIdx;
+    const bg = selected ? "background:rgba(68,204,255,0.1);border-left:2px solid #4cf" : "border-left:2px solid #333";
+    const typeColor = c.type === "badge" || c.type === "personal_effect" ? "#6cf"
+      : c.type === "terminal_log" || c.type === "access_log" ? "#fa0"
+      : c.type === "damage_pattern" || c.type === "residue" ? "#f80" : "#aab";
+
+    html += `<div style="margin:4px 0;padding:6px 10px;${bg}">`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center">`;
+    html += `<span style="color:${typeColor};font-size:10px;letter-spacing:1px">${c.type.replace(/_/g, " ").toUpperCase()}</span>`;
+
+    if (!c.examined && c.sensorRequired) {
+      html += `<span style="color:#f44;font-size:10px">REQUIRES ${c.sensorRequired.toUpperCase()} SENSOR</span>`;
+    } else if (!c.examined) {
+      html += `<span style="color:#555;font-size:10px">NOT EXAMINED</span>`;
+    } else {
+      const catColor = c.evidenceCategory === "confirming" ? "#4a4" : c.evidenceCategory === "contradicting" ? "#f44" : "#ca8";
+      html += `<span style="color:${catColor};font-size:10px">${c.evidenceCategory.toUpperCase()}</span>`;
+    }
+    html += `</div>`;
+
+    if (c.examined) {
+      html += `<div style="color:#bbc;font-size:12px;margin-top:4px;line-height:1.4">${esc(c.text)}</div>`;
+      if (c.crewLinked) {
+        const linked = crew.find(cr => cr.id === c.crewLinked);
+        if (linked) {
+          const dossier = dossiers.find(d => d.crewId === c.crewLinked);
+          const identified = dossier?.confirmed.name ? "\u2713" : "?";
+          html += `<div style="color:#6cf;font-size:10px;margin-top:2px">[${identified}] Linked: ${esc(linked.firstName)} ${esc(linked.lastName)} (${esc(linked.role)})</div>`;
+        }
+      }
+    } else {
+      html += `<div style="color:#555;font-size:11px;margin-top:4px;font-style:italic">Examine this clue in the room to reveal its contents.</div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Processing option
+  if (scene.processed) {
+    html += `<div style="color:#4a4;font-size:12px;margin-top:16px;padding:10px;background:rgba(68,255,136,0.05);border:1px solid rgba(68,255,136,0.2);text-align:center">\u2713 Scene fully processed</div>`;
+  } else {
+    const examinedCount = clues.filter(c => c.examined).length;
+    if (examinedCount > 0) {
+      const turnCost = scene.processAttempts === 0 ? 3 : scene.processAttempts === 1 ? 5 : scene.processAttempts === 2 ? 8 : 8 + (scene.processAttempts - 2) * 4;
+      html += `<div style="margin-top:16px;padding:10px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);text-align:center">`;
+      html += `<div style="color:#fa0;font-size:12px;font-weight:bold">[p] PROCESS SCENE</div>`;
+      html += `<div style="color:#889;font-size:10px;margin-top:4px">Answer WHO/WHAT/OUTCOME based on the evidence</div>`;
+      html += `<div style="color:#667;font-size:10px;margin-top:2px">Cost: ${turnCost} turns${scene.processAttempts > 0 ? ` (attempt ${scene.processAttempts + 1})` : ""}</div>`;
+      html += `</div>`;
+    }
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+/** Scene process view — WHO/WHAT/OUTCOME selection with crew, activity, and outcome pickers. */
+function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js").CrewMember[], dossiers: CrewDossier[]): string {
+  if (hubSceneConfirming) {
+    return renderHubSceneConfirm(scene, crew);
+  }
+
+  const activities = [
+    { key: SceneActivity.EmergencyResponse, label: "Emergency Response" },
+    { key: SceneActivity.Fleeing, label: "Fleeing" },
+    { key: SceneActivity.Hiding, label: "Hiding" },
+    { key: SceneActivity.Sabotage, label: "Sabotage" },
+    { key: SceneActivity.MedicalTreatment, label: "Medical Treatment" },
+    { key: SceneActivity.RoutineWork, label: "Routine Work" },
+    { key: SceneActivity.Investigation, label: "Investigation" },
+    { key: SceneActivity.EquipmentRepair, label: "Equipment Repair" },
+    { key: SceneActivity.DataAccess, label: "Data Access" },
+    { key: SceneActivity.Confrontation, label: "Confrontation" },
+    { key: SceneActivity.Communication, label: "Communication" },
+    { key: SceneActivity.Barricading, label: "Barricading" },
+  ];
+  const outcomes = [
+    { key: SceneOutcome.LeftNormally, label: "Left Normally" },
+    { key: SceneOutcome.LeftInHurry, label: "Left In Hurry" },
+    { key: SceneOutcome.Injured, label: "Injured" },
+    { key: SceneOutcome.DiedHere, label: "Died Here" },
+    { key: SceneOutcome.StillHere, label: "Still Here" },
+    { key: SceneOutcome.SealedInside, label: "Sealed Inside" },
+    { key: SceneOutcome.Unknown, label: "Unknown" },
+  ];
+
+  // Three-column layout: WHO | WHAT | OUTCOME
+  // Track which column is focused: 0=WHO, 1=WHAT, 2=OUTCOME
+  const focusCol = hubOptionIdx; // reuse hubOptionIdx as column focus (0-2)
+
+  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:12px 16px">`;
+  html += `<div style="color:#4cf;font-size:10px;letter-spacing:2px;margin-bottom:8px">PROCESS SCENE: ${esc(scene.roomName.toUpperCase())}</div>`;
+
+  const turnCost = scene.processAttempts === 0 ? 3 : scene.processAttempts === 1 ? 5 : scene.processAttempts === 2 ? 8 : 8 + (scene.processAttempts - 2) * 4;
+  html += `<div style="color:#667;font-size:10px;margin-bottom:12px">Attempt ${scene.processAttempts + 1} \u00B7 Cost: ${turnCost} turns \u00B7 Score 2/3 to succeed</div>`;
+
+  html += `<div style="display:flex;gap:12px">`;
+
+  // WHO column
+  const whoActive = focusCol === 0;
+  html += `<div style="flex:1;border:1px solid ${whoActive ? "#4cf" : "#333"};padding:8px;max-height:300px;overflow-y:auto">`;
+  html += `<div style="color:${whoActive ? "#4cf" : "#889"};font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px">WHO WAS HERE?</div>`;
+  for (let i = 0; i < crew.length; i++) {
+    const c = crew[i];
+    const dossier = dossiers.find(d => d.crewId === c.id);
+    const identified = dossier?.confirmed.name;
+    const selected = whoActive && i === hubSceneWhoIdx;
+    const bg = selected ? "background:rgba(68,204,255,0.15)" : "";
+    const nameText = identified ? `${c.firstName} ${c.lastName}` : `Crew #${i + 1} (${c.role})`;
+    const prefix = selected ? "\u25b6 " : "  ";
+    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : "#889"}">${prefix}${esc(nameText)}</div>`;
+  }
+  html += `</div>`;
+
+  // WHAT column
+  const whatActive = focusCol === 1;
+  html += `<div style="flex:1;border:1px solid ${whatActive ? "#fa0" : "#333"};padding:8px;max-height:300px;overflow-y:auto">`;
+  html += `<div style="color:${whatActive ? "#fa0" : "#889"};font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px">WHAT HAPPENED?</div>`;
+  for (let i = 0; i < activities.length; i++) {
+    const a = activities[i];
+    const selected = whatActive && i === hubSceneWhatIdx;
+    const bg = selected ? "background:rgba(255,170,0,0.15)" : "";
+    const prefix = selected ? "\u25b6 " : "  ";
+    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : "#889"}">${prefix}${esc(a.label)}</div>`;
+  }
+  html += `</div>`;
+
+  // OUTCOME column
+  const outcomeActive = focusCol === 2;
+  html += `<div style="flex:1;border:1px solid ${outcomeActive ? "#f80" : "#333"};padding:8px;max-height:300px;overflow-y:auto">`;
+  html += `<div style="color:${outcomeActive ? "#f80" : "#889"};font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px">OUTCOME?</div>`;
+  for (let i = 0; i < outcomes.length; i++) {
+    const o = outcomes[i];
+    const selected = outcomeActive && i === hubSceneOutcomeIdx;
+    const bg = selected ? "background:rgba(255,136,0,0.15)" : "";
+    const prefix = selected ? "\u25b6 " : "  ";
+    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : "#889"}">${prefix}${esc(o.label)}</div>`;
+  }
+  html += `</div>`;
+
+  html += `</div>`; // end flex row
+
+  // Current selections summary
+  const selectedCrew = crew[hubSceneWhoIdx];
+  const selectedWhat = activities[hubSceneWhatIdx];
+  const selectedOutcome = outcomes[hubSceneOutcomeIdx];
+  const crewName = dossiers.find(d => d.crewId === selectedCrew?.id)?.confirmed.name
+    ? `${selectedCrew.firstName} ${selectedCrew.lastName}`
+    : `Crew #${hubSceneWhoIdx + 1}`;
+
+  html += `<div style="margin-top:12px;padding:8px;background:rgba(255,255,255,0.03);border:1px solid #333">`;
+  html += `<div style="color:#889;font-size:10px;letter-spacing:1px;margin-bottom:4px">YOUR ASSESSMENT</div>`;
+  html += `<div style="font-size:12px;color:#eef">WHO: <span style="color:#4cf">${esc(crewName)}</span> \u00B7 WHAT: <span style="color:#fa0">${esc(selectedWhat?.label ?? "?")}</span> \u00B7 OUTCOME: <span style="color:#f80">${esc(selectedOutcome?.label ?? "?")}</span></div>`;
+  html += `</div>`;
+
+  html += `<div style="color:#fa0;text-align:center;font-size:12px;margin-top:10px">[Enter] Submit assessment \u00B7 [\u2190/\u2192] Switch column \u00B7 [\u2191/\u2193] Select</div>`;
+
+  // Dev mode: show ground truth
+  if (devModeEnabled) {
+    const gt = scene.groundTruth;
+    const gtCrew = gt.who.map(id => crew.find(c => c.id === id)).filter(Boolean);
+    html += `<div style="border-top:1px solid #f0f;margin-top:8px;padding-top:4px;color:#f0f;font-size:10px">`;
+    html += `DEV TRUTH: WHO=${gtCrew.map(c => c!.firstName).join("+")} WHAT=${gt.what} OUTCOME=${gt.outcome}`;
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+/** Scene processing confirmation dialog. */
+function renderHubSceneConfirm(scene: RoomScene, crew: import("./shared/types.js").CrewMember[]): string {
+  const activities = [
+    { key: SceneActivity.EmergencyResponse, label: "Emergency Response" },
+    { key: SceneActivity.Fleeing, label: "Fleeing" },
+    { key: SceneActivity.Hiding, label: "Hiding" },
+    { key: SceneActivity.Sabotage, label: "Sabotage" },
+    { key: SceneActivity.MedicalTreatment, label: "Medical Treatment" },
+    { key: SceneActivity.RoutineWork, label: "Routine Work" },
+    { key: SceneActivity.Investigation, label: "Investigation" },
+    { key: SceneActivity.EquipmentRepair, label: "Equipment Repair" },
+    { key: SceneActivity.DataAccess, label: "Data Access" },
+    { key: SceneActivity.Confrontation, label: "Confrontation" },
+    { key: SceneActivity.Communication, label: "Communication" },
+    { key: SceneActivity.Barricading, label: "Barricading" },
+  ];
+  const outcomes = [
+    { key: SceneOutcome.LeftNormally, label: "Left Normally" },
+    { key: SceneOutcome.LeftInHurry, label: "Left In Hurry" },
+    { key: SceneOutcome.Injured, label: "Injured" },
+    { key: SceneOutcome.DiedHere, label: "Died Here" },
+    { key: SceneOutcome.StillHere, label: "Still Here" },
+    { key: SceneOutcome.SealedInside, label: "Sealed Inside" },
+    { key: SceneOutcome.Unknown, label: "Unknown" },
+  ];
+
+  const selectedCrew = crew[hubSceneWhoIdx];
+  const turnCost = scene.processAttempts === 0 ? 3 : scene.processAttempts === 1 ? 5 : scene.processAttempts === 2 ? 8 : 8 + (scene.processAttempts - 2) * 4;
+
+  let html = `<div style="padding:20px;text-align:center">`;
+  html += `<div style="color:#4cf;font-size:14px;margin-bottom:16px">PROCESS SCENE: ${esc(scene.roomName)}</div>`;
+  html += `<div style="color:#eef;font-size:13px;margin-bottom:8px">`;
+  html += `WHO: <span style="color:#4cf">${esc(selectedCrew?.firstName ?? "?")} ${esc(selectedCrew?.lastName ?? "")}</span><br>`;
+  html += `WHAT: <span style="color:#fa0">${esc(activities[hubSceneWhatIdx]?.label ?? "?")}</span><br>`;
+  html += `OUTCOME: <span style="color:#f80">${esc(outcomes[hubSceneOutcomeIdx]?.label ?? "?")}</span>`;
+  html += `</div>`;
+  html += `<div style="color:#ca8;font-size:12px;margin:12px 0">This will cost ${turnCost} turns.</div>`;
+  html += `<div style="color:#aaa;font-size:14px">[Y] Confirm  [N] Go back</div>`;
+  html += `</div>`;
+  return html;
+}
+
 /** WHAT WE KNOW section — auto-generated narrative prose. */
 function renderHubWhatWeKnow(): string {
   if (!state.mystery) return `<div style="padding:16px;color:#888">No mystery data available.</div>`;
@@ -4170,6 +4625,9 @@ function closeInvestigationHub(): void {
   }
   investigationHubOpen = false;
   hubDetailDeduction = null;
+  hubSceneDetail = null;
+  hubSceneSubView = "clues";
+  hubSceneConfirming = false;
   display.setHubMode?.(false);
   document.getElementById("game-container")?.classList.remove("hub-open");
   display.addLog("[Investigation Hub closed]", "system");
@@ -4257,20 +4715,30 @@ function handleHubInput(e: KeyboardEvent): void {
   }
 
   // Escape from detail views first
+  if (hubSceneDetail && e.key === "Escape") {
+    if (hubSceneSubView === "process") {
+      hubSceneSubView = "clues";
+    } else {
+      hubSceneDetail = null;
+    }
+    hubSceneConfirming = false;
+    renderInvestigationHub();
+    return;
+  }
   if (hubDetailDeduction && e.key === "Escape") {
     hubDetailDeduction = null;
     renderInvestigationHub();
     return;
   }
   // Close hub
-  if (e.key === "Escape" || (e.key === "r" && !hubDetailDeduction) || (e.key === "v" && hubSection === "evidence" && !hubDetailDeduction)) {
+  if (e.key === "Escape" || (e.key === "r" && !hubDetailDeduction && !hubSceneDetail) || (e.key === "v" && hubSection === "evidence" && !hubDetailDeduction)) {
     closeInvestigationHub();
     return;
   }
 
   // Tab cycles sections
-  if (e.key === "Tab" && !hubDetailDeduction) {
-    const tabs: Array<"evidence" | "connections" | "crew" | "whatweknow"> = ["evidence", "connections", "crew", "whatweknow"];
+  if (e.key === "Tab" && !hubDetailDeduction && !hubSceneDetail) {
+    const tabs: Array<"evidence" | "connections" | "crew" | "whatweknow" | "scenes"> = ["evidence", "scenes", "connections", "crew", "whatweknow"];
     const curIdx = tabs.indexOf(hubSection);
     hubSection = tabs[(curIdx + 1) % tabs.length];
     hubIdx = 0;
@@ -4282,6 +4750,8 @@ function handleHubInput(e: KeyboardEvent): void {
   // Section-specific input handling
   if (hubSection === "evidence") {
     handleHubEvidenceInput(e);
+  } else if (hubSection === "scenes") {
+    handleHubScenesInput(e);
   } else if (hubSection === "connections") {
     handleHubConnectionsInput(e);
   } else if (hubSection === "crew") {
@@ -4319,6 +4789,144 @@ function handleHubCrewInput(e: KeyboardEvent): void {
   if (e.key === "ArrowDown" || e.key === "s" || e.key === "j") {
     hubIdx = Math.min(maxIdx, hubIdx + 1);
     renderInvestigationHub();
+    return;
+  }
+}
+
+function handleHubScenesInput(e: KeyboardEvent): void {
+  const scenes = state.mystery?.roomScenes ?? [];
+  const crew = state.mystery?.crew ?? [];
+
+  // Scene confirm dialog
+  if (hubSceneConfirming) {
+    if (e.key === "y" || e.key === "Y") {
+      hubSceneConfirming = false;
+      // Submit the ProcessScene action
+      const scene = scenes.find(s => s.roomId === hubSceneDetail);
+      if (scene) {
+        const activities: SceneActivity[] = [
+          SceneActivity.EmergencyResponse, SceneActivity.Fleeing, SceneActivity.Hiding,
+          SceneActivity.Sabotage, SceneActivity.MedicalTreatment, SceneActivity.RoutineWork,
+          SceneActivity.Investigation, SceneActivity.EquipmentRepair, SceneActivity.DataAccess,
+          SceneActivity.Confrontation, SceneActivity.Communication, SceneActivity.Barricading,
+        ];
+        const outcomes: SceneOutcome[] = [
+          SceneOutcome.LeftNormally, SceneOutcome.LeftInHurry, SceneOutcome.Injured,
+          SceneOutcome.DiedHere, SceneOutcome.StillHere, SceneOutcome.SealedInside, SceneOutcome.Unknown,
+        ];
+        const selectedCrew = crew[hubSceneWhoIdx];
+        handleAction({
+          type: ActionType.ProcessScene,
+          sceneRoomId: scene.roomId,
+          whoAnswer: selectedCrew ? [selectedCrew.id] : [],
+          whatAnswer: activities[hubSceneWhatIdx] ?? SceneActivity.RoutineWork,
+          outcomeAnswer: outcomes[hubSceneOutcomeIdx] ?? SceneOutcome.Unknown,
+        });
+        // Exit process view after submission
+        hubSceneSubView = "clues";
+        hubSceneDetail = null;
+      }
+      renderInvestigationHub();
+      return;
+    }
+    if (e.key === "n" || e.key === "N" || e.key === "Escape") {
+      hubSceneConfirming = false;
+      renderInvestigationHub();
+      return;
+    }
+    return;
+  }
+
+  // Process sub-view (WHO/WHAT/OUTCOME selection)
+  if (hubSceneDetail && hubSceneSubView === "process") {
+    const focusCol = hubOptionIdx; // 0=WHO, 1=WHAT, 2=OUTCOME
+
+    // Left/Right switch columns
+    if (e.key === "ArrowLeft" || e.key === "a") {
+      hubOptionIdx = Math.max(0, hubOptionIdx - 1);
+      renderInvestigationHub();
+      return;
+    }
+    if (e.key === "ArrowRight" || e.key === "d") {
+      hubOptionIdx = Math.min(2, hubOptionIdx + 1);
+      renderInvestigationHub();
+      return;
+    }
+
+    // Up/Down within current column
+    if (e.key === "ArrowUp" || e.key === "w") {
+      if (focusCol === 0) hubSceneWhoIdx = Math.max(0, hubSceneWhoIdx - 1);
+      else if (focusCol === 1) hubSceneWhatIdx = Math.max(0, hubSceneWhatIdx - 1);
+      else hubSceneOutcomeIdx = Math.max(0, hubSceneOutcomeIdx - 1);
+      renderInvestigationHub();
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "s") {
+      if (focusCol === 0) hubSceneWhoIdx = Math.min(crew.length - 1, hubSceneWhoIdx + 1);
+      else if (focusCol === 1) hubSceneWhatIdx = Math.min(11, hubSceneWhatIdx + 1); // 12 activities
+      else hubSceneOutcomeIdx = Math.min(6, hubSceneOutcomeIdx + 1); // 7 outcomes
+      renderInvestigationHub();
+      return;
+    }
+
+    // Enter submits
+    if (e.key === "Enter") {
+      hubSceneConfirming = true;
+      renderInvestigationHub();
+      return;
+    }
+    return;
+  }
+
+  // Scene detail view (clue list)
+  if (hubSceneDetail) {
+    const scene = scenes.find(s => s.roomId === hubSceneDetail);
+    if (!scene) { hubSceneDetail = null; renderInvestigationHub(); return; }
+
+    if (e.key === "ArrowUp" || e.key === "w") {
+      hubIdx = Math.max(0, hubIdx - 1);
+      renderInvestigationHub();
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "s") {
+      hubIdx = Math.min(scene.physicalClues.length - 1, hubIdx + 1);
+      renderInvestigationHub();
+      return;
+    }
+    // 'p' enters process mode
+    if (e.key === "p" && !scene.processed && scene.physicalClues.some(c => c.examined)) {
+      hubSceneSubView = "process";
+      hubOptionIdx = 0; // start on WHO column
+      hubSceneWhoIdx = 0;
+      hubSceneWhatIdx = 0;
+      hubSceneOutcomeIdx = 0;
+      renderInvestigationHub();
+      return;
+    }
+    return;
+  }
+
+  // Scene list view
+  const maxIdx = scenes.length - 1;
+  if (e.key === "ArrowUp" || e.key === "w") {
+    hubIdx = Math.max(0, hubIdx - 1);
+    renderInvestigationHub();
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "s") {
+    hubIdx = Math.min(maxIdx, hubIdx + 1);
+    renderInvestigationHub();
+    return;
+  }
+  // Enter opens scene detail
+  if (e.key === "Enter") {
+    const scene = scenes[hubIdx];
+    if (scene) {
+      hubSceneDetail = scene.roomId;
+      hubSceneSubView = "clues";
+      hubIdx = 0;
+      renderInvestigationHub();
+    }
     return;
   }
 }
