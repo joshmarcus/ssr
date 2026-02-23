@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 125 (V240 completed — forceTags pipeline fix + bot timeline)
+- **Phase**: Sprint 128 (V243 completed — mystery UX polish + scene-deduction linking)
 - **Test status**: 380 tests passing across 29 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -13,7 +13,7 @@
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 1300, Normal: 1000, Hard: 700) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: All tested seeds VICTORY with 100% deduction success (184201, 42, 777, 100, 54321)
+- **Playtest results**: All tested seeds VICTORY with 100% deduction success (184201, 42, 777, 100, 54321). Seed 777 improved from 900→142 turns after scene-deduction linking.
 
 ## What Works
 
@@ -121,6 +121,26 @@
 ## Known Issues
 
 - No CI pipeline deployed
+
+## Sprint 126-128 Changes (V241-V243)
+
+### V243 — Wrong-Answer Feedback + Scene-Deduction Linking
+- **Wrong-answer narrative feedback**: Penalty details shown in log (-X HP, +Y turns), CORVUS-7 hint text displayed after wrong answer, final-attempt warning on last attempt
+- **Scene-deduction tag linking**: Processed scenes generate journal entries with deduction-relevant tags (crew last names, activity-derived tags like maintenance/forensic/signal, timeline tags for perfect scores)
+- **CORVUS-7 scene commentary**: Perfect 3/3 scene analysis triggers "CORVUS-7: Perfect analysis. [crew] was [activity] in [room]. This changes the picture."
+- **Impact**: Seed 777 playtest improved from 900 turns to 142 turns — scene processing now directly contributes to deduction tag coverage
+
+### V242 — Tag Transparency + Hub Navigation + Deduction Chain
+- **Tag transparency**: Locked deductions now show "Still needed: thermal analysis, maintenance records" instead of opaque "X/Y clues found"
+- **Investigation coverage in detail view**: Green pills for covered tags, grey pills for missing tags displayed before key evidence
+- **Hub tab shortcuts**: [1]-[4] number keys for direct EVIDENCE/SCENES/CONNECTIONS/CREW access, numbers displayed in tab labels
+- **Inter-tier deduction narrative**: Previous tier conclusion shown as "ESTABLISHED" context when viewing next deduction
+- **Next-tier bridge logs**: After solving a deduction, log hints at the next available question or suggests gathering more evidence
+
+### V241 — Contextual Hints + Penalty Warning + Progress HUD
+- **First-encounter hints**: Contextual system messages on first terminal read, first scene examine, first scene processing, and first deduction availability
+- **Deduction penalty warning**: Confirmation prompt now shows wrong-answer cost (3 HP + 10 turns), remaining attempts, final-attempt warning
+- **Scene progress in HUD**: Objective box now shows "Scenes: X/Y" alongside Evidence and Deduction progress counters
 
 ## Sprint 120-123 Changes (V236-V238)
 
