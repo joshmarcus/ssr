@@ -241,6 +241,8 @@ let pendingCrewDoor: { entityId: string; crewName: string } | null = null;
 let confirmingDeduction = false; // Y/N confirmation before locking in deduction answer
 let mapOpen = false;
 let helpOpen = false;
+let autoSaveFlashTimer = 0; // performance.now() timestamp of last auto-save (0 = no flash)
+let runStartTime = Date.now(); // real-time start of current run (for elapsed timer)
 let incidentCardOpen = false;
 let logReviewOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
@@ -1304,6 +1306,12 @@ function checkRoomEntry(): void {
       const tensionMsg = getTensionFlavor(state.turn, currentRoom.name);
       if (tensionMsg) display.addLog(tensionMsg, "narrative");
     }
+
+    // Auto-save on room transition (every room change, not just first visit)
+    if (!state.gameOver) {
+      saveGame(state);
+      autoSaveFlashTimer = performance.now();
+    }
   }
 }
 
@@ -1775,6 +1783,36 @@ function renderAll(): void {
   display.render(state);
   display.renderHUD(state, visitedRoomIds);
 
+  // Auto-save flash indicator
+  if (autoSaveFlashTimer > 0) {
+    const elapsed = performance.now() - autoSaveFlashTimer;
+    if (elapsed < 1500) {
+      let saveEl = document.getElementById("autosave-flash");
+      if (!saveEl) {
+        saveEl = document.createElement("div");
+        saveEl.id = "autosave-flash";
+        saveEl.style.cssText = "position:fixed;top:8px;right:8px;color:rgba(0,255,180,0.7);font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;z-index:50;pointer-events:none;transition:opacity 0.5s";
+        document.body.appendChild(saveEl);
+      }
+      saveEl.textContent = "SAVED";
+      saveEl.style.opacity = elapsed < 1000 ? "1" : String(1 - (elapsed - 1000) / 500);
+    } else {
+      autoSaveFlashTimer = 0;
+      const saveEl = document.getElementById("autosave-flash");
+      if (saveEl) saveEl.style.opacity = "0";
+    }
+  }
+
+  // Elapsed time indicator in HUD status bar
+  const hudStatus = document.getElementById("hud-status");
+  if (hudStatus && !state.gameOver) {
+    const elapsedMs = Date.now() - runStartTime;
+    const mins = Math.floor(elapsedMs / 60000);
+    const secs = Math.floor((elapsedMs % 60000) / 1000);
+    const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`;
+    hudStatus.innerHTML += ` <span style="color:#334;font-size:10px">${timeStr}</span>`;
+  }
+
   // Update investigation aura: pass evidence room data to 3D renderer
   if (state.mystery && (display as any).setInvestigationRooms) {
     const journal = state.mystery.journal;
@@ -1843,6 +1881,7 @@ function resetGameState(newSeed: number): void {
   // Persist seed so next "New Game" increments from here
   try { localStorage.setItem(LAST_SEED_KEY, String(seed)); } catch { /* ignore */ }
   state = generate(seed, difficulty);
+  runStartTime = Date.now();
   lastPlayerRoomId = "";
   visitedRoomIds.clear();
   journalOpen = false;
@@ -1888,6 +1927,7 @@ function resetGameState(newSeed: number): void {
   echoedRooms.clear();
   mapOpen = false;
   helpOpen = false;
+  autoSaveFlashTimer = 0;
   incidentCardOpen = false;
   logReviewOpen = false;
   activeDeduction = null;
@@ -3113,7 +3153,21 @@ function handleAction(action: Action): void {
     }
     flickerThenRender();
     // Show full-screen game-over overlay after the flicker
-    setTimeout(() => { display.showGameOverOverlay(state); }, 400);
+    const runElapsedMs = Date.now() - runStartTime;
+    setTimeout(() => {
+      display.showGameOverOverlay(state);
+      // Inject elapsed time into game-over stats
+      const turnsStat = document.querySelector(".gameover-stats .gameover-stat");
+      if (turnsStat) {
+        const mins = Math.floor(runElapsedMs / 60000);
+        const secs = Math.floor((runElapsedMs % 60000) / 1000);
+        const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`;
+        const timeEl = document.createElement("div");
+        timeEl.className = "gameover-stat";
+        timeEl.innerHTML = `<span class="stat-label">Time:</span> <span class="stat-value">${timeStr}</span>`;
+        turnsStat.insertAdjacentElement("afterend", timeEl);
+      }
+    }, 400);
     return;
   }
 
