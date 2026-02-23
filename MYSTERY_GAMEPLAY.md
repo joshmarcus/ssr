@@ -1,6 +1,8 @@
 # Mystery Gameplay Redesign — "Station Autopsy"
 
 > **Status**: FINAL v2 — Integrated feedback from Game Design Lead, Mystery Writer, and UX Creative Designer. Ready for implementation.
+>
+> **Implementation progress**: See [`MYSTERY_GAMEPLAY_STATUS.md`](./MYSTERY_GAMEPLAY_STATUS.md) for sprint-by-sprint status. This document is the master design reference — edit intentionally, don't lose the vision.
 
 ## The Central Question
 
