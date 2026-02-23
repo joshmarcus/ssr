@@ -4990,11 +4990,39 @@ function renderInvestigationHub(): void {
   if (crackMoment) progressHtml += `<span style="color:#fa0;font-weight:bold">[BREACH]</span>`;
   progressHtml += `</div>`;
 
+  // CORVUS-7 contextual recommendation
+  let corvusRec = "";
+  const unlockedDeductions = deductions.filter(d => !d.solved);
+  const unprocessedScenes = scenes.filter(s => !s.processed && s.physicalClues.some(c => c.examined));
+  const readyDeductions = unlockedDeductions.filter(d => {
+    const threshold = d.evidenceThreshold ?? 1;
+    return journal.length >= threshold;
+  });
+  if (entries.length < 3) {
+    corvusRec = "Explore rooms and interact with terminals to collect evidence.";
+  } else if (unprocessedScenes.length > 0 && processedScenes === 0) {
+    corvusRec = `${unprocessedScenes.length} scene${unprocessedScenes.length > 1 ? "s" : ""} ready to process. Open SCENES tab to analyze what happened.`;
+  } else if (readyDeductions.length > 0 && deductionsSolved === 0) {
+    corvusRec = `${readyDeductions.length} deduction${readyDeductions.length > 1 ? "s" : ""} available. Open CONNECTIONS to answer.`;
+  } else if (crewIds < crewTotal && entries.length >= 6) {
+    corvusRec = `${crewTotal - crewIds} crew unidentified. Look for badges and personal effects.`;
+  } else if (unprocessedScenes.length > 0) {
+    corvusRec = `${unprocessedScenes.length} scene${unprocessedScenes.length > 1 ? "s" : ""} with examined clues ready for processing.`;
+  } else if (readyDeductions.length > 0) {
+    corvusRec = `${readyDeductions.length} deduction${readyDeductions.length > 1 ? "s" : ""} ready to answer. Check CONNECTIONS.`;
+  } else if (deductionsSolved === deductions.length && deductions.length > 0) {
+    corvusRec = "All deductions answered. Prepare for evacuation.";
+  } else {
+    corvusRec = "Continue exploring to gather more evidence.";
+  }
+  const corvusHtml = `<div style="padding:2px 8px;font-size:10px;color:#6a8;border-bottom:1px solid #1a1a1a;font-style:italic">CORVUS-7: ${corvusRec}</div>`;
+
   overlay.innerHTML = `
     <div class="broadcast-box">
       <div class="broadcast-title">\u2550\u2550\u2550 INVESTIGATION HUB \u2550\u2550\u2550${devModeEnabled ? ' <span style="color:#f0f;font-size:11px">[DEV]</span>' : ''}</div>
       <div class="journal-tabs" style="display:flex;gap:4px;padding:4px 8px;border-bottom:1px solid #333">${tabsHtml}</div>
       ${progressHtml}
+      ${corvusHtml}
       ${bodyHtml}
       <div class="broadcast-controls">${controlsText}</div>
     </div>`;
@@ -5931,8 +5959,27 @@ function renderSceneListItem(s: RoomScene, idx: number, selected: boolean, isRea
     html += `<span style="color:${statusColor};font-size:9px;font-weight:bold;letter-spacing:1px">${statusLabel}</span>`;
   }
   html += `</div>`;
+  // Timeline phase indicator
+  const phaseNames: Record<string, string> = {
+    normal_ops: "Normal Ops", trigger: "Trigger", escalation: "Escalation",
+    collapse: "Collapse", aftermath: "Aftermath",
+  };
+  const phaseColors: Record<string, string> = {
+    normal_ops: "#6a8", trigger: "#fa0", escalation: "#f80",
+    collapse: "#f44", aftermath: "#88f",
+  };
+  let phaseTag = "";
+  if (s.processed && s.crewPresent.length > 0) {
+    const phase = s.crewPresent[0].phase;
+    const pName = phaseNames[phase] ?? phase;
+    const pColor = phaseColors[phase] ?? "#667";
+    phaseTag = ` · <span style="color:${pColor}">${esc(pName)}</span>`;
+  } else if (!s.processed) {
+    phaseTag = ` · <span style="color:#444">Phase: ???</span>`;
+  }
+
   html += `<div style="font-size:10px;color:#667">`;
-  html += `Clues: ${examined}/${total}${sensorGated > 0 ? ` (+${sensorGated} sensor)` : ""}`;
+  html += `Clues: ${examined}/${total}${sensorGated > 0 ? ` (+${sensorGated} sensor)` : ""}${phaseTag}`;
   html += `</div></div>`;
   return html;
 }
@@ -6012,8 +6059,19 @@ function renderHubScenes(): string {
     listHtml += `</div>`;
   }
 
-  // Incident board summary
+  // Incident board summary — with scene-per-phase counts
   const board = state.mystery?.incidentBoard;
+  // Count processed scenes per timeline phase
+  const scenesPerPhase = new Map<string, { total: number; processed: number }>();
+  for (const s of scenes) {
+    if (s.crewPresent.length > 0) {
+      const phase = s.crewPresent[0].phase;
+      const entry = scenesPerPhase.get(phase) ?? { total: 0, processed: 0 };
+      entry.total++;
+      if (s.processed) entry.processed++;
+      scenesPerPhase.set(phase, entry);
+    }
+  }
   if (board) {
     listHtml += `<div style="padding:6px 10px;border-bottom:1px solid #333;margin-bottom:4px">`;
     listHtml += `<div style="color:#fa0;font-size:10px;letter-spacing:1.5px">INCIDENT TIMELINE</div>`;
@@ -6028,7 +6086,9 @@ function renderHubScenes(): string {
       else if (slot.status === "proposed") { icon = "?"; color = "#fa0"; }
       else if (slot.status === "unlocked") { icon = "\u25cb"; color = "#ca8"; }
       else { icon = "\u25cb"; color = "#555"; }
-      listHtml += `<div style="font-size:11px;padding:2px 0"><span style="color:${color}">[${icon}]</span> <span style="color:${slot.status === "confirmed" ? "#bbc" : "#667"}">${esc(label)}</span>`;
+      const phaseScenes = scenesPerPhase.get(slot.phase);
+      const sceneCount = phaseScenes ? ` <span style="color:#556;font-size:9px">(${phaseScenes.processed}/${phaseScenes.total} scenes)</span>` : "";
+      listHtml += `<div style="font-size:11px;padding:2px 0"><span style="color:${color}">[${icon}]</span> <span style="color:${slot.status === "confirmed" ? "#bbc" : "#667"}">${esc(label)}</span>${sceneCount}`;
       if (slot.status === "confirmed" && slot.confirmedCard) {
         listHtml += ` <span style="color:#4a4;font-size:10px">— ${esc(slot.confirmedCard.event.slice(0, 30))}</span>`;
       }
