@@ -2501,6 +2501,33 @@ export class BrowserDisplay3D implements IGameDisplay {
       autopsyHtml += `</div>`;
     }
 
+    // Deduction retrospective
+    let retroHtml = "";
+    if (deductions.length > 0) {
+      retroHtml += `<div style="border-top:1px solid #333;margin:6px 0;padding-top:6px">`;
+      retroHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;text-align:center;margin-bottom:4px">DEDUCTION RETROSPECTIVE</div>`;
+      for (const d of deductions) {
+        const correctOpt = d.options.find(o => o.correct);
+        const correctLabel = correctOpt?.label ?? "—";
+        if (!d.solved) {
+          retroHtml += `<div style="font-size:10px;color:#556;margin:2px 0;font-family:monospace">` +
+            `<span style="color:#556">?</span> ${d.question.slice(0, 50)}${d.question.length > 50 ? "…" : ""} ` +
+            `<span style="color:#556">[unanswered]</span> ` +
+            `<span style="color:#888">Answer: ${correctLabel}</span></div>`;
+        } else if (d.answeredCorrectly) {
+          retroHtml += `<div style="font-size:10px;color:#0c0;margin:2px 0;font-family:monospace">` +
+            `<span style="color:#0f0">✓</span> ${d.question.slice(0, 50)}${d.question.length > 50 ? "…" : ""} ` +
+            `<span style="color:#0c0">${correctLabel}</span></div>`;
+        } else {
+          retroHtml += `<div style="font-size:10px;color:#f66;margin:2px 0;font-family:monospace">` +
+            `<span style="color:#f44">✗</span> ${d.question.slice(0, 50)}${d.question.length > 50 ? "…" : ""} ` +
+            `<span style="color:#f66">[wrong]</span> ` +
+            `<span style="color:#888">Answer: ${correctLabel}</span></div>`;
+        }
+      }
+      retroHtml += `</div>`;
+    }
+
     // Run history
     const runHistoryHtml = this.renderRunHistory(state.seed);
 
@@ -2524,8 +2551,9 @@ export class BrowserDisplay3D implements IGameDisplay {
           ${choicesHtml}
         </div>
         ${autopsyHtml}
+        ${retroHtml}
         ${runHistoryHtml}
-        <div class="gameover-restart">Press [R] to restart</div>
+        <div class="gameover-restart">[R] Replay · [N] New Game · [C] Copy Summary</div>
       </div>`;
     overlay.classList.add("active");
   }

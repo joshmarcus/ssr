@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 133 (V248 completed — pause menu + seed display + save/load tests)
+- **Phase**: Sprint 136 (V251 completed — game-over retrospective + save/load UI)
 - **Test status**: 394 tests passing across 30 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -125,6 +125,21 @@
 
 - No CI pipeline deployed
 - Seed 42: Bot takes 900 turns (rescue-blocked crew require emergency override at turn 900 to transmit data core)
+
+## Sprint 134-136 Changes (V249-V251)
+
+### V251 — Game-Over Deduction Retrospective
+- **Deduction retrospective**: Game-over screen now shows each deduction question with correct answer. Green checkmark for correct, red X for wrong (with correct answer revealed), grey ? for unanswered.
+- **Improved game-over hints**: Restart prompt updated from "[R] to restart" to "[R] Replay · [N] New Game · [C] Copy Summary"
+
+### V250 — Save/Load UI Integration
+- **Pause menu save/load**: Pause menu expanded to Resume/Save Game/Load Game/Help/New Game. Save Game triggers immediate save with confirmation flash. Load Game loads last save (greyed out when no save exists). Navigation skips disabled items.
+- **Title screen continue**: When a save exists, game shows Continue/New Game title screen instead of going directly to the opening crawl. Continue loads the save, New Game deletes save and starts fresh.
+
+### V249 — Audio Controls
+- **Audio mute [F8]**: Toggle mute/unmute with log feedback
+- **Volume control [F9/F10]**: 25% step volume adjustment with visual bar feedback, localStorage persistence
+- **Help overlay updated**: F8/F9/F10 audio controls added to help overlay
 
 ## Sprint 132-133 Changes (V247-V248)
 
