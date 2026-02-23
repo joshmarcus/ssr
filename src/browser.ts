@@ -1178,6 +1178,26 @@ function checkRoomEntry(): void {
         if (fragment) display.addLog(fragment, "narrative");
       }
 
+      // Scene atmosphere hint — first impression of what happened in this room
+      if (state.mystery?.roomScenes) {
+        const scene = state.mystery.roomScenes.find(s => s.roomId === currentRoom.id);
+        if (scene && !scene.processed) {
+          const outcomeHints: Record<string, string> = {
+            left_normally: "Everything seems orderly, but something doesn't add up.",
+            left_in_hurry: "Signs of a hasty departure. Personal items scattered, drawers left open.",
+            injured: "Traces of a struggle. Someone was hurt here.",
+            died_here: "A heavy silence hangs in the air. Something terrible happened here.",
+            still_here: "The room feels occupied. Someone might still be nearby.",
+            sealed_inside: "The room has been sealed from the inside. Barricade marks on the door frame.",
+            unknown: "The room tells a story, but the details are unclear.",
+          };
+          const hint = outcomeHints[scene.groundTruth.outcome] ?? outcomeHints.unknown;
+          display.addLog(hint, "narrative");
+          const clueCount = scene.physicalClues.length;
+          display.addLog(`[X] Examine scene (${clueCount} clue${clueCount !== 1 ? "s" : ""} to find)`, "system");
+        }
+      }
+
       // List notable entities in the room
       const roomEntities: string[] = [];
       for (const [id, ent] of state.entities) {
