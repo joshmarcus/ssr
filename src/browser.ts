@@ -4488,7 +4488,16 @@ function showIncidentCard(): void {
         <div style="margin-bottom:8px">
           <div style="color:#4af;font-weight:bold;margin-bottom:6px">\u2500\u2500 NARRATIVE THREADS \u2500\u2500</div>
           ${mystery.threads.length > 0
-            ? mystery.threads.map(t => `<div style="color:#a8a"><span style="color:#fa0">\u25b6</span> ${esc(t.name)}</div>`).join("")
+            ? mystery.threads.map(t => {
+                const journalIds = new Set(mystery.journal.map(j => j.id));
+                const found = t.entries.filter(id => journalIds.has(id)).length;
+                const total = t.entries.length;
+                const pct = total > 0 ? Math.round((found / total) * 100) : 0;
+                const done = found >= total && total > 0;
+                const barColor = done ? "#4f4" : pct >= 50 ? "#fa0" : "#6cf";
+                const icon = done ? `<span style="color:#4f4">\u2713</span>` : `<span style="color:#fa0">\u25b6</span>`;
+                return `<div style="color:#a8a;margin:2px 0;display:flex;align-items:center;gap:6px">${icon} <span style="flex:1">${esc(t.name)}</span> <span style="color:#667;font-size:10px">${found}/${total}</span> <div style="width:40px;height:3px;background:#222;border-radius:2px"><div style="width:${pct}%;height:100%;background:${barColor};border-radius:2px"></div></div></div>`;
+              }).join("")
             : `<div style="color:#555">No threads discovered yet.</div>`}
         </div>
       </div>
@@ -5248,6 +5257,10 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
     { key: "by_thread", label: "THREADS" },
     { key: "unread", label: "UNREAD" },
   ];
+  const unreadCount = entries.filter(e => !hubViewedEvidenceIds.has(e.id)).length;
+  if (unreadCount > 0) {
+    filters[filters.length - 1].label = `UNREAD (${unreadCount})`;
+  }
   let filterHtml = `<div style="display:flex;gap:6px;padding:4px 8px;border-bottom:1px solid #333;font-size:11px">`;
   filterHtml += `<span style="color:#888;margin-right:2px">[f]</span>`;
   for (const f of filters) {
@@ -5280,6 +5293,10 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
     if (mark === "contradicting") return ` <span style="color:#f44;font-size:8px;background:rgba(255,68,68,0.1);padding:0 3px;border-radius:2px">\u26A0 CONTRADICTS</span>`;
     return ` <span style="color:#4cf;font-size:8px;background:rgba(68,200,255,0.1);padding:0 3px;border-radius:2px">OFFICIAL</span>`;
   };
+  const newBadgeMark = (id: string) => {
+    if (readIds.has(id)) return "";
+    return ` <span style="color:#0f0;font-size:8px;background:rgba(0,255,0,0.1);padding:0 3px;border-radius:2px">NEW</span>`;
+  };
 
   let listHtml = "";
   if (hubEvidenceFilter === "by_room") {
@@ -5295,7 +5312,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
       listHtml += `<div style="color:#8af;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">${esc(room)} (${roomEntries.length})</div>`;
       for (const e of roomEntries) {
         const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
-        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span></div></div>`;
+        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}${newBadgeMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span></div></div>`;
         flatIdx++;
       }
     }
@@ -5314,7 +5331,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
       listHtml += `<div style="color:#fa8;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">${label} (${catEntries.length})</div>`;
       for (const e of catEntries) {
         const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
-        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}${newBadgeMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
         flatIdx++;
       }
     }
@@ -5343,7 +5360,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
         const foundEntries = entries.filter(e => threadEntries.includes(e.id));
         for (const e of foundEntries) {
           const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
-          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}${newBadgeMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
           flatIdx++;
         }
       }
@@ -5354,7 +5371,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
         listHtml += `<div style="color:#556;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">Unthreaded (${unthreaded.length})</div>`;
         for (const e of unthreaded) {
           const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
-          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}${newBadgeMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
           flatIdx++;
         }
       }
@@ -5368,7 +5385,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
       for (let i = 0; i < unread.length; i++) {
         const e = unread[i];
         const cls = i === hubIdx ? "journal-entry selected" : "journal-entry";
-        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}${newBadgeMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
       }
     }
   } else {
@@ -5376,7 +5393,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i];
       const cls = i === hubIdx ? "journal-entry selected" : "journal-entry";
-      listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+      listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}${newBadgeMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
     }
   }
 
@@ -5746,19 +5763,38 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
     }
   }
 
+  // ── Pulse animation for ready deductions ──
+  html += `<style>@keyframes deductionPulse{0%,100%{border-color:rgba(255,170,0,0.3);box-shadow:0 0 0 rgba(255,170,0,0)}50%{border-color:rgba(255,170,0,0.7);box-shadow:0 0 8px rgba(255,170,0,0.15)}}</style>`;
+
   // ── Currently unlocked deduction(s) — THE MAIN EVENT ──
   let flatIdx = 0;
   for (const d of unlocked) {
     const isActive = flatIdx === hubIdx;
 
-    html += `<div class="deduction-card unlocked-card${isActive ? " active-card" : ""}" style="margin-bottom:8px;padding:10px 12px;border:1px solid rgba(255,170,0,0.4);border-radius:4px;background:rgba(255,170,0,0.05)">`;
+    // Evidence readiness: compare journal count to threshold
+    const evCount = journal.length;
+    const threshold = d.evidenceThreshold ?? 1;
+    const evRatio = threshold > 0 ? Math.min(evCount / threshold, 2) : 1;
+    const readyLabel = evRatio >= 1.5 ? "STRONG" : evRatio >= 1.0 ? "READY" : "GATHERING";
+    const readyColor = evRatio >= 1.5 ? "#4f8" : evRatio >= 1.0 ? "#fa0" : "#889";
+
+    html += `<div class="deduction-card unlocked-card${isActive ? " active-card" : ""}" style="margin-bottom:8px;padding:10px 12px;border:1px solid rgba(255,170,0,0.4);border-radius:4px;background:rgba(255,170,0,0.05);animation:deductionPulse 2.5s ease-in-out infinite">`;
     html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">`;
     html += `<span style="color:#fa0;font-size:18px">\u25C7</span>`;
-    html += `<span style="color:#fa0;font-weight:bold;font-size:14px">${esc(d.question)}</span>`;
+    html += `<span style="color:#fa0;font-weight:bold;font-size:14px;flex:1">${esc(d.question)}</span>`;
+    html += `<span style="color:${readyColor};font-size:9px;letter-spacing:1px;border:1px solid ${readyColor};padding:1px 5px;border-radius:2px">${readyLabel}</span>`;
     html += `</div>`;
     if (d.hintText) {
       html += `<div style="color:#6cf;font-size:12px;padding:2px 0 2px 26px;margin-bottom:4px">\u2139 ${esc(d.hintText)}</div>`;
     }
+    // Evidence depth bar
+    const barPct = Math.min(Math.round(evRatio * 50), 100); // 2x threshold = full bar
+    const barColor = evRatio >= 1.5 ? "#4f8" : evRatio >= 1.0 ? "#fa0" : "#6cf";
+    html += `<div style="padding-left:26px;margin-bottom:4px">`;
+    html += `<div style="display:flex;align-items:center;gap:6px">`;
+    html += `<span style="color:#667;font-size:10px">Evidence: ${evCount} entries</span>`;
+    html += `<div style="flex:1;max-width:80px;background:#222;height:3px;border-radius:2px"><div style="width:${barPct}%;height:100%;background:${barColor};border-radius:2px"></div></div>`;
+    html += `</div></div>`;
     if ((d.wrongAttempts ?? 0) > 0) {
       const attemptsLeft = (d.maxAttempts ?? 2) - (d.wrongAttempts ?? 0);
       html += `<div style="color:#f44;font-size:11px;padding-left:26px">\u26a0 ${attemptsLeft} attempt${attemptsLeft !== 1 ? "s" : ""} remaining (wrong answer costs 3 HP + 10 turns)</div>`;
@@ -6490,6 +6526,26 @@ function renderHubAnalysis(): string {
     html += `<div style="margin-bottom:12px"></div>`;
   }
 
+  // Narrative threads progress
+  const threads = mystery.threads ?? [];
+  if (threads.length > 0) {
+    const journalIds = new Set(mystery.journal.map(j => j.id));
+    const completedThreads = threads.filter(t => t.entries.every(id => journalIds.has(id)));
+    html += `<div style="color:#8af;font-size:10px;letter-spacing:1.5px;margin-bottom:6px">NARRATIVE THREADS (${completedThreads.length}/${threads.length} complete)</div>`;
+    for (const t of threads) {
+      const found = t.entries.filter(id => journalIds.has(id)).length;
+      const total = t.entries.length;
+      const pct = total > 0 ? Math.round((found / total) * 100) : 0;
+      const done = found >= total && total > 0;
+      const barColor = done ? "#4f4" : pct >= 50 ? "#fa0" : "#448";
+      const icon = done ? `<span style="color:#4f4">\u2713</span>` : `<span style="color:#667">\u25cb</span>`;
+      html += `<div style="font-size:11px;padding:2px 10px;display:flex;align-items:center;gap:6px">${icon} <span style="color:${done ? "#8af" : "#889"};flex:1">${esc(t.name)}</span>`;
+      html += `<div style="width:50px;height:3px;background:#222;border-radius:2px"><div style="width:${pct}%;height:100%;background:${barColor};border-radius:2px"></div></div>`;
+      html += `<span style="color:#556;font-size:9px;min-width:30px;text-align:right">${found}/${total}</span></div>`;
+    }
+    html += `<div style="margin-bottom:12px"></div>`;
+  }
+
   // Unresolved questions
   const unsolved = deductions.filter(d => !d.solved);
   if (unsolved.length > 0) {
@@ -6633,6 +6689,16 @@ function renderHubScenes(): string {
     const wrongAnswers = (whoCorrect ? 0 : 1) + (whatCorrect ? 0 : 1) + (outcomeCorrect ? 0 : 1);
     if (wrongAnswers > 0) {
       listHtml += `<div style="color:#f66;font-size:10px;text-align:center;margin-top:4px">-${wrongAnswers * 2} HP penalty (${wrongAnswers} wrong)</div>`;
+    }
+    // Show next processable scene hint
+    const nextReady = scenes.find(s => !s.processed && s.physicalClues.some(c => c.examined));
+    if (nextReady) {
+      listHtml += `<div style="color:#fa0;font-size:10px;text-align:center;margin-top:6px;border-top:1px solid #333;padding-top:4px">\u25B6 Next: ${esc(nextReady.roomName)} \u2014 [Enter] to open</div>`;
+    } else {
+      const unvisited = scenes.filter(s => !s.processed && s.physicalClues.every(c => !c.examined));
+      if (unvisited.length > 0) {
+        listHtml += `<div style="color:#667;font-size:10px;text-align:center;margin-top:6px;border-top:1px solid #333;padding-top:4px">${unvisited.length} scene${unvisited.length !== 1 ? "s" : ""} still unexplored</div>`;
+      }
     }
     listHtml += `</div>`;
   } else if (hubSceneResult) {
@@ -7652,6 +7718,13 @@ function handleHubScenesInput(e: KeyboardEvent): void {
         // Exit process view after submission
         hubSceneSubView = "clues";
         hubSceneDetail = null;
+        // Auto-advance: find next unprocessed scene with examined clues
+        const updatedScenes = state.mystery?.roomScenes ?? [];
+        const nextProcessable = updatedScenes.findIndex(s =>
+          !s.processed && s.physicalClues.some(c => c.examined));
+        if (nextProcessable >= 0) {
+          hubIdx = nextProcessable;
+        }
       }
       renderInvestigationHub();
       return;
