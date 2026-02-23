@@ -1078,18 +1078,37 @@ function enablePostCrackTint(): void {
 }
 
 /** Trigger Contradiction Found visual event — two pieces of evidence clash. */
-function triggerContradictionFound(officialText: string, realText: string): void {
+function triggerContradictionFound(officialText: string, realText: string, officialRoom?: string, realRoom?: string): void {
   display.triggerScreenFlash("damage");
+
+  // Build enhanced comparison with room labels
+  const officialLabel = officialRoom ? `OFFICIAL RECORD [${officialRoom}]` : "OFFICIAL RECORD";
+  const realLabel = realRoom ? `CONTRADICTING EVIDENCE [${realRoom}]` : "CONTRADICTING EVIDENCE";
+
+  // CORVUS-7 analysis
+  const analysisLines = [
+    "CORVUS-7: The official account doesn't match the physical evidence.",
+    "CORVUS-7: Someone's record is wrong. Possibly deliberately.",
+    "CORVUS-7: Two versions of the same event. Only one can be true.",
+    "CORVUS-7: This contradiction may be the key to understanding what really happened.",
+  ];
+  const analysisText = analysisLines[prevRevealedContradictions % analysisLines.length];
+
   showDiscoveryOverlay({
     title: "CONTRADICTION DETECTED",
-    subtitle: "Two pieces of evidence tell different stories.",
+    subtitle: `${officialLabel} vs ${realLabel}`,
     body: officialText,
     bodyB: realText,
     color: "#ff4444",
     bgColor: "rgba(20, 0, 0, 0.92)",
-    duration: 15000,
+    duration: 18000,
     glitch: true,
   });
+  // Delayed CORVUS-7 analysis log
+  setTimeout(() => {
+    display.addLog(analysisText, "warning");
+    display.addLog("Check the ANALYSIS tab in the Hub for contradiction details.", "system");
+  }, 2000);
 }
 
 /** Trigger Timeline Slot Confirmed visual event. */
@@ -1139,6 +1158,8 @@ function checkDiscoveryMoments(): void {
       triggerContradictionFound(
         newlyRevealed.official.text,
         newlyRevealed.contradicting.text,
+        newlyRevealed.official.roomHint,
+        newlyRevealed.contradicting.roomHint,
       );
     }
   }
@@ -6533,7 +6554,11 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
       }
       if (theories.fate) {
         if (detFateRevealed) {
-          detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Fate theory: <span style="color:#bbc">${theories.fate.replace(/_/g, " ")}</span></div>`;
+          const fateColors: Record<string, string> = { dead: "#f44", missing: "#fa0", survived: "#4f4", escaped: "#4cf", in_cryo: "#88f" };
+          const fateColor = fateColors[theories.fate] ?? "#bbc";
+          const fateBorders: Record<string, string> = { dead: "border-left:3px solid #f44", survived: "border-left:3px solid #4f4", escaped: "border-left:3px solid #4cf", in_cryo: "border-left:3px solid #88f", missing: "border-left:3px solid #fa0" };
+          const fateBorder = fateBorders[theories.fate] ?? "";
+          detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px;padding-left:6px;${fateBorder}">Fate: <span style="color:${fateColor};font-weight:bold">${theories.fate.replace(/_/g, " ").toUpperCase()}</span></div>`;
         } else if (detFateTier >= 2) {
           detailHtml += `<div style="color:#556;font-size:11px;margin-bottom:3px">Fate theory: <span style="color:#667">UNCONFIRMED — need more investigation</span></div>`;
         } else {
@@ -8088,8 +8113,27 @@ function handleHubScenesInput(e: KeyboardEvent): void {
         // Investigation ceremony: trigger ghost reveal for correctly identified crew
         if (whoCorrect && selectedCrew) {
           display.triggerGhostReveal?.(selectedCrew.id);
-          const fateHint = outcomeCorrect ? ` Their fate: ${hubSceneResult!.correctOutcome.toLowerCase()}.` : "";
-          display.addLog(`Memory unlocked: ${selectedCrew.firstName} ${selectedCrew.lastName}'s presence confirmed in ${scene.roomName}.${fateHint}`, "milestone");
+          const crewFullName = `${selectedCrew.firstName} ${selectedCrew.lastName}`;
+          if (outcomeCorrect) {
+            // Fate narrative beats — dramatic text based on outcome
+            const fateBeats: Record<string, { text: string; type: LogType }> = {
+              died_here: { text: `${crewFullName} died in ${scene.roomName}. The evidence tells the story of their final moments.`, type: "critical" },
+              injured: { text: `${crewFullName} was injured here. Blood traces and disturbed equipment mark the scene.`, type: "warning" },
+              left_in_hurry: { text: `${crewFullName} fled ${scene.roomName} in a panic. Their belongings remain scattered.`, type: "narrative" },
+              sealed_inside: { text: `${crewFullName} sealed themselves inside. A desperate choice — barricade marks on every exit.`, type: "warning" },
+              still_here: { text: `${crewFullName} never left this room. They may still be nearby.`, type: "milestone" },
+              left_normally: { text: `${crewFullName} left ${scene.roomName} in orderly fashion. Whatever happened, they saw it coming.`, type: "narrative" },
+            };
+            const beat = fateBeats[gt.outcome];
+            if (beat) {
+              display.addLog(beat.text, beat.type);
+              display.triggerScreenFlash(gt.outcome === "died_here" ? "damage" : "milestone");
+            } else {
+              display.addLog(`Memory unlocked: ${crewFullName}'s presence confirmed in ${scene.roomName}.`, "milestone");
+            }
+          } else {
+            display.addLog(`Memory unlocked: ${crewFullName}'s presence confirmed in ${scene.roomName}.`, "milestone");
+          }
         }
         // Update investigation momentum based on scene score
         if (score >= 3) updateMomentum(8);        // Perfect scene

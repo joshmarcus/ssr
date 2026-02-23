@@ -3244,6 +3244,21 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
 
           next = fireMilestone(next, "first_crew_evacuated");
 
+          // Update dossier fate for evacuated crew
+          if (next.mystery?.dossiers) {
+            const newDossiers = [...next.mystery.dossiers];
+            for (const evacId of newEvacuated) {
+              const dIdx = newDossiers.findIndex(d => d.crewId === evacId);
+              if (dIdx >= 0) {
+                newDossiers[dIdx] = {
+                  ...newDossiers[dIdx],
+                  theories: { ...newDossiers[dIdx].theories, fate: CrewFate.Escaped },
+                };
+              }
+            }
+            next = { ...next, mystery: { ...next.mystery, dossiers: newDossiers } };
+          }
+
           // CORVUS-7 archetype farewell when all crew are safe
           if (remaining === 0 && !next.milestones.has("corvus_evac_farewell")) {
             const evacArchetype = next.mystery?.timeline?.archetype;
@@ -5943,11 +5958,29 @@ export function step(state: GameState, action: Action): GameState {
         for (const crewId of whoAnswer) {
           const dossierIdx = next.mystery!.dossiers!.findIndex(d => d.crewId === crewId);
           if (dossierIdx >= 0) {
-            const updatedDossier = updateTheoriesFromScene(
+            let updatedDossier = updateTheoriesFromScene(
               next.mystery!.dossiers![dossierIdx],
               targetScene.roomName,
               targetScene.groundTruth.what,
             );
+            // Derive fate from correct outcome
+            if (result.outcomeCorrect) {
+              const outcomeFateMap: Record<string, CrewFate> = {
+                [SceneOutcome.DiedHere]: CrewFate.Dead,
+                [SceneOutcome.Injured]: CrewFate.Missing,
+                [SceneOutcome.LeftInHurry]: CrewFate.Missing,
+                [SceneOutcome.SealedInside]: CrewFate.InCryo,
+                [SceneOutcome.StillHere]: CrewFate.Survived,
+                [SceneOutcome.LeftNormally]: CrewFate.Survived,
+              };
+              const derivedFate = outcomeFateMap[targetScene.groundTruth.outcome];
+              if (derivedFate) {
+                updatedDossier = {
+                  ...updatedDossier,
+                  theories: { ...updatedDossier.theories, fate: derivedFate },
+                };
+              }
+            }
             const newDossiers = [...next.mystery!.dossiers!];
             newDossiers[dossierIdx] = updatedDossier;
             next = { ...next, mystery: { ...next.mystery!, dossiers: newDossiers } };
