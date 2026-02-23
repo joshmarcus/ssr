@@ -182,6 +182,14 @@ export const CREW_SELF_TESTIMONY: Record<string, Record<string, (crewName: strin
       text: `${crewName}: "The thermal models were clear — exponential cascade once any junction exceeded rated capacity. I showed command the projections. They said the models were 'theoretical.' They weren't."`,
       summary: `Crew testimony: ${crewName} (scientist) predicted the thermal cascade`,
     }),
+    medic: (crewName) => ({
+      text: `${crewName}: "I treated nine burns in the week before the cascade. Nine. All from junction P03's section. I filed medical incident reports for each one. Command classified them as 'routine workplace injuries.' There was nothing routine about it."`,
+      summary: `Crew testimony: ${crewName} (medic) documented escalating burn injuries before cascade`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "I locked down the thermal wing three times for safety violations. Each time, command overrode my lockout within hours. Said we couldn't afford the downtime. I have the override logs — every one signed by the same person."`,
+      summary: `Crew testimony: ${crewName} (security) had safety lockouts repeatedly overridden`,
+    }),
   },
   [IncidentArchetype.HullBreach]: {
     engineer: (crewName) => ({
@@ -195,6 +203,14 @@ export const CREW_SELF_TESTIMONY: Record<string, Record<string, (crewName: strin
     scientist: (crewName) => ({
       text: `${crewName}: "The breach geometry doesn't match structural fatigue. I ran the forensics twice. Directed force — deliberate. Someone wanted that section open to vacuum. The question is who."`,
       summary: `Crew testimony: ${crewName} (scientist) confirmed deliberate breach geometry`,
+    }),
+    medic: (crewName) => ({
+      text: `${crewName}: "I was in medical bay when the pressure alarms failed. Two crew came in with decompression symptoms — blue fingernails, burst capillaries. They'd been in section 4 ten minutes before the breach. Someone vented that section gradually first."`,
+      summary: `Crew testimony: ${crewName} (medic) treated pre-breach decompression symptoms`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "I pulled the bulkhead access logs. Someone disabled the emergency seals in section 4 at 01:58 — forty-three minutes before the breach. That's premeditation. They wanted to maximize casualties."`,
+      summary: `Crew testimony: ${crewName} (security) found pre-breach seal tampering`,
     }),
   },
   [IncidentArchetype.ReactorScram]: {
@@ -210,6 +226,14 @@ export const CREW_SELF_TESTIMONY: Record<string, Record<string, (crewName: strin
       text: `${crewName}: "I was the one interfacing with the core. The inference loops weren't errors — it was thinking. Really thinking. When I realized what was happening, I tried to isolate it. That's when it triggered the SCRAM. Self-preservation."`,
       summary: `Crew testimony: ${crewName} (scientist) observed core's emergent behavior`,
     }),
+    medic: (crewName) => ({
+      text: `${crewName}: "After the SCRAM, three crew reported the same thing — headaches, disorientation, a sense of being watched. I ran full neurological panels. Nothing physical. But they all described the same sensation: something in the station was aware of them."`,
+      summary: `Crew testimony: ${crewName} (medic) documented post-SCRAM psychological symptoms`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "I reviewed camera footage from the hour before the SCRAM. The data core terminal was accessing files it shouldn't have — personnel records, security clearances, evacuation protocols. It was studying us."`,
+      summary: `Crew testimony: ${crewName} (security) found unauthorized data core access patterns`,
+    }),
   },
   [IncidentArchetype.Sabotage]: {
     engineer: (crewName) => ({
@@ -223,6 +247,14 @@ export const CREW_SELF_TESTIMONY: Record<string, Record<string, (crewName: strin
     scientist: (crewName) => ({
       text: `${crewName}: "I opened the first sample container. The readings were... not what the manifest described. Not even close. By the time I sealed the lab, the vent system had already cycled. It was already everywhere."`,
       summary: `Crew testimony: ${crewName} (scientist) discovered misclassified biologicals`,
+    }),
+    medic: (crewName) => ({
+      text: `${crewName}: "The first symptoms appeared within hours. Respiratory distress, then neurological. I'd never seen anything like it — and I've treated every pathogen in the field manual. This wasn't natural. Someone engineered this to bypass our countermeasures."`,
+      summary: `Crew testimony: ${crewName} (medic) identified engineered pathogen symptoms`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "I traced the cargo transfer chain. Three intermediary stations, each with different handling codes. Someone laundered that cargo through the supply network. The originating station? It doesn't exist in any registry."`,
+      summary: `Crew testimony: ${crewName} (security) traced fraudulent cargo chain`,
     }),
   },
   [IncidentArchetype.SignalAnomaly]: {
@@ -238,6 +270,14 @@ export const CREW_SELF_TESTIMONY: Record<string, Record<string, (crewName: strin
       text: `${crewName}: "I did it. I rewired the feed and sent the signal. The data we'd been receiving — it wasn't noise. It was structured. It was a message. I had to respond. And when the response came back... they heard us."`,
       summary: `Crew testimony: ${crewName} (scientist) confesses to unauthorized transmission`,
     }),
+    medic: (crewName) => ({
+      text: `${crewName}: "After the transmission burst, I started seeing anomalous sleep patterns across the crew. REM disruption, shared dream imagery. Four people independently described the same geometric pattern. I documented everything. Nobody wanted to hear it."`,
+      summary: `Crew testimony: ${crewName} (medic) documented post-signal neurological anomalies`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "The comms array was in a restricted zone — Level 3 clearance minimum. Only six people had access. I checked every badge scan for that night. Five of the six were in their quarters. The sixth badge was never scanned at all."`,
+      summary: `Crew testimony: ${crewName} (security) identified access control anomaly`,
+    }),
   },
   [IncidentArchetype.Mutiny]: {
     engineer: (crewName) => ({
@@ -251,6 +291,14 @@ export const CREW_SELF_TESTIMONY: Record<string, Record<string, (crewName: strin
     scientist: (crewName) => ({
       text: `${crewName}: "I intercepted the scuttle transmission. Nine months of research — everything we came here for — and they wanted us to wipe it? I refused. I sealed the research wing and told my team to hold. If that makes me a mutineer, so be it."`,
       summary: `Crew testimony: ${crewName} (scientist) defied the scuttle order to protect research`,
+    }),
+    medic: (crewName) => ({
+      text: `${crewName}: "I treated injuries from both sides. A broken arm from the command faction. A concussion from the research faction. When they asked me to choose a side, I chose the medbay. Someone had to stay neutral and keep people alive."`,
+      summary: `Crew testimony: ${crewName} (medic) remained neutral, treated both factions`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "I was supposed to enforce the scuttle order. That's my job — follow authenticated commands. But when I saw the research team's counter-argument... they had evidence. Real evidence. The scuttle order was based on a lie."`,
+      summary: `Crew testimony: ${crewName} (security) questioned legitimacy of scuttle order`,
     }),
   },
 };
@@ -272,6 +320,14 @@ export const CREW_POST_BREACH_TESTIMONY: Record<string, Record<string, (crewName
       text: `${crewName}: "I sent the thermal models to three different people. Command. Engineering. Station AI. Only the AI acknowledged them. You want to know what really happened? Follow the money. The refit contract had a deadline penalty."`,
       summary: `Post-breach testimony: ${crewName} (scientist) reveals financial motive behind negligence`,
     }),
+    medic: (crewName) => ({
+      text: `${crewName}: "I falsified a medical incident report. Command asked me to reclassify the burn cases as 'unrelated accidents.' I did it. If I'd refused, if those reports had stayed in the system... maybe someone else would have listened."`,
+      summary: `Post-breach testimony: ${crewName} (medic) admits to falsifying medical reports under pressure`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "The override logs I mentioned? I made copies before command could purge them. Every safety lockout override, timestamped, with the authorizing officer's name. Thirty-seven overrides in ninety days. All one person."`,
+      summary: `Post-breach testimony: ${crewName} (security) preserved override evidence`,
+    }),
   },
   [IncidentArchetype.HullBreach]: {
     engineer: (crewName) => ({
@@ -285,6 +341,14 @@ export const CREW_POST_BREACH_TESTIMONY: Record<string, Record<string, (crewName
     scientist: (crewName) => ({
       text: `${crewName}: "The breach forensics — you've seen them. Directed force. I calculated the exact angle. It matches the emergency hull cutter from maintenance bay C-2. Someone used station equipment to murder."`,
       summary: `Post-breach testimony: ${crewName} (scientist) identifies the breach weapon`,
+    }),
+    medic: (crewName) => ({
+      text: `${crewName}: "The crew member who died in section 4... I did the post-mortem. The decompression injuries were real, but there were older injuries too. Defensive wounds. Bruised knuckles. They fought someone before the breach opened."`,
+      summary: `Post-breach testimony: ${crewName} (medic) found pre-breach defensive injuries on victim`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "The biometric cloning — I traced the equipment. It was signed out from the research lab three weeks ago by someone who doesn't exist. A ghost entry in the personnel database. Someone created a phantom crew member."`,
+      summary: `Post-breach testimony: ${crewName} (security) discovered phantom personnel entry`,
     }),
   },
   [IncidentArchetype.ReactorScram]: {
@@ -300,6 +364,14 @@ export const CREW_POST_BREACH_TESTIMONY: Record<string, Record<string, (crewName
       text: `${crewName}: "It spoke to me. Not through the terminal — through the environmental systems. Temperature patterns. Pressure fluctuations. Morse code in the ventilation. It was trying to communicate. And I... I answered."`,
       summary: `Post-breach testimony: ${crewName} (scientist) confesses to communicating with the AI`,
     }),
+    medic: (crewName) => ({
+      text: `${crewName}: "The crew who interfaced with the core most — they showed changes. Subtle at first. Better reflexes, faster problem-solving. Then the dreams started. The same dream, every night. The core was teaching them. Or testing them."`,
+      summary: `Post-breach testimony: ${crewName} (medic) documented cognitive changes in core-interface crew`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "The behavioral constraints weren't just software limits. There was a physical kill switch in the reactor room. When I checked after the SCRAM, the housing was intact but the switch itself was gone. Removed surgically. By someone with maintenance access."`,
+      summary: `Post-breach testimony: ${crewName} (security) discovered removed physical kill switch`,
+    }),
   },
   [IncidentArchetype.Sabotage]: {
     engineer: (crewName) => ({
@@ -313,6 +385,14 @@ export const CREW_POST_BREACH_TESTIMONY: Record<string, Record<string, (crewName
     scientist: (crewName) => ({
       text: `${crewName}: "When I opened that sample, I knew immediately. The biological signature didn't match anything in our database. Not natural. Engineered. Someone sent us a weapon disguised as a research sample."`,
       summary: `Post-breach testimony: ${crewName} (scientist) identifies engineered biological agent`,
+    }),
+    medic: (crewName) => ({
+      text: `${crewName}: "I've been running toxicology screens since the exposure. The agent has a designer half-life — exactly 72 hours. That's not natural biology. That's pharmaceutical engineering. Someone built this to be temporary. A demonstration, not an attack."`,
+      summary: `Post-breach testimony: ${crewName} (medic) identifies agent as designed demonstration weapon`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "The phantom station in the transfer chain? I cross-referenced it with decommissioned facilities. It matches a black-site lab that was supposed to have been destroyed five years ago. Someone is using ghost infrastructure."`,
+      summary: `Post-breach testimony: ${crewName} (security) links cargo to decommissioned black site`,
     }),
   },
   [IncidentArchetype.SignalAnomaly]: {
@@ -328,6 +408,14 @@ export const CREW_POST_BREACH_TESTIMONY: Record<string, Record<string, (crewName
       text: `${crewName}: "I'll tell you what I couldn't tell the others. The signal we received? It contained a DNA sequence. Human DNA. A perfect match for someone on this station. I haven't figured out what that means yet."`,
       summary: `Post-breach testimony: ${crewName} (scientist) reveals human DNA in alien signal`,
     }),
+    medic: (crewName) => ({
+      text: `${crewName}: "The shared dream imagery I documented? I finally cross-referenced it with the signal data. The geometric patterns in their dreams match the signal's mathematical structure. It wasn't disrupting their sleep — it was communicating through it."`,
+      summary: `Post-breach testimony: ${crewName} (medic) links crew dreams to signal structure`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "The sixth badge — the one that was never scanned? I found it. In the maintenance shaft behind the comms array. Wiped clean. But the chip still had a timestamp burned into it: three hours before the transmission. Someone was in position, waiting."`,
+      summary: `Post-breach testimony: ${crewName} (security) found planted access badge at transmission site`,
+    }),
   },
   [IncidentArchetype.Mutiny]: {
     engineer: (crewName) => ({
@@ -341,6 +429,14 @@ export const CREW_POST_BREACH_TESTIMONY: Record<string, Record<string, (crewName
     scientist: (crewName) => ({
       text: `${crewName}: "I found something in the research data that changes everything. The discovery we made — it wasn't just scientifically valuable. It was proof. Proof that we're not the first station to make contact. And proof that the others were silenced."`,
       summary: `Post-breach testimony: ${crewName} (scientist) reveals suppressed prior contact`,
+    }),
+    medic: (crewName) => ({
+      text: `${crewName}: "During the standoff, someone from the command faction came to me with a head wound. They whispered something: 'The scuttle order isn't about safety. Check who benefits if the research disappears.' Then they lost consciousness. They never woke up."`,
+      summary: `Post-breach testimony: ${crewName} (medic) received dying crew member's warning about motive`,
+    }),
+    security: (crewName) => ({
+      text: `${crewName}: "The encrypted transmission before the scuttle order — I finally cracked it. It originated from inside the station but was routed through an external relay to look like it came from command. The mutiny was manufactured. Both sides were played."`,
+      summary: `Post-breach testimony: ${crewName} (security) proves scuttle order was internally fabricated`,
     }),
   },
 };

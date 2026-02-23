@@ -2908,7 +2908,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           // Key crew members give first-person accounts instead of third-person references
           const crewLast = crewLastName;
           const crewRole = target.props["role"] as string || "";
-          const isSelfReference = crewLast === engineerLast || crewLast === captainLast || crewLast === scientistLast;
+          const isSelfReference = crewLast === engineerLast || crewLast === captainLast || crewLast === scientistLast || crewLast === medicLast || crewLast === securityLast;
           let testimony: { text: string; summary: string };
           if (isSelfReference) {
             // Look up role-specific self-testimony

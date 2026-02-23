@@ -1612,6 +1612,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     attemptsLeft?: number;
     hintText?: string;
     nextDeductionTeaser?: string;
+    evidenceHints?: { summary: string; room: string }[];
   }): void {
     if (this._deductionResultActive) return;
     this._deductionResultActive = true;
@@ -1677,6 +1678,20 @@ export class BrowserDisplay3D implements IGameDisplay {
         bodyHtml += `<div class="dr-divider"></div>`;
         bodyHtml += `<div class="dr-conclusion" style="color:#a86">The answer was: ${esc(opts.correctAnswer)}</div>`;
       }
+
+      // Show conclusion text and revelations on lockout (so player learns the reasoning)
+      if (opts.conclusionText) {
+        bodyHtml += `<div class="dr-conclusion" style="color:#888;margin-top:8px">${esc(opts.conclusionText)}</div>`;
+      }
+      if (opts.evidenceHints && opts.evidenceHints.length > 0) {
+        bodyHtml += `<div class="dr-divider"></div>`;
+        bodyHtml += `<div class="dr-revelations">`;
+        bodyHtml += `<div class="dr-rev-header" style="color:#a86">Key Evidence You Missed</div>`;
+        for (const hint of opts.evidenceHints) {
+          bodyHtml += `<div class="dr-rev-item" style="color:#998">${esc(hint.summary)} <span style="color:#665;font-size:10px">[${esc(hint.room)}]</span></div>`;
+        }
+        bodyHtml += `</div>`;
+      }
     } else {
       // Wrong but still has attempts
       verdictLabel = "INCORRECT";
@@ -1693,6 +1708,17 @@ export class BrowserDisplay3D implements IGameDisplay {
       if (opts.hintText) {
         bodyHtml += `<div class="dr-divider"></div>`;
         bodyHtml += `<div class="dr-conclusion" style="color:#6af">${esc(opts.hintText)}</div>`;
+      }
+
+      // Evidence breadcrumbs — guide player toward correct reasoning without revealing answer
+      if (opts.evidenceHints && opts.evidenceHints.length > 0) {
+        bodyHtml += `<div class="dr-divider"></div>`;
+        bodyHtml += `<div class="dr-revelations">`;
+        bodyHtml += `<div class="dr-rev-header" style="color:#6af">Consider This Evidence</div>`;
+        for (const hint of opts.evidenceHints) {
+          bodyHtml += `<div class="dr-rev-item" style="color:#89a">${esc(hint.summary)} <span style="color:#567;font-size:10px">[${esc(hint.room)}]</span></div>`;
+        }
+        bodyHtml += `</div>`;
       }
     }
 

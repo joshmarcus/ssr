@@ -46,6 +46,7 @@ export interface IGameDisplay {
     attemptsLeft?: number;
     hintText?: string;
     nextDeductionTeaser?: string;
+    evidenceHints?: { summary: string; room: string }[];  // key evidence hints for wrong/lockout
   }): void;
   triggerGhostReveal?(crewId: string): void;
   showCaseClosed?(opts: {

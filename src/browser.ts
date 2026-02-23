@@ -315,6 +315,7 @@ let scrubberHintFired = false; // one-time hint when scrubber first activates
 let beaconHintFired = false; // one-time hint when beacon first deploys
 let lastProgressTurn = 0; // last turn where player made meaningful progress
 let lastNudgeTurn = 0; // prevent nudge spam
+let lastPuzzleGuidanceTurn = 0; // cooldown for contextual puzzle hints
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
 
 // ── Wait message variety ────────────────────────────────────────
@@ -2263,6 +2264,7 @@ function resetGameState(newSeed: number): void {
   beaconHintFired = false;
   lastProgressTurn = 0;
   lastNudgeTurn = 0;
+  lastPuzzleGuidanceTurn = 0;
   pendingCrewDoor = null;
   journalTab = "evidence";
   choiceSelectedIdx = 0;
@@ -2969,6 +2971,59 @@ function handleAction(action: Action): void {
       const nudgeIdx = (state.turn * 7 + state.seed) % nudgePool.length;
       display.addLog(nudgePool[nudgeIdx], "system");
       lastNudgeTurn = state.turn;
+    }
+
+    // ── Contextual puzzle guidance — CORVUS-7 hints for nearby uninteracted entities ──
+    if (state.turn >= 5 && state.turn - lastPuzzleGuidanceTurn >= 15) {
+      const gpx = state.player.entity.pos.x;
+      const gpy = state.player.entity.pos.y;
+      let guidanceText: string | null = null;
+      let guidanceKey = "";
+
+      for (const [, ent] of state.entities) {
+        const dist = Math.abs(ent.pos.x - gpx) + Math.abs(ent.pos.y - gpy);
+        if (dist > 3) continue;
+
+        if (ent.type === EntityType.Relay && !ent.props["activated"] && !state.milestones.has("puzzle_hint_relay")) {
+          guidanceText = "CORVUS-7: I'm detecting an idle power relay nearby. Activate it [Enter] to restore power to this section.";
+          guidanceKey = "puzzle_hint_relay";
+        } else if (ent.type === EntityType.Breach && !ent.props["sealed"] && !ent.props["exhausted"] && !state.milestones.has("puzzle_hint_breach")) {
+          guidanceText = "CORVUS-7: Hull breach detected in this area. Approach and seal it [Enter] to restore pressure.";
+          guidanceKey = "puzzle_hint_breach";
+        } else if (ent.type === EntityType.LogTerminal && !ent.props["exhausted"] && !state.milestones.has("puzzle_hint_terminal")) {
+          guidanceText = "CORVUS-7: That terminal contains station logs. Interact [Enter] to download crew records.";
+          guidanceKey = "puzzle_hint_terminal";
+        } else if (ent.type === EntityType.SensorPickup && !ent.props["collected"] && !state.milestones.has("puzzle_hint_sensor")) {
+          guidanceText = "CORVUS-7: Sensor upgrade detected nearby. Collect it [Enter] to expand detection capabilities.";
+          guidanceKey = "puzzle_hint_sensor";
+        } else if (ent.type === EntityType.EvidenceTrace && !ent.props["exhausted"] && ent.props["scanHidden"] !== true && !state.milestones.has("puzzle_hint_trace")) {
+          guidanceText = "CORVUS-7: Forensic evidence detected in this area. Approach and examine it [Enter].";
+          guidanceKey = "puzzle_hint_trace";
+        }
+        if (guidanceText) break;
+      }
+
+      // Also check for unexamined crime scene clues in current room
+      if (!guidanceText && state.mystery?.roomScenes) {
+        const currentRoom = state.rooms.find(r =>
+          gpx >= r.x && gpx < r.x + r.width && gpy >= r.y && gpy < r.y + r.height
+        );
+        if (currentRoom) {
+          const scene = state.mystery.roomScenes.find(s => s.roomId === currentRoom.id);
+          if (scene && !scene.processed && scene.physicalClues.some(c => !c.examined) && !state.milestones.has("puzzle_hint_scene")) {
+            guidanceText = `CORVUS-7: Physical evidence in ${currentRoom.name} warrants examination. Press [X] to examine clues.`;
+            guidanceKey = "puzzle_hint_scene";
+          }
+        }
+      }
+
+      if (guidanceText && guidanceKey) {
+        display.addLog(guidanceText, "system");
+        lastPuzzleGuidanceTurn = state.turn;
+        const newMs = new Set(state.milestones);
+        newMs.add(guidanceKey);
+        state = { ...state, milestones: newMs };
+      }
     }
   }
 
@@ -5204,6 +5259,18 @@ function commitDeductionAnswer(): void {
     audio.playDeductionWrong();
     updateMomentum(-25); // Wrong deduction breaks momentum
 
+    // Build evidence hints — journal entries matching deduction's required tags
+    const evidenceHints: { summary: string; room: string }[] = [];
+    if (journal.length > 0 && activeDeduction.requiredTags.length > 0) {
+      const tagSet = new Set(activeDeduction.requiredTags);
+      const matching = journal.filter(j => j.tags.some(t => tagSet.has(t)));
+      // Pick up to 2 most recent matching entries as breadcrumbs
+      const hints = matching.slice(-2);
+      for (const h of hints) {
+        evidenceHints.push({ summary: h.summary, room: h.roomFound });
+      }
+    }
+
     // Show cinematic overlay
     if (display.showDeductionResult) {
       display.showDeductionResult({
@@ -5211,10 +5278,12 @@ function commitDeductionAnswer(): void {
         question: activeDeduction.question,
         chosenAnswer: chosen.label,
         correctAnswer: isLockout ? correctAnswerLabel : undefined,
+        conclusionText: isLockout ? solved.conclusionText : undefined,
         penaltyHp: penalty?.hp,
         penaltyTurns: penalty?.turns,
         attemptsLeft: isLockout ? 0 : attemptsLeft,
         hintText: !isLockout ? activeDeduction.hintText : undefined,
+        evidenceHints: evidenceHints.length > 0 ? evidenceHints : undefined,
       });
     }
   }
@@ -6057,6 +6126,56 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
       if (connectedIds.size > 5) {
         connectedHtml += `<div style="color:#556;font-size:9px;padding-left:6px">...and ${connectedIds.size - 5} more connections</div>`;
       }
+
+      // Synthesis hint — when 3+ connected entries share tags, generate pattern analysis
+      if (connEntries.length >= 2) {
+        // Collect all shared tags across connections
+        const allSharedTags = new Map<string, number>();
+        for (const ce of connEntries) {
+          const conn = connections.find(c =>
+            (c.sourceId === entry.id && c.targetId === ce.id) ||
+            (c.targetId === entry.id && c.sourceId === ce.id)
+          );
+          for (const t of conn?.sharedTags ?? []) {
+            allSharedTags.set(t, (allSharedTags.get(t) ?? 0) + 1);
+          }
+        }
+        // Find the most common shared theme
+        let topTag = "";
+        let topCount = 0;
+        for (const [tag, count] of allSharedTags) {
+          if (count > topCount) { topTag = tag; topCount = count; }
+        }
+
+        if (topTag && topCount >= 2) {
+          // Collect unique rooms and crew across these entries
+          const synthRooms = new Set<string>();
+          const synthCrew = new Set<string>();
+          synthRooms.add(entry.room);
+          for (const ce of connEntries) {
+            if (ce.roomFound) synthRooms.add(ce.roomFound);
+            for (const c of ce.crewMentioned) synthCrew.add(c);
+          }
+          for (const c of entry.crewMentioned) synthCrew.add(c);
+
+          const roomList = [...synthRooms].slice(0, 3);
+          const crewNames = [...synthCrew].slice(0, 2).map(cId => {
+            const m = crew.find(c => c.id === cId);
+            return m ? `${m.firstName} ${m.lastName}` : cId;
+          });
+
+          let synthText = `Pattern detected: ${topCount + 1} entries share "${topTag.replace(/_/g, " ")}" connection`;
+          if (crewNames.length > 0) synthText += ` — involves ${crewNames.join(", ")}`;
+          if (roomList.length > 1) synthText += ` across ${roomList.join(", ")}`;
+          synthText += ".";
+
+          connectedHtml += `<div style="margin-top:6px;padding:4px 8px;background:rgba(100,170,255,0.06);border-left:2px solid #68a;border-radius:2px">`;
+          connectedHtml += `<div style="color:#68a;font-size:9px;letter-spacing:1px;margin-bottom:2px">CORVUS-7 ANALYSIS</div>`;
+          connectedHtml += `<div style="color:#9ab;font-size:11px">${esc(synthText)}</div>`;
+          connectedHtml += `</div>`;
+        }
+      }
+
       connectedHtml += `</div>`;
     }
   }
