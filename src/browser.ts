@@ -2106,6 +2106,7 @@ function handleAction(action: Action): void {
   const ppy = state.player.entity.pos.y;
   const prevDirt = state.tiles[ppy]?.[ppx]?.dirt ?? 0;
   const hadEvacFarewell = state.milestones.has("corvus_evac_farewell");
+  const prevJournalCount = state.mystery?.journal.length ?? 0;
   state = step(state, resolvedAction);
 
   // Start background music on first player interaction
@@ -2134,6 +2135,25 @@ function handleAction(action: Action): void {
 
   // Discovery moment VFX (Crack Moment, Contradiction, Timeline, Crew Fate)
   checkDiscoveryMoments();
+
+  // Evidence discovery narrative feedback — when new journal entries are added
+  const newJournalCount = state.mystery?.journal.length ?? 0;
+  if (newJournalCount > prevJournalCount && state.mystery) {
+    const newEntries = state.mystery.journal.slice(prevJournalCount);
+    for (const entry of newEntries) {
+      const catLabel = entry.category.toUpperCase();
+      // Check if this entry matches a contradiction pair
+      const isContradiction = state.mystery.contradictionPairs?.some(cp =>
+        (cp.officialFound && entry.detail.includes(cp.official.text)) ||
+        (cp.contradictingFound && entry.detail.includes(cp.contradicting.text))
+      );
+      if (isContradiction) {
+        display.addLog(`\u26A0 CONFLICTING ACCOUNT DETECTED \u2014 ${entry.summary}`, "warning");
+        display.triggerScreenFlash?.("damage");
+        audio.playDeductionWrong();
+      }
+    }
+  }
 
   // One-time utility attachment activation hints
   if (!scrubberHintFired && state.player.entity.props["hasScrubber"] === true && state.turn % 3 === 0) {
