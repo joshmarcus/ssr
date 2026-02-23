@@ -3971,45 +3971,126 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
   if (!state.mystery) return `<div style="padding:16px;color:#888">No crew data available.</div>`;
   const crew = state.mystery.crew;
   if (crew.length === 0) return `<div style="padding:16px;color:#888">No crew records found.</div>`;
+  const dossiers = state.mystery.dossiers ?? [];
 
   // Clamp hubIdx to crew length
   if (hubIdx >= crew.length) hubIdx = crew.length - 1;
   if (hubIdx < 0) hubIdx = 0;
 
-  // Build crew list (left panel)
-  let listHtml = "";
+  // Build crew list (left panel) — 3-band: identified / partial / unknown
+  const identified: number[] = [];
+  const partial: number[] = [];
+  const unknown: number[] = [];
   for (let i = 0; i < crew.length; i++) {
-    const c = crew[i];
-    const selected = i === hubIdx;
-    const mentionCount = journal.filter(j => j.crewMentioned.includes(c.id)).length;
-    const statusColor = c.fate === CrewFate.Dead ? "#f44" : c.fate === CrewFate.Missing ? "#fa0" : "#4a4";
-    const statusText = c.fate === CrewFate.Dead ? "DECEASED" : c.fate === CrewFate.Missing ? "MISSING" : c.fate === CrewFate.Escaped ? "EVACUATED" : c.fate === CrewFate.Survived ? "ALIVE" : "UNKNOWN";
-    const bg = selected ? "background:rgba(68,204,255,0.12);border-left:2px solid #4cf" : "border-left:2px solid transparent";
-    listHtml += `<div style="padding:6px 10px;cursor:pointer;${bg};margin:2px 0">
-      <div style="color:${selected ? "#eef" : "#aab"};font-weight:${selected ? "bold" : "normal"};font-size:13px">${c.firstName} ${c.lastName}</div>
-      <div style="font-size:10px;color:#667">${c.role.toUpperCase()} · <span style="color:${statusColor}">${statusText}</span>${mentionCount > 0 ? ` · ${mentionCount} evidence` : ""}</div>
-    </div>`;
+    const d = dossiers.find(ds => ds.crewId === crew[i].id);
+    if (d?.confirmed.name) identified.push(i);
+    else if (d && (d.theories.lastKnownRoom || d.theories.involvement)) partial.push(i);
+    else unknown.push(i);
+  }
+  const orderedIndices = [...identified, ...partial, ...unknown];
+
+  let listHtml = "";
+
+  // Band headers
+  const bandLabels: [number[], string, string][] = [
+    [identified, "IDENTIFIED", "#4a4"],
+    [partial, "PARTIAL DATA", "#ca8"],
+    [unknown, "UNKNOWN", "#555"],
+  ];
+
+  for (const [band, label, color] of bandLabels) {
+    if (band.length === 0) continue;
+    listHtml += `<div style="color:${color};font-size:9px;letter-spacing:1.5px;padding:4px 10px;border-bottom:1px solid #222;margin-top:4px">${label} (${band.length})</div>`;
+    for (const idx of band) {
+      const c = crew[idx];
+      const d = dossiers.find(ds => ds.crewId === c.id);
+      const selected = idx === hubIdx;
+      const mentionCount = journal.filter(j => j.crewMentioned.includes(c.id)).length;
+      const statusColor = c.fate === CrewFate.Dead ? "#f44" : c.fate === CrewFate.Missing ? "#fa0" : "#4a4";
+      const statusText = c.fate === CrewFate.Dead ? "DECEASED" : c.fate === CrewFate.Missing ? "MISSING" : c.fate === CrewFate.Escaped ? "EVACUATED" : c.fate === CrewFate.Survived ? "ALIVE" : "UNKNOWN";
+      const bg = selected ? "background:rgba(68,204,255,0.12);border-left:2px solid #4cf" : "border-left:2px solid transparent";
+      const nameText = d?.confirmed.name ? `${c.firstName} ${c.lastName}` : `Crew #${idx + 1}`;
+      const roleText = d?.confirmed.role ? d.confirmed.role.toUpperCase() : c.role.toUpperCase();
+      listHtml += `<div style="padding:6px 10px;${bg};margin:1px 0">
+        <div style="color:${selected ? "#eef" : "#aab"};font-weight:${selected ? "bold" : "normal"};font-size:13px">${esc(nameText)}</div>
+        <div style="font-size:10px;color:#667">${roleText} \u00B7 <span style="color:${statusColor}">${statusText}</span>${mentionCount > 0 ? ` \u00B7 ${mentionCount} evidence` : ""}${d?.linkedEvidence && d.linkedEvidence.length > 0 ? ` \u00B7 ${d.linkedEvidence.length} scene clues` : ""}</div>
+      </div>`;
+    }
   }
 
   // Build detail panel (right side) for selected crew member
   const selected = crew[hubIdx];
+  const dossier = dossiers.find(d => d.crewId === selected.id);
   const mentions = journal.filter(j => j.crewMentioned.includes(selected.id));
   const profileReady = mentions.length >= 2;
 
   let detailHtml = `<div style="padding:12px">`;
-  detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:2px;margin-bottom:8px">CREW PROFILE</div>`;
-  detailHtml += `<div style="color:#eef;font-size:16px;font-weight:bold;margin-bottom:4px">${selected.firstName} ${selected.lastName}</div>`;
-  detailHtml += `<div style="color:#8ac;font-size:12px;margin-bottom:10px">${selected.role.toUpperCase()} · Badge: ${selected.badgeId}</div>`;
+  detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:2px;margin-bottom:8px">CREW DOSSIER</div>`;
 
-  // Personality and traits
+  // Name: show confirmed or unconfirmed
+  if (dossier?.confirmed.name) {
+    detailHtml += `<div style="color:#eef;font-size:16px;font-weight:bold;margin-bottom:4px">${selected.firstName} ${selected.lastName} <span style="color:#4a4;font-size:10px">\u2713 IDENTIFIED</span></div>`;
+    detailHtml += `<div style="color:#8ac;font-size:12px;margin-bottom:6px">${selected.role.toUpperCase()} \u00B7 Badge: ${selected.badgeId}</div>`;
+  } else {
+    detailHtml += `<div style="color:#889;font-size:16px;font-weight:bold;margin-bottom:4px">Crew #${hubIdx + 1} <span style="color:#555;font-size:10px">UNIDENTIFIED</span></div>`;
+    detailHtml += `<div style="color:#667;font-size:12px;margin-bottom:6px">${selected.role.toUpperCase()} \u00B7 Find their badge to identify</div>`;
+  }
+
+  // Dossier theories
+  if (dossier) {
+    const theories = dossier.theories;
+    if (theories.lastKnownRoom || theories.involvement || theories.fate) {
+      detailHtml += `<div style="color:#fa0;font-size:10px;letter-spacing:1.5px;margin:8px 0 4px">WORKING THEORIES</div>`;
+      if (theories.lastKnownRoom) {
+        detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Last seen: <span style="color:#bbc">${esc(theories.lastKnownRoom)}</span></div>`;
+      }
+      if (theories.involvement) {
+        const invColors: Record<string, string> = { victim: "#f44", instigator: "#f80", responder: "#4cf", bystander: "#889", unknown: "#555" };
+        detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Involvement: <span style="color:${invColors[theories.involvement] ?? "#889"}">${theories.involvement.toUpperCase()}</span></div>`;
+      }
+      if (theories.fate) {
+        detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Fate theory: <span style="color:#bbc">${theories.fate.replace(/_/g, " ")}</span></div>`;
+      }
+    }
+
+    // Personal details from dossier
+    const pd = dossier.personalDetails;
+    if (pd.want || pd.habit || pd.contradiction) {
+      detailHtml += `<div style="color:#6cf;font-size:10px;letter-spacing:1.5px;margin:8px 0 4px">PERSONAL DETAILS</div>`;
+      if (pd.want) detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Wants: <span style="color:#bbc">${esc(pd.want)}</span></div>`;
+      if (pd.habit) detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Habit: <span style="color:#bbc">${esc(pd.habit)}</span></div>`;
+      if (pd.contradiction) detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Contradiction: <span style="color:#fca">${esc(pd.contradiction)}</span></div>`;
+    }
+
+    // Scene clue links
+    if (dossier.linkedEvidence && dossier.linkedEvidence.length > 0) {
+      detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin:8px 0 4px">SCENE EVIDENCE (${dossier.linkedEvidence.length})</div>`;
+      for (const clueId of dossier.linkedEvidence.slice(0, 6)) {
+        // Find the clue text from room scenes
+        let clueText = clueId;
+        if (state.mystery?.roomScenes) {
+          for (const sc of state.mystery.roomScenes) {
+            const clue = sc.physicalClues.find(c => c.id === clueId);
+            if (clue) { clueText = clue.text.slice(0, 60); break; }
+          }
+        }
+        detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px;padding-left:8px;border-left:1px solid #333">${esc(clueText)}</div>`;
+      }
+      if (dossier.linkedEvidence.length > 6) {
+        detailHtml += `<div style="color:#556;font-size:10px">...and ${dossier.linkedEvidence.length - 6} more</div>`;
+      }
+    }
+  }
+
+  // Personality and traits (from base crew data)
   if (selected.personality) {
-    detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:6px">Personality: <span style="color:#bbc">${selected.personality}</span></div>`;
+    detailHtml += `<div style="color:#889;font-size:11px;margin-top:8px;margin-bottom:6px">Personality: <span style="color:#bbc">${selected.personality}</span></div>`;
   }
   if (selected.secret) {
     detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:6px">Secret: <span style="color:#fca">${selected.secret}</span></div>`;
   }
   if (selected.lastKnownRoom) {
-    detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:10px">Last known location: <span style="color:#bbc">${selected.lastKnownRoom}</span></div>`;
+    detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:6px">Last known location: <span style="color:#bbc">${selected.lastKnownRoom}</span></div>`;
   }
 
   // Relationships
@@ -4020,19 +4101,19 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
       if (otherCrew) {
         detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">
           <span style="color:#bbc">${otherCrew.firstName} ${otherCrew.lastName}</span>
-          <span style="color:#667"> — ${rel.type}</span>
+          <span style="color:#667"> \u2014 ${rel.type}</span>
         </div>`;
       }
     }
   }
 
-  // Linked evidence
+  // Linked journal evidence
   if (mentions.length > 0) {
-    detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin:12px 0 6px">LINKED EVIDENCE (${mentions.length})</div>`;
+    detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin:12px 0 6px">JOURNAL EVIDENCE (${mentions.length})</div>`;
     for (const entry of mentions.slice(0, 8)) {
       detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:4px;padding-left:8px;border-left:1px solid #333">
         <span style="color:#bbc">${entry.summary}</span>
-        <span style="color:#556"> — ${entry.roomFound}</span>
+        <span style="color:#556"> \u2014 ${entry.roomFound}</span>
       </div>`;
     }
     if (mentions.length > 8) {
@@ -4780,14 +4861,30 @@ function handleHubEvidenceInput(e: KeyboardEvent): void {
 
 function handleHubCrewInput(e: KeyboardEvent): void {
   const crew = state.mystery?.crew ?? [];
-  const maxIdx = crew.length - 1;
+  const dossiers = state.mystery?.dossiers ?? [];
+  // Compute same banded order as renderHubCrew
+  const identified: number[] = [];
+  const partial: number[] = [];
+  const unknown: number[] = [];
+  for (let i = 0; i < crew.length; i++) {
+    const d = dossiers.find(ds => ds.crewId === crew[i].id);
+    if (d?.confirmed.name) identified.push(i);
+    else if (d && (d.theories.lastKnownRoom || d.theories.involvement)) partial.push(i);
+    else unknown.push(i);
+  }
+  const orderedIndices = [...identified, ...partial, ...unknown];
+  const currentVisualIdx = orderedIndices.indexOf(hubIdx);
+  const maxVisIdx = orderedIndices.length - 1;
+
   if (e.key === "ArrowUp" || e.key === "w" || e.key === "k") {
-    hubIdx = Math.max(0, hubIdx - 1);
+    const newVisIdx = Math.max(0, currentVisualIdx - 1);
+    hubIdx = orderedIndices[newVisIdx] ?? hubIdx;
     renderInvestigationHub();
     return;
   }
   if (e.key === "ArrowDown" || e.key === "s" || e.key === "j") {
-    hubIdx = Math.min(maxIdx, hubIdx + 1);
+    const newVisIdx = Math.min(maxVisIdx, currentVisualIdx + 1);
+    hubIdx = orderedIndices[newVisIdx] ?? hubIdx;
     renderInvestigationHub();
     return;
   }
