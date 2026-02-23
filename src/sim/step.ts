@@ -5499,6 +5499,12 @@ export function step(state: GameState, action: Action): GameState {
           ...s,
           processAttempts: s.processAttempts + 1,
           processed: result.score >= 2, // need 2+ correct to mark as processed
+          lastAttemptResult: {
+            whoCorrect: result.whoCorrect,
+            whatCorrect: result.whatCorrect,
+            outcomeCorrect: result.outcomeCorrect,
+            score: result.score,
+          },
         };
       });
 

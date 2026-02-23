@@ -5712,6 +5712,21 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
     }
   }
 
+  // Scenes where this crew member was confirmed present (via scene processing)
+  const sceneAppearances = (state.mystery?.roomScenes ?? []).filter(sc =>
+    sc.processed && sc.groundTruth.who.includes(selected.id)
+  );
+  if (sceneAppearances.length > 0) {
+    detailHtml += `<div style="color:#fa0;font-size:10px;letter-spacing:1.5px;margin:8px 0 4px">CONFIRMED SCENES (${sceneAppearances.length})</div>`;
+    for (const sc of sceneAppearances) {
+      const actLabel = sc.groundTruth.what.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const outLabel = sc.groundTruth.outcome.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px;padding-left:8px;border-left:2px solid #a80">`;
+      detailHtml += `<span style="color:#bbc">${esc(sc.roomName)}</span> <span style="color:#667">\u2014 ${esc(actLabel)} \u2192 ${esc(outLabel)}</span>`;
+      detailHtml += `</div>`;
+    }
+  }
+
   // Linked journal evidence with cross-tab hints
   if (mentions.length > 0) {
     detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin:12px 0 6px">JOURNAL EVIDENCE (${mentions.length}) <span style="color:#556;font-weight:normal">[Tab] to EVIDENCE for details</span></div>`;
@@ -6204,6 +6219,20 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
 
   const turnCost = scene.processAttempts === 0 ? 3 : scene.processAttempts === 1 ? 5 : scene.processAttempts === 2 ? 8 : 8 + (scene.processAttempts - 2) * 4;
   html += `<div style="color:#667;font-size:10px;margin-bottom:8px">Attempt ${scene.processAttempts + 1} \u00B7 Cost: ${turnCost} turns \u00B7 Score 2/3 to succeed</div>`;
+
+  // ── PREVIOUS ATTEMPT RESULTS — show what was wrong last time ──
+  if (scene.lastAttemptResult && !scene.processed) {
+    const prev = scene.lastAttemptResult;
+    const prevColor = prev.score >= 2 ? "#4a4" : prev.score >= 1 ? "#fa0" : "#f44";
+    html += `<div style="margin-bottom:8px;padding:5px 8px;background:rgba(255,100,50,0.06);border:1px solid #533;border-radius:3px">`;
+    html += `<div style="color:${prevColor};font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:2px">PREVIOUS ATTEMPT: ${prev.score}/3</div>`;
+    const dim = (label: string, ok: boolean) => {
+      const icon = ok ? `<span style="color:#4a4">\u2713</span>` : `<span style="color:#f44">\u2717</span>`;
+      return `${icon} <span style="color:${ok ? "#8a8" : "#f88"}">${label}</span>`;
+    };
+    html += `<div style="font-size:10px;display:flex;gap:12px">${dim("WHO", prev.whoCorrect)} ${dim("WHAT", prev.whatCorrect)} ${dim("OUTCOME", prev.outcomeCorrect)}</div>`;
+    html += `</div>`;
+  }
 
   // ── CLUES FOUND — show examined clue text as reference ──
   if (examinedClues.length > 0) {

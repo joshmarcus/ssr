@@ -381,6 +381,12 @@ export interface RoomScene {
   evidenceCategory: EvidenceCategory;
   processed: boolean;
   processAttempts: number;
+  lastAttemptResult?: {
+    whoCorrect: boolean;
+    whatCorrect: boolean;
+    outcomeCorrect: boolean;
+    score: number;
+  };
   groundTruth: {
     who: string[];         // crew IDs
     what: SceneActivity;
