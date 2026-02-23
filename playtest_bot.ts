@@ -248,7 +248,11 @@ function interactPriority(entity: Entity, state: GameState): number {
     case EntityType.PowerCell: return 45;
     case EntityType.FuseBox: return 40;
     case EntityType.PressureValve: return 35;
-    case EntityType.Breach: return 30;
+    case EntityType.Breach: {
+      if (entity.props["sealed"] === true) return -1;
+      if (entity.props["scanHidden"] === true) return -1;
+      return 30;
+    }
     case EntityType.CrewNPC: {
       if (entity.props["evacuated"] === true || entity.props["dead"] === true) return -1;
       if (entity.props["following"] === true) {
@@ -258,10 +262,13 @@ function interactPriority(entity: Entity, state: GameState): number {
       }
       // Only discover crew (first interaction) if not yet found
       if (entity.props["found"] !== true) return 25; // discover crew
-      // Already found — only recruit (second interaction) when all deductions are done
-      // This prevents crew getting lost during long exploration traversals
-      const allDedsSolved = (state.mystery?.deductions ?? []).every(d => d.solved);
-      return allDedsSolved ? 200 : -1; // recruit only when ready to escort
+      // Recruit found crew earlier: once 50%+ deductions solved OR turn > 200 OR evacuating
+      const deds = state.mystery?.deductions ?? [];
+      const solvedCount = deds.filter(d => d.solved).length;
+      const readyToRecruit = evacuating ||
+        solvedCount >= Math.ceil(deds.length / 2) ||
+        state.turn > 200;
+      return readyToRecruit ? 200 : -1;
     }
     case EntityType.EscapePod: {
       if (!evacuating) return -1; // don't interact before evacuation
@@ -415,21 +422,37 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
-  // Phase 2 ENDGAME OVERRIDE: If all deductions done and turn > 700, rush to data core
+  // Phase 2 ENDGAME OVERRIDE: If all deductions done and near emergency override, rush to data core
+  // Only rush when turn is close to emergency override threshold (90% of maxTurns)
+  // or when no found living crew remain to block transmission
   {
     const deds = state.mystery?.deductions ?? [];
     const allDone = deds.length > 0 && deds.every(d => d.solved);
-    if (allDone && state.turn > 700) {
-      for (const [, entity] of state.entities) {
-        if (entity.type === EntityType.DataCore) {
-          if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
-            return { type: ActionType.Interact, targetId: entity.id };
+    if (allDone) {
+      // Check if data core would actually accept transmission
+      let foundLivingCount = 0;
+      for (const [, e] of state.entities) {
+        if (e.type === EntityType.CrewNPC &&
+            e.props["found"] === true &&
+            e.props["evacuated"] !== true &&
+            e.props["dead"] !== true) {
+          foundLivingCount++;
+        }
+      }
+      const emergencyThreshold = Math.floor(state.maxTurns * 0.89); // rush slightly before override
+      const canTransmit = foundLivingCount === 0 || state.turn >= emergencyThreshold;
+      if (canTransmit) {
+        for (const [, entity] of state.entities) {
+          if (entity.type === EntityType.DataCore) {
+            if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
+              return { type: ActionType.Interact, targetId: entity.id };
+            }
+            const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+              manhattan({ x, y }, entity.pos) <= 1
+            ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+              manhattan({ x, y }, entity.pos) <= 1, true);
+            if (dir) return { type: ActionType.Move, direction: dir };
           }
-          const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
-            manhattan({ x, y }, entity.pos) <= 1
-          ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
-            manhattan({ x, y }, entity.pos) <= 1, true);
-          if (dir) return { type: ActionType.Move, direction: dir };
         }
       }
     }
@@ -437,21 +460,20 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
 
   // Phase 2a: Station Autopsy — examine scene clues + process scenes
   if (state.mystery?.roomScenes) {
+    // First: examine clues in current room
     const currentRoom = getRoomAt(state, { x: px, y: py });
     if (currentRoom) {
       const roomScene = state.mystery.roomScenes.find(
         s => s.roomName === currentRoom.name && !s.processed,
       );
       if (roomScene) {
-        // Examine unexamined clues first
         const unexamined = roomScene.physicalClues.filter(c => !c.examined && !c.sensorRequired);
         if (unexamined.length > 0) {
           return { type: ActionType.ExamineScene, sceneRoomId: roomScene.roomId };
         }
-        // If all examinable clues examined, process the scene
+        // All clues examined in current room — process immediately
         const examinedCount = roomScene.physicalClues.filter(c => c.examined).length;
         if (examinedCount > 0 && !roomScene.processed) {
-          // Use ground truth for oracle mode (like deduction oracle)
           const gt = roomScene.groundTruth;
           return {
             type: ActionType.ProcessScene,
@@ -462,6 +484,23 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
           };
         }
       }
+    }
+    // Second: process any previously-visited room whose clues were examined but scene not processed
+    for (const scene of state.mystery.roomScenes) {
+      if (scene.processed) continue;
+      const examinedCount = scene.physicalClues.filter(c => c.examined).length;
+      if (examinedCount === 0) continue;
+      const unexamined = scene.physicalClues.filter(c => !c.examined && !c.sensorRequired);
+      if (unexamined.length > 0) continue; // still has unexamined clues
+      // All examinable clues examined — process this scene
+      const gt = scene.groundTruth;
+      return {
+        type: ActionType.ProcessScene,
+        sceneRoomId: scene.roomId,
+        whoAnswer: gt.who,
+        whatAnswer: gt.what as string,
+        outcomeAnswer: gt.outcome as string,
+      };
     }
   }
 
@@ -607,16 +646,20 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
         }
       }
 
-      // Exclude rescue-blocked crew from count (4+ failed interaction attempts)
+      // Exclude rescue-blocked crew from count (3+ failed interaction attempts)
       const rescueBlockedCount = foundNotFollowing.filter(c =>
-        (interactAttempts.get(c.id) ?? 0) >= 4
+        (interactAttempts.get(c.id) ?? 0) >= 3
       ).length;
       foundLivingRemaining -= rescueBlockedCount;
 
       // Under time pressure, fallback to data core
-      // - After turn 700: give up on crew evacuation entirely
-      // - After turn 400: give up only if no remaining crew to evacuate
-      const timePressure = state.turn > 700 || (state.turn > 400 && foundLivingRemaining === 0);
+      // - After turn 500: give up on crew evacuation entirely
+      // - After turn 300: give up if no remaining reachable crew
+      // - After turn 200: give up if all found crew are rescue-blocked and no followers
+      const allFoundBlocked = foundLivingRemaining === 0 && !hasFollowingCrew(state);
+      const timePressure = state.turn > 500 ||
+        (state.turn > 300 && foundLivingRemaining === 0) ||
+        (state.turn > 200 && allFoundBlocked && unfoundCrew.length > 0);
       if ((foundLivingRemaining > 0 || unfoundCrew.length > 0) && !timePressure) {
         // PRIMARY WIN PATH: evacuate all living crew
 
@@ -625,7 +668,7 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
           if (foundNotFollowing.length > 0) {
             const nearbyCrew = foundNotFollowing.filter(c =>
               manhattan({ x: px, y: py }, c.pos) <= 10 &&
-              (interactAttempts.get(c.id) ?? 0) < 4
+              (interactAttempts.get(c.id) ?? 0) < 3
             ).sort((a, b) =>
               manhattan({ x: px, y: py }, a.pos) - manhattan({ x: px, y: py }, b.pos)
             );
@@ -716,9 +759,9 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
             }
           }
         } else if (foundNotFollowing.length > 0) {
-          // Found crew not yet following — go recruit nearest (skip rescue-blocked after 4 attempts)
+          // Found crew not yet following — go recruit nearest (skip rescue-blocked after 3 attempts)
           const recruitable = foundNotFollowing.filter(c =>
-            (interactAttempts.get(c.id) ?? 0) < 4
+            (interactAttempts.get(c.id) ?? 0) < 3
           );
           if (recruitable.length > 0) {
           const sorted = recruitable.sort((a, b) =>
@@ -752,19 +795,33 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
           if (dir) return { type: ActionType.Move, direction: dir };
         }
       } else {
-        // FALLBACK: No living crew — data core transmit (bittersweet victory)
-        for (const [, entity] of state.entities) {
-          if (entity.type === EntityType.DataCore) {
-            if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
-              return { type: ActionType.Interact, targetId: entity.id };
-            }
-            const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
-              manhattan({ x, y }, entity.pos) <= 1
-            ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
-              manhattan({ x, y }, entity.pos) <= 1, true);
-            if (dir) return { type: ActionType.Move, direction: dir };
+        // FALLBACK: time pressure or no living crew — data core transmit
+        // Only try if data core would accept (no found living crew, or near emergency override)
+        let foundLiving = 0;
+        for (const [, e] of state.entities) {
+          if (e.type === EntityType.CrewNPC &&
+              e.props["found"] === true &&
+              e.props["evacuated"] !== true &&
+              e.props["dead"] !== true) {
+            foundLiving++;
           }
         }
+        const nearEmergency = state.turn >= Math.floor(state.maxTurns * 0.89);
+        if (foundLiving === 0 || nearEmergency) {
+          for (const [, entity] of state.entities) {
+            if (entity.type === EntityType.DataCore) {
+              if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
+                return { type: ActionType.Interact, targetId: entity.id };
+              }
+              const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                manhattan({ x, y }, entity.pos) <= 1
+              ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+                manhattan({ x, y }, entity.pos) <= 1, true);
+              if (dir) return { type: ActionType.Move, direction: dir };
+            }
+          }
+        }
+        // If data core can't accept yet, fall through to exploration/interaction phases
       }
     }
   }
@@ -801,10 +858,10 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     .filter(p => p.priority > 0)
     .filter(p => {
       const attempts = interactAttempts.get(p.entity.id) ?? 0;
-      // Sealed crew need 3 interactions: discover → unseal → recruit
+      // Crew need discover → recruit (some may need rescue first)
       if (p.entity.type === EntityType.CrewNPC && p.entity.props["following"] !== true &&
           p.entity.props["evacuated"] !== true && p.entity.props["dead"] !== true) {
-        return attempts < 4;
+        return attempts < 3;
       }
       return attempts < 2; // skip after 2 failed attempts for other entities
     })
@@ -934,7 +991,7 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
       const crewLimit = entity.type === EntityType.CrewNPC &&
         entity.props["following"] !== true &&
         entity.props["evacuated"] !== true &&
-        entity.props["dead"] !== true ? 4 : 2;
+        entity.props["dead"] !== true ? 3 : 2;
       if (attempts >= crewLimit) continue;
       const pri = interactPriority(entity, state);
       if (pri <= 0) continue;
@@ -966,7 +1023,26 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
-  // Phase 5: Explore unexplored tiles
+  // Phase 5: Explore unexplored tiles — prioritize room tiles over corridors
+  // Build room tile set for room-biased exploration
+  const roomTileSet = new Set<string>();
+  for (const room of state.rooms) {
+    for (let ry = room.y; ry < room.y + room.height; ry++) {
+      for (let rx = room.x; rx < room.x + room.width; rx++) {
+        if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+          roomTileSet.add(`${rx},${ry}`);
+        }
+      }
+    }
+  }
+  // Pass 1: Prioritize unexplored room tiles (rooms have evidence, scenes, entities)
+  const roomExploreDir = bfsToTarget(state, { x: px, y: py }, (x, y) => {
+    return !visited.has(`${x},${y}`) && state.tiles[y][x].walkable && roomTileSet.has(`${x},${y}`);
+  }) ?? bfsToTarget(state, { x: px, y: py }, (x, y) => {
+    return !visited.has(`${x},${y}`) && state.tiles[y][x].walkable && roomTileSet.has(`${x},${y}`);
+  }, true);
+  if (roomExploreDir) return { type: ActionType.Move, direction: roomExploreDir };
+  // Pass 2: Fall back to any unexplored tile
   const exploreDir = bfsToTarget(state, { x: px, y: py }, (x, y) => {
     return !visited.has(`${x},${y}`) && state.tiles[y][x].walkable;
   }) ?? bfsToTarget(state, { x: px, y: py }, (x, y) => {

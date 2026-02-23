@@ -327,10 +327,6 @@ function autoExploreBFS(): Direction | null {
   const py = state.player.entity.pos.y;
   const key = (x: number, y: number) => `${x},${y}`;
 
-  // BFS from player position
-  const visited = new Set<string>();
-  const queue: { x: number; y: number; firstDir: Direction }[] = [];
-
   const dirs: { dx: number; dy: number; dir: Direction }[] = [
     { dx: 0, dy: -1, dir: Direction.North },
     { dx: 0, dy: 1, dir: Direction.South },
@@ -342,39 +338,55 @@ function autoExploreBFS(): Direction | null {
     { dx: 1, dy: 1, dir: Direction.SouthEast },
   ];
 
-  visited.add(key(px, py));
-  for (const { dx, dy, dir } of dirs) {
-    const nx = px + dx;
-    const ny = py + dy;
-    if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
-    if (!state.tiles[ny][nx].walkable) continue;
-    visited.add(key(nx, ny));
-    queue.push({ x: nx, y: ny, firstDir: dir });
+  // Build set of tiles inside rooms for room-biased exploration
+  const roomTiles = new Set<string>();
+  for (const room of state.rooms) {
+    for (let ry = room.y; ry < room.y + room.height; ry++) {
+      for (let rx = room.x; rx < room.x + room.width; rx++) {
+        if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+          roomTiles.add(key(rx, ry));
+        }
+      }
+    }
   }
 
-  let head = 0;
-  while (head < queue.length) {
-    const { x, y, firstDir } = queue[head++];
-    const tile = state.tiles[y][x];
-
-    // Goal: an unexplored walkable tile
-    if (!tile.explored) {
-      return firstDir;
-    }
-
-    for (const { dx, dy } of dirs) {
-      const nx = x + dx;
-      const ny = y + dy;
+  // BFS helper — returns first direction toward nearest tile matching predicate
+  function bfs(isGoal: (x: number, y: number, tile: typeof state.tiles[0][0]) => boolean): Direction | null {
+    const vis = new Set<string>();
+    const q: { x: number; y: number; firstDir: Direction }[] = [];
+    vis.add(key(px, py));
+    for (const { dx, dy, dir } of dirs) {
+      const nx = px + dx;
+      const ny = py + dy;
       if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
-      const k = key(nx, ny);
-      if (visited.has(k)) continue;
       if (!state.tiles[ny][nx].walkable) continue;
-      visited.add(k);
-      queue.push({ x: nx, y: ny, firstDir });
+      vis.add(key(nx, ny));
+      q.push({ x: nx, y: ny, firstDir: dir });
     }
+    let head = 0;
+    while (head < q.length) {
+      const { x, y, firstDir } = q[head++];
+      if (isGoal(x, y, state.tiles[y][x])) return firstDir;
+      for (const { dx, dy } of dirs) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || nx >= state.width || ny < 0 || ny >= state.height) continue;
+        const k = key(nx, ny);
+        if (vis.has(k)) continue;
+        if (!state.tiles[ny][nx].walkable) continue;
+        vis.add(k);
+        q.push({ x: nx, y: ny, firstDir });
+      }
+    }
+    return null;
   }
 
-  return null; // no unexplored tiles reachable
+  // Pass 1: Prioritize unexplored room tiles (rooms have entities, scenes, evidence)
+  const roomDir = bfs((x, y, tile) => !tile.explored && roomTiles.has(key(x, y)));
+  if (roomDir) return roomDir;
+
+  // Pass 2: Fall back to any unexplored walkable tile (corridors)
+  return bfs((_x, _y, tile) => !tile.explored);
 }
 
 /** Check if there are non-exhausted interactable entities adjacent to player. */
