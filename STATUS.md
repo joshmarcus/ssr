@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 104 (V224 completed — Room visual personality: viewports, screens, ceiling lights)
+- **Phase**: Sprint 107 (V227 completed — Spatial map + floor details + door signs)
 - **Test status**: 292 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -195,6 +195,25 @@
 - **Brighter panels**: Opacity raised to 0.75 with room-tinted color blend
 - **Volumetric cones**: CylinderGeometry light cones descending from each panel
 - **Floor pools**: CircleGeometry discs with additive blend under each panel
+
+### V225 — Holographic Door Signs
+- **Door name signs**: Canvas-textured room name labels above doorframes
+- **Room-tinted**: Background bars and text colored per room type
+- **Corridor navigation**: Visible from corridors approaching rooms
+
+### V226 — Floor Detail Decals
+- **Drain grates**: Small dark circles on ~25% of floor tiles
+- **Panel seams**: Thin dark lines with random orientation
+- **Wear marks**: Subtle lighter patches with additive blend
+- **Access panels**: Small dark rectangle outlines for visual variety
+
+### V227 — Spatial Station Map Overlay
+- **Canvas-based map**: Visual room rectangles with corridors, doors, player position
+- **Room-tinted borders**: Color-coded by room type (Power yellow, Data Core purple, etc.)
+- **Room name labels**: Visible inside visited rooms
+- **Player dot**: Green circle with white border showing current position
+- **Door states**: Red (locked) vs green (open) on map
+- **Room list sidebar**: Retained for quick text reference alongside spatial view
 
 ### Technical Notes
 - Screenshot tool now dismisses evidence cards after autoplay via synthetic keydown
