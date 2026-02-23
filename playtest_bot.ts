@@ -413,6 +413,36 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
+  // Phase 2a: Station Autopsy — examine scene clues + process scenes
+  if (state.mystery?.roomScenes) {
+    const currentRoom = getRoomAt(state, { x: px, y: py });
+    if (currentRoom) {
+      const roomScene = state.mystery.roomScenes.find(
+        s => s.roomName === currentRoom.name && !s.processed,
+      );
+      if (roomScene) {
+        // Examine unexamined clues first
+        const unexamined = roomScene.physicalClues.filter(c => !c.examined && !c.sensorRequired);
+        if (unexamined.length > 0) {
+          return { type: ActionType.ExamineScene, sceneRoomId: roomScene.roomId };
+        }
+        // If all examinable clues examined, process the scene
+        const examinedCount = roomScene.physicalClues.filter(c => c.examined).length;
+        if (examinedCount > 0 && !roomScene.processed) {
+          // Use ground truth for oracle mode (like deduction oracle)
+          const gt = roomScene.groundTruth;
+          return {
+            type: ActionType.ProcessScene,
+            sceneRoomId: roomScene.roomId,
+            whoAnswer: gt.who,
+            whatAnswer: gt.what as string,
+            outcomeAnswer: gt.outcome as string,
+          };
+        }
+      }
+    }
+  }
+
   // Phase 2b: Submit available mystery choices (pick first option)
   if (state.mystery) {
     const choiceThresholds = [3, 6, 10];
@@ -963,6 +993,8 @@ for (let turn = 0; turn < state.maxTurns; turn++) {
     action.type === ActionType.Interact ? `INTERACT ${action.targetId}` :
     action.type === ActionType.SubmitDeduction ? `SUBMIT_DEDUCTION ${action.deductionId}=${action.answerKey}` :
     action.type === ActionType.SubmitChoice ? `SUBMIT_CHOICE ${action.choiceId}=${action.answerKey}` :
+    action.type === ActionType.ExamineScene ? `EXAMINE_SCENE ${action.sceneRoomId}` :
+    action.type === ActionType.ProcessScene ? `PROCESS_SCENE ${action.sceneRoomId}` :
     action.type.toUpperCase();
 
   const pos = `(${state.player.entity.pos.x},${state.player.entity.pos.y})`;
@@ -1018,6 +1050,23 @@ const deds = state.mystery?.deductions ?? [];
 const answered = deds.filter(d => d.solved).length;
 const correct = deds.filter(d => d.answeredCorrectly).length;
 console.log(`Deductions: ${answered}/${deds.length} answered, ${correct} correct`);
+
+// Station Autopsy stats
+const botScenes = state.mystery?.roomScenes ?? [];
+const botProcessed = botScenes.filter(s => s.processed).length;
+const botDossiers = state.mystery?.dossiers ?? [];
+const botIdentified = botDossiers.filter(d => d.confirmed.name).length;
+const botAccum = state.mystery?.evidenceAccumulation;
+const botBoard = state.mystery?.incidentBoard;
+const botConfirmed = botBoard?.slots.filter(s => s.status === "confirmed").length ?? 0;
+if (botScenes.length > 0) {
+  console.log(`Scenes processed: ${botProcessed}/${botScenes.length}`);
+  console.log(`Crew identified: ${botIdentified}/${botDossiers.length}`);
+  if (botBoard) console.log(`Timeline confirmed: ${botConfirmed}/${botBoard.slots.length}`);
+  if (botAccum) {
+    console.log(`Evidence: ${botAccum.confirming_found}C/${botAccum.ambiguous_found}A/${botAccum.contradicting_found}X${botAccum.crack_moment_fired ? " [CRACK MOMENT]" : ""}`);
+  }
+}
 
 // List unvisited interactable entities
 const uninteracted: string[] = [];
