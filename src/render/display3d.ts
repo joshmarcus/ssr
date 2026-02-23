@@ -1860,6 +1860,57 @@ export class BrowserDisplay3D implements IGameDisplay {
     window.addEventListener("keydown", this._caseClosedDismissHandler);
   }
 
+  // ── HUD notification banner ────────────────────────────────
+  private _hudNotifTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Show a brief notification banner at the top of the screen.
+   * Auto-dismisses after `duration` ms. Used for deduction unlocks, milestone events, etc.
+   */
+  showHUDNotification(opts: {
+    label: string;        // e.g. "NEW DEDUCTION"
+    text: string;         // e.g. "What happened aboard CORVUS-7?"
+    hint: string;         // e.g. "Press [V] to investigate"
+    color?: string;       // accent color (default: orange)
+    duration?: number;    // ms before auto-dismiss (default: 6000)
+  }): void {
+    let el = document.getElementById("hud-notification");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "hud-notification";
+      el.style.cssText =
+        "position:fixed;top:0;left:50%;transform:translateX(-50%);" +
+        "z-index:95;pointer-events:none;opacity:0;transition:opacity 0.4s,top 0.4s;" +
+        "font-family:'Courier New',monospace;text-align:center;padding:10px 24px;" +
+        "max-width:600px;";
+      document.body.appendChild(el);
+    }
+
+    const color = opts.color ?? "#fa0";
+    el.innerHTML =
+      `<div style="display:inline-block;background:rgba(0,0,0,0.85);border:1px solid ${color};` +
+      `border-radius:4px;padding:8px 20px;box-shadow:0 0 20px rgba(255,170,0,0.2)">` +
+      `<div style="color:${color};font-size:10px;font-weight:bold;letter-spacing:2px;margin-bottom:3px">${opts.label}</div>` +
+      `<div style="color:#eee;font-size:13px;margin-bottom:4px">${opts.text}</div>` +
+      `<div style="color:#889;font-size:10px;letter-spacing:1px">${opts.hint}</div>` +
+      `</div>`;
+
+    // Animate in
+    el.style.opacity = "0";
+    el.style.top = "-10px";
+    requestAnimationFrame(() => {
+      el!.style.opacity = "1";
+      el!.style.top = "12px";
+    });
+
+    // Clear previous timer
+    if (this._hudNotifTimer) clearTimeout(this._hudNotifTimer);
+    this._hudNotifTimer = setTimeout(() => {
+      el!.style.opacity = "0";
+      el!.style.top = "-10px";
+    }, opts.duration ?? 6000);
+  }
+
   /** Update which rooms have collected evidence for investigation aura effects. */
   setInvestigationRooms(rooms: Map<string, { evidenceCount: number; fullyInvestigated: boolean }>): void {
     this._investigationRooms = rooms;

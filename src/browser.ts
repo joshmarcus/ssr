@@ -51,6 +51,7 @@ import { getUnlockedDeductions, solveDeduction } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave, recordRun } from "./sim/saveLoad.js";
 import { isEntityExhausted } from "./shared/ui.js";
+import { computeGoals, computeGoalDiscoveries, type Goal, type Subgoal } from "./shared/goals.js";
 import { formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
 
 // ── Archetype display names ─────────────────────────────────────
@@ -206,6 +207,7 @@ const corridorAmbientFired = new Set<string>(); // track corridor segments that 
 let lastCorridorAmbientTurn = 0; // cooldown: don't fire corridor ambient more than once per 20 turns
 let lastStationEventTurn = 0; // cooldown for station-wide ambient events
 let lastJournalLength = 0; // track journal size for insight notifications
+const previouslyUnlockedDeductions = new Set<string>(); // track deduction IDs that were already unlocked
 const foreshadowedRooms = new Map<string, string>(); // room name → log excerpt (for manuscript echo)
 const echoedRooms = new Set<string>(); // rooms where we've already shown the echo
 let journalOpen = false;
@@ -246,6 +248,12 @@ let hubEvidenceFilter: "all" | "by_room" | "by_type" | "unread" = "all"; // evid
 const hubViewedEvidenceIds = new Set<string>(); // tracks which evidence entries player has viewed in Hub
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
 let pendingCeremonyDeduction: { id: string; correct: boolean } | null = null; // for post-overlay CORVUS-7 commentary
+// ── Goal panel state ──────────────────────────────────────────
+let goalPanelOpen = false;
+let goalPanelIdx = 0;           // selected goal index
+let focusedGoalId: string | null = null; // player's chosen focus goal
+const discoveredGoalIds = new Set<string>(); // persistent set of discovered goal IDs
+let lastGoalDiscoveryCount = 0; // for detecting new discoveries
 let contradictionFalseLeadFired = false; // has the misleading log been shown
 let contradictionRefutationFired = false; // has the refutation been shown
 // ── ReactorScram dwell penalty (data core surveillance) ──────────
@@ -1433,6 +1441,36 @@ function initGame(): void {
       }
       return; // swallow all input while incident card is open
     }
+    // ── Goal panel keyboard handling ──────────────────────────
+    if (goalPanelOpen) {
+      e.preventDefault();
+      if (e.key === "Escape" || e.key === "g") {
+        goalPanelOpen = false;
+        const overlay = document.getElementById("goal-panel-overlay");
+        if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; }
+        return;
+      }
+      const goals = computeGoals(state, discoveredGoalIds, { visitedRoomIds });
+      if (e.key === "ArrowUp" || e.key === "w" || e.key === "k") {
+        goalPanelIdx = Math.max(0, goalPanelIdx - 1);
+      } else if (e.key === "ArrowDown" || e.key === "s" || e.key === "j") {
+        goalPanelIdx = Math.min(goals.length - 1, goalPanelIdx + 1);
+      } else if (e.key === "Enter" || e.key === " ") {
+        // Focus/unfocus the selected goal
+        const selected = goals[goalPanelIdx];
+        if (selected) {
+          if (focusedGoalId === selected.id) {
+            focusedGoalId = null; // unfocus
+            display.addLog(`Goal tracking cleared.`, "system");
+          } else {
+            focusedGoalId = selected.id;
+            display.addLog(`Now tracking: ${selected.title}`, "system");
+          }
+        }
+      }
+      showGoalPanel();
+      return;
+    }
     if (logReviewOpen) {
       if (e.key === "Escape" || e.key === "`") {
         e.preventDefault();
@@ -1588,14 +1626,17 @@ function initGame(): void {
       renderInvestigationHub();
       return;
     }
-    // G key toggles incident summary card
+    // G key toggles goal panel
     if (e.key === "g" && !journalOpen && !investigationHubOpen && !state.gameOver) {
       e.preventDefault();
-      incidentCardOpen = !incidentCardOpen;
-      if (incidentCardOpen) {
-        showIncidentCard();
+      goalPanelOpen = !goalPanelOpen;
+      if (goalPanelOpen) {
+        // Refresh discoveries before showing
+        const newDisc = computeGoalDiscoveries(state);
+        for (const id of newDisc) discoveredGoalIds.add(id);
+        showGoalPanel();
       } else {
-        const overlay = document.getElementById("journal-overlay");
+        const overlay = document.getElementById("goal-panel-overlay");
         if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; }
       }
       return;
@@ -1682,6 +1723,9 @@ function renderAll(): void {
     (display as any).setStationStress(stress);
   }
 
+  // ── Focused goal HUD ─────────────────────────────────────────
+  updateGoalHUD();
+
   // Auto-explore badge
   const autoEl = document.getElementById("auto-explore-badge");
   if (autoEl) {
@@ -1732,6 +1776,12 @@ function resetGameState(newSeed: number): void {
   corridorAmbientFired.clear();
   lastCorridorAmbientTurn = 0;
   lastJournalLength = 0;
+  previouslyUnlockedDeductions.clear();
+  goalPanelOpen = false;
+  goalPanelIdx = 0;
+  focusedGoalId = null;
+  discoveredGoalIds.clear();
+  lastGoalDiscoveryCount = 0;
   foreshadowedRooms.clear();
   echoedRooms.clear();
   mapOpen = false;
@@ -2588,28 +2638,60 @@ function handleAction(action: Action): void {
         }
       }
 
-      // Check if any unsolved deduction gained new tag coverage
-      const solvedIds = new Set(mystery.deductions.filter(d => d.solved).map(d => d.id));
-      let insightFired = false;
-      for (const d of mystery.deductions) {
-        if (d.solved) continue;
-        if (d.unlockAfter && !solvedIds.has(d.unlockAfter)) continue;
-        const relevantNewTags = d.requiredTags.filter(t => newTags.has(t));
-        if (relevantNewTags.length > 0) {
-          const allTags = new Set(journal.flatMap(j => j.tags));
-          const covered = d.requiredTags.filter(t => allTags.has(t)).length;
-          const total = d.requiredTags.length;
-          if (covered === total && !insightFired) {
-            display.addLog(`CORVUS-7 CENTRAL: Evidence cross-referenced. All data assembled for a deduction. Open CONNECTIONS [v].`, "milestone");
-            audio.playDeductionReady();
-            insightFired = true;
-          } else if (!insightFired) {
-            display.addLog(`CORVUS-7 CENTRAL: New evidence cross-referenced — ${covered}/${total} data points for active investigation.`, "system");
-            insightFired = true;
+      // Check if any deduction is newly unlocked (evidence threshold + chain prerequisite)
+      const currentlyUnlocked = getUnlockedDeductions(mystery.deductions, journal);
+      for (const d of currentlyUnlocked) {
+        if (!previouslyUnlockedDeductions.has(d.id)) {
+          previouslyUnlockedDeductions.add(d.id);
+          // Fire HUD notification for newly unlocked deduction
+          display.addLog(`CORVUS-7 CENTRAL: Evidence cross-referenced. New deduction available. Open CONNECTIONS [v].`, "milestone");
+          audio.playDeductionReady();
+          if (display.showHUDNotification) {
+            display.showHUDNotification({
+              label: "NEW DEDUCTION AVAILABLE",
+              text: d.question,
+              hint: "Press [V] to open Investigation Hub → CONNECTIONS",
+              color: "#fa0",
+              duration: 7000,
+            });
+          }
+          break; // one notification per tick
+        }
+      }
+      // Also track unlocked set for deductions that were already unlocked at game start
+      for (const d of currentlyUnlocked) {
+        previouslyUnlockedDeductions.add(d.id);
+      }
+    }
+    // ── Goal discovery notifications ─────────────────────────────
+    const newDiscoveries = computeGoalDiscoveries(state);
+    let goalDiscoveryNotified = false;
+    for (const id of newDiscoveries) {
+      if (!discoveredGoalIds.has(id)) {
+        discoveredGoalIds.add(id);
+        // Find the goal to get its title
+        const allGoals = computeGoals(state, discoveredGoalIds, { visitedRoomIds });
+        const newGoal = allGoals.find(g => g.id === id);
+        if (newGoal && !goalDiscoveryNotified) {
+          display.addLog(`NEW GOAL: ${newGoal.title} — press [G] to view goals`, "milestone");
+          if (display.showHUDNotification) {
+            display.showHUDNotification({
+              label: "NEW GOAL DISCOVERED",
+              text: newGoal.title,
+              hint: "Press [G] to view Mission Goals",
+              color: newGoal.color,
+              duration: 5000,
+            });
+          }
+          goalDiscoveryNotified = true;
+          // Auto-focus first goal if nothing focused
+          if (!focusedGoalId) {
+            focusedGoalId = id;
           }
         }
       }
     }
+
     // ── Contradiction events ────────────────────────────────────
     // False lead: fire after the player reads their 3rd terminal
     if (!contradictionFalseLeadFired && state.mystery?.timeline?.archetype) {
@@ -3154,7 +3236,7 @@ function showHelp(): void {
           <div><span style="color:#fff">[v]</span>  Investigation Hub → Evidence</div>
           <div><span style="color:#fff">[;]</span>  Quick journal toggle</div>
           <div><span style="color:#fff">[\`]</span>  Message log review</div>
-          <div><span style="color:#fff">[g]</span>  Incident summary card</div>
+          <div><span style="color:#fff">[g]</span>  Mission Goals (track/focus)</div>
           <div><span style="color:#fff">[m]</span>  Station map overlay</div>
           <div><span style="color:#fff">[?]</span>  This help screen</div>
         </div>
@@ -3388,6 +3470,202 @@ function closeMapOverlay(): void {
   }
   mapOpen = false;
   renderAll();
+}
+
+// ── Goal panel ───────────────────────────────────────────────────
+function showGoalPanel(): void {
+  let overlay = document.getElementById("goal-panel-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "goal-panel-overlay";
+    overlay.style.cssText =
+      "position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;" +
+      "background:rgba(0,0,0,0.75);font-family:'Courier New',monospace;pointer-events:auto;";
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.add("active");
+
+  const goals = computeGoals(state, discoveredGoalIds, { visitedRoomIds });
+  if (goalPanelIdx >= goals.length) goalPanelIdx = Math.max(0, goals.length - 1);
+
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Left panel: goal list
+  let listHtml = "";
+  for (let i = 0; i < goals.length; i++) {
+    const g = goals[i];
+    const selected = i === goalPanelIdx;
+    const focused = focusedGoalId === g.id;
+    const pct = Math.round(g.progress * 100);
+    const completedSubs = g.subgoals.filter(s => s.completed).length;
+    const totalSubs = g.subgoals.filter(s => s.discovered).length;
+
+    const borderColor = selected ? g.color : "transparent";
+    const bg = selected ? "rgba(255,255,255,0.06)" : "transparent";
+    const focusTag = focused ? `<span style="color:#4f8;font-size:9px;letter-spacing:1px;margin-left:6px">TRACKING</span>` : "";
+    const completedTag = g.completed ? `<span style="color:#4f8;font-size:9px;margin-left:6px">\u2713</span>` : "";
+
+    // Progress bar
+    const barBg = g.completed ? "#4f8" : g.color;
+    const barHtml = `<div style="height:3px;background:#222;border-radius:2px;margin-top:4px;width:100%">` +
+      `<div style="height:100%;background:${barBg};border-radius:2px;width:${pct}%"></div></div>`;
+
+    listHtml += `<div style="padding:8px 12px;border-left:3px solid ${borderColor};background:${bg};cursor:pointer;margin:1px 0">`;
+    listHtml += `<div style="display:flex;align-items:center">`;
+    listHtml += `<span style="color:${g.color};font-size:14px;margin-right:8px">${g.icon}</span>`;
+    listHtml += `<span style="color:${selected ? "#eef" : "#aab"};font-size:13px;font-weight:${selected ? "bold" : "normal"}">${esc(g.title)}</span>`;
+    listHtml += focusTag + completedTag;
+    listHtml += `</div>`;
+    listHtml += `<div style="display:flex;align-items:center;gap:8px;margin-left:22px">`;
+    listHtml += `<span style="color:#667;font-size:10px">${pct}%</span>`;
+    listHtml += `<span style="color:#556;font-size:10px">${completedSubs}/${totalSubs} tasks</span>`;
+    listHtml += `</div>`;
+    listHtml += barHtml;
+    listHtml += `</div>`;
+  }
+
+  // Right panel: selected goal detail
+  let detailHtml = "";
+  const selectedGoal = goals[goalPanelIdx];
+  if (selectedGoal) {
+    const focused = focusedGoalId === selectedGoal.id;
+    detailHtml += `<div style="padding:16px">`;
+    detailHtml += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">`;
+    detailHtml += `<span style="color:${selectedGoal.color};font-size:20px">${selectedGoal.icon}</span>`;
+    detailHtml += `<span style="color:#eef;font-size:16px;font-weight:bold">${esc(selectedGoal.title)}</span>`;
+    detailHtml += `</div>`;
+    detailHtml += `<div style="color:#889;font-size:12px;margin-bottom:12px;line-height:1.4">${esc(selectedGoal.description)}</div>`;
+
+    // Focus hint
+    if (selectedGoal.focusHint) {
+      detailHtml += `<div style="color:${selectedGoal.color};font-size:11px;margin-bottom:12px;padding:6px 8px;background:rgba(255,255,255,0.03);border-left:2px solid ${selectedGoal.color};border-radius:2px">`;
+      detailHtml += `\u25B8 ${esc(selectedGoal.focusHint)}`;
+      detailHtml += `</div>`;
+    }
+
+    // Subgoals
+    detailHtml += `<div style="color:#889;font-size:10px;letter-spacing:1.5px;margin-bottom:6px">TASKS</div>`;
+    const visibleSubs = selectedGoal.subgoals.filter(s => s.discovered);
+    const hiddenCount = selectedGoal.subgoals.filter(s => !s.discovered).length;
+    for (const sub of visibleSubs) {
+      const icon = sub.completed ? `<span style="color:#4f8">\u2713</span>` : `<span style="color:#667">\u25CB</span>`;
+      const textColor = sub.completed ? "#6a6" : "#bbc";
+      detailHtml += `<div style="padding:4px 0 4px 4px;border-bottom:1px solid rgba(255,255,255,0.03)">`;
+      detailHtml += `<div style="display:flex;align-items:center;gap:6px">`;
+      detailHtml += `${icon} <span style="color:${textColor};font-size:12px">${esc(sub.title)}</span>`;
+      detailHtml += `</div>`;
+      if (sub.progressText) {
+        detailHtml += `<div style="color:#667;font-size:10px;padding-left:18px">${esc(sub.progressText)}</div>`;
+      }
+      if (sub.hint && !sub.completed) {
+        detailHtml += `<div style="color:#556;font-size:10px;padding-left:18px;font-style:italic">${esc(sub.hint)}</div>`;
+      }
+      detailHtml += `</div>`;
+    }
+    if (hiddenCount > 0) {
+      detailHtml += `<div style="color:#444;font-size:10px;margin-top:4px;font-style:italic">${hiddenCount} more task${hiddenCount !== 1 ? "s" : ""} to discover...</div>`;
+    }
+
+    // Focus action
+    detailHtml += `<div style="margin-top:16px;padding-top:8px;border-top:1px solid #333">`;
+    if (focused) {
+      detailHtml += `<div style="color:#4f8;font-size:12px">\u2713 Currently tracking this goal</div>`;
+      detailHtml += `<div style="color:#667;font-size:10px;margin-top:2px">[Enter] Stop tracking</div>`;
+    } else {
+      detailHtml += `<div style="color:${selectedGoal.color};font-size:12px">[Enter] Track this goal</div>`;
+      detailHtml += `<div style="color:#667;font-size:10px;margin-top:2px">Tracked goals show progress in the HUD</div>`;
+    }
+    detailHtml += `</div>`;
+
+    detailHtml += `</div>`;
+  }
+
+  // Overall progress
+  const totalGoals = goals.length;
+  const completedGoals = goals.filter(g => g.completed).length;
+
+  overlay.innerHTML =
+    `<div style="background:rgba(8,12,20,0.95);border:1px solid #334;border-radius:6px;width:700px;max-width:90vw;max-height:80vh;overflow:hidden;box-shadow:0 0 40px rgba(0,0,0,0.5)">` +
+    `<div style="padding:12px 16px;border-bottom:1px solid #223;display:flex;align-items:center;justify-content:space-between">` +
+    `<div style="color:#4cf;font-size:11px;letter-spacing:2px;font-weight:bold">=== MISSION GOALS ===</div>` +
+    `<div style="color:#667;font-size:10px">${completedGoals}/${totalGoals} complete | [G/Esc] Close | [\u2191\u2193] Navigate | [Enter] Track</div>` +
+    `</div>` +
+    `<div style="display:flex;max-height:calc(80vh - 50px)">` +
+    `<div style="flex:0 0 260px;border-right:1px solid #223;overflow-y:auto;max-height:calc(80vh - 50px)">${listHtml}</div>` +
+    `<div style="flex:1;overflow-y:auto;max-height:calc(80vh - 50px)">${detailHtml}</div>` +
+    `</div>` +
+    `</div>`;
+}
+
+// ── Goal HUD (persistent overlay showing focused goal) ──────────
+function updateGoalHUD(): void {
+  let el = document.getElementById("goal-hud");
+  if (!focusedGoalId || state.gameOver) {
+    if (el) el.style.display = "none";
+    return;
+  }
+
+  // Refresh discoveries
+  const newDisc = computeGoalDiscoveries(state);
+  for (const id of newDisc) discoveredGoalIds.add(id);
+
+  const goals = computeGoals(state, discoveredGoalIds, { visitedRoomIds });
+  const goal = goals.find(g => g.id === focusedGoalId);
+  if (!goal) {
+    if (el) el.style.display = "none";
+    return;
+  }
+
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "goal-hud";
+    el.style.cssText =
+      "position:fixed;top:8px;right:8px;z-index:80;pointer-events:none;" +
+      "font-family:'Courier New',monospace;max-width:240px;" +
+      "background:rgba(8,12,20,0.8);border:1px solid rgba(255,255,255,0.1);" +
+      "border-radius:4px;padding:6px 10px;";
+    document.body.appendChild(el);
+  }
+  el.style.display = "block";
+  el.style.borderColor = goal.color + "44";
+
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const pct = Math.round(goal.progress * 100);
+
+  // Find next incomplete discovered subgoal
+  const nextSub = goal.subgoals.find(s => s.discovered && !s.completed);
+
+  let html = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">`;
+  html += `<span style="color:${goal.color};font-size:12px">${goal.icon}</span>`;
+  html += `<span style="color:${goal.color};font-size:10px;letter-spacing:1px;font-weight:bold">${esc(goal.title).toUpperCase()}</span>`;
+  if (goal.completed) {
+    html += `<span style="color:#4f8;font-size:9px">\u2713</span>`;
+  }
+  html += `</div>`;
+
+  // Progress bar
+  const barBg = goal.completed ? "#4f8" : goal.color;
+  html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">`;
+  html += `<div style="height:2px;background:#333;border-radius:1px;flex:1">`;
+  html += `<div style="height:100%;background:${barBg};border-radius:1px;width:${pct}%"></div>`;
+  html += `</div>`;
+  html += `<span style="color:#667;font-size:9px">${pct}%</span>`;
+  html += `</div>`;
+
+  // Next subgoal hint
+  if (nextSub) {
+    html += `<div style="color:#889;font-size:9px;line-height:1.3">`;
+    html += `\u25B8 ${esc(nextSub.title)}`;
+    if (nextSub.progressText) {
+      html += ` <span style="color:#556">(${esc(nextSub.progressText)})</span>`;
+    }
+    html += `</div>`;
+  }
+
+  // [G] hint
+  html += `<div style="color:#445;font-size:8px;margin-top:2px">[G] Goals</div>`;
+
+  el.innerHTML = html;
 }
 
 // ── Incident summary card ────────────────────────────────────────
@@ -4152,14 +4430,18 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
   const journal = state.mystery?.journal ?? [];
   const crew = state.mystery?.crew ?? [];
 
-  // Crew with relationships
+  // Crew with relationships + cross-tab hints
   let crewHtml = "";
   if (entry.crewMentioned.length > 0) {
-    crewHtml = `<div style="color:#6cf;font-size:12px;margin-top:8px;border-top:1px solid #222;padding-top:6px"><div style="font-weight:bold;margin-bottom:4px">CREW MENTIONED</div>`;
+    crewHtml = `<div style="color:#6cf;font-size:12px;margin-top:8px;border-top:1px solid #222;padding-top:6px"><div style="font-weight:bold;margin-bottom:4px">CREW MENTIONED <span style="color:#556;font-size:10px;font-weight:normal;letter-spacing:1px">[Tab] to CREW for dossiers</span></div>`;
     for (const crewId of entry.crewMentioned) {
       const member = crew.find(c => c.id === crewId);
       if (!member) continue;
-      crewHtml += `<div style="margin:4px 0"><span style="color:#fff">${esc(member.firstName)} ${esc(member.lastName)}</span> — ${esc(fmtRole(member.role))}`;
+      // Check if identified (has dossier)
+      const dossier = state.mystery?.dossiers?.find((ds: any) => ds.crewId === crewId);
+      const identified = !!dossier?.confirmed?.name;
+      const idIcon = identified ? `<span style="color:#4f8;font-size:9px" title="Identified">&#x2713;</span>` : `<span style="color:#665;font-size:9px" title="Unidentified">?</span>`;
+      crewHtml += `<div style="margin:4px 0"><span style="color:#fff">${esc(member.firstName)} ${esc(member.lastName)}</span> ${idIcon} — ${esc(fmtRole(member.role))}`;
       crewHtml += `<div style="color:#888;font-size:11px;padding-left:8px">Personality: ${esc(member.personality)} | Fate: ${esc(member.fate.replace(/_/g, " "))}</div>`;
       if (member.relationships.length > 0) {
         for (const rel of member.relationships) {
@@ -4172,6 +4454,23 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
       crewHtml += `</div>`;
     }
     crewHtml += `</div>`;
+  }
+
+  // Room cross-tab hint to SCENES
+  let roomHintHtml = "";
+  if (entry.room && state.mystery?.roomScenes) {
+    const roomScene = state.mystery.roomScenes.find(s => s.roomName === entry.room);
+    if (roomScene) {
+      const clueCount = roomScene.physicalClues.length;
+      const examined = roomScene.physicalClues.filter(c => c.examined).length;
+      const processed = roomScene.processed;
+      const statusText = processed ? "Scene processed"
+        : examined > 0 ? `${examined}/${clueCount} clues examined`
+        : `${clueCount} clues to examine`;
+      const statusColor = processed ? "#4f8" : examined > 0 ? "#ca8" : "#888";
+      roomHintHtml = `<div style="color:${statusColor};font-size:11px;margin-top:4px;padding:3px 6px;background:rgba(255,255,255,0.02);border-left:2px solid ${statusColor}">` +
+        `SCENE: ${esc(entry.room)} — ${statusText} <span style="color:#556;font-size:10px;letter-spacing:1px">[Tab] to SCENES</span></div>`;
+    }
   }
 
   // Minimap
@@ -4206,6 +4505,7 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
     </div>
     <div class="journal-detail-content">${esc(entry.detail)}</div>
     ${crewHtml}
+    ${roomHintHtml}
     ${minimapHtml}
     ${devHtml}`;
 }
@@ -4233,77 +4533,132 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
 
   let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:8px 12px">`;
 
+  // ── Case progress chain — visual node tracker ──
+  const totalD = deductions.length;
+  const solvedCount = solved.length;
+  const pctComplete = totalD > 0 ? Math.round((solvedCount / totalD) * 100) : 0;
+  html += `<div style="margin-bottom:10px;padding:6px 8px;background:rgba(255,255,255,0.02);border:1px solid #333;border-radius:4px">`;
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">`;
+  html += `<span style="color:#6cf;font-size:10px;letter-spacing:1.5px;font-weight:bold">CASE PROGRESS</span>`;
+  html += `<span style="color:${pctComplete === 100 ? "#4f8" : "#fa0"};font-size:12px;font-weight:bold">${pctComplete}%</span>`;
+  html += `</div>`;
+  // Node chain: each deduction is a node connected by lines
+  html += `<div style="display:flex;align-items:center;gap:0;padding:2px 0">`;
+  for (let i = 0; i < totalD; i++) {
+    const d = deductions[i];
+    const isSolved = d.solved;
+    const isUnlocked = unlockedSet.has(d.id);
+    const nodeColor = isSolved ? (d.answeredCorrectly ? "#4f8" : "#f44")
+      : isUnlocked ? "#fa0" : "#444";
+    const nodeChar = isSolved ? (d.answeredCorrectly ? "\u25C9" : "\u2717") : isUnlocked ? "\u25C7" : "\u25CB";
+    const tierLabel = ["WHAT", "WHERE", "WHY", "WHO", "BLAME", "HIDDEN"][i] ?? `T${i + 1}`;
+    html += `<div style="display:flex;flex-direction:column;align-items:center;flex:1">`;
+    html += `<div style="color:${nodeColor};font-size:16px;line-height:1">${nodeChar}</div>`;
+    html += `<div style="color:${nodeColor};font-size:8px;letter-spacing:0.5px;margin-top:2px">${tierLabel}</div>`;
+    html += `</div>`;
+    if (i < totalD - 1) {
+      const lineColor = deductions[i].solved ? "#4f8" : "#333";
+      html += `<div style="flex:0 0 12px;height:1px;background:${lineColor};margin-top:-8px"></div>`;
+    }
+  }
+  html += `</div>`;
+  html += `</div>`;
+
   // ── Guidance header: tell the player what to do ──
   if (unlocked.length > 0) {
     html += `<div style="color:#44ff88;font-size:13px;margin-bottom:10px;padding:8px;border:1px solid rgba(68,255,136,0.3);border-radius:4px;background:rgba(68,255,136,0.05)">`;
-    html += `\u25B6 You have a deduction ready to answer. Select it and press [Enter].`;
+    html += `\u25B6 Deduction ready. Select it and press [Enter] to review evidence and answer.`;
     html += `</div>`;
   } else if (solved.length === deductions.length) {
     html += `<div style="color:#44ff88;font-size:13px;margin-bottom:10px;padding:8px;border:1px solid rgba(68,255,136,0.3);border-radius:4px;background:rgba(68,255,136,0.05)">`;
-    html += `\u2713 All deductions complete. Your investigation is finished.`;
+    html += `\u2713 Investigation complete. All deductions answered.`;
     html += `</div>`;
   } else {
     // Nothing unlocked yet — tell player what they need
     const nextThreshold = nextLocked?.evidenceThreshold ?? 2;
     const chainLocked = nextLocked?.unlockAfter && !solvedIds.has(nextLocked.unlockAfter);
     if (chainLocked) {
-      html += `<div style="color:#888;font-size:12px;margin-bottom:10px;padding:8px;border:1px solid #333;border-radius:4px;background:rgba(255,255,255,0.02)">`;
-      html += `Keep exploring the station and collecting evidence. Your next question will unlock after you answer the current one.`;
+      html += `<div style="color:#889;font-size:12px;margin-bottom:10px;padding:8px;border:1px solid #333;border-radius:4px;background:rgba(255,255,255,0.02)">`;
+      html += `Solve the current deduction to unlock the next question in the chain.`;
       html += `</div>`;
     } else {
       const needed = Math.max(0, nextThreshold - journal.length);
-      html += `<div style="color:#888;font-size:12px;margin-bottom:10px;padding:8px;border:1px solid #333;border-radius:4px;background:rgba(255,255,255,0.02)">`;
+      html += `<div style="color:#889;font-size:12px;margin-bottom:10px;padding:8px;border:1px solid #333;border-radius:4px;background:rgba(255,255,255,0.02)">`;
       html += `Collect ${needed} more piece${needed !== 1 ? "s" : ""} of evidence to unlock the next deduction. Read terminals, examine items, and scan rooms.`;
       html += `</div>`;
     }
   }
 
   // ── Currently unlocked deduction(s) — THE MAIN EVENT ──
-  // Track a flat index for keyboard navigation
   let flatIdx = 0;
   for (const d of unlocked) {
     const isActive = flatIdx === hubIdx;
-    const catLabel = d.category.toUpperCase().replace("_", " ");
 
-    html += `<div class="deduction-card unlocked-card${isActive ? " active-card" : ""}" style="margin-bottom:8px;padding:8px;border:1px solid rgba(255,170,0,0.4);border-radius:4px;background:rgba(255,170,0,0.05)">`;
-    html += `<div style="color:#fa0;font-weight:bold;font-size:14px;margin-bottom:4px">\u25C7 ${esc(d.question)}</div>`;
+    html += `<div class="deduction-card unlocked-card${isActive ? " active-card" : ""}" style="margin-bottom:8px;padding:10px 12px;border:1px solid rgba(255,170,0,0.4);border-radius:4px;background:rgba(255,170,0,0.05)">`;
+    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">`;
+    html += `<span style="color:#fa0;font-size:18px">\u25C7</span>`;
+    html += `<span style="color:#fa0;font-weight:bold;font-size:14px">${esc(d.question)}</span>`;
+    html += `</div>`;
     if (d.hintText) {
-      html += `<div style="color:#6cf;font-size:12px;padding:2px 0;margin-bottom:4px">\u2139 ${esc(d.hintText)}</div>`;
+      html += `<div style="color:#6cf;font-size:12px;padding:2px 0 2px 26px;margin-bottom:4px">\u2139 ${esc(d.hintText)}</div>`;
     }
     if ((d.wrongAttempts ?? 0) > 0) {
       const attemptsLeft = (d.maxAttempts ?? 2) - (d.wrongAttempts ?? 0);
-      html += `<div style="color:#f44;font-size:11px">\u26a0 ${attemptsLeft} attempt${attemptsLeft !== 1 ? "s" : ""} remaining</div>`;
+      html += `<div style="color:#f44;font-size:11px;padding-left:26px">\u26a0 ${attemptsLeft} attempt${attemptsLeft !== 1 ? "s" : ""} remaining (wrong answer costs 3 HP + 10 turns)</div>`;
     }
     if (isActive) {
-      html += `<div style="color:#44ff88;font-size:12px;margin-top:4px">[Enter] Read evidence &amp; answer</div>`;
+      html += `<div style="color:#44ff88;font-size:12px;margin-top:6px;padding-left:26px">\u25B8 [Enter] Read evidence &amp; answer</div>`;
     }
     html += `</div>`;
     flatIdx++;
   }
 
-  // ── Solved deductions — compact summary ──
+  // ── Solved deductions — richer display with narrative ──
   if (solved.length > 0) {
-    html += `<div style="color:#888;font-size:11px;margin-top:10px;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">Answered (${solved.length})</div>`;
+    html += `<div style="color:#889;font-size:10px;margin-top:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:1.5px">Answered (${solved.length})</div>`;
     for (const d of solved) {
       const icon = d.answeredCorrectly ? "\u2713" : "\u2717";
-      const color = d.answeredCorrectly ? "#4a4" : "#a44";
+      const borderColor = d.answeredCorrectly ? "rgba(68,170,68,0.3)" : "rgba(170,68,68,0.3)";
+      const iconColor = d.answeredCorrectly ? "#4a4" : "#a44";
       const correctOpt = d.options.find(o => o.correct);
-      html += `<div style="color:${color};padding:3px 0;font-size:11px;border-bottom:1px solid #222">`;
-      html += `<span>[${icon}]</span> ${esc(d.question)}`;
-      if (d.answeredCorrectly && correctOpt) html += ` \u2014 <span style="color:#aaa">${esc(correctOpt.label)}</span>`;
-      else if (!d.answeredCorrectly) html += ` \u2014 <span style="color:#a44">Incorrect</span>`;
+      // correctOpt is sufficient — we don't track the chosen answer on the Deduction type
+      html += `<div style="padding:6px 10px;margin-bottom:4px;border-left:3px solid ${borderColor};background:rgba(255,255,255,0.02);border-radius:2px">`;
+      html += `<div style="display:flex;align-items:center;gap:6px">`;
+      html += `<span style="color:${iconColor};font-size:14px">${icon}</span>`;
+      html += `<span style="color:#aab;font-size:12px">${esc(d.question)}</span>`;
+      html += `</div>`;
+      if (d.answeredCorrectly && correctOpt) {
+        html += `<div style="color:#6a6;font-size:11px;padding-left:20px;margin-top:2px">${esc(correctOpt.label)}</div>`;
+        // Show conclusion text if available
+        if (d.conclusionText) {
+          html += `<div style="color:#889;font-size:10px;padding-left:20px;margin-top:2px;font-style:italic">${esc(d.conclusionText)}</div>`;
+        }
+      } else if (!d.answeredCorrectly && correctOpt) {
+        html += `<div style="color:#a44;font-size:11px;padding-left:20px;margin-top:2px">Incorrect \u2014 Answer: ${esc(correctOpt.label)}</div>`;
+      }
       html += `</div>`;
     }
   }
 
-  // ── Next locked deduction — teaser only ──
+  // ── Next locked deduction — teaser with progress bar ──
   if (nextLocked && solved.length < deductions.length - 1) {
     const chainBlocked = nextLocked.unlockAfter && !solvedIds.has(nextLocked.unlockAfter);
     const threshold = nextLocked.evidenceThreshold ?? 1;
-    html += `<div style="color:#555;font-size:11px;margin-top:12px;padding:6px;border:1px solid #222;border-radius:4px;background:rgba(255,255,255,0.01)">`;
-    html += `<span style="color:#444">\u25CB</span> Next: ???`;
-    if (!chainBlocked) {
-      html += ` <span style="color:#444;font-size:10px">(${journal.length}/${threshold} evidence)</span>`;
+    html += `<div style="color:#555;font-size:11px;margin-top:12px;padding:8px;border:1px solid #222;border-radius:4px;background:rgba(255,255,255,0.01)">`;
+    html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">`;
+    html += `<span style="color:#444;font-size:14px">\u25CB</span>`;
+    html += `<span style="color:#667">Next deduction</span>`;
+    html += `</div>`;
+    if (chainBlocked) {
+      html += `<div style="color:#556;font-size:10px;padding-left:20px">Locked \u2014 solve the current deduction first</div>`;
+    } else {
+      const progress = Math.min(journal.length / threshold, 1);
+      const barWidth = Math.round(progress * 100);
+      html += `<div style="padding-left:20px">`;
+      html += `<div style="color:#556;font-size:10px;margin-bottom:3px">${journal.length}/${threshold} evidence collected</div>`;
+      html += `<div style="background:#222;border-radius:2px;height:4px;width:100%;max-width:200px">`;
+      html += `<div style="background:#fa0;height:100%;border-radius:2px;width:${barWidth}%;transition:width 0.3s"></div>`;
+      html += `</div></div>`;
     }
     html += `</div>`;
   }
@@ -4578,9 +4933,9 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
     }
   }
 
-  // Linked journal evidence
+  // Linked journal evidence with cross-tab hints
   if (mentions.length > 0) {
-    detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin:12px 0 6px">JOURNAL EVIDENCE (${mentions.length})</div>`;
+    detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin:12px 0 6px">JOURNAL EVIDENCE (${mentions.length}) <span style="color:#556;font-weight:normal">[Tab] to EVIDENCE for details</span></div>`;
     for (const entry of mentions.slice(0, 8)) {
       detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:4px;padding-left:8px;border-left:1px solid #333">
         <span style="color:#bbc">${entry.summary}</span>
@@ -4591,7 +4946,7 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
       detailHtml += `<div style="color:#556;font-size:10px">...and ${mentions.length - 8} more</div>`;
     }
   } else {
-    detailHtml += `<div style="color:#556;font-size:11px;margin-top:10px;font-style:italic">No evidence linked to this crew member yet.</div>`;
+    detailHtml += `<div style="color:#556;font-size:11px;margin-top:10px;font-style:italic">No evidence linked to this crew member yet. Explore and read terminals to find connections.</div>`;
   }
 
   // Profiling insight (when 2+ evidence pieces mention this person)

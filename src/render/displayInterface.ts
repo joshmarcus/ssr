@@ -57,4 +57,11 @@ export interface IGameDisplay {
     totalCount: number;
     evidenceCount: number;
   }): void;
+  showHUDNotification?(opts: {
+    label: string;
+    text: string;
+    hint: string;
+    color?: string;
+    duration?: number;
+  }): void;
 }
