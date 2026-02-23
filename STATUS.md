@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 146 (V264 completed — investigation quality HUD, thread progress)
+- **Phase**: Sprint 149 (V270 completed — mystery investigation UX refinements)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -138,6 +138,34 @@
 - **Investigation quality HUD**: Live IQ:X% indicator showing investigation score (scenes, crew ID, timeline, contradictions)
 - **Thread progress in Hub**: Evidence tab BY THREAD filter shows narrative threads with progress bars and descriptions
 - **Clipboard run summary [C]**: Full text summary with rating, deductions, investigation stats for sharing
+
+## Sprint 147-149 Changes (V265-V270)
+
+### V265 — Scene Processing HP Penalty
+- **Wrong answer consequences**: -2 HP per wrong WHO/WHAT/OUTCOME answer (max -6 HP)
+- **Confirmation warning**: Scene confirm dialog warns about HP penalty
+- **Result display**: Post-processing banner shows HP lost
+
+### V266 — Choice Evidence Context
+- **Relevant evidence panel**: Scene processing UI shows journal entries from the same room or mentioning linked crew
+- **Reading context**: Up to 6 entries with crew name tags, helping players reason about answers
+
+### V267 — Scene Retry Feedback
+- **Previous attempt results**: Stores WHO/WHAT/OUTCOME correctness per scene
+- **Retry banner**: Shows which dimensions were right/wrong in last attempt
+
+### V268 — Crew Dossier Evidence Trail
+- **Confirmed scenes**: Dossier shows rooms where crew member was correctly identified via scene processing
+- **Activity and outcome**: Each confirmed scene shows what happened and the outcome
+
+### V269 — Contradiction Markers
+- **Evidence list markers**: Warning icon on entries that match contradiction pair texts
+- **Detail view labels**: OFFICIAL RECORD or CONTRADICTING EVIDENCE with contextual hints
+- **Progressive disclosure**: Different messages for revealed vs emerging contradictions
+
+### V270 — Deduction Hint Preview
+- **Tier names**: Next locked deduction shows "WHAT HAPPENED", "WHERE IT STARTED", etc.
+- **Category hints**: Investigation-area-specific guidance (e.g., "Identify where the incident originated")
 
 ## Known Issues
 
