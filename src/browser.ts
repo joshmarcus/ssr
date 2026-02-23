@@ -4979,6 +4979,19 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
   // Track current selection as viewed
   const readIds = hubViewedEvidenceIds;
 
+  // Build contradiction marker set — evidence entries whose text matches a contradiction pair
+  const contradictionEntryIds = new Set<string>();
+  const pairs = state.mystery?.contradictionPairs ?? [];
+  for (const pair of pairs) {
+    if (pair.officialFound || pair.contradictingFound) {
+      for (const e of entries) {
+        if (pair.officialFound && e.detail.includes(pair.official.text)) contradictionEntryIds.add(e.id);
+        if (pair.contradictingFound && e.detail.includes(pair.contradicting.text)) contradictionEntryIds.add(e.id);
+      }
+    }
+  }
+  const contradictMark = (id: string) => contradictionEntryIds.has(id) ? ` <span style="color:#f44;font-size:9px" title="Part of a contradiction">\u26A0</span>` : "";
+
   let listHtml = "";
   if (hubEvidenceFilter === "by_room") {
     // Group by room
@@ -4993,7 +5006,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
       listHtml += `<div style="color:#8af;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">${esc(room)} (${roomEntries.length})</div>`;
       for (const e of roomEntries) {
         const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
-        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span></div></div>`;
+        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span></div></div>`;
         flatIdx++;
       }
     }
@@ -5012,7 +5025,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
       listHtml += `<div style="color:#fa8;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">${label} (${catEntries.length})</div>`;
       for (const e of catEntries) {
         const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
-        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
         flatIdx++;
       }
     }
@@ -5041,7 +5054,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
         const foundEntries = entries.filter(e => threadEntries.includes(e.id));
         for (const e of foundEntries) {
           const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
-          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
           flatIdx++;
         }
       }
@@ -5052,7 +5065,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
         listHtml += `<div style="color:#556;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">Unthreaded (${unthreaded.length})</div>`;
         for (const e of unthreaded) {
           const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
-          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
           flatIdx++;
         }
       }
@@ -5066,7 +5079,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
       for (let i = 0; i < unread.length; i++) {
         const e = unread[i];
         const cls = i === hubIdx ? "journal-entry selected" : "journal-entry";
-        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
       }
     }
   } else {
@@ -5074,7 +5087,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i];
       const cls = i === hubIdx ? "journal-entry selected" : "journal-entry";
-      listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+      listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}${contradictMark(e.id)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
     }
   }
 
@@ -5206,6 +5219,29 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
     relevanceHtml += `</div>`;
   }
 
+  // Contradiction pair info
+  let contradictionHtml = "";
+  const cPairs = state.mystery?.contradictionPairs ?? [];
+  for (const cp of cPairs) {
+    const isOfficial = cp.officialFound && entry.detail.includes(cp.official.text);
+    const isContradicting = cp.contradictingFound && entry.detail.includes(cp.contradicting.text);
+    if (isOfficial || isContradicting) {
+      const label = isOfficial ? "OFFICIAL RECORD" : "CONTRADICTING EVIDENCE";
+      const color = isOfficial ? "#4cf" : "#f44";
+      contradictionHtml = `<div style="margin-top:8px;padding:6px 8px;background:rgba(${isOfficial ? "68,200,255" : "255,68,68"},0.06);border:1px solid ${color};border-radius:3px">`;
+      contradictionHtml += `<div style="color:${color};font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:2px">\u26A0 ${label}</div>`;
+      if (cp.revealed) {
+        contradictionHtml += `<div style="color:#dda;font-size:11px">This evidence ${isOfficial ? "tells the official story" : "contradicts the official account"}.</div>`;
+      } else if (cp.officialFound && cp.contradictingFound) {
+        contradictionHtml += `<div style="color:#889;font-size:11px">A contradiction is emerging...</div>`;
+      } else {
+        contradictionHtml += `<div style="color:#889;font-size:11px">There may be another side to this story.</div>`;
+      }
+      contradictionHtml += `</div>`;
+      break;
+    }
+  }
+
   // Minimap
   const minimapHtml = renderEvidenceMinimap(entry.room);
 
@@ -5238,6 +5274,7 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
     </div>
     <div class="journal-detail-content">${esc(entry.detail)}</div>
     ${relevanceHtml}
+    ${contradictionHtml}
     ${crewHtml}
     ${roomHintHtml}
     ${minimapHtml}
@@ -5379,14 +5416,27 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
     }
   }
 
-  // ── Next locked deduction — teaser with progress bar ──
+  // ── Next locked deduction — teaser with progress bar and hint ──
   if (nextLocked && solved.length < deductions.length - 1) {
     const chainBlocked = nextLocked.unlockAfter && !solvedIds.has(nextLocked.unlockAfter);
+    const nextIdx = deductions.indexOf(nextLocked);
+    const tierNames = ["WHAT HAPPENED", "WHERE IT STARTED", "WHY IT HAPPENED", "WHO WAS INVOLVED", "WHO IS TO BLAME", "THE HIDDEN TRUTH"];
+    const tierLabel = tierNames[nextIdx] ?? `TIER ${nextIdx + 1}`;
+    const categoryHints: Record<string, string> = {
+      what: "Determine what type of incident occurred",
+      where: "Identify where the incident originated",
+      why: "Understand the root cause",
+      who_hero: "Identify who tried to stop it",
+      who_blame: "Determine who is responsible",
+      hidden: "Uncover what was concealed",
+    };
+    const hintText = categoryHints[nextLocked.category] ?? "Continue investigating to unlock this question";
     html += `<div style="color:#555;font-size:11px;margin-top:12px;padding:8px;border:1px solid #222;border-radius:4px;background:rgba(255,255,255,0.01)">`;
     html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">`;
     html += `<span style="color:#444;font-size:14px">\u25CB</span>`;
-    html += `<span style="color:#667">Next deduction</span>`;
+    html += `<span style="color:#667">Next: <span style="color:#889">${tierLabel}</span></span>`;
     html += `</div>`;
+    html += `<div style="color:#556;font-size:10px;padding-left:20px;margin-bottom:4px;font-style:italic">${esc(hintText)}</div>`;
     if (chainBlocked) {
       html += `<div style="color:#556;font-size:10px;padding-left:20px">Locked \u2014 solve the current deduction first</div>`;
     } else {
