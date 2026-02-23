@@ -5502,10 +5502,17 @@ export function step(state: GameState, action: Action): GameState {
         };
       });
 
+      // HP penalty for wrong answers: -2 per incorrect answer
+      const wrongCount = 3 - result.score;
+      const hpPenalty = wrongCount * 2;
+
       next = {
         ...next,
         mystery: { ...next.mystery!, roomScenes: updatedScenes },
         turn: next.turn + result.turnCost, // scene processing costs turns
+        player: hpPenalty > 0
+          ? { ...next.player, hp: Math.max(0, next.player.hp - hpPenalty) }
+          : next.player,
       };
 
       // Update dossiers from WHO answer results
@@ -5534,9 +5541,10 @@ export function step(state: GameState, action: Action): GameState {
       if (result.outcomeCorrect) parts.push("OUTCOME: correct");
       else parts.push("OUTCOME: incorrect");
 
+      const penaltyText = hpPenalty > 0 ? ` -${hpPenalty} HP.` : "";
       const scoreText = result.score >= 2
-        ? `Scene processed (${result.score}/3). ${result.turnCost} turns spent.`
-        : `Scene analysis incomplete (${result.score}/3). ${result.turnCost} turns spent. Try again with better answers.`;
+        ? `Scene processed (${result.score}/3). ${result.turnCost} turns spent.${penaltyText}`
+        : `Scene analysis incomplete (${result.score}/3). ${result.turnCost} turns spent.${penaltyText} Try again with better answers.`;
 
       next.logs = [...next.logs, {
         id: `log_process_result_${processRoomId}_${next.turn}`,

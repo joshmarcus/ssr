@@ -5876,6 +5876,10 @@ function renderHubScenes(): string {
     listHtml += dimRow("WHO", whoCorrect, whoAnswer, correctWho);
     listHtml += dimRow("WHAT", whatCorrect, whatAnswer, correctWhat);
     listHtml += dimRow("OUTCOME", outcomeCorrect, outcomeAnswer, correctOutcome);
+    const wrongAnswers = (whoCorrect ? 0 : 1) + (whatCorrect ? 0 : 1) + (outcomeCorrect ? 0 : 1);
+    if (wrongAnswers > 0) {
+      listHtml += `<div style="color:#f66;font-size:10px;text-align:center;margin-top:4px">-${wrongAnswers * 2} HP penalty (${wrongAnswers} wrong)</div>`;
+    }
     listHtml += `</div>`;
   } else if (hubSceneResult) {
     hubSceneResult = null; // auto-dismiss after 8s
@@ -6221,6 +6225,39 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     html += `</div>`;
   }
 
+  // ── RELEVANT EVIDENCE — journal entries related to this room or suggested crew ──
+  const journal = state.mystery?.journal ?? [];
+  const roomEvidence = journal.filter(e => e.roomFound === scene.roomName);
+  const crewEvidence = new Set<string>();
+  for (const clue of examinedClues) {
+    if (clue.crewLinked) {
+      for (const je of journal) {
+        if (je.crewMentioned.includes(clue.crewLinked) && !roomEvidence.some(r => r.id === je.id)) {
+          crewEvidence.add(je.id);
+        }
+      }
+    }
+  }
+  const relevantEntries = [...roomEvidence, ...journal.filter(je => crewEvidence.has(je.id))];
+  if (relevantEntries.length > 0) {
+    html += `<div style="margin-bottom:10px;padding:6px 8px;background:rgba(100,180,255,0.04);border:1px solid #334;border-radius:3px;max-height:100px;overflow-y:auto">`;
+    html += `<div style="color:#6af;font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:3px">RELEVANT EVIDENCE (${relevantEntries.length})</div>`;
+    for (const entry of relevantEntries.slice(0, 6)) {
+      const crewTags = entry.crewMentioned.map(id => {
+        const c = crew.find(m => m.id === id);
+        return c ? c.lastName : "";
+      }).filter(Boolean);
+      const crewStr = crewTags.length > 0 ? ` <span style="color:#6cf;font-size:9px">[${crewTags.join(", ")}]</span>` : "";
+      html += `<div style="margin:1px 0;font-size:10px;color:#99a;padding:1px 4px;border-left:2px solid #446">`;
+      html += `<span style="color:#aac">${esc(entry.summary)}</span>${crewStr}`;
+      html += `</div>`;
+    }
+    if (relevantEntries.length > 6) {
+      html += `<div style="color:#556;font-size:9px;padding:1px 4px">...and ${relevantEntries.length - 6} more</div>`;
+    }
+    html += `</div>`;
+  }
+
   html += `<div style="display:flex;gap:12px">`;
 
   // WHO column — highlight crew linked to clues
@@ -6346,7 +6383,7 @@ function renderHubSceneConfirm(scene: RoomScene, crew: import("./shared/types.js
   html += `WHAT: <span style="color:#fa0">${esc(activities[hubSceneWhatIdx]?.label ?? "?")}</span><br>`;
   html += `OUTCOME: <span style="color:#f80">${esc(outcomes[hubSceneOutcomeIdx]?.label ?? "?")}</span>`;
   html += `</div>`;
-  html += `<div style="color:#ca8;font-size:12px;margin:12px 0">This will cost ${turnCost} turns.</div>`;
+  html += `<div style="color:#ca8;font-size:12px;margin:12px 0">This will cost ${turnCost} turns. Wrong answers cost 2 HP each.</div>`;
   html += `<div style="color:#aaa;font-size:14px">[Y] Confirm  [N] Go back</div>`;
   html += `</div>`;
   return html;
