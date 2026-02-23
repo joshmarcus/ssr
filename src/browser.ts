@@ -38,7 +38,8 @@ import {
   DATA_CORE_DWELL_WARNINGS,
   FIRST_DISCOVERY_BEATS,
   COOLANT_CASCADE_WARNINGS, HULL_BREACH_CORRUPTION_WARNINGS,
-  SABOTAGE_ORGANISM_WARNINGS, SIGNAL_PULSE_WARNINGS,
+  SABOTAGE_ORGANISM_WARNINGS, SABOTAGE_SECURITY_ENCOUNTER_LOGS, SABOTAGE_CORPORATE_EVIDENCE,
+  SIGNAL_PULSE_WARNINGS,
   CORVUS_FINAL_APPROACH,
   CORVUS_MISSION_BRIEFING,
   PACING_NUDGE_CLEAN, PACING_NUDGE_INVESTIGATE, PACING_NUDGE_RECOVER, PACING_NUDGE_EVACUATE,
@@ -2889,6 +2890,98 @@ function handleAction(action: Action): void {
           display.addLog(pool[(sabotageOrganismPhase / 60) % pool.length], "warning");
           break; // relocate one drone per tick
         }
+      }
+    }
+  }
+
+  // ── Sabotage: progressive security encounter logs + corporate evidence ──
+  if (state.turn !== prevTurn && state.mystery?.timeline?.archetype === IncidentArchetype.Sabotage) {
+    const journal = state.mystery.journal;
+    const milestones = state.milestones;
+    // Security encounter logs: reveal at evidence count 3, 5, 7, 9
+    const secThresholds = [3, 5, 7, 9];
+    for (let si = 0; si < secThresholds.length && si < SABOTAGE_SECURITY_ENCOUNTER_LOGS.length; si++) {
+      const msKey = `sabotage_sec_log_${si}`;
+      if (journal.length >= secThresholds[si] && !milestones.has(msKey)) {
+        const newMs = new Set(milestones);
+        newMs.add(msKey);
+        const log = SABOTAGE_SECURITY_ENCOUNTER_LOGS[si];
+        state = { ...state, milestones: newMs };
+        display.addLog(`RECOVERED RECORD: ${log.text}`, "narrative");
+        // Also add as journal entry
+        if (state.mystery) {
+          const entryId = `journal_sec_encounter_${si}`;
+          if (!state.mystery.journal.some(j => j.id === entryId)) {
+            const entry = {
+              id: entryId,
+              turnDiscovered: state.turn,
+              category: "trace" as const,
+              summary: log.summary,
+              detail: log.text,
+              crewMentioned: [] as string[],
+              roomFound: log.room,
+              tags: ["organism", "security", "containment"],
+              thread: "",
+            };
+            // Find crew mentioned
+            for (const member of state.mystery.crew) {
+              if (log.text.includes(member.lastName) || log.text.includes(member.firstName)) {
+                entry.crewMentioned.push(member.id);
+              }
+            }
+            state = {
+              ...state,
+              mystery: {
+                ...state.mystery,
+                journal: [...state.mystery.journal, entry],
+                discoveredEvidence: new Set([...state.mystery.discoveredEvidence, entryId]),
+              },
+            };
+          }
+        }
+        break; // one log per turn
+      }
+    }
+    // Corporate conspiracy evidence: reveal at evidence count 6, 10, 14
+    const corpThresholds = [6, 10, 14];
+    for (let ci = 0; ci < corpThresholds.length && ci < SABOTAGE_CORPORATE_EVIDENCE.length; ci++) {
+      const msKey = `sabotage_corp_${ci}`;
+      if (journal.length >= corpThresholds[ci] && !state.milestones.has(msKey)) {
+        const newMs = new Set(state.milestones);
+        newMs.add(msKey);
+        const corp = SABOTAGE_CORPORATE_EVIDENCE[ci];
+        state = { ...state, milestones: newMs };
+        display.addLog(`CORVUS-7 DATA RECOVERY: ${corp.text}`, "narrative");
+        if (state.mystery) {
+          const entryId = `journal_corp_evidence_${ci}`;
+          if (!state.mystery.journal.some(j => j.id === entryId)) {
+            const entry = {
+              id: entryId,
+              turnDiscovered: state.turn,
+              category: "trace" as const,
+              summary: corp.summary,
+              detail: corp.text,
+              crewMentioned: [] as string[],
+              roomFound: "Data Recovery",
+              tags: ["corporate", "cargo", "conspiracy"],
+              thread: "",
+            };
+            for (const member of state.mystery.crew) {
+              if (corp.text.includes(member.lastName) || corp.text.includes(member.firstName)) {
+                entry.crewMentioned.push(member.id);
+              }
+            }
+            state = {
+              ...state,
+              mystery: {
+                ...state.mystery,
+                journal: [...state.mystery.journal, entry],
+                discoveredEvidence: new Set([...state.mystery.discoveredEvidence, entryId]),
+              },
+            };
+          }
+        }
+        break; // one reveal per turn
       }
     }
   }

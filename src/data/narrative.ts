@@ -867,12 +867,16 @@ export const ARCHETYPE_ATMOSPHERE: Record<string, string[]> = {
     "The deck plating is warm underfoot. Waste heat from an overtaxed relay somewhere nearby.",
     "A thin mist vents from a ceiling joint — superheated coolant hitting cold air.",
     "The smell of burnt insulation. Another relay junction running dry.",
+    "A wall-mounted efficiency meter reads 142%. Green light. 'OPTIMAL.' The system that measures performance doesn't measure safety.",
+    "Thermal warning tape on a junction box. Handwritten: 'DEFER — Q4 REVIEW PENDING.' The date is three weeks before the cascade.",
   ],
   [IncidentArchetype.HullBreach]: [
     "The air feels thin here. Your chassis sensors register a 3% pressure drop in this corridor.",
     "A distant metallic shriek — hull plates deforming under stress differential.",
     "Condensation forms on cold-side walls where the vacuum is just centimeters away.",
     "The emergency klaxon sounds once, then cuts out. The system that should be screaming has been silenced.",
+    "A security terminal in the corridor shows a badge reader log. Someone swiped the captain's credential at 01:12 — but the captain was logged in quarters until 06:00. The badge was copied.",
+    "Maintenance access panel next to the hull crawlspace. The screws are hand-tight — removed and replaced repeatedly. Someone visited this section more than once.",
   ],
   [IncidentArchetype.ReactorScram]: [
     "A terminal you pass flickers and displays a single line: 'ARE YOU LISTENING?' Then goes dark.",
@@ -885,12 +889,20 @@ export const ARCHETYPE_ATMOSPHERE: Record<string, string[]> = {
     "The biological containment indicator on a wall panel is red. It has been red for a long time.",
     "Something sticky on the deck plating. Your treads leave prints in it. It's organic.",
     "A quarantine seal on a maintenance hatch has been peeled open from the inside.",
+    "A section of wall paneling bulges outward. Something behind it shifts when you approach — then goes still. It's listening.",
+    "Mucus trails on the ceiling. The organism moves vertically. Your sensors estimate mass at 40 kilograms and climbing.",
+    "The air recycler grille is bent open. Tufts of fibrous tissue cling to the metal edges — shed as it squeezed through. It's adapting to the ductwork.",
+    "Three parallel gouges in the deck plating, 15 centimeters apart. The scoring depth increases with each mark. It's getting stronger.",
   ],
   [IncidentArchetype.SignalAnomaly]: [
     "Your sensor array crackles with static. For one moment, you detect something at 14.7 kHz.",
     "Every screen you pass displays the same thing: a waveform. Pulsing. Regular. Not human.",
     "The lights flicker in a pattern that doesn't match any power fluctuation. It's rhythmic.",
     "Your navigation subsystem briefly reports a bearing. Not to any room. To something above the station.",
+    "Scorch marks along the conduit runs — the full-power transmission turned every wire in the station into an antenna. The EM pulse traveled through the infrastructure like lightning through a tree.",
+    "A wall panel's insulation has melted into the junction behind it. The signal's energy coupled into the power grid and heated every conductor above tolerance. This is how an antenna kills a station.",
+    "The deck plating hums at a frequency you can feel in your chassis. The response signal imprinted itself on the station's metallic structure. The whole station is vibrating at 14.7 kHz.",
+    "Capacitor banks in a junction box are swollen and blackened. The transmission pulse induced current in every circuit — the station's electronics couldn't handle the load. Cascade failure in milliseconds.",
   ],
   [IncidentArchetype.Mutiny]: [
     "A welded barricade blocks the corridor ahead. Scorch marks from an improvised cutting torch. Someone wanted through. Someone else made sure they couldn't.",
@@ -1050,6 +1062,13 @@ export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
     "Corridor": [
       { sensor: "atmospheric", text: "Atmospheric scan: micro-fractures in the corridor walls. The decompression wave stressed the entire station hull. The pressure history is forensic evidence." },
     ],
+    "Bridge": [
+      { sensor: "thermal", text: "Thermal scan: the security terminal's badge reader shows thermal residue from a cloning device — a compact heat press that duplicates RFID credentials. The captain's badge was copied here, after hours, using maintenance equipment modified for the purpose." },
+      { sensor: "atmospheric", text: "Atmospheric scan: air filtration logs show the bridge was accessed at 00:45 on the night of the breach. The ventilation timestamp is independent of badge records — someone was here who didn't want to be logged." },
+    ],
+    "Research Lab": [
+      { sensor: "thermal", text: "Thermal scan: a workstation shows heat patterns from extended soldering work. Components laid out: RFID duplicator parts, antenna coils. Someone built a badge cloner in the research lab, using station equipment." },
+    ],
   },
   [IncidentArchetype.ReactorScram]: {
     "Research Lab": [
@@ -1088,6 +1107,13 @@ export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
     "Crew Quarters": [
       { sensor: "atmospheric", text: "Atmospheric scan: sealed quarters show clean atmospheric readings. Someone got the doors shut before the biological contamination reached here." },
     ],
+    "Research Lab": [
+      { sensor: "atmospheric", text: "Atmospheric scan: biological marker concentration in the lab is 12x baseline. The organism spent time here — feeding on culture media and reagent stocks. Growth rate: exponential." },
+      { sensor: "thermal", text: "Thermal scan: residual heat signature on the specimen bench. The organism rested here. Its thermal profile suggests endothermic metabolism — it generates its own heat. It's warm-blooded." },
+    ],
+    "Engine Core": [
+      { sensor: "thermal", text: "Thermal scan: organic residue on the reactor housing. The organism was drawn to the heat source. Shed tissue samples show rapid cell division — the warmth accelerates its growth cycle." },
+    ],
   },
   [IncidentArchetype.SignalAnomaly]: {
     "Communications Hub": [
@@ -1106,6 +1132,13 @@ export const SENSOR_CLUES: Record<string, Record<string, SensorClue[]>> = {
     ],
     "Signal Room": [
       { sensor: "thermal", text: "Thermal scan: the antenna array's residual heat charge is still measurable. Full power transmission, unshielded. The signal is still echoing at 14.7 kHz." },
+    ],
+    "Life Support": [
+      { sensor: "thermal", text: "Thermal scan: the air recycler control boards show burn-through damage. The EM pulse from the transmission induced current in every circuit — the cascade went: antenna → power grid → every system on the bus. Life support failed because it was connected, not because it was targeted." },
+      { sensor: "atmospheric", text: "Atmospheric scan: atmospheric composition drifted for 14 minutes after the transmission before backup systems engaged. The gap: EM pulse destroyed the primary controller, and the backup needed time to boot from cold storage." },
+    ],
+    "Med Bay": [
+      { sensor: "thermal", text: "Thermal scan: the autodoc's circuit boards show induced-current burn patterns. The transmission didn't just damage the antenna — the full-power pulse turned the station's wiring into a secondary antenna. Every device on the power bus received a lethal surge." },
     ],
   },
   [IncidentArchetype.Mutiny]: {
@@ -1588,6 +1621,53 @@ export const SABOTAGE_ORGANISM_WARNINGS: string[] = [
   "Scratching in the ventilation ducts. Moving. The organism has relocated.",
   "PROXIMITY ALERT — Biological signature has shifted. It's in a different section now.",
   "CORVUS-7 CENTRAL: Motion detected in maintenance corridor. The entity has moved. Be cautious.",
+  "Thermal bloom in the ductwork — the organism's body heat is spiking. It's metabolizing something. Growing.",
+  "A wet, rhythmic sound from the walls. Breathing. Slow and deep. It has lungs now.",
+  "CORVUS-7 CENTRAL: Organism mass estimate revised upward. It's consuming station biomatter — insulation, medical supplies, anything organic.",
+];
+
+
+// ── Sabotage: Security encounter logs (discoverable evidence) ──
+// Found at crime scenes or security terminals during Sabotage runs.
+// Progressive detail about the organism encounter in corridor C-4.
+export const SABOTAGE_SECURITY_ENCOUNTER_LOGS: { text: string; summary: string; room: string }[] = [
+  {
+    text: "SECURITY LOG C4-001 (Chief's personal recorder): First visual contact at 14:37. The organism was pressed against the ceiling of corridor C-4, approximately 1.2 meters long. Mottled grey-brown. No eyes that I could see, but it tracked my light. Multisegmented — six limbs minimum. I discharged the stun baton at close range. It didn't flinch. It reached for me.",
+    summary: "Security encounter log: first visual contact with organism — 1.2m, six limbs, stun-resistant",
+    room: "Corridor",
+  },
+  {
+    text: "SECURITY LOG C4-002 (Chief's personal recorder): Second encounter, 90 minutes later. The thing is bigger. Noticeably. It's been in the ventilation — I can hear it moving through the ducts. Skin is developing a reflective quality, like oil on water. I sealed sections 3 through 5 with emergency bulkheads. It went through the vent grille in section 4. Bent the frame outward. Steel.",
+    summary: "Security encounter log: organism growing rapidly, breached steel vent grille",
+    room: "Corridor",
+  },
+  {
+    text: "SECURITY LOG C4-003 (Chief's personal recorder): I set up electrical barriers in the cargo approach. Three crew behind me, unarmed. The organism came low this time — along the floor, fast. When it hit the barrier it screamed. Not a human sound. Something between grinding metal and a frequency I felt in my teeth. It retreated. The barriers held. For now.",
+    summary: "Security encounter log: electrical barriers effective, organism displays vocal capacity",
+    room: "Cargo Hold",
+  },
+  {
+    text: "SECURITY LOG C4-004 (Chief's personal recorder, FINAL): It's learning. Third approach vector — it came through the maintenance shaft below the barrier line. I had to physically block the hatch while the crew ran. Direct contact: its skin is warm. Not cold like you'd expect. Warm and wet. I felt it testing my grip, probing for weakness. Deliberate. Intelligent. When it pulled back, it took a piece of my vest. I think it was studying the material.",
+    summary: "Security encounter log: organism displays intelligence, warm-blooded, testing defenses",
+    room: "Cargo Hold",
+  },
+];
+
+// ── Sabotage: Corporate conspiracy evidence (journal entries) ──
+// Discoverable at terminals/traces that reveal the corporate angle.
+export const SABOTAGE_CORPORATE_EVIDENCE: { text: string; summary: string }[] = [
+  {
+    text: "ENCRYPTED MEMO (partially recovered): '...field testing requires controlled release under station conditions. Subject organism demonstrates accelerated growth in microgravity. Expected recovery window: 72 hours. Acceptable crew exposure threshold...' — The memo is addressed to a corporate subsidiary that doesn't appear on any public registry.",
+    summary: "Corporate memo: organism was a planned 'field test' with expected 72-hour recovery",
+  },
+  {
+    text: "FINANCIAL TRANSFER RECORD: Payment of 2.4M credits to the station's cargo routing coordinator, originating from a shell company registered on Titan. The transfer cleared 48 hours before the cargo arrived. The routing coordinator's name doesn't match any current crew member — the position was filled and vacated within one pay cycle.",
+    summary: "Financial transfer: 2.4M credits paid to temporary cargo coordinator before organism arrival",
+  },
+  {
+    text: "CARGO ROUTING OVERRIDE: Priority shipping code BLACKTHORN-7 applied to the containment manifest. This code bypasses standard quarantine inspection at two waypoint stations. The code was authorized by a signatory who lists their affiliation as 'Research Division, Outer Colonies Branch' — a division that was officially dissolved three years ago.",
+    summary: "Cargo routing override by dissolved corporate division bypassed quarantine inspections",
+  },
 ];
 
 // ── Pacing nudges: CORVUS-7 hints when player idles ──────────
@@ -1677,6 +1757,9 @@ export const SIGNAL_PULSE_WARNINGS: string[] = [
   "14.7 kHz PULSE — Sensor interference. Instruments recalibrating...",
   "Electromagnetic surge from the array. Sensor overlay disrupted. Navigating blind.",
   "CORVUS-7 CENTRAL: Signal pulse detected. The array is still active. Sensors offline temporarily.",
+  "EM SPIKE — The residual signal is coupling into the power grid again. Every conductor on the station is ringing like a tuning fork.",
+  "CORVUS-7 CENTRAL: Pulse echo. The station's metal framework is re-radiating the signal. The response frequency is embedded in the structure itself.",
+  "14.7 kHz resonance detected in hull plating. The signal isn't just in the electronics — it's in the walls. The station has become the antenna.",
 ];
 
 // ── Cross-system reveal: puzzle completion → narrative evidence ──
@@ -1847,8 +1930,8 @@ export const CORVUS_WITNESS_COMMENTARY: Record<string, Record<string, string[]>>
       "CORVUS-7: Quarterly review deadline was 72 hours after the cascade. The timing is... significant.",
     ],
     deduction_agenda: [
-      "CORVUS-7: Off-shift access patterns. Someone was doing more than their job description.",
-      "CORVUS-7: Encrypted personal comms. The agenda was hidden, but the metadata isn't.",
+      "CORVUS-7: Corporate efficiency reports list this station at 140% rated thermal capacity. Someone signed off on that number and called it 'optimal.'",
+      "CORVUS-7: Quarterly review deadline was approaching. Maintenance downtime would have dropped efficiency below the production bonus threshold. The cascade was the cost of making the numbers work.",
     ],
   },
   [IncidentArchetype.HullBreach]: {

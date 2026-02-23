@@ -100,6 +100,20 @@ const REVELATIONS: RevelationMap = {
       synthesisText: "The official report looked clean. The recovered draft tells the real story: three maintenance requests deleted, a whistleblower reassigned, and the word 'deferred' overwritten with 'material fatigue.' {captain} didn't just fail to act — {captain_last} rewrote history.",
       conclusionText: "CONFIRMED: {captain} falsified the incident report. The official record is a lie. The system didn't fail — it was failed.",
     },
+    deduction_agenda: {
+      tagRevelations: [
+        {
+          tag: "coolant",
+          text: "Corporate efficiency directive: 'Station CORVUS-7 thermal output exceeds rated capacity by 40%. Current performance deemed optimal. Maintenance downtime is not authorized without divisional approval.' Signed by someone who has never set foot on this station.",
+        },
+        {
+          tag: "maintenance",
+          text: "Quarterly production bonus structure: station crews receive a 15% bonus for maintaining efficiency above 130% rated capacity. The coolant system couldn't support that load. The bonus structure rewarded the exact condition that caused the cascade.",
+        },
+      ],
+      synthesisText: "Corporate set production targets 40% above safe thermal capacity and tied crew bonuses to maintaining those numbers. Maintenance meant downtime; downtime meant losing the bonus. The captain deferred repairs because the system rewarded running hot and punished doing the right thing.",
+      conclusionText: "CONFIRMED: The cascade was built into the incentive structure. Corporate policy rewarded dangerous operations and punished maintenance. {captain} made a terrible choice — but the system was designed to produce exactly that choice.",
+    },
   },
 
   // ══════════════════════════════════════════════════════════════════
@@ -138,15 +152,15 @@ const REVELATIONS: RevelationMap = {
       tagRevelations: [
         {
           tag: "hull",
-          text: "The alarm override used a security-tier access code — not engineering, not command. Someone with security clearance disabled the monitoring before the breach.",
+          text: "The alarm override at 02:41 used the captain's access code — but the captain was asleep in quarters. Badge reader thermal analysis shows a cloned credential: someone built an RFID duplicator from research lab components and copied the captain's badge after hours.",
         },
         {
           tag: "forensic",
-          text: "Badge logs show three unauthorized visits to the hull crawlspace in the week before the breach — always third shift, never with a work order. Someone was weakening this section deliberately.",
+          text: "Badge logs show three unauthorized visits to the hull crawlspace in the week before the breach — always third shift, never with a work order. The cloned credential gave someone access they shouldn't have had. Someone was weakening this section deliberately.",
         },
       ],
-      synthesisText: "Security override codes disabled the alarms. Three unauthorized visits to the breach section in one week, all during unmonitored shifts. The hull wasn't weakened by neglect — it was weakened deliberately, by someone with security access and patience.",
-      conclusionText: "CONFIRMED: Deliberate sabotage using security credentials. But who was it aimed at?",
+      synthesisText: "The captain's override was used, but the captain was asleep. Badge cloning — an RFID duplicator built from research equipment. Three unauthorized visits to the hull section in one week, all using forged credentials during unmonitored shifts. The hull wasn't weakened by neglect — it was sabotaged by someone who manufactured their own access.",
+      conclusionText: "CONFIRMED: Forged credentials, deliberate weakening. This breach was planned over days. But who was it aimed at?",
     },
     deduction_hero: {
       tagRevelations: [
@@ -173,8 +187,8 @@ const REVELATIONS: RevelationMap = {
           text: "{security_last}'s incident report: \"catastrophic micro-meteorite strike.\" The scans show tool marks. The report omits the disabled alarms, the badge access, the three unauthorized visits.",
         },
       ],
-      synthesisText: "{security} disabled the alarms, weakened the hull, and positioned the breach to kill {medic}. Then sealed the tampered section to lock the evidence behind airtight bulkheads. Every piece of evidence that looks like heroism is evidence of the cover-up.",
-      conclusionText: "CONFIRMED: {security} murdered {medic} and hid behind the emergency response. The hero of this emergency is the killer.",
+      synthesisText: "{security} cloned the captain's badge, disabled hull alarms, weakened the hull over three visits, and positioned the breach to kill {medic}. Then sealed the tampered section first — not to save lives, but to lock the physical evidence behind airtight bulkheads. Every piece of evidence that looks like heroism is evidence of the cover-up.",
+      conclusionText: "CONFIRMED: {security} built a badge cloner, forged captain's credentials, murdered {medic}, and hid behind the emergency response. The hero of this emergency is the killer.",
     },
   },
 

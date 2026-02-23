@@ -144,7 +144,8 @@ export function generateDeductions(
 
   // ── Tier 6 (optional): What were they really doing here? ──
   if (timeline.archetype === IncidentArchetype.SignalAnomaly ||
-      timeline.archetype === IncidentArchetype.Sabotage) {
+      timeline.archetype === IncidentArchetype.Sabotage ||
+      timeline.archetype === IncidentArchetype.CoolantCascade) {
     deductions.push(generateHiddenAgendaDeduction(crew, timeline, scientist));
   }
 
@@ -556,6 +557,16 @@ function generateHiddenAgendaDeduction(
       "A signal planted by UN-ORC to test the crew's compliance with communication protocols",
     ];
     hintText = "Analyze the decoded signal data and the content of the outbound transmission — what was actually sent and received?";
+  } else if (timeline.archetype === IncidentArchetype.CoolantCascade) {
+    correctLabel = "Corporate directive to maintain production quotas — maintenance was deferred to pass quarterly efficiency reviews";
+    question = "Why was the coolant system allowed to fail?";
+    requiredTags = ["coolant", "maintenance"];
+    wrongAnswers = [
+      "Budget cuts from UN-ORC Command — the station simply couldn't afford the replacement parts",
+      "The engineer's maintenance reports contained calculation errors that made the risk seem manageable",
+      "Sabotage by a crew member who wanted the station decommissioned for personal reasons",
+    ];
+    hintText = "Look at the timeline between maintenance warnings and command decisions — who benefits from keeping the station running at dangerous capacity?";
   } else {
     correctLabel = "The cargo was a classified biological sample — the station was a waypoint for a covert xenobiology program";
     question = "What was really in that cargo?";
