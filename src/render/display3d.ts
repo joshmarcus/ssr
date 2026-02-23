@@ -2641,6 +2641,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeWallDamageDecals(state);
     this.placeSpaceViewports(state);
     this.placeWallScreens(state);
+    this.placeDoorSigns(state);
     this.placeCorridorWallProps(state);
     this.placeEmergencyWallStrips(state);
     this.placeCorridorFixtures(state);
@@ -7964,6 +7965,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _viewportStarSprites: { sprite: THREE.Sprite; baseOpacity: number; phase: number }[] = [];
   private _wallScreenRooms: Set<string> = new Set();
   private _wallScreens: { mesh: THREE.Mesh; phase: number; color: number }[] = [];
+  private _doorSignTiles: Set<string> = new Set();
+  private _doorSignSprites: THREE.Sprite[] = [];
 
   private placeWallDamageDecals(state: GameState): void {
     for (let y = 1; y < state.height - 1; y++) {
@@ -8251,6 +8254,78 @@ export class BrowserDisplay3D implements IGameDisplay {
         glowMesh.position.x -= Math.sin(pos.rotY) * backOff;
         glowMesh.position.z -= Math.cos(pos.rotY) * backOff;
         rGroup.add(glowMesh);
+      }
+    }
+  }
+
+  // ── Private: holographic door signs ───────────────────────────
+  /** Place small room name signs above doors, visible from corridors */
+  private placeDoorSigns(state: GameState): void {
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (tile.type !== TileType.Door && tile.type !== TileType.LockedDoor) continue;
+        if (!tile.explored) continue;
+
+        const key = `dsign_${x},${y}`;
+        if (this._doorSignTiles.has(key)) continue;
+        this._doorSignTiles.add(key);
+
+        // Find which room this door belongs to
+        let roomName = "";
+        let roomTint = 0x88aacc;
+        for (const room of state.rooms) {
+          // Door is adjacent to room
+          if (x >= room.x - 1 && x <= room.x + room.width &&
+              y >= room.y - 1 && y <= room.y + room.height) {
+            roomName = room.name;
+            roomTint = ROOM_WALL_TINTS_3D[room.name] ?? 0x88aacc;
+            break;
+          }
+        }
+        if (!roomName) continue;
+
+        // Create canvas-textured sprite with room name
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 32;
+        const ctx = canvas.getContext("2d")!;
+
+        // Background bar
+        const r = ((roomTint >> 16) & 0xff);
+        const g = ((roomTint >> 8) & 0xff);
+        const b = (roomTint & 0xff);
+        ctx.fillStyle = `rgba(${Math.round(r * 0.2)},${Math.round(g * 0.2)},${Math.round(b * 0.2)},0.8)`;
+        ctx.fillRect(0, 0, 256, 32);
+
+        // Border
+        ctx.strokeStyle = `rgba(${r},${g},${b},0.6)`;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, 0, 256, 32);
+
+        // Room name text
+        const label = roomName.toUpperCase();
+        ctx.font = "bold 16px 'Courier New', monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = `rgb(${Math.min(255, r + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)})`;
+        ctx.fillText(label, 128, 16);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.SpriteMaterial({
+          map: tex,
+          transparent: true,
+          opacity: 0.85,
+          depthWrite: false,
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(1.0, 1.0 * (32 / 256), 1);
+        sprite.position.set(x, 1.75, y); // above door frame
+
+        // Add to appropriate group
+        const bucket = this.getCorridorBucket(this.decorationGroup, x, y);
+        bucket.add(sprite);
+        this._doorSignSprites.push(sprite);
       }
     }
   }
