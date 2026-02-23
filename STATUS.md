@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 149 (V270 completed — mystery investigation UX refinements)
+- **Phase**: Sprint 152 (V276 completed — mystery investigation depth + feedback)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -138,6 +138,34 @@
 - **Investigation quality HUD**: Live IQ:X% indicator showing investigation score (scenes, crew ID, timeline, contradictions)
 - **Thread progress in Hub**: Evidence tab BY THREAD filter shows narrative threads with progress bars and descriptions
 - **Clipboard run summary [C]**: Full text summary with rating, deductions, investigation stats for sharing
+
+## Sprint 150-152 Changes (V271-V276)
+
+### V271 — Deduction Cascade Effects
+- **Station hazard reduction**: Correct deductions reduce heat/smoke by 5 station-wide
+- **Narrative log**: "Station systems stabilizing..." feedback on correct answers
+
+### V272 — Enhanced Game-Over Investigation Summary
+- **IQ breakdown**: Progress bars for scenes (30%), crew ID (25%), timeline (25%), contradictions (20%)
+- **Two Stories**: Side-by-side Official vs Reality evidence comparison for revealed contradictions
+
+### V273 — Thread Completion Milestones
+- **CORVUS-7 thread recognition**: When a narrative thread reaches 3 entries, fires a milestone with thread description
+- **Thread awareness**: Players learn that evidence is forming coherent storylines
+
+### V274 — Clue Examination Polish
+- **Descriptive summaries**: Journal summaries now include clue type + text excerpt instead of generic labels
+- **Per-clue log messages**: Individual CLUE logs with type label, crew tags, and text excerpts
+- **Sensor-gated warnings**: Clear messaging when remaining clues require sensor upgrades
+
+### V275 — Evidence Accumulation HUD
+- **Accumulation display**: HUD progress line shows confirming/ambiguous/contradicting counts (C/A/X)
+- **Real-time feedback**: Immediate visibility of evidence category balance
+
+### V276 — Crew Identification Celebration
+- **Badge milestone**: CORVUS-7 announces crew identification with name, role, badge ID
+- **Audio/visual feedback**: Screen flash + deduction correct SFX on identification
+- **Dossier link**: Clue automatically linked to dossier for crew tracking
 
 ## Sprint 147-149 Changes (V265-V270)
 
