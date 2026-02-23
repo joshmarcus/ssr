@@ -4266,10 +4266,10 @@ function renderInvestigationHub(): void {
   const scenes = state.mystery?.roomScenes ?? [];
   const processedScenes = scenes.filter(s => s.processed).length;
   const tabLabels: Record<string, string> = {
-    evidence: `EVIDENCE (${entries.length})${newBadge}`,
-    scenes: `SCENES (${processedScenes}/${scenes.length})`,
-    connections: `CONNECTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`,
-    crew: `CREW (${state.mystery?.crew.length ?? 0})`,
+    evidence: `<span style="color:#556;font-size:9px">1</span> EVIDENCE (${entries.length})${newBadge}`,
+    scenes: `<span style="color:#556;font-size:9px">2</span> SCENES (${processedScenes}/${scenes.length})`,
+    connections: `<span style="color:#556;font-size:9px">3</span> CONNECTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`,
+    crew: `<span style="color:#556;font-size:9px">4</span> CREW (${state.mystery?.crew.length ?? 0})`,
   };
   // Update evidence view count when viewing evidence tab
   if (hubSection === "evidence") {
@@ -4647,7 +4647,8 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
       html += `<div style="color:#889;font-size:12px;margin-bottom:10px;padding:8px;border:1px solid #333;border-radius:4px;background:rgba(255,255,255,0.02)">`;
       html += `<div style="margin-bottom:4px">\uD83D\uDD0D Key clues found: <span style="color:${found === total ? "#4f8" : "#fa0"};font-weight:bold">${found}/${total}</span></div>`;
       if (coverage.missing.length > 0) {
-        html += `<div style="color:#667;font-size:11px">Find relevant evidence to unlock this deduction. Read terminals, examine items, and explore new rooms.</div>`;
+        const missingLabels = coverage.missing.map(t => t.replace(/_/g, " ")).join(", ");
+        html += `<div style="color:#667;font-size:11px">Still needed: <span style="color:#a86">${esc(missingLabels)}</span>. Explore rooms, read terminals, examine clues.</div>`;
       }
       html += `</div>`;
     }
@@ -4722,9 +4723,14 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
       const barWidth = Math.round(progress * 100);
       html += `<div style="padding-left:20px">`;
       html += `<div style="color:#556;font-size:10px;margin-bottom:3px">Key clues: ${found}/${total} found</div>`;
-      html += `<div style="background:#222;border-radius:2px;height:4px;width:100%;max-width:200px">`;
+      html += `<div style="background:#222;border-radius:2px;height:4px;width:100%;max-width:200px;margin-bottom:3px">`;
       html += `<div style="background:${found === total ? "#4f8" : "#fa0"};height:100%;border-radius:2px;width:${barWidth}%;transition:width 0.3s"></div>`;
-      html += `</div></div>`;
+      html += `</div>`;
+      if (coverage.missing.length > 0) {
+        const missingLabels = coverage.missing.map(t => t.replace(/_/g, " ")).join(", ");
+        html += `<div style="color:#556;font-size:9px">Missing: <span style="color:#a86">${esc(missingLabels)}</span></div>`;
+      }
+      html += `</div>`;
     }
     html += `</div>`;
   }
@@ -4764,6 +4770,23 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
   // ── LEFT PANEL: Question + Evidence ──
   let leftHtml = `<div style="padding:8px 12px;overflow-y:auto;max-height:420px">`;
 
+  // Previous tier context — show what was established before
+  if (deduction.unlockAfter && state.mystery) {
+    const prevDeduction = state.mystery.deductions.find(d => d.id === deduction.unlockAfter);
+    if (prevDeduction?.solved && prevDeduction.answeredCorrectly) {
+      const prevAnswer = prevDeduction.options.find(o => o.correct);
+      if (prevAnswer) {
+        leftHtml += `<div style="margin-bottom:6px;padding:5px 10px;background:rgba(68,170,68,0.05);border-left:2px solid rgba(68,170,68,0.3);border-radius:0 3px 3px 0">`;
+        leftHtml += `<div style="color:#5a5;font-size:9px;letter-spacing:1px;margin-bottom:2px">ESTABLISHED</div>`;
+        leftHtml += `<div style="color:#8a8;font-size:11px">${esc(prevDeduction.question)} \u2014 <span style="color:#6c6">${esc(prevAnswer.label)}</span></div>`;
+        if (prevDeduction.conclusionText) {
+          leftHtml += `<div style="color:#686;font-size:10px;font-style:italic;margin-top:2px">${esc(prevDeduction.conclusionText)}</div>`;
+        }
+        leftHtml += `</div>`;
+      }
+    }
+  }
+
   // Question box — large, centered, distinctive
   leftHtml += `<div style="padding:10px 14px;margin-bottom:10px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.3);border-radius:4px;text-align:center">`;
   leftHtml += `<div style="color:#fa0;font-size:16px;font-weight:bold;line-height:1.4">${esc(deduction.question)}</div>`;
@@ -4791,6 +4814,22 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
       leftHtml += `<div style="color:#ca8;font-size:11px;font-weight:bold;margin-top:6px;border-top:1px solid #332;padding-top:4px">\u2605 ${esc(deduction.synthesisText)}</div>`;
     }
     leftHtml += `</div>`;
+  }
+
+  // Clue coverage indicator — show which evidence areas are covered/missing
+  {
+    const coverage = getTagCoverage(deduction, journal);
+    if (coverage.covered.length > 0 || coverage.missing.length > 0) {
+      leftHtml += `<div style="margin-bottom:8px;padding:5px 8px;background:rgba(100,200,255,0.04);border-left:2px solid #468;border-radius:0 3px 3px 0">`;
+      leftHtml += `<div style="color:#6cf;font-size:9px;font-weight:bold;letter-spacing:1px;margin-bottom:3px">INVESTIGATION COVERAGE</div>`;
+      for (const tag of coverage.covered) {
+        leftHtml += `<span style="display:inline-block;margin:1px 3px;padding:1px 6px;font-size:10px;background:rgba(68,255,136,0.12);border:1px solid rgba(68,255,136,0.3);border-radius:2px;color:#4f8">${esc(tag.replace(/_/g, " "))}</span>`;
+      }
+      for (const tag of coverage.missing) {
+        leftHtml += `<span style="display:inline-block;margin:1px 3px;padding:1px 6px;font-size:10px;background:rgba(136,136,136,0.08);border:1px solid rgba(136,136,136,0.2);border-radius:2px;color:#667">${esc(tag.replace(/_/g, " "))} ?</span>`;
+      }
+      leftHtml += `</div>`;
+    }
   }
 
   // Key evidence — compact cards
@@ -5827,6 +5866,21 @@ function handleHubInput(e: KeyboardEvent): void {
     return;
   }
 
+  // Number keys 1-4 for direct tab access
+  if (!hubDetailDeduction && !hubSceneDetail) {
+    const tabMap: Record<string, "evidence" | "scenes" | "connections" | "crew"> = {
+      "1": "evidence", "2": "scenes", "3": "connections", "4": "crew",
+    };
+    const target = tabMap[e.key];
+    if (target && target !== hubSection) {
+      hubSection = target;
+      hubIdx = 0;
+      hubOptionIdx = 0;
+      renderInvestigationHub();
+      return;
+    }
+  }
+
   // Section-specific input handling
   if (hubSection === "evidence") {
     handleHubEvidenceInput(e);
@@ -6184,9 +6238,18 @@ function commitHubDeductionAnswer(): void {
     audio.playDeductionCorrect();
     applyDeductionReward(solved);
 
-    // Find next unlocked deduction teaser
+    // Find next unlocked deduction teaser + narrative bridge
     const nextDeduction = deductions.find(d => d.unlockAfter === solved.id && !d.solved);
     const nextTeaser = nextDeduction ? nextDeduction.question : undefined;
+    if (nextDeduction) {
+      // Check if next deduction is now actually unlocked (evidence count met)
+      const nextUnlocked = getUnlockedDeductions(state.mystery!.deductions, journal);
+      if (nextUnlocked.some(d => d.id === nextDeduction.id)) {
+        display.addLog(`New line of inquiry: "${nextDeduction.question}"`, "narrative");
+      } else {
+        display.addLog(`Next question emerging... gather more evidence to proceed.`, "system");
+      }
+    }
 
     // Show cinematic overlay (same as commitDeductionAnswer)
     if (display.showDeductionResult) {
