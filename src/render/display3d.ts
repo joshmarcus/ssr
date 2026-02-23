@@ -2994,7 +2994,25 @@ export class BrowserDisplay3D implements IGameDisplay {
             ? `<span style="color:${sceneColor}">Scenes: ${processedScenes}/${totalScenes}</span>`
             : "";
 
-          progressHtml = `<br><span class="hud-obj-progress">${evidenceProgress} | ${deductionProgress}${sceneProgress ? ` | ${sceneProgress}` : ""}</span>`;
+          // Investigation quality score (live preview)
+          const dossiers = state.mystery.dossiers ?? [];
+          const identifiedCrew = dossiers.filter(d => d.confirmed.name).length;
+          const board = state.mystery.incidentBoard;
+          const confirmedSlots = board?.slots.filter(s => s.status === "confirmed").length ?? 0;
+          const totalSlots = board?.slots.length ?? 0;
+          const contradictions = state.mystery.contradictionPairs?.filter(cp => cp.revealed).length ?? 0;
+          const totalContradictions = state.mystery.contradictionPairs?.length ?? 0;
+
+          let iqScore = 0;
+          if (totalScenes > 0) iqScore += (processedScenes / totalScenes) * 30;
+          if (dossiers.length > 0) iqScore += (identifiedCrew / dossiers.length) * 25;
+          if (totalSlots > 0) iqScore += (confirmedSlots / totalSlots) * 25;
+          if (totalContradictions > 0) iqScore += (contradictions / totalContradictions) * 20;
+          const iqPct = Math.round(iqScore);
+          const iqColor = iqPct >= 80 ? "#4f4" : iqPct >= 50 ? "#fa0" : iqPct >= 25 ? "#c80" : "#556";
+          const iqLabel = `<span style="color:${iqColor};font-size:10px">IQ:${iqPct}%</span>`;
+
+          progressHtml = `<br><span class="hud-obj-progress">${evidenceProgress} | ${deductionProgress}${sceneProgress ? ` | ${sceneProgress}` : ""} | ${iqLabel}</span>`;
         }
 
         // Deduction-ready notification

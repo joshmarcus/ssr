@@ -277,7 +277,7 @@ let hubSceneResult: {
   correctWhat: string;
   correctOutcome: string;
 } | null = null; // per-dimension result display after scene processing
-let hubEvidenceFilter: "all" | "by_room" | "by_type" | "unread" = "all"; // evidence tab filter mode
+let hubEvidenceFilter: "all" | "by_room" | "by_type" | "by_thread" | "unread" = "all"; // evidence tab filter mode
 const hubViewedEvidenceIds = new Set<string>(); // tracks which evidence entries player has viewed in Hub
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
 let pendingCeremonyDeduction: { id: string; correct: boolean } | null = null; // for post-overlay CORVUS-7 commentary
@@ -4965,6 +4965,7 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
     { key: "all", label: "ALL" },
     { key: "by_room", label: "BY ROOM" },
     { key: "by_type", label: "BY TYPE" },
+    { key: "by_thread", label: "THREADS" },
     { key: "unread", label: "UNREAD" },
   ];
   let filterHtml = `<div style="display:flex;gap:6px;padding:4px 8px;border-bottom:1px solid #333;font-size:11px">`;
@@ -5015,6 +5016,47 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
         flatIdx++;
       }
     }
+  } else if (hubEvidenceFilter === "by_thread") {
+    // Group by narrative thread with progress
+    const threads = state.mystery?.threads ?? [];
+    const journal = state.mystery?.journal ?? [];
+    const entryIds = new Set(entries.map(e => e.id));
+
+    if (threads.length === 0) {
+      listHtml = `<div class="journal-empty" style="padding:12px;color:#888">No narrative threads discovered yet.</div>`;
+    } else {
+      let flatIdx = 0;
+      for (const thread of threads) {
+        const threadEntries = thread.entries.filter(id => entryIds.has(id));
+        const foundCount = threadEntries.length;
+        const totalCount = thread.entries.length;
+        const pct = totalCount > 0 ? Math.round((foundCount / totalCount) * 100) : 0;
+        const barColor = pct >= 100 ? "#4f4" : pct >= 50 ? "#fa0" : "#6cf";
+        const progressBar = `<div style="display:inline-block;width:50px;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;vertical-align:middle;margin-left:6px">` +
+          `<div style="width:${pct}%;height:100%;background:${barColor}"></div></div>`;
+        listHtml += `<div style="color:#8cf;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">` +
+          `${esc(thread.name)} (${foundCount}/${totalCount}) ${progressBar}` +
+          `<div style="color:#556;font-size:9px;margin-top:1px">${esc(thread.description)}</div></div>`;
+        // Show found entries under this thread
+        const foundEntries = entries.filter(e => threadEntries.includes(e.id));
+        for (const e of foundEntries) {
+          const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
+          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+          flatIdx++;
+        }
+      }
+      // Unthreaded entries
+      const threadedIds = new Set(threads.flatMap(t => t.entries));
+      const unthreaded = entries.filter(e => !threadedIds.has(e.id));
+      if (unthreaded.length > 0) {
+        listHtml += `<div style="color:#556;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">Unthreaded (${unthreaded.length})</div>`;
+        for (const e of unthreaded) {
+          const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
+          listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+          flatIdx++;
+        }
+      }
+    }
   } else if (hubEvidenceFilter === "unread") {
     // Show only unread entries
     const unread = entries.filter(e => !readIds.has(e.id));
@@ -5049,6 +5091,17 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
     const catMap = new Map<string, EvidenceEntry[]>();
     for (const e of entries) { const c = e.category || "other"; if (!catMap.has(c)) catMap.set(c, []); catMap.get(c)!.push(e); }
     for (const [, catEntries] of catMap) flatList.push(...catEntries);
+    detailEntry = flatList[hubIdx];
+  } else if (hubEvidenceFilter === "by_thread") {
+    const threads = state.mystery?.threads ?? [];
+    const entryIds = new Set(entries.map(e => e.id));
+    const flatList: EvidenceEntry[] = [];
+    for (const thread of threads) {
+      const threadEntryIds = thread.entries.filter(id => entryIds.has(id));
+      flatList.push(...entries.filter(e => threadEntryIds.includes(e.id)));
+    }
+    const threadedIds = new Set(threads.flatMap(t => t.entries));
+    flatList.push(...entries.filter(e => !threadedIds.has(e.id)));
     detailEntry = flatList[hubIdx];
   } else if (hubEvidenceFilter === "unread") {
     const unread = entries.filter(e => !readIds.has(e.id));
@@ -6519,13 +6572,17 @@ function getFilteredEvidenceCount(): number {
   if (hubEvidenceFilter === "unread") {
     return entries.filter(e => !hubViewedEvidenceIds.has(e.id)).length;
   }
+  if (hubEvidenceFilter === "by_thread") {
+    // Count entries that belong to any thread + unthreaded entries
+    return entries.length; // All entries are navigable in thread view
+  }
   return entries.length;
 }
 
 function handleHubEvidenceInput(e: KeyboardEvent): void {
   // [f] cycles evidence filter
   if (e.key === "f" || e.key === "F") {
-    const modes: Array<typeof hubEvidenceFilter> = ["all", "by_room", "by_type", "unread"];
+    const modes: Array<typeof hubEvidenceFilter> = ["all", "by_room", "by_type", "by_thread", "unread"];
     const curIdx = modes.indexOf(hubEvidenceFilter);
     hubEvidenceFilter = modes[(curIdx + 1) % modes.length];
     hubIdx = 0;
