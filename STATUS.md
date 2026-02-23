@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 100 (V221 completed — Wall damage decals + sprint reflection)
+- **Phase**: Sprint 104 (V224 completed — Room visual personality: viewports, screens, ceiling lights)
 - **Test status**: 292 tests passing across 24 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -181,10 +181,26 @@
 - **Smoke stains**: Grey-brown stains on walls near high-smoke tiles (>40 smoke)
 - **Room-aware grouping**: Decals added to room groups for proper culling on room transitions
 
+### V222 — Space Viewports on Room Walls
+- **Space viewports**: Dark window panels (0.7x0.4) on 1-3 room walls per room
+- **Twinkling stars**: 3-6 animated star sprites per viewport with individual phases
+- **Edge glow frame**: Room-tinted border + outer additive halo for visibility
+
+### V223 — Wall-Mounted Monitor Screens
+- **Monitor screens**: 2-4 glowing screen panels per room on wall surfaces
+- **Room-type colors**: Data Core purple, Comms blue, Med Bay teal, etc.
+- **Animated glow**: 1.8Hz pulsing with per-screen phase offset
+
+### V224 — Enhanced Ceiling Light Panels
+- **Brighter panels**: Opacity raised to 0.75 with room-tinted color blend
+- **Volumetric cones**: CylinderGeometry light cones descending from each panel
+- **Floor pools**: CircleGeometry discs with additive blend under each panel
+
 ### Technical Notes
-- Discovered 4 empty corridor light arrays (corridorLightList, corridorFixtureLights, _lightShaftMeshes, _floorPoolMeshes) — V215 corridor light animation was dead code; fixed by populating light shaft and floor pool arrays in V219
-- All corridor lighting now operates through emissive materials and light shaft meshes (no PointLights for performance)
+- Screenshot tool now dismisses evidence cards after autoplay via synthetic keydown
+- Discovered 4 empty corridor light arrays — V215 corridor light animation was dead code; fixed in V219
 - Sprint 100 reflection added to CLAUDE.md (V171-V221 learnings)
+- Playtest: Golden seed 184201 VICTORY confirmed — 5/5 deductions, HP 973/1000, 268 turns
 - 292 tests passing, TypeScript clean
 
 ## Sprint 73 Changes (In Progress)
