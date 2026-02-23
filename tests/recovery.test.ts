@@ -38,6 +38,7 @@ function makeRecoveryState(phase: ObjectivePhase = ObjectivePhase.Recover) {
     events: [],
     primaryHazard: "fire",
     sensorBias: SensorType.Thermal,
+    phaseRooms: {},
   };
   const mystery: MysteryState = {
     crew: [],

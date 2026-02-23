@@ -43,6 +43,7 @@ function addMysteryState(state: GameState, phase: ObjectivePhase = ObjectivePhas
     events: [],
     primaryHazard: "fire",
     sensorBias: SensorType.Thermal,
+    phaseRooms: {},
   };
   const mystery: MysteryState = {
     crew: [],

@@ -37,6 +37,7 @@ function makeTestState(phase: ObjectivePhase = ObjectivePhase.Recover) {
     events: [],
     primaryHazard: "fire",
     sensorBias: SensorType.Thermal,
+    phaseRooms: {},
   };
 
   const deductions: Deduction[] = [

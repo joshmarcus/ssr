@@ -17,7 +17,7 @@ import type { GameState, Entity, CrewMember, Room } from "../shared/types.js";
 import { EntityType, CrewRole, CrewFate, TileType, IncidentArchetype, PersonalityTrait } from "../shared/types.js";
 
 // ── Duty station mapping ────────────────────────────────────────
-const ROLE_DUTY_ROOMS: Record<string, string[]> = {
+export const ROLE_DUTY_ROOMS: Record<string, string[]> = {
   [CrewRole.Captain]: ["Bridge", "Communications Hub"],
   [CrewRole.Engineer]: ["Engine Core", "Power Relay Junction", "Engineering Storage"],
   [CrewRole.Medic]: ["Med Bay", "Crew Quarters"],

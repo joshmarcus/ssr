@@ -268,6 +268,8 @@ export interface IncidentTimeline {
   culpritId?: string;
   primaryHazard: string;
   sensorBias: SensorType;
+  /** Deterministic mapping of each timeline phase to a specific room name */
+  phaseRooms: Partial<Record<TimelinePhase, string>>;
 }
 
 export enum DeductionCategory {
