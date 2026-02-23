@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 119 (V235 completed — Mystery UI clarity sprint)
-- **Test status**: 379 tests passing across 29 test files (0 failing)
+- **Phase**: Sprint 123 (V238 completed — Evidence tag gating + scene inference)
+- **Test status**: 380 tests passing across 29 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
 - **Archetypes**: 6 active (Mutiny added — "The Divide")
@@ -34,15 +34,17 @@
   - Sabotage — "The Stowaway" (B+)
   - SignalAnomaly — "First Contact" (A)
   - Mutiny — "The Divide" (NEW)
-- 5-6 chained deductions with evidence-count thresholds, per-deduction hint text, and revelation cascade
-- **"Read & Deduce" system (V201)**: Players read evidence, understand the story, and answer with real consequences
-  - Deductions unlock by evidence count (2/4/6/8/10/12 entries per tier), not invisible tags
+- 5-6 chained deductions with evidence tag gating, per-deduction hint text, and revelation cascade
+- **"Read & Deduce" system (V201→V238)**: Players read evidence, understand the story, and answer with real consequences
+  - Deductions unlock when player finds the RIGHT evidence (required tags covered) AND minimum count threshold met
   - Wrong answers cost 3 HP + 10 turns; 2 wrong attempts = permanent lockout
   - All revelations shown freely as "What the evidence suggests" reading aids
   - Synthesis shown freely as "ANALYSIS" block — no tag-gating
   - Tags remain internal for procgen/narrative threading (hidden from player, visible in dev mode F5)
+  - CONNECTIONS tab shows "key clues found: X/Y" progress (not raw evidence count)
   - Post-answer narrative overlay (correct: revelation + reward + next unlock, incorrect: penalty + attempts remaining)
   - ~100 authored revelation/synthesis/conclusion strings across 5 archetypes x 5-6 deduction tiers
+- **Scene inference hints (V238)**: Clue types suggest activities, text keywords suggest outcomes, crew links suggest WHO — guidance displayed with `← evidence` markers
 - Narrative threads grouping evidence
 - **Investigation Hub [r/v]**: unified 4-section overlay
   - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, thread)
@@ -118,6 +120,30 @@
 ## Known Issues
 
 - No CI pipeline deployed
+
+## Sprint 120-123 Changes (V236-V238)
+
+### V238 — Evidence Tag Gating + Scene Inference Hints
+- **Deductions require relevant evidence**: `getUnlockedDeductions()` now checks both evidence count threshold AND tag coverage — players must find the RIGHT evidence, not just any evidence
+- **`getTagCoverage()` helper**: New export for UI to show clue progress without exposing tags
+- **Scene inference hints**: Reverse mapping from clue types → suggested activities (damage_pattern → EmergencyResponse/Confrontation, etc.), text keyword analysis → suggested outcomes (blood/body → DiedHere, etc.), crew links from examined clues → suggested WHO
+- **CONNECTIONS tab clue progress**: Shows "key clues found: X/Y" instead of raw evidence count; progress bars use tag coverage ratio
+- **Harness observation update**: `evidenceCount`/`evidenceThreshold` replaced with `cluesFound`/`cluesNeeded`/`unlocked`
+- **Test coverage**: New `getTagCoverage` test, updated unlock tests for dual gating (count + tags)
+
+### V237 — Goal/Subgoal System + Hub Improvements
+- **Goal system**: 7 discoverable goals (Survey, Investigate, Scenes, Crew, Mystery, Repair, Evacuate) with subgoal tracking
+- **Goal panel [G]**: Two-panel overlay — goal list with progress bars + subgoal details with hints
+- **Goal tracking**: Player can focus a goal; persistent top-right HUD shows tracked goal progress + next subgoal
+- **Goal discovery**: Goals unlock based on game state thresholds with HUD notifications
+- **Deduction unlock notifications**: HUD banner when new deductions become available
+- **Cross-tab crew links**: Evidence detail shows crew identification status, tab hints for crew dossiers
+- **CONNECTIONS tab overhaul**: Visual node-based progress chain (WHAT→WHERE→WHY→WHO→BLAME→HIDDEN), case progress percentage, richer solved display with conclusion text
+
+### V236 — Autoplay Bot Mystery Actions
+- **Bot mystery actions**: F7 autoplay bot now examines scenes, processes scene profiles, and submits deduction answers
+- **Bot deduction strategy**: Keyword overlap scoring from journal text against answer labels
+- **Bot scene processing**: Random selections for WHO/WHAT/OUTCOME when scenes are ready
 
 ## Sprint 88-90 Changes (V208-V213)
 
