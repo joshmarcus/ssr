@@ -1296,10 +1296,13 @@ function checkRoomEntry(): void {
       if (roomScene && !roomScene.processed) {
         const unexamined = roomScene.physicalClues.filter(c => !c.examined && !c.sensorRequired).length;
         const sensorGated = roomScene.physicalClues.filter(c => !c.examined && c.sensorRequired).length;
+        const examined = roomScene.physicalClues.filter(c => c.examined).length;
         if (unexamined > 0) {
           display.addLog(`SCENE: ${unexamined} physical clue${unexamined > 1 ? "s" : ""} detected. Press [x] to examine.${sensorGated > 0 ? ` (${sensorGated} more require sensor upgrades)` : ""}`, "milestone");
         } else if (sensorGated > 0) {
           display.addLog(`SCENE: ${sensorGated} clue${sensorGated > 1 ? "s" : ""} require sensor upgrades to examine.`, "sensor");
+        } else if (examined > 0) {
+          display.addLog(`SCENE: All clues examined in ${currentRoom.name}. Ready for scene processing [R \u2192 SCENES].`, "milestone");
         }
       }
     }

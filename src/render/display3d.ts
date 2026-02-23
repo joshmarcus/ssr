@@ -2577,6 +2577,28 @@ export class BrowserDisplay3D implements IGameDisplay {
       iqBreakdownHtml += `</div>`;
     }
 
+    // Investigation highlights — completed threads + key milestones
+    let highlightsHtml = "";
+    const threads = state.mystery?.threads ?? [];
+    const completedThreads = threads.filter(t => t.entries.length >= 3);
+    if (completedThreads.length > 0 || evidenceCount >= 10) {
+      highlightsHtml += `<div style="border-top:1px solid #333;margin:6px 0;padding-top:6px">`;
+      highlightsHtml += `<div style="color:#8af;font-size:10px;letter-spacing:1.5px;text-align:center;margin-bottom:4px">INVESTIGATION HIGHLIGHTS</div>`;
+      if (completedThreads.length > 0) {
+        for (const t of completedThreads.slice(0, 4)) {
+          highlightsHtml += `<div style="font-size:10px;color:#99a;margin:2px 0;padding-left:8px;border-left:2px solid #448">`;
+          highlightsHtml += `<span style="color:#aac">${t.name}</span> <span style="color:#556">(${t.entries.length} entries)</span>`;
+          if (t.description) highlightsHtml += `<div style="color:#667;font-size:9px">${t.description.slice(0, 60)}${t.description.length > 60 ? "..." : ""}</div>`;
+          highlightsHtml += `</div>`;
+        }
+      }
+      // Key stats summary line
+      const scenePct = scenes.length > 0 ? Math.round((processedScenes / scenes.length) * 100) : 0;
+      const crewPct = dossiers.length > 0 ? Math.round((identifiedCrew / dossiers.length) * 100) : 0;
+      highlightsHtml += `<div style="font-size:10px;color:#667;text-align:center;margin-top:4px">${evidenceCount} evidence · ${scenePct}% scenes · ${crewPct}% crew · ${completedThreads.length} threads</div>`;
+      highlightsHtml += `</div>`;
+    }
+
     // Run history
     const runHistoryHtml = this.renderRunHistory(state.seed);
 
@@ -2603,6 +2625,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         ${iqBreakdownHtml}
         ${storyHtml}
         ${retroHtml}
+        ${highlightsHtml}
         ${runHistoryHtml}
         <div class="gameover-restart">[R] Replay · [N] New Game · [C] Copy Summary</div>
       </div>`;
