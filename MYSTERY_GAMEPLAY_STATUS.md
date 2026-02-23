@@ -3,7 +3,7 @@
 > **Master design document**: [`MYSTERY_GAMEPLAY.md`](./MYSTERY_GAMEPLAY.md) — do not lose the overall vision.
 > This file tracks sprint-by-sprint implementation progress.
 
-## Current Phase: Sprint 7 — Discovery Moments VFX + Moral Dimension + Delayed Feedback
+## Current Phase: Sprint 8 — Memory Echoes + Vestigial Cleanup
 
 ### Sprint Overview
 
@@ -17,6 +17,7 @@
 | Sprint 5 | Game Loop Integration (step.ts wiring, harness updates, integration tests) | DONE |
 | Sprint 6 | Investigation Hub UI + Moral Dimension (overlay rendering, endgame) | DONE |
 | Sprint 7 | Discovery Moments VFX + Moral Dimension + Delayed Feedback | DONE |
+| Sprint 8 | Memory Echoes + Vestigial Cleanup | DONE |
 
 ---
 
@@ -249,4 +250,35 @@ The simulation layer was 95% complete but the visual feedback layer had signific
   - CSS animation keyframes: discoveryGlitch (screen shake), discoveryFlicker (opacity pulse)
   - All transition tracking variables reset on game restart
 - **Tests**: Updated mystery-choices.test.ts and timeline.test.ts for 4 choices (3 standard + 1 moral)
+- All 379 tests passing across 29 test files
+
+---
+
+## Sprint 8 — Memory Echoes + Vestigial Cleanup
+
+**Status**: DONE
+
+**Goal**: Complete memory echo ghost rendering pipeline, delete deprecated code, remove vestigial UI elements.
+
+### Tasks
+- [x] Generate memory_echo clues in roomScenes.ts (30% chance per room with crew, Thermal sensor required)
+- [x] Emit special `log_memory_echo_` logs in step.ts ExamineScene handler
+- [x] Add `triggerGhostReveal(crewId)` public method to display3d.ts — triggers existing SceneEcho revelation animation
+- [x] Detect `log_memory_echo_` logs in browser.ts and call `triggerGhostReveal` on the 3D renderer
+- [x] Delete deprecated 2D renderer `src/render/display.ts` (no imports, only comment references)
+- [x] Remove vestigial WHAT WE KNOW tab from Investigation Hub (4 tabs instead of 5)
+- [x] Update displayInterface.ts with optional `triggerGhostReveal` method
+
+### Changes Made
+- **`src/sim/roomScenes.ts`**: Added memory_echo clue generation — 30% chance per room with crew present, requires Thermal sensor, uses `CLUE_TEMPLATES.memory_echo` templates
+- **`src/sim/step.ts`**: ExamineScene handler emits `log_memory_echo_<crewId>_<turn>` log for memory echo clues with source "milestone"
+- **`src/render/display3d.ts`**: Added `triggerGhostReveal(crewId)` — finds matching GhostSilhouette SceneEchoes by crewId, triggers revelation animation (0.5s ramp, 1.0s hold, 1.0s fade) via existing `_echoDiscoveryTimes` system
+- **`src/render/displayInterface.ts`**: Added optional `triggerGhostReveal?(crewId: string): void` to IGameDisplay interface
+- **`src/browser.ts`**:
+  - Detects `log_memory_echo_` logs in the log processing loop, extracts crewId, calls `display.triggerGhostReveal?.()` on the 3D renderer
+  - Removed WHAT WE KNOW tab: deleted from tab arrays, tab labels, rendering branch, input handling branch
+  - Removed `generateWhatWeKnow` import (kept `formatRelationship`, `formatCrewMemberDetail`, `getDeductionsForEntry` — still used in CREW and EVIDENCE tabs)
+  - Removed `lastWwkJournalCount` state variable and its reset
+  - Investigation Hub now has 4 tabs: EVIDENCE, SCENES, CONNECTIONS, CREW
+- **`src/render/display.ts`**: DELETED — deprecated 2D renderer, no imports anywhere in codebase
 - All 379 tests passing across 29 test files

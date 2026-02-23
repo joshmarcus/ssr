@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 114 (V230 completed — Station Autopsy discovery moments VFX + moral dimension)
+- **Phase**: Sprint 115 (V231 completed — Memory echoes + vestigial cleanup)
 - **Test status**: 379 tests passing across 29 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -222,6 +222,13 @@
 - **Player dot**: Green circle with white border showing current position
 - **Door states**: Red (locked) vs green (open) on map
 - **Room list sidebar**: Retained for quick text reference alongside spatial view
+
+### V231 — Memory Echoes + Vestigial Cleanup
+- **Memory echo clues**: 30% chance per room with crew, requires Thermal sensor, triggers ghost silhouette revelation in 3D
+- **Ghost reveal pipeline**: memory_echo clue examined → `log_memory_echo_` log → browser.ts detects → `triggerGhostReveal(crewId)` → SceneEcho revelation animation (0.5s ramp, 1s hold, 1s fade)
+- **Deleted deprecated 2D renderer** (`src/render/display.ts`): No imports anywhere, only stale comments remained
+- **Removed WHAT WE KNOW tab**: Investigation Hub reduced to 4 tabs (EVIDENCE, SCENES, CONNECTIONS, CREW). Underlying `whatWeKnow.ts` module retained for internal narrative generation
+- **Interface update**: `triggerGhostReveal` added as optional method on `IGameDisplay`
 
 ### V230 — Discovery Moments VFX + Moral Dimension + Delayed Feedback
 - **Moral Dimension**: archetype-specific final moral question (no correct answer) — 6 unique moral dilemmas

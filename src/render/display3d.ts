@@ -9707,6 +9707,22 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
   }
 
+  /** Public method: trigger ghost reveal for a specific crew member's SceneEcho.
+   *  Called from browser.ts when a memory_echo clue is examined. */
+  triggerGhostReveal(crewId: string): void {
+    if (!this._lastState?.mystery?.sceneEchoes) return;
+    const now = this.clock.getElapsedTime();
+    for (const echo of this._lastState.mystery.sceneEchoes) {
+      if (echo.echoType === SceneEchoType.GhostSilhouette && echo.crewId === crewId) {
+        if (!this._echoDiscoveryTimes.has(echo.id)) {
+          echo.discovered = true;
+          this._echoDiscoveryTimes.set(echo.id, now);
+          this.addLog(`[MEMORY ECHO] A ghostly trace of crew member ${crewId} materializes...`, "narrative");
+        }
+      }
+    }
+  }
+
   // Entity types that get a small colored point light for visual emphasis
   // Key entities only (max ~8 lights active at a time for performance)
   private static readonly ENTITY_GLOW_LIGHTS: Partial<Record<string, { color: number; intensity: number; distance: number }>> = {

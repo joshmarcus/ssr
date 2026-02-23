@@ -479,6 +479,27 @@ export function generateRoomScenes(
       clueIdx++;
     }
 
+    // Memory echo clue — crew member ghost trace (30% chance if crew present and room has space)
+    if (crewForClues.length > 0 && clues.length < 4 && ROT.RNG.getUniform() < 0.3) {
+      const echoCrew = crew.find((c) => c.id === crewForClues[0].crewId);
+      if (echoCrew) {
+        const templates = CLUE_TEMPLATES.memory_echo;
+        const template = pickTemplate(templates);
+        const text = template(echoCrew, room.name, timeline.archetype);
+        clues.push({
+          id: makeClueId(room.id, clueIdx),
+          type: "memory_echo",
+          text,
+          sensorRequired: SensorType.Thermal, // require thermal sensor like ghost silhouettes
+          crewLinked: echoCrew.id,
+          examined: false,
+          pos: randomPosInRoom(room),
+          evidenceCategory: roomEvCat,
+        });
+        clueIdx++;
+      }
+    }
+
     // Ensure at least 2 clues per room (even non-story rooms get environmental detail)
     while (clues.length < 2) {
       if (damageType !== "none") {

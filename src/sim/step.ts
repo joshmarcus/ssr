@@ -5255,6 +5255,17 @@ export function step(state: GameState, action: Action): GameState {
           scene.roomName,
         );
 
+        // Memory echo clue — special log for ghost reveal trigger
+        if (clue.type === "memory_echo") {
+          next.logs = [...next.logs, {
+            id: `log_memory_echo_${clue.crewLinked ?? "unknown"}_${next.turn}`,
+            timestamp: next.turn,
+            source: "milestone",
+            text: clue.text,
+            read: false,
+          }];
+        }
+
         // Update dossier if clue is crew-linked
         if (clue.crewLinked && next.mystery!.dossiers) {
           const crewMember = next.mystery!.crew.find(c => c.id === clue.crewLinked);

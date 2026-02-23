@@ -47,6 +47,7 @@ export interface IGameDisplay {
     hintText?: string;
     nextDeductionTeaser?: string;
   }): void;
+  triggerGhostReveal?(crewId: string): void;
   showCaseClosed?(opts: {
     archetypeTitle: string;
     storySubtitle: string;

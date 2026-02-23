@@ -51,7 +51,7 @@ import { getUnlockedDeductions, solveDeduction } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave, recordRun } from "./sim/saveLoad.js";
 import { isEntityExhausted } from "./shared/ui.js";
-import { generateWhatWeKnow, formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
+import { formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
 
 // ── Archetype display names ─────────────────────────────────────
 const ARCHETYPE_DISPLAY_NAMES: Record<IncidentArchetype, string> = {
@@ -229,7 +229,7 @@ let incidentCardOpen = false;
 let logReviewOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
 let investigationHubOpen = false;
-let hubSection: "evidence" | "connections" | "crew" | "whatweknow" | "scenes" = "evidence";
+let hubSection: "evidence" | "connections" | "crew" | "scenes" = "evidence";
 let hubIdx = 0;                       // selected item index within current section
 let hubOptionIdx = 0;                 // selected option within a deduction/choice
 let hubDetailDeduction: string | null = null; // deduction ID in detail/answer mode
@@ -243,7 +243,6 @@ let hubSceneOutcomeIdx = 0; // selected outcome for OUTCOME answer
 let hubSceneConfirming = false; // Y/N confirmation for scene processing
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
 let pendingCeremonyDeduction: { id: string; correct: boolean } | null = null; // for post-overlay CORVUS-7 commentary
-let lastWwkJournalCount = 0; // journal count when WHAT WE KNOW was last viewed
 let contradictionFalseLeadFired = false; // has the misleading log been shown
 let contradictionRefutationFired = false; // has the refutation been shown
 // ── ReactorScram dwell penalty (data core surveillance) ──────────
@@ -1678,7 +1677,6 @@ function resetGameState(newSeed: number): void {
   hubDetailDeduction = null;
   hubConfirming = false;
   hubIdx = 0;
-  lastWwkJournalCount = 0;
   contradictionFalseLeadFired = false;
   contradictionRefutationFired = false;
   dwellTurnsStationary = 0;
@@ -1869,6 +1867,14 @@ function handleAction(action: Action): void {
         });
         pendingSceneRoom = currentRoom?.name ?? null;
         continue; // skip immediate display
+      }
+      // Memory echo clue examined — trigger ghost reveal in 3D renderer
+      if (simLog.id.startsWith("log_memory_echo_")) {
+        const crewId = simLog.id.replace("log_memory_echo_", "").replace(/_\d+$/, "");
+        if (crewId && crewId !== "unknown") {
+          display.triggerGhostReveal?.(crewId);
+        }
+        // Still show the log text normally (don't skip)
       }
       const logType = classifySimLog(simLog.text, simLog.source);
       display.addLog(simLog.text, logType);
@@ -2699,7 +2705,7 @@ function handleAction(action: Action): void {
     const crewDead = evac?.crewDead.length ?? 0;
     let crewTotal = crewEvac + crewDead;
     for (const [, e] of state.entities) { if (e.type === EntityType.CrewNPC) crewTotal++; }
-    // Scoring matches display.ts showGameOverOverlay — keep in sync
+    // Scoring matches display3d.ts showGameOverOverlay — keep in sync
     let sc = 0;
     if (state.victory) sc += 30;
     sc += Math.min(20, dedsCorrect * (20 / Math.max(deds.length, 1)));
@@ -3882,7 +3888,7 @@ function renderInvestigationHub(): void {
   const journal = state.mystery.journal;
 
   // Tab bar
-  const tabs: Array<"evidence" | "connections" | "crew" | "whatweknow" | "scenes"> = ["evidence", "scenes", "connections", "crew", "whatweknow"];
+  const tabs: Array<"evidence" | "connections" | "crew" | "scenes"> = ["evidence", "scenes", "connections", "crew"];
   const newEvidenceCount = entries.length - lastEvidenceViewCount;
   const newBadge = newEvidenceCount > 0 && hubSection !== "evidence"
     ? ` <span style="color:#0f0;font-size:10px">+${newEvidenceCount} new</span>` : "";
@@ -3893,7 +3899,6 @@ function renderInvestigationHub(): void {
     scenes: `SCENES (${processedScenes}/${scenes.length})`,
     connections: `CONNECTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`,
     crew: `CREW (${state.mystery?.crew.length ?? 0})`,
-    whatweknow: "WHAT WE KNOW",
   };
   // Update evidence view count when viewing evidence tab
   if (hubSection === "evidence") {
@@ -3915,8 +3920,6 @@ function renderInvestigationHub(): void {
     bodyHtml = renderHubConnections(deductions, journal);
   } else if (hubSection === "crew") {
     bodyHtml = renderHubCrew(journal);
-  } else if (hubSection === "whatweknow") {
-    bodyHtml = renderHubWhatWeKnow();
   }
 
   const controlsText = hubDetailDeduction
@@ -4892,58 +4895,6 @@ function renderHubSceneConfirm(scene: RoomScene, crew: import("./shared/types.js
   return html;
 }
 
-/** WHAT WE KNOW section — auto-generated narrative prose. */
-function renderHubWhatWeKnow(): string {
-  if (!state.mystery) return `<div style="padding:16px;color:#888">No mystery data available.</div>`;
-
-  const wwk = generateWhatWeKnow(state.mystery);
-  const confidenceColors: Record<string, string> = {
-    none: "#555", low: "#ca8", medium: "#fa0", high: "#4a4", complete: "#44ff88",
-  };
-  const confidenceLabels: Record<string, string> = {
-    none: "INSUFFICIENT DATA", low: "PRELIMINARY", medium: "DEVELOPING", high: "SUBSTANTIAL", complete: "CONCLUSIVE",
-  };
-  const confidencePct: Record<string, number> = {
-    none: 5, low: 25, medium: 50, high: 75, complete: 100,
-  };
-  const confidenceColor = confidenceColors[wwk.confidence] || "#888";
-  const confidenceLabel = confidenceLabels[wwk.confidence] || wwk.confidence.toUpperCase();
-  const confPct = confidencePct[wwk.confidence] ?? 0;
-
-  // Track new evidence since last visit
-  const currentJournalCount = state.mystery.journal.length;
-  const newEntries = currentJournalCount - lastWwkJournalCount;
-  lastWwkJournalCount = currentJournalCount;
-  const updateBadge = newEntries > 0
-    ? ` <span style="color:#4af;font-size:11px;margin-left:8px">+${newEntries} new evidence since last analysis</span>`
-    : "";
-
-  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:12px 16px">`;
-  html += `<div class="wwk-header">\u25C8 CORVUS-7 ANALYSIS</div>`;
-  html += `<div style="margin-bottom:4px"><span style="color:${confidenceColor};font-weight:bold;font-size:12px">${confidenceLabel}</span>${updateBadge}</div>`;
-  html += `<div class="wwk-confidence-track"><div class="wwk-confidence-fill" style="width:${confPct}%;background:${confidenceColor};box-shadow:0 0 8px ${confidenceColor}"></div></div>`;
-
-  for (const para of wwk.paragraphs) {
-    html += `<div class="wwk-paragraph">${esc(para)}</div>`;
-  }
-
-  // Dev mode: show correct answers alongside narrative
-  if (devModeEnabled) {
-    const deductions = state.mystery.deductions;
-    html += `<div style="border-top:1px solid #f0f;margin-top:12px;padding-top:8px;color:#f0f;font-size:11px">`;
-    html += `<div style="font-weight:bold;margin-bottom:4px">DEV: CORRECT ANSWERS</div>`;
-    for (const d of deductions) {
-      const correct = d.options.find(o => o.correct);
-      const statusMark = d.solved ? (d.answeredCorrectly ? "\u2713" : "\u2717") : "?";
-      html += `<div>[${statusMark}] ${esc(d.category.toUpperCase())}: ${esc(correct?.label ?? "N/A")}</div>`;
-    }
-    html += `</div>`;
-  }
-
-  html += `</div>`;
-  return html;
-}
-
 /** Render a proportional ASCII minimap showing where evidence was found. */
 function renderEvidenceMinimap(roomName: string): string {
   if (!state.rooms || state.rooms.length === 0) return "";
@@ -5122,7 +5073,7 @@ function handleHubInput(e: KeyboardEvent): void {
 
   // Tab cycles sections
   if (e.key === "Tab" && !hubDetailDeduction && !hubSceneDetail) {
-    const tabs: Array<"evidence" | "connections" | "crew" | "whatweknow" | "scenes"> = ["evidence", "scenes", "connections", "crew", "whatweknow"];
+    const tabs: Array<"evidence" | "connections" | "crew" | "scenes"> = ["evidence", "scenes", "connections", "crew"];
     const curIdx = tabs.indexOf(hubSection);
     hubSection = tabs[(curIdx + 1) % tabs.length];
     hubIdx = 0;
@@ -5140,9 +5091,6 @@ function handleHubInput(e: KeyboardEvent): void {
     handleHubConnectionsInput(e);
   } else if (hubSection === "crew") {
     handleHubCrewInput(e);
-  } else if (hubSection === "whatweknow") {
-    // No interactive elements in What We Know
-    return;
   }
 }
 
