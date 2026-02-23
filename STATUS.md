@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 169 (V327 completed — crack moment choreography, post-breach testimony, sensor reveals, contradiction annotations)
+- **Phase**: Sprint 170 (V331 completed — investigation momentum, hazard evidence, rescue rewards, environmental echoes)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -138,6 +138,48 @@
 - **Investigation quality HUD**: Live IQ:X% indicator showing investigation score (scenes, crew ID, timeline, contradictions)
 - **Thread progress in Hub**: Evidence tab BY THREAD filter shows narrative threads with progress bars and descriptions
 - **Clipboard run summary [C]**: Full text summary with rating, deductions, investigation stats for sharing
+
+## Sprint 169-170 Changes (V324-V331)
+
+### V324 — Crack Moment Dramatic Choreography
+- **PA stutter**: Corrupted station PA broadcast on crack moment trigger
+- **CORVUS-7 reframing**: Delayed narrative logs that reinterpret the investigation
+- **Archetype-specific hints**: 6 unique reframing narratives per incident archetype
+
+### V325 — Context-Aware Crew Testimony
+- **Post-breach testimony**: After crack moment, crew can be questioned again for deeper testimony
+- **Role-specific accounts**: 18 unique testimony entries (6 archetypes × 3 roles)
+- **Generic fallback**: 6 archetype-specific generic testimonies for non-key roles
+
+### V326 — Sensor-Reveal Evidence Reinterpretation
+- **Pickup notification**: Sensor acquisition shows count of newly-accessible hidden clues across all rooms
+- **Room entry reveal**: Entering rooms with sensor-gated clues shows sensor-specific discovery notification
+
+### V327 — Evidence Contradiction Annotation
+- **Opposing text display**: Evidence detail shows the contradicting/official counterpart text inline
+- **ANALYSIS tab pairs**: Side-by-side official vs real story comparison for discovered contradiction pairs
+
+### V328 — Investigation Momentum System
+- **Momentum tracking (0-100%)**: Correct deductions (+12), perfect scenes (+8), timeline confirmations (+10)
+- **Penalty for errors**: Wrong deductions (-25), poor scenes (-15)
+- **Progressive notifications**: CORVUS-7 commentary at 25/50/75/100% thresholds
+- **Scene confidence badges**: At 75%+ momentum, scene processing WHO/WHAT/OUTCOME columns show HIGH confidence on correct answers
+
+### V329 — Hazard-as-Tool Evidence Discovery
+- **Breach seal evidence**: 6 archetype-specific environmental trace entries revealed when sealing breaches
+- **Relay activation evidence**: 6 archetype-specific system log entries from relay diagnostics
+- **Cooling evidence**: 6 archetype-specific thermal data entries from cooling relay restoration
+- **Discovery notification**: "[ENVIRONMENTAL ANALYSIS]" / "[SYSTEM RECOVERY]" log messages on evidence reveal
+
+### V330 — Crew Rescue Risk/Reward
+- **Rescue gratitude testimony**: Crew rescued from hazardous rooms share eyewitness accounts (12 entries: 6 archetypes × 2 hazard types)
+- **HP risk**: Rescuing in residual heat/low pressure costs HP proportional to hazard severity
+- **Evidence reward**: Gratitude testimony added as crew-category journal entry
+
+### V331 — Environmental Storytelling Echoes
+- **Memory echoes**: Returning to processed scene rooms shows echo of confirmed findings (who was there, what happened)
+- **Damage echoes**: High-damage rooms show archetype-specific environmental descriptions (54 entries: 6 archetypes × 3 damage types × 3 variants)
+- **One-time fire**: Echoes fire once per room via milestones to avoid repetition
 
 ## Sprint 156-159 Changes (V283-V291)
 
