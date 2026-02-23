@@ -329,6 +329,8 @@ function findNearestPod(state: GameState): string | null {
 
 // Track entities we've tried interacting with and they didn't change
 const interactAttempts = new Map<string, number>();
+// Track timeline slots that returned "no proposal available" to avoid wasting turns
+const timelineFailedSlots = new Set<string>();
 // Committed navigation target — persist until reached or unreachable
 let navTarget: string | null = null;
 // Track previous position for anti-oscillation in BFS
@@ -413,6 +415,26 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
+  // Phase 2 ENDGAME OVERRIDE: If all deductions done and turn > 700, rush to data core
+  {
+    const deds = state.mystery?.deductions ?? [];
+    const allDone = deds.length > 0 && deds.every(d => d.solved);
+    if (allDone && state.turn > 700) {
+      for (const [, entity] of state.entities) {
+        if (entity.type === EntityType.DataCore) {
+          if (manhattan({ x: px, y: py }, entity.pos) <= 1) {
+            return { type: ActionType.Interact, targetId: entity.id };
+          }
+          const dir = bfsToTarget(state, { x: px, y: py }, (x, y) =>
+            manhattan({ x, y }, entity.pos) <= 1
+          ) ?? bfsToTarget(state, { x: px, y: py }, (x, y) =>
+            manhattan({ x, y }, entity.pos) <= 1, true);
+          if (dir) return { type: ActionType.Move, direction: dir };
+        }
+      }
+    }
+  }
+
   // Phase 2a: Station Autopsy — examine scene clues + process scenes
   if (state.mystery?.roomScenes) {
     const currentRoom = getRoomAt(state, { x: px, y: py });
@@ -464,7 +486,8 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
   if (state.mystery?.incidentBoard) {
     const board = state.mystery.incidentBoard;
     for (const slot of board.slots) {
-      if (slot.status === "unlocked" || slot.status === "proposed") {
+      if ((slot.status === "unlocked" || slot.status === "proposed") &&
+          !timelineFailedSlots.has(slot.phase)) {
         // Confirm with correct card (oracle mode — always confirm correct)
         return {
           type: ActionType.ConfirmTimeline,
@@ -590,8 +613,10 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
       ).length;
       foundLivingRemaining -= rescueBlockedCount;
 
-      // Under time pressure, use data core fallback if all found crew are evacuated
-      const timePressure = state.turn > 400 && foundLivingRemaining === 0;
+      // Under time pressure, fallback to data core
+      // - After turn 700: give up on crew evacuation entirely
+      // - After turn 400: give up only if no remaining crew to evacuate
+      const timePressure = state.turn > 700 || (state.turn > 400 && foundLivingRemaining === 0);
       if ((foundLivingRemaining > 0 || unfoundCrew.length > 0) && !timePressure) {
         // PRIMARY WIN PATH: evacuate all living crew
 
@@ -994,6 +1019,16 @@ for (let turn = 0; turn < state.maxTurns; turn++) {
   const prevPos = { x: state.player.entity.pos.x, y: state.player.entity.pos.y };
   state = step(state, action);
   lastPos = prevPos;
+
+  // Track failed timeline confirmation attempts to avoid wasting turns
+  if (action.type === ActionType.ConfirmTimeline && action.timelinePhase) {
+    const noProposalLog = state.logs.find(l =>
+      l.timestamp === state.turn && l.text.includes("No proposal available")
+    );
+    if (noProposalLog) {
+      timelineFailedSlots.add(action.timelinePhase);
+    }
+  }
 
   const currentRoom = getRoomAt(state, state.player.entity.pos)?.name ?? "Corridor";
   if (currentRoom !== lastRoom) {
