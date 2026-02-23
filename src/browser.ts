@@ -5341,6 +5341,37 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
     devHtml += `</div>`;
   }
 
+  // Connected evidence — entries sharing 2+ tags with this entry
+  let connectedHtml = "";
+  const connections = state.mystery?.connections ?? [];
+  const connectedIds = new Set<string>();
+  for (const conn of connections) {
+    if (conn.sourceId === entry.id) connectedIds.add(conn.targetId);
+    if (conn.targetId === entry.id) connectedIds.add(conn.sourceId);
+  }
+  if (connectedIds.size > 0) {
+    const connEntries = journal.filter(j => connectedIds.has(j.id)).slice(0, 5);
+    if (connEntries.length > 0) {
+      connectedHtml = `<div style="margin-top:8px;border-top:1px solid #222;padding-top:6px">`;
+      connectedHtml += `<div style="color:#8af;font-size:10px;letter-spacing:1px;margin-bottom:4px">CONNECTED EVIDENCE (${connectedIds.size})</div>`;
+      for (const ce of connEntries) {
+        const sharedConn = connections.find(c =>
+          (c.sourceId === entry.id && c.targetId === ce.id) ||
+          (c.targetId === entry.id && c.sourceId === ce.id)
+        );
+        const sharedCount = sharedConn?.sharedTags.length ?? 0;
+        connectedHtml += `<div style="font-size:11px;color:#99a;padding:2px 6px;margin:2px 0;border-left:2px solid #448">`;
+        connectedHtml += `<span style="color:#aac">${esc(ce.summary)}</span>`;
+        connectedHtml += ` <span style="color:#556;font-size:9px">${ce.roomFound} · ${sharedCount} shared tags</span>`;
+        connectedHtml += `</div>`;
+      }
+      if (connectedIds.size > 5) {
+        connectedHtml += `<div style="color:#556;font-size:9px;padding-left:6px">...and ${connectedIds.size - 5} more connections</div>`;
+      }
+      connectedHtml += `</div>`;
+    }
+  }
+
   return `
     <div class="journal-detail-title">${esc(entry.summary)}</div>
     <div class="journal-detail-meta">
@@ -5350,6 +5381,7 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
     <div class="journal-detail-content">${esc(entry.detail)}</div>
     ${relevanceHtml}
     ${contradictionHtml}
+    ${connectedHtml}
     ${crewHtml}
     ${roomHintHtml}
     ${minimapHtml}
@@ -5848,6 +5880,44 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
       const outLabel = sc.groundTruth.outcome.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
       detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px;padding-left:8px;border-left:2px solid #a80">`;
       detailHtml += `<span style="color:#bbc">${esc(sc.roomName)}</span> <span style="color:#667">\u2014 ${esc(actLabel)} \u2192 ${esc(outLabel)}</span>`;
+      detailHtml += `</div>`;
+    }
+  }
+
+  // Testimony section — show crew questioning results + cross-references
+  const testimonyEntries = journal.filter(j => j.id === `journal_testimony_${selected.id}`);
+  if (testimonyEntries.length > 0) {
+    detailHtml += `<div style="color:#fca;font-size:10px;letter-spacing:1.5px;margin:8px 0 4px">TESTIMONY</div>`;
+    for (const te of testimonyEntries) {
+      detailHtml += `<div style="color:#ddc;font-size:11px;line-height:1.4;padding:6px 8px;background:rgba(255,200,100,0.04);border:1px solid #443;border-radius:3px;margin-bottom:4px;font-style:italic">"${esc(te.detail)}"</div>`;
+      // Cross-reference: find other crew members mentioned in testimony text
+      const mentionedOthers: { name: string; role: string }[] = [];
+      for (const c of crew) {
+        if (c.id === selected.id) continue;
+        if (te.detail.includes(c.lastName) || te.detail.includes(c.firstName)) {
+          mentionedOthers.push({ name: `${c.firstName} ${c.lastName}`, role: c.role });
+        }
+      }
+      if (mentionedOthers.length > 0) {
+        detailHtml += `<div style="font-size:10px;color:#6a8;padding-left:8px;margin-bottom:4px">References: ${mentionedOthers.map(m => `<span style="color:#8ca">${esc(m.name)}</span> <span style="color:#556">(${m.role})</span>`).join(", ")}</div>`;
+      }
+    }
+  }
+
+  // Mentioned in others' testimony
+  const othersTestimony = journal.filter(j =>
+    j.id.startsWith("journal_testimony_") &&
+    !j.id.endsWith(`_${selected.id}`) &&
+    (j.detail.includes(selected.lastName) || j.detail.includes(selected.firstName))
+  );
+  if (othersTestimony.length > 0) {
+    detailHtml += `<div style="color:#6cf;font-size:10px;letter-spacing:1.5px;margin:8px 0 4px">MENTIONED BY OTHERS (${othersTestimony.length})</div>`;
+    for (const ot of othersTestimony.slice(0, 4)) {
+      const witnessId = ot.id.replace("journal_testimony_", "");
+      const witness = crew.find(c => c.id === witnessId);
+      const witnessName = witness ? `${witness.firstName} ${witness.lastName}` : "Unknown";
+      detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px;padding-left:8px;border-left:1px solid #446">`;
+      detailHtml += `<span style="color:#8ac">${esc(witnessName)}</span>: <span style="color:#aab;font-style:italic">"${esc(ot.detail.slice(0, 80))}${ot.detail.length > 80 ? "..." : ""}"</span>`;
       detailHtml += `</div>`;
     }
   }
