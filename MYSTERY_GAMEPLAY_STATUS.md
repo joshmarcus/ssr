@@ -15,7 +15,7 @@
 | Sprint 3 | Incident Board & Timeline (system-proposed cards, revelation triggers) | DONE |
 | Sprint 4 | Two-Story Structure (evidence accumulation, contradiction pairs, Crack Moment) | DONE |
 | Sprint 5 | Game Loop Integration (step.ts wiring, harness updates, integration tests) | DONE |
-| Sprint 6 | Investigation Hub UI + Moral Dimension (overlay rendering, endgame) | PLANNED |
+| Sprint 6 | Investigation Hub UI + Moral Dimension (overlay rendering, endgame) | DONE |
 
 ---
 
@@ -148,7 +148,7 @@
 
 ## Sprint 6 — Investigation Hub UI + Moral Dimension
 
-**Status**: IN PROGRESS
+**Status**: DONE
 
 **Goal**: Update the Investigation Hub overlay rendering for the new mystery systems, add moral dimension and endgame.
 
@@ -157,9 +157,9 @@
 - [x] Add incident board timeline display (in SCENES tab sidebar)
 - [x] Add evidence accumulation + crack moment visual feedback (in SCENES tab sidebar)
 - [x] Add dossier progress summary (in SCENES tab sidebar)
-- [ ] Add dossier wall display (3-band: identified/partial/unknown) — enhance CREW tab
-- [ ] Add moral choice + scoring + endgame summary
-- [ ] Playtest full mystery flow end-to-end
+- [x] Add dossier wall display (3-band: identified/partial/unknown) — enhanced CREW tab
+- [x] Add investigation quality scoring + endgame summary
+- [x] Playtest full mystery flow end-to-end (playtest bot + unit tests)
 
 ### Changes Made
 - **`src/browser.ts`**: Major Investigation Hub expansion
@@ -178,4 +178,21 @@
   - State variables: hubSceneDetail, hubSceneSubView, hubSceneWhoIdx, hubSceneWhatIdx, hubSceneOutcomeIdx, hubSceneConfirming
   - [x] key binding: ExamineScene in current room
   - Scene notification on room entry: "SCENE: N physical clues detected. Press [x] to examine."
+  - CREW tab enhanced with 3-band dossier display (IDENTIFIED/PARTIAL DATA/UNKNOWN)
+  - Dossier theories (involvement, fate, location), personal details, scene evidence links
+  - Banded keyboard navigation follows visual order
+  - Investigation quality summary in endgame log (scenes, crew, timeline, contradictions, crack moment)
+- **`src/render/display3d.ts`**: Endgame overlay enhancement
+  - INVESTIGATION QUALITY section in game-over overlay
+  - Enhanced scoring formula includes investigation quality (30% weight)
+- **`playtest_bot.ts`**: Scene examination and processing support
+  - Bot examines scene clues on room entry, processes scenes with ground truth
+  - Station Autopsy stats in summary output
 - New imports: SceneActivity, SceneOutcome, TimelinePhase, CrewDossier, RoomScene
+
+### Playtest Results (seed 184201)
+- 11/24 scenes processed (bot visits 12 rooms)
+- 9 confirming / 8 ambiguous / 6 contradicting evidence
+- CRACK MOMENT triggered
+- 5/5 deductions correct, 36 evidence pieces
+- All 379 tests passing across 29 test files
