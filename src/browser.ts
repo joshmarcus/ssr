@@ -1165,6 +1165,10 @@ function checkDiscoveryMoments(): void {
       currentCrew,
       totalCrew,
     );
+    // Investigation ceremony: trigger ghost reveal for newly identified crew
+    if (newlyId) {
+      display.triggerGhostReveal?.(newlyId.crewId);
+    }
   }
   prevIdentifiedCrew = currentCrew;
 }
@@ -3436,13 +3440,64 @@ function handleAction(action: Action): void {
         const endAccum = state.mystery.evidenceAccumulation;
 
         if (endScenes.length > 0) {
+          // Compute IQ score: 30% scenes, 25% crew, 25% timeline, 20% contradictions
+          const scenePct = endScenes.length > 0 ? endProcessed / endScenes.length : 0;
+          const crewPct = endDossiers.length > 0 ? endIdentified / endDossiers.length : 0;
+          const timelinePct = endTotalSlots > 0 ? endConfirmed / endTotalSlots : 0;
+          const totalContradictions = state.mystery.contradictionPairs?.length ?? 0;
+          const contradPct = totalContradictions > 0 ? endContradictions / totalContradictions : 0;
+          const iqScore = Math.round(
+            scenePct * 30 + crewPct * 25 + timelinePct * 25 + contradPct * 20
+          );
+          const iqGrade = iqScore >= 90 ? "S" : iqScore >= 75 ? "A" : iqScore >= 60 ? "B" : iqScore >= 40 ? "C" : "D";
+
           display.addLog("", "system");
-          display.addLog("\u2550\u2550 Investigation Quality \u2550\u2550", "milestone");
-          display.addLog(`Scenes processed: ${endProcessed}/${endScenes.length}`, "sensor");
-          display.addLog(`Crew identified: ${endIdentified}/${endDossiers.length}`, "sensor");
-          if (endTotalSlots > 0) display.addLog(`Timeline confirmed: ${endConfirmed}/${endTotalSlots}`, "sensor");
-          if (endContradictions > 0) display.addLog(`Contradictions found: ${endContradictions}`, "sensor");
-          if (endAccum?.crack_moment_fired) display.addLog("CRACK MOMENT: The official story crumbled.", "milestone");
+          display.addLog(`\u2550\u2550 INVESTIGATION SCORECARD \u2550\u2550`, "milestone");
+          display.addLog(`Overall Quality: ${iqGrade} (${iqScore}%)`, iqScore >= 75 ? "milestone" : iqScore >= 50 ? "system" : "warning");
+          const bar = (label: string, n: number, t: number, weight: string) => {
+            const pct = t > 0 ? Math.round((n / t) * 100) : 0;
+            const filled = Math.round(pct / 10);
+            const barStr = "\u2588".repeat(filled) + "\u2591".repeat(10 - filled);
+            display.addLog(`  ${label}: ${n}/${t} [${barStr}] ${pct}% (${weight})`, n >= t && t > 0 ? "milestone" : "sensor");
+          };
+          bar("Scenes   ", endProcessed, endScenes.length, "30%");
+          bar("Crew     ", endIdentified, endDossiers.length, "25%");
+          bar("Timeline ", endConfirmed, endTotalSlots, "25%");
+          bar("Contradic", endContradictions, totalContradictions, "20%");
+          if (endAccum?.crack_moment_fired) display.addLog("  CRACK MOMENT: The official story crumbled.", "milestone");
+
+          // CORVUS-7 assessment based on IQ grade
+          const assessments: Record<string, string> = {
+            S: "CORVUS-7: Exemplary investigation. Every thread followed, every truth uncovered. This is how it's done.",
+            A: "CORVUS-7: Thorough work. The truth is clear, even if a few threads remain loose.",
+            B: "CORVUS-7: Solid investigation. You found enough to understand what happened — most of it, anyway.",
+            C: "CORVUS-7: Partial picture. Key pieces of the puzzle remain hidden. The truth is there, if you look harder.",
+            D: "CORVUS-7: Insufficient investigation. Too many questions unanswered. The station keeps its secrets.",
+          };
+          display.addLog(assessments[iqGrade] ?? assessments.C!, "narrative");
+
+          // Weakest area hint
+          const areas = [
+            { name: "scenes", pct: scenePct, hint: "Process more room scenes in the SCENES tab" },
+            { name: "crew", pct: crewPct, hint: "Examine badges and interact with crew to confirm identities" },
+            { name: "timeline", pct: timelinePct, hint: "Confirm incident phases in the timeline board" },
+            { name: "contradictions", pct: contradPct, hint: "Use sensors to uncover evidence that contradicts the official story" },
+          ];
+          const weakest = areas.reduce((a, b) => a.pct < b.pct ? a : b);
+          if (weakest.pct < 0.75) {
+            display.addLog(`  Weakest area: ${weakest.name}. ${weakest.hint}.`, "system");
+          }
+
+          // HUD notification with score
+          if (display.showHUDNotification) {
+            display.showHUDNotification({
+              label: "IQ SCORE",
+              text: `Investigation Quality: ${iqGrade} (${iqScore}%)`,
+              hint: iqScore >= 75 ? "Thorough investigation" : "Check the log for details",
+              color: iqScore >= 75 ? "#4f8" : iqScore >= 50 ? "#fa0" : "#f44",
+              duration: 8000,
+            });
+          }
         }
 
         // CORVUS-7 final transmission — archetype-specific farewell
@@ -4869,6 +4924,15 @@ function commitDeductionAnswer(): void {
     audio.playDeductionCorrect();
     applyDeductionReward(solved);
     updateMomentum(12); // Correct deduction builds momentum
+
+    // Investigation ceremony: ghost reveal for WHO deductions
+    if (solved.category === DeductionCategory.Who && state.mystery) {
+      const correctKey = solved.options.find(o => o.correct)?.key ?? "";
+      const crewMatch = state.mystery.crew.find(c => c.id === correctKey || c.lastName === correctKey);
+      if (crewMatch) {
+        display.triggerGhostReveal?.(crewMatch.id);
+      }
+    }
 
     // Station cascade: reduce hazards station-wide on correct deduction
     let hazardReduced = false;
@@ -7929,6 +7993,12 @@ function handleHubScenesInput(e: KeyboardEvent): void {
           correctWhat: activityLabel(gt.what),
           correctOutcome: activityLabel(gt.outcome),
         };
+        // Investigation ceremony: trigger ghost reveal for correctly identified crew
+        if (whoCorrect && selectedCrew) {
+          display.triggerGhostReveal?.(selectedCrew.id);
+          const fateHint = outcomeCorrect ? ` Their fate: ${hubSceneResult!.correctOutcome.toLowerCase()}.` : "";
+          display.addLog(`Memory unlocked: ${selectedCrew.firstName} ${selectedCrew.lastName}'s presence confirmed in ${scene.roomName}.${fateHint}`, "milestone");
+        }
         // Update investigation momentum based on scene score
         if (score >= 3) updateMomentum(8);        // Perfect scene
         else if (score >= 2) updateMomentum(4);    // Good scene
