@@ -2528,6 +2528,55 @@ export class BrowserDisplay3D implements IGameDisplay {
       retroHtml += `</div>`;
     }
 
+    // Official Story vs Real Story — if contradictions were found
+    let storyHtml = "";
+    if (contradictions > 0 && state.mystery?.contradictionPairs) {
+      const revealedPairs = state.mystery.contradictionPairs.filter(cp => cp.revealed);
+      if (revealedPairs.length > 0) {
+        storyHtml += `<div style="border-top:1px solid #333;margin:6px 0;padding-top:6px">`;
+        storyHtml += `<div style="color:#f44;font-size:10px;letter-spacing:1.5px;text-align:center;margin-bottom:4px">THE TWO STORIES</div>`;
+        for (const pair of revealedPairs.slice(0, 3)) {
+          storyHtml += `<div style="display:flex;gap:8px;margin:4px 0;font-size:10px">`;
+          storyHtml += `<div style="flex:1;padding:4px 6px;background:rgba(68,200,255,0.05);border-left:2px solid #4cf">`;
+          storyHtml += `<div style="color:#4cf;font-size:9px;margin-bottom:2px">OFFICIAL</div>`;
+          storyHtml += `<div style="color:#889">${pair.official.text.slice(0, 80)}${pair.official.text.length > 80 ? "..." : ""}</div>`;
+          storyHtml += `</div>`;
+          storyHtml += `<div style="flex:1;padding:4px 6px;background:rgba(255,68,68,0.05);border-left:2px solid #f44">`;
+          storyHtml += `<div style="color:#f44;font-size:9px;margin-bottom:2px">REALITY</div>`;
+          storyHtml += `<div style="color:#889">${pair.contradicting.text.slice(0, 80)}${pair.contradicting.text.length > 80 ? "..." : ""}</div>`;
+          storyHtml += `</div>`;
+          storyHtml += `</div>`;
+        }
+        if (revealedPairs.length > 3) {
+          storyHtml += `<div style="color:#556;font-size:9px;text-align:center">...and ${revealedPairs.length - 3} more contradictions uncovered</div>`;
+        }
+        storyHtml += `</div>`;
+      }
+    }
+
+    // Investigation quality breakdown
+    let iqBreakdownHtml = "";
+    if (scenes.length > 0) {
+      let iqScore = 0;
+      const sceneScore = (processedScenes / Math.max(scenes.length, 1)) * 30;
+      const crewScore = (identifiedCrew / Math.max(dossiers.length, 1)) * 25;
+      const timelineScore = (confirmedSlots / Math.max(totalSlots, 1)) * 25;
+      const contradictScore = (contradictions / Math.max(totalContradictions, 1)) * 20;
+      iqScore = Math.round(sceneScore + crewScore + timelineScore + contradictScore);
+      const iqColor = iqScore >= 80 ? "#4f4" : iqScore >= 50 ? "#fa0" : iqScore >= 25 ? "#c80" : "#556";
+      iqBreakdownHtml += `<div style="border-top:1px solid #333;margin:6px 0;padding-top:6px">`;
+      iqBreakdownHtml += `<div style="color:${iqColor};font-size:12px;text-align:center;font-weight:bold;margin-bottom:4px">INVESTIGATION QUALITY: ${iqScore}%</div>`;
+      const bar = (label: string, pct: number, max: number, color: string) => {
+        const filled = Math.round((pct / max) * 100);
+        return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;font-size:10px"><span style="color:#889;min-width:80px">${label}</span><div style="flex:1;background:#222;height:4px;border-radius:2px;max-width:120px"><div style="background:${color};height:100%;border-radius:2px;width:${filled}%"></div></div><span style="color:#667">${Math.round(pct)}/${max}</span></div>`;
+      };
+      iqBreakdownHtml += bar("Scenes", sceneScore, 30, "#4cf");
+      iqBreakdownHtml += bar("Crew ID", crewScore, 25, "#4f8");
+      iqBreakdownHtml += bar("Timeline", timelineScore, 25, "#fa0");
+      iqBreakdownHtml += bar("Contradictions", contradictScore, 20, "#f44");
+      iqBreakdownHtml += `</div>`;
+    }
+
     // Run history
     const runHistoryHtml = this.renderRunHistory(state.seed);
 
@@ -2551,6 +2600,8 @@ export class BrowserDisplay3D implements IGameDisplay {
           ${choicesHtml}
         </div>
         ${autopsyHtml}
+        ${iqBreakdownHtml}
+        ${storyHtml}
         ${retroHtml}
         ${runHistoryHtml}
         <div class="gameover-restart">[R] Replay · [N] New Game · [C] Copy Summary</div>

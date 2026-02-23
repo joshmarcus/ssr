@@ -4530,6 +4530,26 @@ function commitDeductionAnswer(): void {
     audio.playDeductionCorrect();
     applyDeductionReward(solved);
 
+    // Station cascade: reduce hazards station-wide on correct deduction
+    let hazardReduced = false;
+    for (let y = 0; y < state.height; y++) {
+      for (let x = 0; x < state.width; x++) {
+        const tile = state.tiles[y][x];
+        if (tile.heat > 0 || tile.smoke > 0) {
+          if (!hazardReduced) {
+            // Clone tiles array once
+            state.tiles = state.tiles.map(row => row.map(t => ({ ...t })));
+            hazardReduced = true;
+          }
+          state.tiles[y][x].heat = Math.max(0, state.tiles[y][x].heat - 5);
+          state.tiles[y][x].smoke = Math.max(0, state.tiles[y][x].smoke - 5);
+        }
+      }
+    }
+    if (hazardReduced) {
+      display.addLog("Station systems stabilizing... hazard levels reduced.", "narrative");
+    }
+
     // Show cinematic overlay
     if (display.showDeductionResult) {
       display.showDeductionResult({
