@@ -3292,11 +3292,12 @@ function showHelp(): void {
         <div>
           <div style="color:#4af;font-weight:bold;margin-bottom:6px">── In Menus ──</div>
           <div><span style="color:#fff">[Tab]</span>  Switch sections / tabs</div>
-          <div><span style="color:#fff">[Enter]</span>  Submit deduction answer</div>
+          <div><span style="color:#fff">[1]-[4]</span>  Jump to Hub tab (Evidence/Scenes/Connections/Crew)</div>
+          <div><span style="color:#fff">[f]</span>  Cycle evidence filter (all/room/type/unread)</div>
+          <div><span style="color:#fff">[p]</span>  Process scene (in Scene detail view)</div>
+          <div><span style="color:#fff">[Enter]</span>  Submit / select</div>
           <div><span style="color:#fff">[Y] / [N]</span>  Confirm or cancel prompts</div>
-          <div><span style="color:#fff">[Esc]</span>  Close overlay / New Game (press twice)</div>
-          <div><span style="color:#fff">[R]</span>  Replay same seed (game over)</div>
-          <div><span style="color:#fff">[N]</span>  New Game (game over)</div>
+          <div><span style="color:#fff">[Esc]</span>  Close overlay / back</div>
         </div>
       </div>
 
@@ -3306,6 +3307,15 @@ function showHelp(): void {
         <div><span style="color:#fa0">INVESTIGATION</span>  Read terminals, collect evidence, solve deductions</div>
         <div><span style="color:#f44">RECOVERY</span>  Reroute relays, transmit data from Data Core</div>
         <div><span style="color:#f0f">EVACUATION</span>  Lead crew survivors to powered Escape Pods</div>
+      </div>
+
+      <div style="margin-top:12px;border-top:1px solid #333;padding-top:12px;max-width:700px;margin-left:auto;margin-right:auto">
+        <div style="color:#666;font-weight:bold;margin-bottom:6px">── Display & Debug ──</div>
+        <div><span style="color:#888">[F2]</span>  Toggle chase cam / ortho cam</div>
+        <div><span style="color:#888">[F3]</span>  Toggle 3D renderer</div>
+        <div><span style="color:#888">[F4]</span>  Toggle outline effect</div>
+        <div><span style="color:#888">[F7]</span>  Toggle autoplay bot</div>
+        <div><span style="color:#888">[R] / [N]</span>  Replay / New Game (game over screen)</div>
       </div>
     </div>`;
   overlay.classList.add("active");

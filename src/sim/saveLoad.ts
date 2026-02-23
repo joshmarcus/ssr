@@ -69,11 +69,36 @@ function isValidGameState(s: unknown): s is GameState {
   if (!pe.pos || typeof pe.pos !== "object") return false;
   // Must have entities Map
   if (!(gs.entities instanceof Map)) return false;
-  // Must have tiles Map
-  if (!(gs.tiles instanceof Map)) return false;
+  // Must have tiles as 2D array
+  if (!Array.isArray(gs.tiles)) return false;
   // Must have rooms array
   if (!Array.isArray(gs.rooms)) return false;
   return true;
+}
+
+/** Ensure mystery state fields are initialized after deserialization.
+ *  Fields added in later versions may be missing from older saves. */
+function ensureMysteryDefaults(state: GameState): GameState {
+  if (!state.mystery) return state;
+  const m = state.mystery;
+  // Ensure arrays exist
+  if (!m.roomScenes) (m as any).roomScenes = [];
+  if (!m.dossiers) (m as any).dossiers = [];
+  if (!m.connections) (m as any).connections = [];
+  if (!m.insights) (m as any).insights = [];
+  if (!m.threads) (m as any).threads = [];
+  if (!m.choices) (m as any).choices = [];
+  if (!m.contradictionPairs) (m as any).contradictionPairs = [];
+  if (!m.pendingContradictions) (m as any).pendingContradictions = [];
+  // Ensure Sets
+  if (!(m.discoveredEvidence instanceof Set)) {
+    (m as any).discoveredEvidence = new Set(Array.isArray(m.discoveredEvidence) ? m.discoveredEvidence : []);
+  }
+  // Ensure milestones Set
+  if (!(state.milestones instanceof Set)) {
+    (state as any).milestones = new Set(Array.isArray(state.milestones) ? state.milestones : []);
+  }
+  return state;
 }
 
 /** Load game state from localStorage. Returns null if no save exists or save is corrupt.
@@ -93,7 +118,7 @@ export function loadGame(): GameState | null {
       localStorage.removeItem(SAVE_KEY);
       return null;
     }
-    return state;
+    return ensureMysteryDefaults(state);
   } catch (err) {
     console.warn("[saveLoad] Failed to load save:", err);
     // Delete corrupt save so next load doesn't hit same error
