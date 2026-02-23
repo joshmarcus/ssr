@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 128 (V243 completed — mystery UX polish + scene-deduction linking)
-- **Test status**: 380 tests passing across 29 test files (0 failing)
+- **Phase**: Sprint 133 (V248 completed — pause menu + seed display + save/load tests)
+- **Test status**: 394 tests passing across 30 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
 - **Archetypes**: 6 active (Mutiny added — "The Divide")
@@ -117,10 +117,43 @@
   - Sensor-gated traces: 2 archetype-specific evidence traces requiring Thermal/Atmospheric scan
   - Timed evidence windows: 1 volatile console per archetype destroyed by escalating heat/pressure
 - Exhausted room dimming + off-screen room arrows for map navigation
+- **Pause menu [ESC]**: Resume/Help/New Game options with seed, archetype, difficulty, turn info
+- Seed display in HUD status bar + visible in pause menu
+- **Save/load testing**: 14 round-trip tests verifying serialization integrity (Map/Set, mystery state, corrupt handling)
 
 ## Known Issues
 
 - No CI pipeline deployed
+- Seed 42: Bot takes 900 turns (rescue-blocked crew require emergency override at turn 900 to transmit data core)
+
+## Sprint 132-133 Changes (V247-V248)
+
+### V248 — Pause Menu + Seed Display + Save/Load Tests
+- **Pause menu [ESC]**: Opens during gameplay with Resume/Help/New Game options. Stops auto-explore and autoplay. Shows seed, archetype, difficulty, and turn counter. Arrow key + Enter navigation.
+- **Seed display in HUD**: Seed shown as "S:XXXXX" in the status bar, visible at a glance
+- **Save/load round-trip tests**: 14 new tests verifying save→load preserves entities Map, tiles array, rooms, mystery state, milestones Set, discoveredEvidence Set. Tests corrupt save handling, version mismatch, ensureMysteryDefaults for missing fields.
+- **Test count**: 394 tests across 30 test files (up from 380/29)
+
+### V247 — Bot Exploration Efficiency + Evacuation Pipeline
+- **Room-biased BFS**: Both autoExploreBFS and playtest bot now use 2-pass BFS — rooms first, corridors fallback. Prioritizes visiting rooms (where evidence, scenes, entities are) over corridor exploration.
+- **Earlier crew recruitment**: Bot recruits found crew after 50%+ deductions solved or turn > 200, instead of waiting for all deductions
+- **Room-by-room scene processing**: Bot processes scenes per-room immediately after all clues examined, instead of only in current room
+- **Smarter endgame**: Bot no longer spams data core when crew are rescue-blocked — waits for emergency override threshold
+- **Playtest improvement**: Seed 184201: 83 turns, Seed 777: 119 turns (was 142), Seed 100: 156 turns, Seed 999: 169 turns
+
+## Sprint 129-131 Changes (V244-V246)
+
+### V246 — Critical Save/Load Bugfix + Help Overlay Update
+- **CRITICAL BUG FIX**: `isValidGameState()` checked `tiles instanceof Map` but tiles is `Tile[][]` — saves could NEVER load. Changed to `Array.isArray(gs.tiles)`.
+- **ensureMysteryDefaults()**: Graceful handling of missing mystery fields from older saves (roomScenes, dossiers, connections, discoveredEvidence Set, milestones Set)
+- **Help overlay update**: Added [1]-[4] Hub shortcuts, [f] filter, [p] process, display/debug keys section
+
+### V245 — Auto-Explore Scene Examination
+- Auto-explore now examines room scene clues during investigation/recovery phase
+
+### V244 — Room Scene Atmosphere Hints
+- Environmental hints on first room entry ("Signs of a hasty departure", "Something terrible happened here")
+- Clue count prompt shown with examine instruction
 
 ## Sprint 126-128 Changes (V241-V243)
 
