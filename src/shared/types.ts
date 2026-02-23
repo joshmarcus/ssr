@@ -114,6 +114,10 @@ export enum ActionType {
   SubmitDeduction = "submitDeduction",
   SubmitChoice = "submitChoice",
   AutoExplore = "autoExplore",
+  ExamineScene = "examineScene",
+  ProcessScene = "processScene",
+  ConfirmTimeline = "confirmTimeline",
+  RejectTimeline = "rejectTimeline",
 }
 
 export enum Direction {
@@ -134,6 +138,14 @@ export interface Action {
   deductionId?: string;
   answerKey?: string;
   choiceId?: string;
+  // Scene processing (Station Autopsy)
+  sceneRoomId?: string;       // room ID for ExamineScene/ProcessScene
+  whoAnswer?: string[];        // crew IDs for ProcessScene WHO answer
+  whatAnswer?: string;         // SceneActivity string for ProcessScene WHAT answer
+  outcomeAnswer?: string;      // SceneOutcome string for ProcessScene OUTCOME answer
+  // Timeline reconstruction
+  timelinePhase?: string;      // TimelinePhase string for ConfirmTimeline/RejectTimeline
+  cardCorrect?: boolean;       // true = confirm correct card, false = confirm wrong card
 }
 
 // ── Room metadata ────────────────────────────────────────────

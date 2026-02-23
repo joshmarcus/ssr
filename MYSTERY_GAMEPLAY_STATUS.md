@@ -3,7 +3,7 @@
 > **Master design document**: [`MYSTERY_GAMEPLAY.md`](./MYSTERY_GAMEPLAY.md) — do not lose the overall vision.
 > This file tracks sprint-by-sprint implementation progress.
 
-## Current Phase: Sprint 5 — Investigation Hub Redesign
+## Current Phase: Sprint 6 — Investigation Hub UI + Moral Dimension
 
 ### Sprint Overview
 
@@ -14,8 +14,8 @@
 | Sprint 2 | Crew Dossiers & Identity (themed biographies, auto-populate) | DONE |
 | Sprint 3 | Incident Board & Timeline (system-proposed cards, revelation triggers) | DONE |
 | Sprint 4 | Two-Story Structure (evidence accumulation, contradiction pairs, Crack Moment) | DONE |
-| Sprint 5 | Investigation Hub Redesign (3-band Dossier Wall, overlay consolidation) | IN PROGRESS |
-| Sprint 6 | Moral Dimension & Endgame (moral choice, scoring, summary) | PLANNED |
+| Sprint 5 | Game Loop Integration (step.ts wiring, harness updates, integration tests) | DONE |
+| Sprint 6 | Investigation Hub UI + Moral Dimension (overlay rendering, endgame) | PLANNED |
 
 ---
 
@@ -111,23 +111,51 @@
 
 ---
 
-## Sprint 5 — Investigation Hub Redesign
+## Sprint 5 — Game Loop Integration
 
-**Status**: IN PROGRESS
+**Status**: DONE
 
 **Goal**: Wire the new mystery systems into the game's step function and player interaction flow.
 
 ### Tasks
-- [ ] Wire scene processing into step.ts (ActionType for examining clues and processing scenes)
-- [ ] Wire dossier updates into step.ts (badge discovery, scene WHO answers)
-- [ ] Wire incident board proposals into the game loop
-- [ ] Wire evidence accumulation + crack moment + contradiction detection
-- [ ] Update harness/observation format for new mystery systems
-- [ ] Update Investigation Hub overlay rendering
-- [ ] Integration test: full mystery flow from room entry to scene solved
+- [x] Wire scene processing into step.ts (ActionType for examining clues and processing scenes)
+- [x] Wire dossier updates into step.ts (badge discovery, scene WHO answers)
+- [x] Wire incident board proposals into the game loop
+- [x] Wire evidence accumulation + crack moment + contradiction detection
+- [x] Update harness/observation format for new mystery systems
+- [ ] Update Investigation Hub overlay rendering (deferred to Sprint 6)
+- [x] Integration test: full mystery flow from room entry to scene solved
 
 ### Changes Made
-(will be filled in as work progresses)
+- **`src/shared/types.ts`**: Added 4 new ActionTypes (`ExamineScene`, `ProcessScene`, `ConfirmTimeline`, `RejectTimeline`), extended Action interface with `sceneRoomId`, `whoAnswer`, `whatAnswer`, `outcomeAnswer`, `timelinePhase`, `cardCorrect` fields
+- **`src/sim/step.ts`**: Added imports for roomScenes, crewDossiers, twoStory, incidentBoard modules. Added `updateMysteryBoardState()` helper. Implemented 4 new action handlers:
+  - `ExamineScene`: Marks room clues as examined, adds journal entries, updates dossiers (badge → confirmIdentity), records evidence accumulation, checks crack moment, detects contradiction pair matches
+  - `ProcessScene`: Evaluates WHO/WHAT/OUTCOME against ground truth, costs turns (escalating: 3/5/8/...), updates dossier theories from WHO, adds journal entry on success (score ≥ 2), decrements pending contradictions, detects new pending contradictions
+  - `ConfirmTimeline`: Confirms/rejects timeline cards via incident board, auto-generates proposals/red herrings, applies 5-turn penalty on wrong, checks board completion
+  - `RejectTimeline`: Reverts slot to unlocked
+- **`src/harness/types.ts`**: Added `sceneStatus`, `evidenceAccumulation`, `dossierProgress`, `incidentBoard`, `contradictions`, `crackMomentFired` to HarnessObservation
+- **`src/harness/claudeDriver.ts`**: Added mystery system fields to observation output, added `EXAMINE_SCENE`/`PROCESS_SCENE`/`CONFIRM_TIMELINE`/`REJECT_TIMELINE` to valid actions and action parser
+- **`src/harness/obsRenderer.ts`**: Added mystery system fields to observation builder
+- **`tests/mystery-integration.test.ts`** (new, 14 tests): Full integration tests covering examine→process→accumulate→confirm flow
 
 ### Issues Found
-(will be filled in as work progresses)
+- Journal categories are `"log" | "item" | "trace" | "access" | "crew"`, not the more descriptive names I initially tried. Mapped physical clue types: badge/personal_effect → "crew", terminal_log/access_log → "log", everything else → "trace"
+- "Free action" in this codebase still increments turn by 1 (just skips world tick). ExamineScene, ConfirmTimeline, RejectTimeline all do early return after the initial `turn + 1`
+- `generateProposal()` returns null when no scenes are processed — timeline confirmation needs scene processing first
+- TypeScript non-null assertions (`!`) needed throughout the ExamineScene handler because mystery state spreads lose type narrowing across reassignment
+
+---
+
+## Sprint 6 — Investigation Hub UI + Moral Dimension
+
+**Status**: PLANNED
+
+**Goal**: Update the Investigation Hub overlay rendering for the new mystery systems, add moral dimension and endgame.
+
+### Tasks
+- [ ] Update Investigation Hub overlay to show room scenes, clue examination, scene processing UI
+- [ ] Add dossier wall display (3-band: identified/partial/unknown)
+- [ ] Add incident board timeline display
+- [ ] Add evidence accumulation + crack moment visual feedback
+- [ ] Add moral choice + scoring + endgame summary
+- [ ] Playtest full mystery flow end-to-end

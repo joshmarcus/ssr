@@ -586,6 +586,36 @@ export function buildObservation(
         podsPowered: evac.podsPowered.length,
       };
     })() : undefined,
+    // Station Autopsy mystery systems
+    sceneStatus: (state.mystery?.roomScenes ?? []).map(s => ({
+      roomId: s.roomId,
+      roomName: s.roomName,
+      cluesExamined: s.physicalClues.filter(c => c.examined).length,
+      cluesTotal: s.physicalClues.length,
+      sensorGated: s.physicalClues.filter(c => c.sensorRequired && !c.examined).length,
+      processed: s.processed,
+      attempts: s.processAttempts,
+    })),
+    evidenceAccumulation: state.mystery?.evidenceAccumulation ?? null,
+    dossierProgress: (state.mystery?.dossiers ?? []).map(d => ({
+      crewId: d.crewId,
+      identified: !!(d.confirmed.name && d.confirmed.role && d.confirmed.badgeId),
+      roomsSeen: d.roomsSeen.length,
+      linkedEvidence: d.linkedEvidence.length,
+    })),
+    incidentBoard: state.mystery?.incidentBoard ? {
+      slots: state.mystery.incidentBoard.slots.map(s => ({
+        phase: s.phase,
+        status: s.status,
+      })),
+      wrongConfirmations: state.mystery.incidentBoard.wrongConfirmations,
+    } : null,
+    contradictions: {
+      revealed: state.mystery?.contradictionPairs?.filter(p => p.revealed).length ?? 0,
+      total: state.mystery?.contradictionPairs?.length ?? 0,
+      pending: state.mystery?.pendingContradictions?.length ?? 0,
+    },
+    crackMomentFired: state.mystery?.evidenceAccumulation?.crack_moment_fired ?? false,
   };
 }
 

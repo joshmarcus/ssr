@@ -257,6 +257,28 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
         });
       }
     }
+
+    // Scene examination/processing actions
+    if (state.mystery.roomScenes && currentRoom) {
+      const roomScene = state.mystery.roomScenes.find(s => s.roomName === currentRoom);
+      if (roomScene) {
+        const unexamined = roomScene.physicalClues.filter(c => !c.examined && !c.sensorRequired).length;
+        if (unexamined > 0) {
+          validActions.push({
+            type: "EXAMINE_SCENE",
+            params: { sceneRoomId: roomScene.roomId },
+            description: `Examine ${unexamined} clue(s) in ${currentRoom}`,
+          });
+        }
+        if (!roomScene.processed && roomScene.physicalClues.some(c => c.examined)) {
+          validActions.push({
+            type: "PROCESS_SCENE",
+            params: { sceneRoomId: roomScene.roomId },
+            description: `Process scene in ${currentRoom} (WHO/WHAT/OUTCOME)`,
+          });
+        }
+      }
+    }
   }
 
   return {
@@ -297,6 +319,36 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
       total: (state.mystery?.choices ?? []).length,
       made: (state.mystery?.choices ?? []).filter(c => c.chosen).length,
     },
+    // Station Autopsy mystery systems
+    sceneStatus: (state.mystery?.roomScenes ?? []).map(s => ({
+      roomId: s.roomId,
+      roomName: s.roomName,
+      cluesExamined: s.physicalClues.filter(c => c.examined).length,
+      cluesTotal: s.physicalClues.length,
+      sensorGated: s.physicalClues.filter(c => c.sensorRequired && !c.examined).length,
+      processed: s.processed,
+      attempts: s.processAttempts,
+    })),
+    evidenceAccumulation: state.mystery?.evidenceAccumulation ?? null,
+    dossierProgress: (state.mystery?.dossiers ?? []).map(d => ({
+      crewId: d.crewId,
+      identified: !!(d.confirmed.name && d.confirmed.role && d.confirmed.badgeId),
+      roomsSeen: d.roomsSeen.length,
+      linkedEvidence: d.linkedEvidence.length,
+    })),
+    incidentBoard: state.mystery?.incidentBoard ? {
+      slots: state.mystery.incidentBoard.slots.map(s => ({
+        phase: s.phase,
+        status: s.status,
+      })),
+      wrongConfirmations: state.mystery.incidentBoard.wrongConfirmations,
+    } : null,
+    contradictions: {
+      revealed: state.mystery?.contradictionPairs?.filter(p => p.revealed).length ?? 0,
+      total: state.mystery?.contradictionPairs?.length ?? 0,
+      pending: state.mystery?.pendingContradictions?.length ?? 0,
+    },
+    crackMomentFired: state.mystery?.evidenceAccumulation?.crack_moment_fired ?? false,
   };
 }
 
@@ -426,6 +478,37 @@ function renderObservationAsText(obs: HarnessObservation): string {
     }
   }
 
+  // Scene status
+  if (obs.sceneStatus && obs.sceneStatus.length > 0) {
+    const unprocessed = obs.sceneStatus.filter(s => !s.processed);
+    const processed = obs.sceneStatus.filter(s => s.processed);
+    lines.push("");
+    lines.push(`--- SCENES (${processed.length}/${obs.sceneStatus.length} processed) ---`);
+    for (const s of unprocessed.slice(0, 5)) {
+      lines.push(`  ${s.roomName}: ${s.cluesExamined}/${s.cluesTotal} clues examined${s.sensorGated > 0 ? ` (${s.sensorGated} sensor-gated)` : ""} [${s.attempts} attempts]`);
+    }
+  }
+
+  // Evidence accumulation
+  if (obs.evidenceAccumulation) {
+    const ea = obs.evidenceAccumulation;
+    lines.push("");
+    lines.push(`--- EVIDENCE (confirming: ${ea.confirming_found}, ambiguous: ${ea.ambiguous_found}, contradicting: ${ea.contradicting_found}) ---`);
+    if (obs.crackMomentFired) lines.push("  CRACK MOMENT FIRED — official story questioned");
+    if (obs.contradictions) {
+      lines.push(`  Contradictions: ${obs.contradictions.revealed}/${obs.contradictions.total} revealed, ${obs.contradictions.pending} pending`);
+    }
+  }
+
+  // Incident board
+  if (obs.incidentBoard) {
+    lines.push("");
+    lines.push(`--- INCIDENT BOARD (${obs.incidentBoard.wrongConfirmations} wrong confirmations) ---`);
+    for (const s of obs.incidentBoard.slots) {
+      lines.push(`  ${s.phase}: ${s.status}`);
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -496,6 +579,31 @@ function parseAction(responseText: string): Action | null {
         const ansKey = (params.answerKey ?? "").toString();
         if (!dedId || !ansKey) return null;
         return { type: ActionType.SubmitDeduction, deductionId: dedId, answerKey: ansKey };
+      }
+      case "EXAMINE_SCENE": {
+        const examRoomId = (params.sceneRoomId ?? "").toString();
+        return { type: ActionType.ExamineScene, sceneRoomId: examRoomId || undefined };
+      }
+      case "PROCESS_SCENE": {
+        const procRoomId = (params.sceneRoomId ?? "").toString();
+        const whoAns = Array.isArray(params.whoAnswer) ? params.whoAnswer.map(String) : [];
+        const whatAns = (params.whatAnswer ?? "").toString();
+        const outcomeAns = (params.outcomeAnswer ?? "").toString();
+        return {
+          type: ActionType.ProcessScene,
+          sceneRoomId: procRoomId || undefined,
+          whoAnswer: whoAns,
+          whatAnswer: whatAns || undefined,
+          outcomeAnswer: outcomeAns || undefined,
+        };
+      }
+      case "CONFIRM_TIMELINE": {
+        const confPhase = (params.timelinePhase ?? "").toString();
+        return { type: ActionType.ConfirmTimeline, timelinePhase: confPhase || undefined };
+      }
+      case "REJECT_TIMELINE": {
+        const rejPhase = (params.timelinePhase ?? "").toString();
+        return { type: ActionType.RejectTimeline, timelinePhase: rejPhase || undefined };
       }
       default:
         return null;

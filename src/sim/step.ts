@@ -1,5 +1,5 @@
-import type { Action, GameState, Entity, LogEntry, Attachment, JournalEntry, Room, EvacuationState, MysteryChoice } from "../shared/types.js";
-import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType, CrewRole, CrewFate, IncidentArchetype } from "../shared/types.js";
+import type { Action, GameState, Entity, LogEntry, Attachment, JournalEntry, Room, EvacuationState, MysteryChoice, RoomScene } from "../shared/types.js";
+import { ActionType, EntityType, TileType, AttachmentSlot, SensorType, ObjectivePhase, DoorKeyType, CrewRole, CrewFate, IncidentArchetype, SceneActivity, SceneOutcome, TimelinePhase } from "../shared/types.js";
 import {
   GLYPHS, PATROL_DRONE_DAMAGE, PATROL_DRONE_STUN_TURNS, PATROL_DRONE_SPEED,
   PATROL_DRONE_ATTACK_COOLDOWN, SMOKE_SLOW_THRESHOLD,
@@ -11,6 +11,10 @@ import { checkWinCondition, checkLossCondition, checkTurnLimit } from "./objecti
 import { updateVision } from "./vision.js";
 import { generateEvidenceTags, getUnlockedDeductions, solveDeduction } from "./deduction.js";
 import { assignThread } from "./threads.js";
+import { processScene } from "./roomScenes.js";
+import { confirmIdentity, updateTheoriesFromScene, linkEvidence, getIdentifiedCrewCount } from "./crewDossiers.js";
+import { recordEvidence, shouldFireCrackMoment, fireCrackMoment, markEvidenceFound, checkPendingContradictions, revealContradiction, getRevealedContradictionCount } from "./twoStory.js";
+import { updateSlotUnlocks, confirmCard, rejectCard, generateProposal, generateRedHerring, buildNarrativeState, isBoardComplete } from "./incidentBoard.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
   CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
@@ -92,6 +96,32 @@ function getInteractableEntities(state: GameState): Entity[] {
     }
   }
   return result;
+}
+
+/**
+ * Update the incident board slot unlocks based on current mystery state.
+ * Called after scene examination or processing.
+ */
+function updateMysteryBoardState(state: GameState): GameState {
+  if (!state.mystery?.incidentBoard || !state.mystery.roomScenes || !state.mystery.dossiers) {
+    return state;
+  }
+
+  const contradictionsFound = state.mystery.contradictionPairs
+    ? getRevealedContradictionCount(state.mystery.contradictionPairs)
+    : 0;
+
+  const narrativeState = buildNarrativeState(
+    state.mystery.roomScenes,
+    state.mystery.dossiers,
+    contradictionsFound,
+  );
+
+  const updatedBoard = updateSlotUnlocks(state.mystery.incidentBoard, narrativeState);
+  return {
+    ...state,
+    mystery: { ...state.mystery, incidentBoard: updatedBoard },
+  };
 }
 
 /**
@@ -5110,6 +5140,505 @@ export function step(state: GameState, action: Action): GameState {
       // Free action — no turn advance
       return next;
     }
+    case ActionType.ExamineScene: {
+      // Examine clues in the current room's scene
+      if (!next.mystery?.roomScenes) {
+        next.logs = [...next.logs, {
+          id: `log_examine_noscenes_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "No scene data available.",
+          read: false,
+        }];
+        break;
+      }
+
+      // Find the player's current room
+      const examRoom = getRoomAt(next, next.player.entity.pos);
+      if (!examRoom) {
+        next.logs = [...next.logs, {
+          id: `log_examine_noroom_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "You're not in a room.",
+          read: false,
+        }];
+        break;
+      }
+
+      // Use sceneRoomId if provided, otherwise use current room
+      const examRoomId = action.sceneRoomId ?? examRoom.id;
+      const scene = next.mystery.roomScenes.find(s => s.roomId === examRoomId);
+      if (!scene) {
+        next.logs = [...next.logs, {
+          id: `log_examine_noscene_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "No scene to examine here.",
+          read: false,
+        }];
+        break;
+      }
+
+      // Check if player has the required sensors for sensor-gated clues
+      const playerSensors = next.player.sensors ?? [];
+
+      // Examine all un-examined clues that the player can see
+      const newScenes = next.mystery.roomScenes.map(s => {
+        if (s.roomId !== examRoomId) return s;
+        const newClues = s.physicalClues.map(clue => {
+          if (clue.examined) return clue;
+          // Sensor-gated clues require the right sensor
+          if (clue.sensorRequired && !playerSensors.includes(clue.sensorRequired)) return clue;
+          return { ...clue, examined: true };
+        });
+        return { ...s, physicalClues: newClues };
+      });
+
+      // Find newly examined clues to add as journal entries
+      const oldScene = scene;
+      const newScene = newScenes.find(s => s.roomId === examRoomId)!;
+      const newlyExamined = newScene.physicalClues.filter(
+        (clue, i) => clue.examined && !oldScene.physicalClues[i].examined
+      );
+
+      next = {
+        ...next,
+        mystery: {
+          ...next.mystery,
+          roomScenes: newScenes,
+        },
+      };
+
+      // Add journal entries for each newly examined clue
+      const mystery = next.mystery!;
+      for (const clue of newlyExamined) {
+        const clueCategory: JournalEntry["category"] = clue.type === "badge" || clue.type === "personal_effect"
+          ? "crew"
+          : clue.type === "terminal_log" || clue.type === "access_log"
+            ? "log"
+            : "trace";
+
+        next = addJournalEntry(
+          next,
+          `journal_clue_${clue.id}`,
+          clueCategory,
+          `Physical clue: ${clue.type.replace(/_/g, " ")}`,
+          clue.text,
+          scene.roomName,
+        );
+
+        // Update dossier if clue is crew-linked
+        if (clue.crewLinked && next.mystery!.dossiers) {
+          const crewMember = next.mystery!.crew.find(c => c.id === clue.crewLinked);
+          const dossierIdx = next.mystery!.dossiers.findIndex(d => d.crewId === clue.crewLinked);
+          if (dossierIdx >= 0 && crewMember) {
+            let dossier = next.mystery!.dossiers[dossierIdx];
+
+            // Badge clue confirms identity
+            if (clue.type === "badge") {
+              dossier = confirmIdentity(dossier, crewMember);
+            }
+
+            // Link this journal entry to the dossier
+            dossier = linkEvidence(dossier, `journal_clue_${clue.id}`);
+
+            const newDossiers = [...next.mystery!.dossiers];
+            newDossiers[dossierIdx] = dossier;
+            next = {
+              ...next,
+              mystery: { ...next.mystery!, dossiers: newDossiers },
+            };
+          }
+        }
+
+        // Record evidence accumulation
+        if (clue.evidenceCategory && next.mystery!.evidenceAccumulation) {
+          const newAcc = recordEvidence(next.mystery!.evidenceAccumulation, clue.evidenceCategory);
+          next = {
+            ...next,
+            mystery: { ...next.mystery!, evidenceAccumulation: newAcc },
+          };
+
+          // Check for Crack Moment
+          if (shouldFireCrackMoment(newAcc)) {
+            const firedAcc = fireCrackMoment(newAcc);
+            next = {
+              ...next,
+              mystery: { ...next.mystery!, evidenceAccumulation: firedAcc },
+            };
+            next.logs = [...next.logs, {
+              id: `log_crack_moment_${next.turn}`,
+              timestamp: next.turn,
+              source: "milestone",
+              text: "Something doesn't add up. The official story — you've been building it in your head, piece by piece. But this... this doesn't fit. Not wrong, exactly. Just the first crack in a picture you thought was complete.",
+              read: false,
+            }];
+          }
+        }
+
+        // Check for contradiction pair evidence
+        if (next.mystery!.contradictionPairs) {
+          for (const pair of next.mystery!.contradictionPairs) {
+            if (pair.revealed) continue;
+            // Match clue text against contradiction pair evidence
+            if (!pair.officialFound && clue.text === pair.official.text) {
+              const newPairs = markEvidenceFound(next.mystery!.contradictionPairs!, pair.id, "official");
+              next = { ...next, mystery: { ...next.mystery!, contradictionPairs: newPairs } };
+            }
+            if (!pair.contradictingFound && clue.text === pair.contradicting.text) {
+              const newPairs = markEvidenceFound(next.mystery!.contradictionPairs!, pair.id, "contradicting");
+              next = { ...next, mystery: { ...next.mystery!, contradictionPairs: newPairs } };
+            }
+          }
+        }
+      }
+
+      // Log summary
+      if (newlyExamined.length > 0) {
+        next.logs = [...next.logs, {
+          id: `log_examine_clues_${next.turn}`,
+          timestamp: next.turn,
+          source: "narrative",
+          text: `Examined ${newlyExamined.length} clue${newlyExamined.length > 1 ? "s" : ""} in ${scene.roomName}.`,
+          read: false,
+        }];
+      } else {
+        const sensorGated = scene.physicalClues.filter(c => !c.examined && c.sensorRequired);
+        if (sensorGated.length > 0) {
+          next.logs = [...next.logs, {
+            id: `log_examine_sensor_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: `${sensorGated.length} clue${sensorGated.length > 1 ? "s" : ""} require sensor upgrades to examine.`,
+            read: false,
+          }];
+        } else {
+          next.logs = [...next.logs, {
+            id: `log_examine_done_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: "All accessible clues in this room have been examined.",
+            read: false,
+          }];
+        }
+      }
+
+      // Update incident board slot unlocks
+      next = updateMysteryBoardState(next);
+
+      // Free action — examining doesn't advance turn
+      return next;
+    }
+
+    case ActionType.ProcessScene: {
+      // Submit WHO/WHAT/OUTCOME answers for a room scene
+      if (!next.mystery?.roomScenes) {
+        next.logs = [...next.logs, {
+          id: `log_process_noscenes_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "No scene data available.",
+          read: false,
+        }];
+        break;
+      }
+
+      const processRoom = getRoomAt(next, next.player.entity.pos);
+      const processRoomId = action.sceneRoomId ?? processRoom?.id;
+      if (!processRoomId) {
+        next.logs = [...next.logs, {
+          id: `log_process_noroom_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "You're not in a room with a scene.",
+          read: false,
+        }];
+        break;
+      }
+
+      const targetScene = next.mystery.roomScenes.find(s => s.roomId === processRoomId);
+      if (!targetScene) {
+        next.logs = [...next.logs, {
+          id: `log_process_noscene_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "No scene to process here.",
+          read: false,
+        }];
+        break;
+      }
+
+      if (targetScene.processed) {
+        next.logs = [...next.logs, {
+          id: `log_process_done_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: `Scene in ${targetScene.roomName} has already been fully processed.`,
+          read: false,
+        }];
+        break;
+      }
+
+      // Require at least 1 examined clue before processing
+      const examinedCount = targetScene.physicalClues.filter(c => c.examined).length;
+      if (examinedCount === 0) {
+        next.logs = [...next.logs, {
+          id: `log_process_noclues_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Examine some clues first before processing the scene.",
+          read: false,
+        }];
+        break;
+      }
+
+      // Parse answers
+      const whoAnswer = action.whoAnswer ?? [];
+      const whatAnswer = (action.whatAnswer as SceneActivity) ?? SceneActivity.RoutineWork;
+      const outcomeAnswer = (action.outcomeAnswer as SceneOutcome) ?? SceneOutcome.Unknown;
+
+      // Evaluate against ground truth
+      const result = processScene(targetScene, whoAnswer, whatAnswer, outcomeAnswer);
+
+      // Update scene state
+      const updatedScenes = next.mystery.roomScenes.map(s => {
+        if (s.roomId !== processRoomId) return s;
+        return {
+          ...s,
+          processAttempts: s.processAttempts + 1,
+          processed: result.score >= 2, // need 2+ correct to mark as processed
+        };
+      });
+
+      next = {
+        ...next,
+        mystery: { ...next.mystery!, roomScenes: updatedScenes },
+        turn: next.turn + result.turnCost, // scene processing costs turns
+      };
+
+      // Update dossiers from WHO answer results
+      if (result.whoCorrect && next.mystery!.dossiers) {
+        for (const crewId of whoAnswer) {
+          const dossierIdx = next.mystery!.dossiers!.findIndex(d => d.crewId === crewId);
+          if (dossierIdx >= 0) {
+            const updatedDossier = updateTheoriesFromScene(
+              next.mystery!.dossiers![dossierIdx],
+              targetScene.roomName,
+              targetScene.groundTruth.what,
+            );
+            const newDossiers = [...next.mystery!.dossiers!];
+            newDossiers[dossierIdx] = updatedDossier;
+            next = { ...next, mystery: { ...next.mystery!, dossiers: newDossiers } };
+          }
+        }
+      }
+
+      // Log the result
+      const parts: string[] = [];
+      if (result.whoCorrect) parts.push("WHO: correct");
+      else parts.push("WHO: incorrect");
+      if (result.whatCorrect) parts.push("WHAT: correct");
+      else parts.push("WHAT: incorrect");
+      if (result.outcomeCorrect) parts.push("OUTCOME: correct");
+      else parts.push("OUTCOME: incorrect");
+
+      const scoreText = result.score >= 2
+        ? `Scene processed (${result.score}/3). ${result.turnCost} turns spent.`
+        : `Scene analysis incomplete (${result.score}/3). ${result.turnCost} turns spent. Try again with better answers.`;
+
+      next.logs = [...next.logs, {
+        id: `log_process_result_${processRoomId}_${next.turn}`,
+        timestamp: next.turn,
+        source: "data_core",
+        text: `${scoreText} [${parts.join(", ")}]`,
+        read: false,
+      }];
+
+      // Add journal entry for processed scene
+      if (result.score >= 2) {
+        next = addJournalEntry(
+          next,
+          `journal_scene_${processRoomId}`,
+          "trace",
+          `Scene analysis: ${targetScene.roomName}`,
+          `Processed scene in ${targetScene.roomName}. ${parts.join(". ")}. Ground truth confirmed for ${result.score}/3 questions.`,
+          targetScene.roomName,
+        );
+      }
+
+      // Update incident board slot unlocks
+      next = updateMysteryBoardState(next);
+
+      // Check pending contradictions — decrement rooms until reveal
+      if (next.mystery?.pendingContradictions && next.mystery.pendingContradictions.length > 0) {
+        const newPending = next.mystery.pendingContradictions
+          .map(pc => ({ ...pc, roomsUntilReveal: pc.roomsUntilReveal - 1 }))
+          .filter(pc => {
+            if (pc.roomsUntilReveal <= 0) {
+              // Reveal this contradiction
+              if (next.mystery?.contradictionPairs) {
+                const newPairs = revealContradiction(next.mystery.contradictionPairs, pc.pairId);
+                const pair = newPairs.find(p => p.id === pc.pairId);
+                next = { ...next, mystery: { ...next.mystery!, contradictionPairs: newPairs } };
+                if (pair) {
+                  next.logs = [...next.logs, {
+                    id: `log_contradiction_${pc.pairId}_${next.turn}`,
+                    timestamp: next.turn,
+                    source: "milestone",
+                    text: `CONTRADICTION DETECTED: "${pair.official.text.substring(0, 60)}..." vs "${pair.contradicting.text.substring(0, 60)}..."`,
+                    read: false,
+                  }];
+                }
+              }
+              return false; // remove from pending
+            }
+            return true; // keep in pending
+          });
+        next = { ...next, mystery: { ...next.mystery, pendingContradictions: newPending } };
+      }
+
+      // Add newly detected pending contradictions
+      if (next.mystery?.contradictionPairs) {
+        const newPendingList = checkPendingContradictions(next.mystery.contradictionPairs);
+        if (newPendingList.length > 0) {
+          const existingIds = new Set((next.mystery.pendingContradictions ?? []).map(p => p.pairId));
+          const fresh = newPendingList.filter(p => !existingIds.has(p.pairId));
+          if (fresh.length > 0) {
+            next = {
+              ...next,
+              mystery: {
+                ...next.mystery,
+                pendingContradictions: [...(next.mystery.pendingContradictions ?? []), ...fresh],
+              },
+            };
+          }
+        }
+      }
+
+      // ProcessScene does NOT return early — it advances the turn normally
+      break;
+    }
+
+    case ActionType.ConfirmTimeline: {
+      // Confirm a timeline card for the incident board
+      if (!next.mystery?.incidentBoard || !action.timelinePhase) {
+        next.logs = [...next.logs, {
+          id: `log_confirm_invalid_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Invalid timeline confirmation.",
+          read: false,
+        }];
+        break;
+      }
+
+      const confirmPhase = action.timelinePhase as TimelinePhase;
+      const board = next.mystery.incidentBoard;
+      const slot = board.slots.find(s => s.phase === confirmPhase);
+
+      if (!slot || (slot.status !== "unlocked" && slot.status !== "proposed")) {
+        next.logs = [...next.logs, {
+          id: `log_confirm_locked_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: `Timeline slot "${confirmPhase.replace(/_/g, " ")}" is not available for confirmation.`,
+          read: false,
+        }];
+        break;
+      }
+
+      // Generate the proposal for this slot if not already proposed
+      const processedScenes = next.mystery.roomScenes?.filter(s => s.processed) ?? [];
+      let card = slot.proposedCard;
+      if (!card) {
+        // Auto-generate based on whether player should get correct or incorrect card
+        if (action.cardCorrect === false) {
+          card = generateRedHerring(confirmPhase, next.mystery.timeline, next.mystery.crew) ?? undefined;
+        } else {
+          card = generateProposal(confirmPhase, next.mystery.timeline, processedScenes, next.mystery.crew) ?? undefined;
+        }
+      }
+
+      if (!card) {
+        next.logs = [...next.logs, {
+          id: `log_confirm_nocard_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "No proposal available for this timeline slot.",
+          read: false,
+        }];
+        break;
+      }
+
+      const { board: newBoard, result: confirmResult } = confirmCard(board, confirmPhase, card);
+      next = {
+        ...next,
+        mystery: { ...next.mystery, incidentBoard: newBoard },
+      };
+
+      if (confirmResult.correct) {
+        next.logs = [...next.logs, {
+          id: `log_confirm_correct_${confirmPhase}_${next.turn}`,
+          timestamp: next.turn,
+          source: "milestone",
+          text: confirmResult.revelationText ?? `Timeline ${confirmPhase.replace(/_/g, " ")} confirmed.`,
+          read: false,
+        }];
+
+        // Check if board is now complete
+        if (isBoardComplete(newBoard)) {
+          next.logs = [...next.logs, {
+            id: `log_board_complete_${next.turn}`,
+            timestamp: next.turn,
+            source: "milestone",
+            text: "INCIDENT TIMELINE COMPLETE — The full sequence of events has been reconstructed.",
+            read: false,
+          }];
+        }
+      } else {
+        next = {
+          ...next,
+          turn: next.turn + confirmResult.turnPenalty,
+        };
+        next.logs = [...next.logs, {
+          id: `log_confirm_wrong_${confirmPhase}_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: `Timeline placement incorrect. +${confirmResult.turnPenalty} turn penalty.`,
+          read: false,
+        }];
+      }
+
+      // Free action — no additional turn advance
+      return next;
+    }
+
+    case ActionType.RejectTimeline: {
+      // Reject a proposed timeline card
+      if (!next.mystery?.incidentBoard || !action.timelinePhase) {
+        break;
+      }
+
+      const rejectPhase = action.timelinePhase as TimelinePhase;
+      const rejectedBoard = rejectCard(next.mystery.incidentBoard, rejectPhase);
+      next = {
+        ...next,
+        mystery: { ...next.mystery, incidentBoard: rejectedBoard },
+      };
+
+      next.logs = [...next.logs, {
+        id: `log_reject_${rejectPhase}_${next.turn}`,
+        timestamp: next.turn,
+        source: "system",
+        text: `Timeline proposal for "${rejectPhase.replace(/_/g, " ")}" rejected.`,
+        read: false,
+      }];
+
+      // Free action
+      return next;
+    }
+
     default:
       break;
   }

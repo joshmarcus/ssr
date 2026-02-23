@@ -64,6 +64,39 @@ export interface HarnessObservation {
     crewFollowing: number;
     podsPowered: number;
   };
+
+  // Station Autopsy mystery systems
+  sceneStatus: {
+    roomId: string;
+    roomName: string;
+    cluesExamined: number;
+    cluesTotal: number;
+    sensorGated: number;
+    processed: boolean;
+    attempts: number;
+  }[];
+  evidenceAccumulation: {
+    confirming_found: number;
+    ambiguous_found: number;
+    contradicting_found: number;
+    crack_moment_fired: boolean;
+  } | null;
+  dossierProgress: {
+    crewId: string;
+    identified: boolean;
+    roomsSeen: number;
+    linkedEvidence: number;
+  }[];
+  incidentBoard: {
+    slots: { phase: string; status: string }[];
+    wrongConfirmations: number;
+  } | null;
+  contradictions: {
+    revealed: number;
+    total: number;
+    pending: number;
+  };
+  crackMomentFired: boolean;
 }
 
 /**
