@@ -55,18 +55,19 @@ export interface NarrativeState {
   crewIdentified: number;
   contradictionsFound: number;
   slotsConfirmed: number;
+  crackMomentFired: boolean;
 }
 
 /**
  * Check and update slot unlock status based on narrative state.
  *
- * | Slot        | Unlock Condition                                    |
- * |-------------|-----------------------------------------------------|
- * | BEFORE      | Available from start                                |
- * | TRIGGER     | 2+ rooms processed AND 1+ crew identified           |
- * | ESCALATION  | 4+ rooms processed AND 1+ contradiction found       |
- * | COLLAPSE    | 6+ rooms processed AND 3+ crew identified           |
- * | AFTERMATH   | All prior slots filled                              |
+ * | Slot        | Unlock Condition                                              |
+ * |-------------|---------------------------------------------------------------|
+ * | BEFORE      | Available from start                                          |
+ * | TRIGGER     | 3+ rooms processed AND 2+ crew identified                     |
+ * | ESCALATION  | 5+ rooms processed AND 1+ contradiction found                 |
+ * | COLLAPSE    | 7+ rooms processed AND 3+ crew identified AND crack moment    |
+ * | AFTERMATH   | All prior slots confirmed                                     |
  */
 export function updateSlotUnlocks(
   board: IncidentBoard,
@@ -82,13 +83,13 @@ export function updateSlotUnlocks(
         shouldUnlock = true; // always unlocked
         break;
       case TimelinePhase.Trigger:
-        shouldUnlock = state.roomsProcessed >= 2 && state.crewIdentified >= 1;
+        shouldUnlock = state.roomsProcessed >= 3 && state.crewIdentified >= 2;
         break;
       case TimelinePhase.Escalation:
-        shouldUnlock = state.roomsProcessed >= 4 && state.contradictionsFound >= 1;
+        shouldUnlock = state.roomsProcessed >= 5 && state.contradictionsFound >= 1;
         break;
       case TimelinePhase.Collapse:
-        shouldUnlock = state.roomsProcessed >= 6 && state.crewIdentified >= 3;
+        shouldUnlock = state.roomsProcessed >= 7 && state.crewIdentified >= 3 && state.crackMomentFired;
         break;
       case TimelinePhase.Aftermath:
         // All prior slots must be confirmed
@@ -320,11 +321,13 @@ export function buildNarrativeState(
   roomScenes: RoomScene[],
   dossiers: CrewDossier[],
   contradictionsFound: number,
+  crackMomentFired: boolean = false,
 ): NarrativeState {
   return {
     roomsProcessed: roomScenes.filter((s) => s.processed).length,
     crewIdentified: getIdentifiedCrewCount(dossiers),
     contradictionsFound,
     slotsConfirmed: 0, // will be set by caller from the board
+    crackMomentFired,
   };
 }

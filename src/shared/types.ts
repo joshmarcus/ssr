@@ -561,6 +561,7 @@ export interface MysteryState {
   incidentBoard?: IncidentBoardState; // timeline reconstruction board
   contradictionPairs?: import("../sim/twoStory.js").ContradictionPair[]; // official vs real story
   pendingContradictions?: import("../sim/twoStory.js").PendingContradiction[]; // delayed reveals
+  perfectSceneStreak?: number; // consecutive 3/3 scene processing results
 }
 
 // ── What We Know (narrative summary) ─────────────────────────

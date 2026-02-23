@@ -112,10 +112,12 @@ function updateMysteryBoardState(state: GameState): GameState {
     ? getRevealedContradictionCount(state.mystery.contradictionPairs)
     : 0;
 
+  const crackMomentFired = state.mystery.evidenceAccumulation?.crack_moment_fired ?? false;
   const narrativeState = buildNarrativeState(
     state.mystery.roomScenes,
     state.mystery.dossiers,
     contradictionsFound,
+    crackMomentFired,
   );
 
   const prevBoard = state.mystery.incidentBoard;
@@ -5808,20 +5810,47 @@ export function step(state: GameState, action: Action): GameState {
         }
       }
 
-      // CORVUS-7 commentary for perfect scene analysis
+      // Scene completion ceremony for perfect analysis (3/3)
       if (result.score === 3) {
         const gt = targetScene.groundTruth;
-        const crewName = gt.who.length > 0
-          ? next.mystery!.crew.find(c => c.id === gt.who[0])?.lastName ?? "someone"
-          : "someone";
+        const crewNames = gt.who
+          .map(id => next.mystery!.crew.find(c => c.id === id))
+          .filter(Boolean)
+          .map(c => `${c!.lastName}`);
+        const whoPhrase = crewNames.length > 0 ? crewNames.join(" & ") : "Unknown";
         const actPhrase = gt.what.replace(/_/g, " ");
+        const outcomePhrase = gt.outcome.replace(/_/g, " ");
+        // Generate a pseudo-timestamp for atmosphere
+        const timeHour = (6 + (next.turn % 18)).toString().padStart(2, "0");
+        const timeMin = ((next.turn * 7) % 60).toString().padStart(2, "0");
         next.logs = [...next.logs, {
-          id: `log_corvus_scene_${processRoomId}_${next.turn}`,
+          id: `log_scene_ceremony_${processRoomId}_${next.turn}`,
           timestamp: next.turn,
           source: "milestone",
-          text: `CORVUS-7: Perfect analysis. ${crewName} was ${actPhrase} in ${targetScene.roomName}. This changes the picture.`,
+          text: `\u2605 SCENE SOLVED: ${targetScene.roomName}, ${timeHour}:${timeMin} UTC \u2014 ${whoPhrase} was ${actPhrase}. Outcome: ${outcomePhrase}. Case closed.`,
           read: false,
         }];
+        // Track perfect streak
+        const streak = (next.mystery!.perfectSceneStreak ?? 0) + 1;
+        next = {
+          ...next,
+          mystery: { ...next.mystery!, perfectSceneStreak: streak },
+        };
+        if (streak >= 3) {
+          next.logs = [...next.logs, {
+            id: `log_scene_streak_${streak}_${next.turn}`,
+            timestamp: next.turn,
+            source: "milestone",
+            text: `${streak} scenes solved perfectly in a row! Investigation momentum building.`,
+            read: false,
+          }];
+        }
+      } else if (result.score >= 2) {
+        // Reset streak on non-perfect
+        next = {
+          ...next,
+          mystery: { ...next.mystery!, perfectSceneStreak: 0 },
+        };
       }
 
       // Hint after first successful scene processing
@@ -6173,6 +6202,38 @@ export function step(state: GameState, action: Action): GameState {
   next = checkWinCondition(next);
   next = checkLossCondition(next);
   next = checkTurnLimit(next);
+
+  // Sensor upgrade exploration hint: after exploring rooms but still only base sensor
+  if (next.mystery && next.mystery.roomScenes && !next.milestones.has("hint_sensor_upgrade")) {
+    const roomsVisited = next.mystery.roomScenes.filter(s => s.processed || s.physicalClues.some(c => c.examined)).length;
+    const hasSensorUpgrade = (next.player.sensors ?? []).length > 1;
+    if (roomsVisited >= 3 && !hasSensorUpgrade) {
+      // Count sensor-gated clues across all rooms
+      const sensorGatedTotal = next.mystery.roomScenes.reduce((sum, s) =>
+        sum + s.physicalClues.filter(c => !c.examined && c.sensorRequired).length, 0);
+      if (sensorGatedTotal > 0) {
+        next = { ...next, milestones: new Set([...next.milestones, "hint_sensor_upgrade"]) };
+        // Find which rooms contain sensor pickups
+        let sensorRoomHint = "";
+        for (const [, entity] of next.entities) {
+          if (entity.type === EntityType.SensorPickup) {
+            const room = next.rooms.find(r =>
+              entity.pos.x >= r.x && entity.pos.x < r.x + r.width &&
+              entity.pos.y >= r.y && entity.pos.y < r.y + r.height);
+            if (room) sensorRoomHint = ` — check ${room.name}`;
+            break;
+          }
+        }
+        next.logs = [...next.logs, {
+          id: `log_hint_sensor_upgrade_${next.turn}`,
+          timestamp: next.turn,
+          source: "system" as const,
+          text: `[SENSOR] ${sensorGatedTotal} hidden clue${sensorGatedTotal > 1 ? "s" : ""} detected across the station requiring upgraded sensors. Find sensor modules to reveal them${sensorRoomHint}.`,
+          read: false,
+        }];
+      }
+    }
+  }
 
   // Update fog-of-war vision
   next = updateVision(next);

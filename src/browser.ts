@@ -2315,6 +2315,15 @@ function handleAction(action: Action): void {
         display.triggerScreenFlash("milestone");
         audio.playInteract();
       }
+      // Scene completion ceremony — screen flash + celebratory audio
+      if (simLog.id.startsWith("log_scene_ceremony_")) {
+        display.triggerScreenFlash("milestone");
+        audio.playDeductionCorrect();
+      }
+      // Scene streak — extra flash
+      if (simLog.id.startsWith("log_scene_streak_")) {
+        display.triggerScreenFlash("milestone");
+      }
       // Clue examination — flash tile and audio
       if (simLog.id.startsWith("log_examine_clues_")) {
         display.flashTile(state.player.entity.pos.x, state.player.entity.pos.y, "#ccaa44");
@@ -5980,8 +5989,26 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
       const d = dossiers.find(ds => ds.crewId === c.id);
       const selected = idx === hubIdx;
       const mentionCount = journal.filter(j => j.crewMentioned.includes(c.id)).length;
-      const statusColor = c.fate === CrewFate.Dead ? "#f44" : c.fate === CrewFate.Missing ? "#fa0" : "#4a4";
-      const statusText = c.fate === CrewFate.Dead ? "DECEASED" : c.fate === CrewFate.Missing ? "MISSING" : c.fate === CrewFate.Escaped ? "EVACUATED" : c.fate === CrewFate.Survived ? "ALIVE" : "UNKNOWN";
+      // Gate fate display behind investigation progress
+      const processedScenes = (state.mystery?.roomScenes ?? []).filter(s => s.processed).length;
+      const identifiedCount = dossiers.filter(ds => ds.confirmed.name).length;
+      const crackFired = state.mystery?.evidenceAccumulation?.crack_moment_fired ?? false;
+      const fateTier = processedScenes >= 6 && identifiedCount >= 3 && crackFired ? 3
+        : processedScenes >= 3 && identifiedCount >= 1 ? 2
+        : 1;
+      const crewSceneConfirmed = (state.mystery?.roomScenes ?? []).some(sc =>
+        sc.processed && sc.groundTruth.who.includes(c.id));
+      let statusColor: string, statusText: string;
+      if (fateTier >= 3 || crewSceneConfirmed) {
+        statusColor = c.fate === CrewFate.Dead ? "#f44" : c.fate === CrewFate.Missing ? "#fa0" : "#4a4";
+        statusText = c.fate === CrewFate.Dead ? "DECEASED" : c.fate === CrewFate.Missing ? "MISSING" : c.fate === CrewFate.Escaped ? "EVACUATED" : c.fate === CrewFate.Survived ? "ALIVE" : "UNKNOWN";
+      } else if (fateTier >= 2) {
+        statusColor = "#889";
+        statusText = "UNCONFIRMED";
+      } else {
+        statusColor = "#556";
+        statusText = "???";
+      }
       const bg = selected ? "background:rgba(68,204,255,0.12);border-left:2px solid #4cf" : "border-left:2px solid transparent";
       const nameText = d?.confirmed.name ? `${c.firstName} ${c.lastName}` : `Crew #${idx + 1}`;
       const roleText = d?.confirmed.role ? d.confirmed.role.toUpperCase() : c.role.toUpperCase();
@@ -5997,6 +6024,17 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
   const dossier = dossiers.find(d => d.crewId === selected.id);
   const mentions = journal.filter(j => j.crewMentioned.includes(selected.id));
   const profileReady = mentions.length >= 2;
+
+  // Fate gating: same tiers as list view
+  const detProcessed = (state.mystery?.roomScenes ?? []).filter(s => s.processed).length;
+  const detIdentified = dossiers.filter(ds => ds.confirmed.name).length;
+  const detCrackFired = state.mystery?.evidenceAccumulation?.crack_moment_fired ?? false;
+  const detFateTier = detProcessed >= 6 && detIdentified >= 3 && detCrackFired ? 3
+    : detProcessed >= 3 && detIdentified >= 1 ? 2
+    : 1;
+  const detCrewSceneConfirmed = (state.mystery?.roomScenes ?? []).some(sc =>
+    sc.processed && sc.groundTruth.who.includes(selected.id));
+  const detFateRevealed = detFateTier >= 3 || detCrewSceneConfirmed;
 
   let detailHtml = `<div style="padding:12px">`;
   detailHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:2px;margin-bottom:8px">CREW DOSSIER</div>`;
@@ -6023,7 +6061,13 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
         detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Involvement: <span style="color:${invColors[theories.involvement] ?? "#889"}">${theories.involvement.toUpperCase()}</span></div>`;
       }
       if (theories.fate) {
-        detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Fate theory: <span style="color:#bbc">${theories.fate.replace(/_/g, " ")}</span></div>`;
+        if (detFateRevealed) {
+          detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px">Fate theory: <span style="color:#bbc">${theories.fate.replace(/_/g, " ")}</span></div>`;
+        } else if (detFateTier >= 2) {
+          detailHtml += `<div style="color:#556;font-size:11px;margin-bottom:3px">Fate theory: <span style="color:#667">UNCONFIRMED — need more investigation</span></div>`;
+        } else {
+          detailHtml += `<div style="color:#445;font-size:11px;margin-bottom:3px">Fate theory: <span style="color:#556">??? — insufficient data</span></div>`;
+        }
       }
     }
 
@@ -6076,7 +6120,7 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
   if (selected.personality) {
     detailHtml += `<div style="color:#889;font-size:11px;margin-top:8px;margin-bottom:6px">Personality: <span style="color:#bbc">${selected.personality}</span></div>`;
   }
-  if (selected.secret) {
+  if (selected.secret && detFateRevealed) {
     detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:6px">Secret: <span style="color:#fca">${selected.secret}</span></div>`;
   }
   if (selected.lastKnownRoom) {
@@ -6215,7 +6259,11 @@ function getCrewProfileInsight(crew: import("./shared/types.js").CrewMember, men
 function renderSceneListItem(s: RoomScene, idx: number, selected: boolean, isReady: boolean): string {
   const examined = s.physicalClues.filter(c => c.examined).length;
   const total = s.physicalClues.length;
-  const sensorGated = s.physicalClues.filter(c => !c.examined && c.sensorRequired).length;
+  const sensorGatedClues = s.physicalClues.filter(c => !c.examined && c.sensorRequired);
+  const sensorGated = sensorGatedClues.length;
+  const playerSensors = state.player?.sensors ?? [];
+  const sensorLockedClues = sensorGatedClues.filter(c => !playerSensors.includes(c.sensorRequired!));
+  const sensorLockedTypes = [...new Set(sensorLockedClues.map(c => c.sensorRequired))];
 
   let statusIcon: string;
   let statusColor: string;
@@ -6262,8 +6310,14 @@ function renderSceneListItem(s: RoomScene, idx: number, selected: boolean, isRea
   }
 
   html += `<div style="font-size:10px;color:#667">`;
-  html += `Clues: ${examined}/${total}${sensorGated > 0 ? ` (+${sensorGated} sensor)` : ""}${phaseTag}`;
-  html += `</div></div>`;
+  html += `Clues: ${examined}/${total}`;
+  if (sensorLockedClues.length > 0) {
+    const sNames = sensorLockedTypes.map(t => t === "thermal" ? "Thermal" : t === "atmospheric" ? "Atmospheric" : String(t));
+    html += ` <span style="color:#f80;font-size:9px" title="${sNames.join("/")} sensor needed">+${sensorLockedClues.length} locked (${sNames.join("/")})</span>`;
+  } else if (sensorGated > 0) {
+    html += ` <span style="color:#6a8;font-size:9px">+${sensorGated} sensor</span>`;
+  }
+  html += `${phaseTag}</div></div>`;
   return html;
 }
 
@@ -6378,9 +6432,9 @@ function renderHubScenes(): string {
         listHtml += ` <span style="color:#fa0;font-size:9px;font-weight:bold">READY</span>`;
       } else if (slot.status === "locked") {
         const reqHints: Record<string, string> = {
-          trigger: "2+ rooms processed, 1+ crew ID'd",
-          escalation: "4+ rooms processed, 1+ contradiction",
-          collapse: "6+ rooms processed, 3+ crew ID'd",
+          trigger: "3+ rooms processed, 2+ crew ID'd",
+          escalation: "5+ rooms processed, 1+ contradiction",
+          collapse: "7+ rooms processed, 3+ crew ID'd, crack moment",
           aftermath: "all prior phases confirmed",
         };
         const hint = reqHints[slot.phase];
@@ -6559,7 +6613,12 @@ function renderHubSceneDetail(scene: RoomScene, crew: import("./shared/types.js"
     html += `<span style="color:${typeColor};font-size:10px;letter-spacing:1px">${c.type.replace(/_/g, " ").toUpperCase()}</span>`;
 
     if (!c.examined && c.sensorRequired) {
-      html += `<span style="color:#f44;font-size:10px">REQUIRES ${c.sensorRequired.toUpperCase()} SENSOR</span>`;
+      const hasSensor = (state.player?.sensors ?? []).includes(c.sensorRequired);
+      if (hasSensor) {
+        html += `<span style="color:#fa0;font-size:10px">${c.sensorRequired.toUpperCase()} — RETURN TO EXAMINE</span>`;
+      } else {
+        html += `<span style="color:#f44;font-size:10px">REQUIRES ${c.sensorRequired.toUpperCase()} SENSOR</span>`;
+      }
     } else if (!c.examined) {
       html += `<span style="color:#555;font-size:10px">NOT EXAMINED</span>`;
     } else {
@@ -6578,6 +6637,8 @@ function renderHubSceneDetail(scene: RoomScene, crew: import("./shared/types.js"
           html += `<div style="color:#6cf;font-size:10px;margin-top:2px">[${identified}] Linked: ${esc(linked.firstName)} ${esc(linked.lastName)} (${esc(linked.role)})</div>`;
         }
       }
+    } else if (c.sensorRequired && !(state.player?.sensors ?? []).includes(c.sensorRequired)) {
+      html += `<div style="color:#f66;font-size:11px;margin-top:4px;font-style:italic">Sensor-locked. Find the ${c.sensorRequired} sensor module to read this evidence.</div>`;
     } else {
       html += `<div style="color:#555;font-size:11px;margin-top:4px;font-style:italic">Examine this clue in the room to reveal its contents.</div>`;
     }
@@ -6605,6 +6666,27 @@ function renderHubSceneDetail(scene: RoomScene, crew: import("./shared/types.js"
       html += `<div style="color:#fa0;font-size:12px;font-weight:bold">[p] PROCESS SCENE</div>`;
       html += `<div style="color:#889;font-size:10px;margin-top:4px">Answer WHO/WHAT/OUTCOME based on the evidence</div>`;
       html += `<div style="color:#667;font-size:10px;margin-top:2px">Cost: ${turnCost} turns${scene.processAttempts > 0 ? ` (attempt ${scene.processAttempts + 1})` : ""}</div>`;
+      html += `</div>`;
+    }
+  }
+
+  // Sensor-locked clue summary callout
+  const detailSensorLocked = scene.physicalClues.filter(c => !c.examined && c.sensorRequired);
+  if (detailSensorLocked.length > 0) {
+    const detailPlayerSensors = state.player?.sensors ?? [];
+    const missing = detailSensorLocked.filter(c => !detailPlayerSensors.includes(c.sensorRequired!));
+    const ready = detailSensorLocked.filter(c => detailPlayerSensors.includes(c.sensorRequired!));
+    if (missing.length > 0) {
+      const missingTypes = [...new Set(missing.map(c => c.sensorRequired))];
+      const sNames = missingTypes.map(t => t === "thermal" ? "Thermal" : t === "atmospheric" ? "Atmospheric" : String(t));
+      html += `<div style="margin-top:12px;padding:8px 10px;background:rgba(255,68,68,0.05);border:1px solid rgba(255,68,68,0.15);border-radius:3px">`;
+      html += `<div style="color:#f80;font-size:11px">${missing.length} hidden clue${missing.length !== 1 ? "s" : ""} require ${sNames.join(" / ")} sensor</div>`;
+      html += `<div style="color:#667;font-size:10px;margin-top:2px">Find sensor upgrades while exploring the station</div>`;
+      html += `</div>`;
+    }
+    if (ready.length > 0) {
+      html += `<div style="margin-top:8px;padding:8px 10px;background:rgba(255,170,0,0.05);border:1px solid rgba(255,170,0,0.15);border-radius:3px">`;
+      html += `<div style="color:#fa0;font-size:11px">${ready.length} clue${ready.length !== 1 ? "s" : ""} now readable — return to room and examine</div>`;
       html += `</div>`;
     }
   }

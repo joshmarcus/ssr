@@ -47,46 +47,46 @@ describe("incident board creation", () => {
 });
 
 describe("slot unlocking", () => {
-  it("TRIGGER unlocks with 2+ rooms and 1+ crew identified", () => {
+  it("TRIGGER unlocks with 3+ rooms and 2+ crew identified", () => {
     let board = createIncidentBoard();
 
     // Not enough rooms
     board = updateSlotUnlocks(board, {
-      roomsProcessed: 1, crewIdentified: 1, contradictionsFound: 0, slotsConfirmed: 0,
+      roomsProcessed: 2, crewIdentified: 2, contradictionsFound: 0, slotsConfirmed: 0, crackMomentFired: false,
     });
     expect(board.slots[1].status).toBe("locked");
 
     // Enough rooms + crew
     board = updateSlotUnlocks(board, {
-      roomsProcessed: 2, crewIdentified: 1, contradictionsFound: 0, slotsConfirmed: 0,
+      roomsProcessed: 3, crewIdentified: 2, contradictionsFound: 0, slotsConfirmed: 0, crackMomentFired: false,
     });
     expect(board.slots[1].status).toBe("unlocked");
   });
 
-  it("ESCALATION unlocks with 4+ rooms and 1+ contradiction", () => {
+  it("ESCALATION unlocks with 5+ rooms and 1+ contradiction", () => {
     let board = createIncidentBoard();
 
     board = updateSlotUnlocks(board, {
-      roomsProcessed: 4, crewIdentified: 2, contradictionsFound: 0, slotsConfirmed: 0,
+      roomsProcessed: 4, crewIdentified: 2, contradictionsFound: 1, slotsConfirmed: 0, crackMomentFired: false,
     });
-    expect(board.slots[2].status).toBe("locked"); // no contradictions
+    expect(board.slots[2].status).toBe("locked"); // not enough rooms
 
     board = updateSlotUnlocks(board, {
-      roomsProcessed: 4, crewIdentified: 2, contradictionsFound: 1, slotsConfirmed: 0,
+      roomsProcessed: 5, crewIdentified: 2, contradictionsFound: 1, slotsConfirmed: 0, crackMomentFired: false,
     });
     expect(board.slots[2].status).toBe("unlocked");
   });
 
-  it("COLLAPSE unlocks with 6+ rooms and 3+ crew identified", () => {
+  it("COLLAPSE unlocks with 7+ rooms, 3+ crew, and crack moment", () => {
     let board = createIncidentBoard();
 
     board = updateSlotUnlocks(board, {
-      roomsProcessed: 6, crewIdentified: 2, contradictionsFound: 1, slotsConfirmed: 0,
+      roomsProcessed: 7, crewIdentified: 3, contradictionsFound: 1, slotsConfirmed: 0, crackMomentFired: false,
     });
-    expect(board.slots[3].status).toBe("locked"); // not enough crew
+    expect(board.slots[3].status).toBe("locked"); // no crack moment
 
     board = updateSlotUnlocks(board, {
-      roomsProcessed: 6, crewIdentified: 3, contradictionsFound: 1, slotsConfirmed: 0,
+      roomsProcessed: 7, crewIdentified: 3, contradictionsFound: 1, slotsConfirmed: 0, crackMomentFired: true,
     });
     expect(board.slots[3].status).toBe("unlocked");
   });
@@ -96,7 +96,7 @@ describe("slot unlocking", () => {
 
     // Unlock everything except aftermath
     board = updateSlotUnlocks(board, {
-      roomsProcessed: 10, crewIdentified: 5, contradictionsFound: 3, slotsConfirmed: 0,
+      roomsProcessed: 10, crewIdentified: 5, contradictionsFound: 3, slotsConfirmed: 0, crackMomentFired: true,
     });
     expect(board.slots[4].status).toBe("locked"); // prior slots not confirmed
 
@@ -105,7 +105,7 @@ describe("slot unlocking", () => {
       board.slots[i] = { ...board.slots[i], status: "confirmed" };
     }
     board = updateSlotUnlocks(board, {
-      roomsProcessed: 10, crewIdentified: 5, contradictionsFound: 3, slotsConfirmed: 4,
+      roomsProcessed: 10, crewIdentified: 5, contradictionsFound: 3, slotsConfirmed: 4, crackMomentFired: true,
     });
     expect(board.slots[4].status).toBe("unlocked");
   });
@@ -115,7 +115,7 @@ describe("slot unlocking", () => {
     board.slots[0] = { ...board.slots[0], status: "confirmed" };
 
     board = updateSlotUnlocks(board, {
-      roomsProcessed: 0, crewIdentified: 0, contradictionsFound: 0, slotsConfirmed: 1,
+      roomsProcessed: 0, crewIdentified: 0, contradictionsFound: 0, slotsConfirmed: 1, crackMomentFired: false,
     });
     expect(board.slots[0].status).toBe("confirmed"); // stays confirmed
   });
