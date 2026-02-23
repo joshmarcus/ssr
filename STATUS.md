@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 139 (V253 completed — gamepad support + title screen + seed input)
-- **Test status**: 394 tests passing across 30 test files (0 failing)
+- **Phase**: Sprint 141 (V255 completed — achievements + gamepad + title screen)
+- **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
 - **Archetypes**: 6 active (Mutiny added — "The Divide")
@@ -120,11 +120,44 @@
 - **Pause menu [ESC]**: Resume/Help/New Game options with seed, archetype, difficulty, turn info
 - Seed display in HUD status bar + visible in pause menu
 - **Save/load testing**: 14 round-trip tests verifying serialization integrity (Map/Set, mystery state, corrupt handling)
+- **Audio controls**: F8 mute/unmute, F9/F10 volume (25% steps, localStorage persistence)
+- **Save/Load UI**: Pause menu save/load, title screen Continue/New Game when save exists
+- **Game-over deduction retrospective**: Shows each deduction with correct answer, colored by result
+- **Title screen**: Run history stats (total runs, wins, best rating, archetypes seen), achievement badges
+- **Seed input**: Custom seed entry before new games (title screen, pause menu, game-over)
+- **Gamepad/controller support**: Full Gamepad API integration (Xbox/Steam Deck), D-pad/stick movement, all buttons mapped
+- **Achievement system**: 8 badges tracking meta-progression across runs (First Victory, S-Rank, Speed Run, etc.)
 
 ## Known Issues
 
 - No CI pipeline deployed
 - Seed 42: Bot takes 900 turns (rescue-blocked crew require emergency override at turn 900 to transmit data core)
+
+## Sprint 140-141 Changes (V254-V255)
+
+### V255 — Achievement Tests
+- **14 new tests**: Full coverage of achievement system (checkAchievements, getAchievements, persistence, edge cases)
+- **Test count**: 408 tests across 31 test files
+
+### V254 — Achievement/Badge System
+- **8 achievements**: First Contact (first victory), Master Detective (all deductions correct), S-Rank Investigator, Rapid Response (under 100 turns), No One Left Behind (all crew saved), Hard Boiled (hard mode), Case Library (all 6 archetypes), Veteran Operative (10 runs)
+- **Game-over notifications**: New achievements announced as milestone log messages
+- **Title screen badges**: Unlocked achievements shown as green icons, locked as dark — hover for details
+- **localStorage persistence**: Achievement data saved in `ssr_achievements` key
+
+## Sprint 137-139 Changes (V252-V253)
+
+### V253 — Gamepad/Controller Support
+- **Gamepad API integration**: Full controller support via standard Gamepad API (Xbox/PlayStation/Steam Deck compatible)
+- **Button mapping**: D-pad/stick = move, A = interact, B = back, X = clean, Y = scan, LB = hub, RB = auto-explore, Start = pause
+- **Stick auto-repeat**: 0.4 deadzone, 300ms initial delay, 150ms repeat rate
+- **Synthetic keyboard events**: Gamepad dispatches standard keyboard events, so ALL existing handlers (overlays, menus, hub, etc.) work automatically
+- **Help overlay**: Controller section added showing all gamepad mappings
+
+### V252 — Title Screen + Seed Input
+- **Title screen**: Shows Continue/New Game when save exists, with MISSION LOG stats (total runs, wins, best rating, archetypes seen)
+- **Seed input screen**: Before starting new game, shows seed input (type numbers, Enter to accept, Esc for random). Accessible from title screen, pause menu, and game-over [N]
+- **Run history integration**: Uses `getRunHistory()` to display archetype coverage (X/6 archetypes)
 
 ## Sprint 134-136 Changes (V249-V251)
 
