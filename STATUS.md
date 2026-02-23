@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 170 (V331 completed — investigation momentum, hazard evidence, rescue rewards, environmental echoes)
+- **Phase**: Sprint 172 (V339 completed — deduction explanations, puzzle guidance, evidence synthesis, crew testimony expansion)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
