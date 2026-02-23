@@ -49,7 +49,7 @@ import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, 
 import { computeChoiceEndings, computeBranchedEpilogue, isMoralChoiceUnlocked } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, getTagCoverage, solveDeduction } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
-import { saveGame, loadGame, hasSave, deleteSave, recordRun } from "./sim/saveLoad.js";
+import { saveGame, loadGame, hasSave, deleteSave, recordRun, getRunHistory } from "./sim/saveLoad.js";
 import { isEntityExhausted } from "./shared/ui.js";
 import { computeGoals, computeGoalDiscoveries, type Goal, type Subgoal } from "./shared/goals.js";
 import { formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
@@ -1939,11 +1939,11 @@ function handleRestartKey(e: KeyboardEvent): void {
   }
   if (e.key === "n" || e.key === "N") {
     e.preventDefault();
-    const newSeed = (seed + 1) % 1000000;
-    resetGameState(newSeed);
-    // Show full opening crawl for the new storyline
-    gameStarted = false;
-    showOpeningCrawl();
+    showSeedInput((chosenSeed) => {
+      resetGameState(chosenSeed);
+      gameStarted = false;
+      showOpeningCrawl();
+    });
   }
   if (e.key === "c" || e.key === "C") {
     e.preventDefault();
@@ -4467,10 +4467,11 @@ function handlePauseInput(e: KeyboardEvent): void {
       showHelp();
     } else if (selected === "New Game") {
       closePauseMenu();
-      const newSeed = (seed + 1) % 1000000;
-      resetGameState(newSeed);
-      gameStarted = false;
-      showOpeningCrawl();
+      showSeedInput((chosenSeed) => {
+        resetGameState(chosenSeed);
+        gameStarted = false;
+        showOpeningCrawl();
+      });
     }
     return;
   }
@@ -6570,10 +6571,93 @@ function esc(text: string): string {
 }
 
 // ── Start: check for save or show opening crawl / title screen ───
+/** Show seed input screen before starting a new game. */
+function showSeedInput(onConfirm: (seed: number) => void): void {
+  const defaultSeed = getNextSeed();
+  let inputStr = String(defaultSeed);
+  let cursorBlink = true;
+
+  const blinkInterval = setInterval(() => {
+    cursorBlink = !cursorBlink;
+    renderSeedInput();
+  }, 500);
+
+  function renderSeedInput(): void {
+    const cursor = cursorBlink ? `<span style="color:#0fa">|</span>` : `<span style="opacity:0">|</span>`;
+    crawlOverlay.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:24px;padding:48px">
+        <div style="text-align:center">
+          <div style="font-size:20px;font-weight:bold;color:#0fa;letter-spacing:4px;margin-bottom:8px">NEW INVESTIGATION</div>
+          <div style="font-size:12px;color:#556">Enter a seed number for this run</div>
+        </div>
+        <div style="background:rgba(0,255,180,0.05);border:1px solid rgba(0,255,180,0.3);border-radius:4px;padding:12px 24px;min-width:200px;text-align:center">
+          <span style="font-size:24px;font-weight:bold;color:#0fa;letter-spacing:3px;font-family:monospace">${inputStr}${cursor}</span>
+        </div>
+        <div style="font-size:10px;color:#445;text-align:center">
+          Type numbers to change seed<br>
+          [Enter] Accept | [Backspace] Delete | [Esc] Random
+        </div>
+      </div>
+    `;
+  }
+
+  renderSeedInput();
+
+  const seedKeyHandler = (e: KeyboardEvent) => {
+    e.preventDefault();
+    if (e.key === "Enter") {
+      clearInterval(blinkInterval);
+      window.removeEventListener("keydown", seedKeyHandler);
+      const parsed = parseInt(inputStr, 10);
+      const finalSeed = isNaN(parsed) || parsed < 0 ? defaultSeed : parsed % 1000000;
+      onConfirm(finalSeed);
+    } else if (e.key === "Escape") {
+      // Random seed
+      clearInterval(blinkInterval);
+      window.removeEventListener("keydown", seedKeyHandler);
+      onConfirm(Math.floor(Math.random() * 1000000));
+    } else if (e.key === "Backspace") {
+      inputStr = inputStr.slice(0, -1);
+      renderSeedInput();
+    } else if (/^[0-9]$/.test(e.key) && inputStr.length < 6) {
+      inputStr += e.key;
+      renderSeedInput();
+    }
+  };
+  window.addEventListener("keydown", seedKeyHandler);
+}
+
 function showTitleScreen(): void {
   crawlOverlay.style.display = "flex";
   let titleIdx = 0; // 0 = Continue, 1 = New Game
   const items = ["Continue", "New Game"];
+
+  // Build run stats from history
+  const history = getRunHistory();
+  let statsHtml = "";
+  if (history.length > 0) {
+    const wins = history.filter(r => r.victory).length;
+    const bestRating = history.reduce((best, r) => {
+      const order = "SDCBA";
+      return order.indexOf(r.rating) > order.indexOf(best) ? r.rating : best;
+    }, "D");
+    const archetypeShort: Record<string, string> = {
+      coolant_cascade: "Whistleblower", hull_breach: "Murder", reactor_scram: "Rogue AI",
+      sabotage: "Stowaway", signal_anomaly: "First Contact", mutiny: "The Divide",
+    };
+    const seenArchetypes = new Set(history.map(r => r.archetype));
+    const archetypeList = [...seenArchetypes].map(a => archetypeShort[a] || a).join(", ");
+    const rc = bestRating === "S" ? "#ff0" : bestRating === "A" ? "#0f0" : bestRating === "B" ? "#6cf" : bestRating === "C" ? "#fa0" : "#f44";
+
+    statsHtml = `
+      <div style="border-top:1px solid #222;padding-top:12px;text-align:center;max-width:320px">
+        <div style="font-size:10px;color:#445;letter-spacing:1.5px;margin-bottom:6px">MISSION LOG</div>
+        <div style="font-size:11px;color:#667">Runs: ${history.length} | Wins: ${wins} | Best: <span style="color:${rc}">${bestRating}</span></div>
+        <div style="font-size:10px;color:#445;margin-top:4px">Cases: ${archetypeList}</div>
+        <div style="font-size:10px;color:#334;margin-top:2px">${seenArchetypes.size}/6 archetypes</div>
+      </div>
+    `;
+  }
 
   function renderTitle(): void {
     let menuHtml = "";
@@ -6594,6 +6678,7 @@ function showTitleScreen(): void {
         <div style="display:flex;flex-direction:column;gap:6px;min-width:200px">
           ${menuHtml}
         </div>
+        ${statsHtml}
         <div style="font-size:10px;color:#334">[Up/Down] Navigate | [Enter] Select</div>
       </div>
     `;
@@ -6636,9 +6721,16 @@ function showTitleScreen(): void {
           showOpeningCrawl();
         }
       } else {
-        // New Game — delete save, start fresh
+        // New Game — show seed input, then start fresh
         deleteSave();
-        showOpeningCrawl();
+        showSeedInput((chosenSeed) => {
+          seed = chosenSeed;
+          stationMood = MOOD_TYPES[seed % 3];
+          corvusPersonality = CORVUS_PERSONALITIES[(seed >> 2) % 3];
+          try { localStorage.setItem(LAST_SEED_KEY, String(seed)); } catch { /* ignore */ }
+          state = generate(seed, difficulty);
+          showOpeningCrawl();
+        });
       }
     }
   };
