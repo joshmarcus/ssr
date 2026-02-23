@@ -20,6 +20,7 @@ import { generateThreads } from "./threads.js";
 import { LANDMARK_CONSOLES } from "../data/consoleText.js";
 import { generateCrewPaths } from "./crewPaths.js";
 import { generateRoomScenes } from "./roomScenes.js";
+import { assignTriplets, createDossiers } from "./crewDossiers.js";
 
 /**
  * Room name assignments — enough for a large station.
@@ -222,6 +223,10 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
       contradicting_found: 0,
       crack_moment_fired: false,
     };
+
+    // Generate crew dossiers with themed triplet personalities
+    const triplets = assignTriplets(crew);
+    state.mystery.dossiers = createDossiers(crew, triplets);
   }
 
   // Place keyed doors (clearance + environmental)

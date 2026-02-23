@@ -382,6 +382,30 @@ export interface EvidenceAccumulation {
   crack_moment_fired: boolean;
 }
 
+// ── Crew Dossiers ───────────────────────────────────────────
+export type CrewInvolvement = "victim" | "bystander" | "responder" | "instigator" | "unknown";
+
+export interface CrewDossier {
+  crewId: string;
+  confirmed: {
+    name?: string;
+    role?: CrewRole;
+    badgeId?: string;
+  };
+  theories: {
+    lastKnownRoom?: string;
+    fate?: CrewFate;
+    involvement?: CrewInvolvement;
+  };
+  personalDetails: {
+    want?: string;
+    habit?: string;
+    contradiction?: string;
+  };
+  linkedEvidence: string[];  // journal entry IDs
+  roomsSeen: string[];       // rooms where this crew member was placed by Scene Processing
+}
+
 // ── Scene Echoes (environmental storytelling) ────────────────
 export enum SceneEchoType {
   GhostSilhouette = "ghost_silhouette",  // translucent crew figure at last known position
@@ -488,6 +512,7 @@ export interface MysteryState {
   insights: Insight[];           // investigation insights (wrapping deductions)
   roomScenes?: RoomScene[];       // room scene data for scene processing
   evidenceAccumulation?: EvidenceAccumulation; // confirming/ambiguous/contradicting counts
+  dossiers?: CrewDossier[];      // crew dossiers built during investigation
 }
 
 // ── What We Know (narrative summary) ─────────────────────────
