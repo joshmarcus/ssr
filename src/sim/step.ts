@@ -5546,6 +5546,22 @@ export function step(state: GameState, action: Action): GameState {
         read: false,
       }];
 
+      // CORVUS-7 commentary for perfect scene analysis
+      if (result.score === 3) {
+        const gt = targetScene.groundTruth;
+        const crewName = gt.who.length > 0
+          ? next.mystery!.crew.find(c => c.id === gt.who[0])?.lastName ?? "someone"
+          : "someone";
+        const actPhrase = gt.what.replace(/_/g, " ");
+        next.logs = [...next.logs, {
+          id: `log_corvus_scene_${processRoomId}_${next.turn}`,
+          timestamp: next.turn,
+          source: "milestone",
+          text: `CORVUS-7: Perfect analysis. ${crewName} was ${actPhrase} in ${targetScene.roomName}. This changes the picture.`,
+          read: false,
+        }];
+      }
+
       // Hint after first successful scene processing
       if (result.score >= 2 && !next.milestones.has("hint_first_process")) {
         next = { ...next, milestones: new Set([...next.milestones, "hint_first_process"]) };
@@ -5570,6 +5586,39 @@ export function step(state: GameState, action: Action): GameState {
         const whoPhrase = crewNames.length > 0 ? crewNames.join(" and ") : "An unknown crew member";
         const narrativeDetail = `Analysis of ${targetScene.roomName}: ${whoPhrase} was ${actLabel} here. Outcome: ${outcomeLabel}. `
           + `Evidence assessment: ${result.score}/3 confirmed.`;
+
+        // Derive deduction-relevant tags from scene ground truth
+        const sceneTags: string[] = [];
+        // Crew tags from WHO
+        for (const crewId of gt.who) {
+          const member = next.mystery!.crew.find(c => c.id === crewId);
+          if (member) sceneTags.push(member.lastName.toLowerCase());
+        }
+        // Activity-derived tags
+        const activityTagMap: Record<string, string[]> = {
+          emergency_response: ["maintenance", "timeline_response"],
+          equipment_repair: ["maintenance", "diagnostic"],
+          sabotage: ["forensic", "timeline_trigger"],
+          data_access: ["data_core", "signal"],
+          communication: ["signal", "transmission"],
+          medical_treatment: ["biological"],
+          investigation: ["forensic"],
+          confrontation: ["timeline_response"],
+          barricading: ["timeline_response"],
+          fleeing: ["timeline_aftermath"],
+          hiding: ["timeline_aftermath"],
+        };
+        const actTags = activityTagMap[gt.what] ?? [];
+        for (const t of actTags) {
+          if (!sceneTags.includes(t)) sceneTags.push(t);
+        }
+        // Perfect scene gets a timeline tag boost
+        if (result.score === 3) {
+          if (!sceneTags.includes("timeline_trigger") && !sceneTags.includes("timeline_response") && !sceneTags.includes("timeline_aftermath")) {
+            sceneTags.push("timeline_response");
+          }
+        }
+
         next = addJournalEntry(
           next,
           `journal_scene_${processRoomId}`,
@@ -5577,6 +5626,8 @@ export function step(state: GameState, action: Action): GameState {
           `Scene: ${targetScene.roomName} — ${actLabel}`,
           narrativeDetail,
           targetScene.roomName,
+          undefined,
+          sceneTags,
         );
 
         // Confirm fate for WHO crew if outcome is correct

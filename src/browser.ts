@@ -4069,7 +4069,13 @@ function commitDeductionAnswer(): void {
     if (isLockout) {
       display.addLog("Investigation stalled — insufficient evidence to continue this line of inquiry.", "warning");
     } else {
-      display.addLog(`Incorrect. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`, "warning");
+      display.addLog(`Incorrect. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining. (-${penalty?.hp ?? 0} HP, +${penalty?.turns ?? 0} turns)`, "warning");
+      if (activeDeduction.hintText) {
+        display.addLog(`CORVUS-7: ${activeDeduction.hintText}`, "narrative");
+      }
+      if (attemptsLeft === 1) {
+        display.addLog("This is your final attempt. Re-read the evidence carefully.", "warning");
+      }
     }
     audio.playDeductionWrong();
 
@@ -6279,7 +6285,13 @@ function commitHubDeductionAnswer(): void {
     if (isLockout) {
       display.addLog("Investigation stalled — insufficient evidence to continue this line of inquiry.", "warning");
     } else {
-      display.addLog(`\u2717 Incorrect. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`, "warning");
+      display.addLog(`\u2717 Incorrect. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining. (-${penalty?.hp ?? 0} HP, +${penalty?.turns ?? 0} turns)`, "warning");
+      if (deduction.hintText) {
+        display.addLog(`CORVUS-7: ${deduction.hintText}`, "narrative");
+      }
+      if (attemptsLeft === 1) {
+        display.addLog("This is your final attempt. Re-read the evidence carefully.", "warning");
+      }
     }
     audio.playDeductionWrong();
 
