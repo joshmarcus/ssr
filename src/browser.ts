@@ -3365,6 +3365,18 @@ function showHelp(): void {
         <div><span style="color:#888">[F10]</span> Volume up</div>
         <div><span style="color:#888">[R] / [N]</span>  Replay / New Game (game over screen)</div>
       </div>
+
+      <div style="margin-top:12px;border-top:1px solid #333;padding-top:12px;max-width:700px;margin-left:auto;margin-right:auto">
+        <div style="color:#666;font-weight:bold;margin-bottom:6px">── Controller / Gamepad ──</div>
+        <div><span style="color:#888">D-Pad / L-Stick</span>  Move / Navigate menus</div>
+        <div><span style="color:#888">A</span>  Interact / Confirm</div>
+        <div><span style="color:#888">B</span>  Back / Cancel</div>
+        <div><span style="color:#888">X</span>  Clean</div>
+        <div><span style="color:#888">Y</span>  Scan</div>
+        <div><span style="color:#888">LB</span>  Investigation Hub</div>
+        <div><span style="color:#888">RB</span>  Auto-Explore</div>
+        <div><span style="color:#888">Start</span>  Pause Menu</div>
+      </div>
     </div>`;
   overlay.classList.add("active");
 }
