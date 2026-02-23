@@ -1,10 +1,10 @@
 # SSR — Project Status
 
-*Last updated: 2026-02-22*
+*Last updated: 2026-02-23*
 
 ## Current State
 
-- **Phase**: Sprint 123 (V238 completed — Evidence tag gating + scene inference)
+- **Phase**: Sprint 125 (V240 completed — forceTags pipeline fix + bot timeline)
 - **Test status**: 380 tests passing across 29 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -13,7 +13,7 @@
 - **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 1300, Normal: 1000, Hard: 700) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
-- **Playtest results**: Golden seed 184201 VICTORY confirmed
+- **Playtest results**: All tested seeds VICTORY with 100% deduction success (184201, 42, 777, 100, 54321)
 
 ## What Works
 
@@ -35,8 +35,9 @@
   - SignalAnomaly — "First Contact" (A)
   - Mutiny — "The Divide" (NEW)
 - 5-6 chained deductions with evidence tag gating, per-deduction hint text, and revelation cascade
-- **"Read & Deduce" system (V201→V238)**: Players read evidence, understand the story, and answer with real consequences
+- **"Read & Deduce" system (V201→V240)**: Players read evidence, understand the story, and answer with real consequences
   - Deductions unlock when player finds the RIGHT evidence (required tags covered) AND minimum count threshold met
+  - **forceTags pipeline (V240)**: Tags guaranteed on both entities AND room scene clues, ensuring all deductions solvable regardless of evidence collection method
   - Wrong answers cost 3 HP + 10 turns; 2 wrong attempts = permanent lockout
   - All revelations shown freely as "What the evidence suggests" reading aids
   - Synthesis shown freely as "ANALYSIS" block — no tag-gating
@@ -1623,6 +1624,11 @@ Three independent review agents evaluated all storylines. Results captured in `W
 ## Recent Changes (Git History)
 
 ```
+2026-02-23        feat: V240 — fix forceTags pipeline for room scene clues + bot timeline confirmation
+2026-02-22        feat: V239 — per-dimension scene feedback + evidence relevance hints + dossier fate
+2026-02-22        feat: V238 — deductions require relevant evidence tags + scene inference hints
+2026-02-22        feat: V237 — goal/subgoal system + investigation hub improvements
+2026-02-22        feat: V236 — autoplay bot mystery actions (examine, process, deduce)
 2026-02-19        feat: sprint 30 — bot pressure puzzle + batch crew pickup + atmospheric hints
 2026-02-19        feat: sprint 29 — pressure puzzle + hazard escalation + atmospheric sensor hints
 2026-02-19        feat: sprint 28 — tag coverage guarantee + tag-aware bot evidence seeking
