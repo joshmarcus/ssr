@@ -352,10 +352,22 @@ function addJournalEntry(
     }
   }
 
-  // CORVUS-7 investigation prompts at evidence milestones
+  // First evidence celebration — fire on very first journal entry
   let milestoneLogs = threadLogs;
   const prevCount = state.mystery.journal.length;
   const newCount = newJournal.length;
+  if (prevCount === 0 && newCount > 0 && !newMilestones.has("first_evidence_collected")) {
+    newMilestones.add("first_evidence_collected");
+    milestoneLogs = [...milestoneLogs, {
+      id: `log_first_evidence_${state.turn}`,
+      timestamp: state.turn,
+      source: "milestone" as const,
+      text: "CORVUS-7: First evidence collected! Open the Investigation Hub [R] to review evidence and track the investigation.",
+      read: false,
+    }];
+  }
+
+  // CORVUS-7 investigation prompts at evidence milestones
   const evidenceMilestones: { count: number; key: string; text: string }[] = [
     { count: 5, key: "corvus_evidence_5", text: "CORVUS-7: Five evidence entries logged. Patterns may be emerging — review the Investigation Hub for connections." },
     { count: 8, key: "corvus_evidence_8", text: "CORVUS-7: Eight evidence entries collected. Consider processing room scenes — enough data to start forming hypotheses." },

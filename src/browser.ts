@@ -1476,6 +1476,25 @@ function initGame(): void {
   display.addLog(MOOD_FLAVOR[stationMood], "narrative");
   display.addLog(CORVUS_GREETING[corvusPersonality], "narrative");
 
+  // Station context briefing — crew count, station status, mission objective
+  if (state.mystery) {
+    const crewCount = state.mystery.crew.length;
+    const roomCount = state.rooms.length;
+    const stationId = `PROVIDENCE-${seed % 1000}`;
+    display.addLog(`CORVUS-7: Station ${stationId} — ${crewCount} crew on manifest, ${roomCount} sections mapped. Last contact: 72 hours ago.`, "narrative");
+    // Archetype-specific alert status
+    const archAlerts: Record<string, string> = {
+      coolant_cascade: "Alert status: COOLANT FAILURE. Temperature readings critical in multiple sections.",
+      hull_breach: "Alert status: HULL INTEGRITY COMPROMISED. Pressure differentials detected across the station.",
+      reactor_scram: "Alert status: REACTOR SHUTDOWN. Emergency power only. Core containment uncertain.",
+      sabotage: "Alert status: SECURITY BREACH. Unauthorized modifications to station systems detected.",
+      signal_anomaly: "Alert status: UNKNOWN SIGNAL. External transmission source overriding station comms.",
+      mutiny: "Alert status: INTERNAL CONFLICT. Command structure compromised. Multiple faction signals.",
+    };
+    const alertText = archAlerts[state.mystery.timeline.archetype] ?? "Alert status: UNKNOWN. Investigating.";
+    display.addLog(`CORVUS-7: ${alertText}`, "warning");
+  }
+
   // Archetype-specific mission briefing (3 lines setting stakes)
   const briefingArchetype = state.mystery?.timeline?.archetype;
   if (briefingArchetype && CORVUS_MISSION_BRIEFING[briefingArchetype]) {
@@ -2192,6 +2211,11 @@ function handleAction(action: Action): void {
       if (simLog.id.startsWith("log_crew_identified_")) {
         display.triggerScreenFlash("milestone");
         audio.playDeductionCorrect();
+      }
+      // First evidence celebration — screen flash
+      if (simLog.id.startsWith("log_first_evidence_")) {
+        display.triggerScreenFlash("milestone");
+        audio.playInteract();
       }
       // Memory echo clue examined — trigger ghost reveal in 3D renderer
       if (simLog.id.startsWith("log_memory_echo_")) {
