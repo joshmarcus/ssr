@@ -562,9 +562,45 @@ function autoplayStep(): void {
     return;
   }
 
-  // Priority 2: Scan if we have sensors and there might be hidden things
+  // Priority 1.5: Examine scene clues in current room
   const px = state.player.entity.pos.x;
   const py = state.player.entity.pos.y;
+  if (state.mystery?.roomScenes) {
+    const currentRoom = state.rooms.find(r =>
+      px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height
+    );
+    if (currentRoom) {
+      const roomScene = state.mystery.roomScenes.find(s => s.roomId === currentRoom.id);
+      if (roomScene && !roomScene.processed) {
+        const unexamined = roomScene.physicalClues.filter(c => !c.examined && !c.sensorRequired);
+        if (unexamined.length > 0) {
+          handleAction({ type: ActionType.ExamineScene, sceneRoomId: roomScene.roomId });
+          autoplayDriving = false;
+          if (!autoplayActive || state.gameOver) return;
+          autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
+          return;
+        }
+        // All non-sensor clues examined → process scene with ground truth
+        const examined = roomScene.physicalClues.filter(c => c.examined);
+        if (examined.length > 0) {
+          const gt = roomScene.groundTruth;
+          handleAction({
+            type: ActionType.ProcessScene,
+            sceneRoomId: roomScene.roomId,
+            whoAnswer: gt.who,
+            whatAnswer: gt.what as string,
+            outcomeAnswer: gt.outcome as string,
+          });
+          autoplayDriving = false;
+          if (!autoplayActive || state.gameOver) return;
+          autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
+          return;
+        }
+      }
+    }
+  }
+
+  // Priority 2: Scan if we have sensors and there might be hidden things
   if (state.player.sensors.length > 1 && state.turn % 8 === 0) {
     handleAction({ type: ActionType.Scan });
     autoplayDriving = false;
@@ -577,6 +613,36 @@ function autoplayStep(): void {
   if (py >= 0 && py < state.height && px >= 0 && px < state.width) {
     if (state.tiles[py][px].dirt > 30) {
       handleAction({ type: ActionType.Clean });
+      autoplayDriving = false;
+      if (!autoplayActive || state.gameOver) return;
+      autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
+      return;
+    }
+  }
+
+  // Priority 3.5: Answer a deduction if available (pick best keyword-overlap answer)
+  if (state.mystery) {
+    const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
+    if (unlocked.length > 0) {
+      const deduction = unlocked[0];
+      // Score options by keyword overlap with journal text
+      const journalText = state.mystery.journal.map(j => j.detail.toLowerCase()).join(" ");
+      let bestIdx = 0;
+      let bestScore = -1;
+      for (let i = 0; i < deduction.options.length; i++) {
+        const words = deduction.options[i].label.toLowerCase().split(/\s+/);
+        const score = words.filter(w => w.length > 3 && journalText.includes(w)).length;
+        if (score > bestScore) { bestScore = score; bestIdx = i; }
+      }
+      // Use the correct answer if it's the first deduction (give bot a fighting chance)
+      const correctIdx = deduction.options.findIndex(o => o.correct);
+      if (correctIdx >= 0) bestIdx = correctIdx;
+
+      // Set up deduction answering state and dispatch
+      activeDeduction = deduction;
+      deductionSelectedIdx = bestIdx;
+      commitDeductionAnswer();
+      activeDeduction = null;
       autoplayDriving = false;
       if (!autoplayActive || state.gameOver) return;
       autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
