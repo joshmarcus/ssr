@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 172 (V339 completed — deduction explanations, puzzle guidance, evidence synthesis, crew testimony expansion)
+- **Phase**: Sprint 173 (V343 completed — archetype narrative improvements from writing review)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -28,12 +28,12 @@
 - 183+ narrative elements (63 log templates, 16 authored logs, 16 crew items, 8 new corridors)
 - Ship computer PA announcements (periodic atmospheric messages)
 - **6 incident archetypes** with distinct human stories and 5-phase timelines:
-  - CoolantCascade — "The Whistleblower" (B-)
-  - HullBreach — "The Murder" (A-)
+  - CoolantCascade — "The Whistleblower" (A-) — now with Tier 6 corporate agenda deduction
+  - HullBreach — "The Murder" (A) — credential cloning mechanism fully explained
   - ReactorScram — "The Rogue AI" (A)
-  - Sabotage — "The Stowaway" (B+)
-  - SignalAnomaly — "First Contact" (A)
-  - Mutiny — "The Divide" (NEW)
+  - Sabotage — "The Stowaway" (A-) — organism physical presence, security encounter logs, corporate evidence
+  - SignalAnomaly — "First Contact" (A) — cascade causality chain fully explained
+  - Mutiny — "The Divide" (A-)
 - 5-6 chained deductions with evidence tag gating, per-deduction hint text, and revelation cascade
 - **"Read & Deduce" system (V201→V240)**: Players read evidence, understand the story, and answer with real consequences
   - Deductions unlock when player finds the RIGHT evidence (required tags covered) AND minimum count threshold met
