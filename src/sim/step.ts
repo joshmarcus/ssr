@@ -12,7 +12,7 @@ import { updateVision } from "./vision.js";
 import { generateEvidenceTags, getUnlockedDeductions, solveDeduction } from "./deduction.js";
 import { assignThread } from "./threads.js";
 import { processScene } from "./roomScenes.js";
-import { confirmIdentity, updateTheoriesFromScene, linkEvidence, getIdentifiedCrewCount } from "./crewDossiers.js";
+import { confirmIdentity, confirmFate, updateTheoriesFromScene, linkEvidence, getIdentifiedCrewCount } from "./crewDossiers.js";
 import { recordEvidence, shouldFireCrackMoment, fireCrackMoment, markEvidenceFound, checkPendingContradictions, revealContradiction, getRevealedContradictionCount } from "./twoStory.js";
 import { updateSlotUnlocks, confirmCard, rejectCard, generateProposal, generateRedHerring, buildNarrativeState, isBoardComplete } from "./incidentBoard.js";
 import { isMoralChoiceUnlocked } from "./mysteryChoices.js";
@@ -5493,16 +5493,48 @@ export function step(state: GameState, action: Action): GameState {
         read: false,
       }];
 
-      // Add journal entry for processed scene
+      // Generate narrative journal entry for processed scene
       if (result.score >= 2) {
+        const gt = targetScene.groundTruth;
+        const crewNames = gt.who
+          .map(id => next.mystery!.crew.find(c => c.id === id))
+          .filter(Boolean)
+          .map(c => `${c!.firstName} ${c!.lastName}`);
+        const actLabel = gt.what.replace(/_/g, " ");
+        const outcomeLabel = gt.outcome.replace(/_/g, " ");
+        const whoPhrase = crewNames.length > 0 ? crewNames.join(" and ") : "An unknown crew member";
+        const narrativeDetail = `Analysis of ${targetScene.roomName}: ${whoPhrase} was ${actLabel} here. Outcome: ${outcomeLabel}. `
+          + `Evidence assessment: ${result.score}/3 confirmed.`;
         next = addJournalEntry(
           next,
           `journal_scene_${processRoomId}`,
           "trace",
-          `Scene analysis: ${targetScene.roomName}`,
-          `Processed scene in ${targetScene.roomName}. ${parts.join(". ")}. Ground truth confirmed for ${result.score}/3 questions.`,
+          `Scene: ${targetScene.roomName} — ${actLabel}`,
+          narrativeDetail,
           targetScene.roomName,
         );
+
+        // Confirm fate for WHO crew if outcome is correct
+        if (result.outcomeCorrect && next.mystery!.dossiers) {
+          const fateMap: Partial<Record<SceneOutcome, CrewFate>> = {
+            [SceneOutcome.DiedHere]: CrewFate.Dead,
+            [SceneOutcome.Injured]: CrewFate.Missing,
+            [SceneOutcome.LeftInHurry]: CrewFate.Escaped,
+            [SceneOutcome.SealedInside]: CrewFate.InCryo,
+            [SceneOutcome.StillHere]: CrewFate.Survived,
+          };
+          const fate = fateMap[gt.outcome];
+          if (fate) {
+            for (const crewId of gt.who) {
+              const dossierIdx = next.mystery!.dossiers!.findIndex(d => d.crewId === crewId);
+              if (dossierIdx >= 0) {
+                const newDossiers = [...next.mystery!.dossiers!];
+                newDossiers[dossierIdx] = confirmFate(newDossiers[dossierIdx], fate);
+                next = { ...next, mystery: { ...next.mystery!, dossiers: newDossiers } };
+              }
+            }
+          }
+        }
       }
 
       // Update incident board slot unlocks

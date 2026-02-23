@@ -243,7 +243,20 @@ let hubSceneWhoIdx = 0;     // selected crew index for WHO answer
 let hubSceneWhatIdx = 0;    // selected activity for WHAT answer
 let hubSceneOutcomeIdx = 0; // selected outcome for OUTCOME answer
 let hubSceneConfirming = false; // Y/N confirmation for scene processing
-let hubSceneResult: { score: number; roomName: string; timestamp: number } | null = null; // brief result display after scene processing
+let hubSceneResult: {
+  score: number;
+  roomName: string;
+  timestamp: number;
+  whoCorrect: boolean;
+  whatCorrect: boolean;
+  outcomeCorrect: boolean;
+  whoAnswer: string;
+  whatAnswer: string;
+  outcomeAnswer: string;
+  correctWho: string;
+  correctWhat: string;
+  correctOutcome: string;
+} | null = null; // per-dimension result display after scene processing
 let hubEvidenceFilter: "all" | "by_room" | "by_type" | "unread" = "all"; // evidence tab filter mode
 const hubViewedEvidenceIds = new Set<string>(); // tracks which evidence entries player has viewed in Hub
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
@@ -4473,6 +4486,44 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
     }
   }
 
+  // Evidence relevance hint — show which deductions this evidence contributes to
+  let relevanceHtml = "";
+  if (entry.tags.length > 0) {
+    const entryTags = new Set(entry.tags);
+    // Map tag categories to readable labels (system, crew, timeline, location)
+    const tagCategories: string[] = [];
+    const systemTags = ["coolant", "thermal", "reactor", "containment", "hull", "pressure", "signal", "electrical", "radiation", "biological", "forensic", "data_core", "classified", "cargo", "transmission", "medical", "faction", "lockdown"];
+    const timelineTags = ["timeline_early", "timeline_trigger", "timeline_response", "timeline_aftermath"];
+    const hasSys = entry.tags.some(t => systemTags.includes(t));
+    const hasTimeline = entry.tags.some(t => timelineTags.includes(t));
+    const hasCrew = entry.tags.some(t => !systemTags.includes(t) && !timelineTags.includes(t) && !t.includes("_"));
+    if (hasSys) tagCategories.push("SYSTEM");
+    if (hasTimeline) tagCategories.push("TIMELINE");
+    if (hasCrew) tagCategories.push("CREW");
+    if (tagCategories.length === 0 && entry.tags.length > 0) tagCategories.push("LOCATION");
+
+    // Find which deductions this evidence's tags contribute to
+    const contributesTo: string[] = [];
+    for (const d of deductions) {
+      if (d.solved) continue;
+      const overlap = d.requiredTags.filter(t => entryTags.has(t));
+      if (overlap.length > 0) {
+        const coverage = getTagCoverage(d, journal);
+        const tierNames = ["WHAT", "WHERE", "WHY", "WHO", "BLAME", "HIDDEN"];
+        const dIdx = deductions.indexOf(d);
+        const tierLabel = tierNames[dIdx] ?? d.category.toUpperCase();
+        contributesTo.push(`${tierLabel} (${coverage.covered.length}/${coverage.covered.length + coverage.missing.length})`);
+      }
+    }
+
+    relevanceHtml = `<div style="margin-top:8px;border-top:1px solid #222;padding-top:6px">`;
+    relevanceHtml += `<div style="color:#889;font-size:10px;letter-spacing:1px;margin-bottom:3px">EVIDENCE TYPE: <span style="color:#aab">${tagCategories.join(" \u00B7 ")}</span></div>`;
+    if (contributesTo.length > 0) {
+      relevanceHtml += `<div style="color:#fa0;font-size:10px">\u2192 Relevant to: ${contributesTo.join(", ")}</div>`;
+    }
+    relevanceHtml += `</div>`;
+  }
+
   // Minimap
   const minimapHtml = renderEvidenceMinimap(entry.room);
 
@@ -4504,6 +4555,7 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
       ${entry.thread ? ` | Thread: ${esc(entry.thread)}` : ""}
     </div>
     <div class="journal-detail-content">${esc(entry.detail)}</div>
+    ${relevanceHtml}
     ${crewHtml}
     ${roomHintHtml}
     ${minimapHtml}
@@ -5082,18 +5134,30 @@ function renderHubScenes(): string {
   // Scene list (left panel)
   let listHtml = "";
 
-  // ── Scene processing result banner (auto-dismiss after 5s) ──
-  if (hubSceneResult && (Date.now() - hubSceneResult.timestamp < 5000)) {
-    const { score, roomName } = hubSceneResult;
+  // ── Scene processing result banner (auto-dismiss after 8s) ──
+  if (hubSceneResult && (Date.now() - hubSceneResult.timestamp < 8000)) {
+    const { score, roomName, whoCorrect, whatCorrect, outcomeCorrect,
+      whoAnswer, whatAnswer, outcomeAnswer, correctWho, correctWhat, correctOutcome } = hubSceneResult;
     const resultColor = score >= 3 ? "#4a4" : score >= 2 ? "#fa0" : "#f44";
     const resultLabel = score >= 3 ? "PERFECT ASSESSMENT" : score >= 2 ? "SCENE PROCESSED" : "ANALYSIS INCOMPLETE";
     const resultIcon = score >= 3 ? "\u2605" : score >= 2 ? "\u2713" : "\u2717";
-    listHtml += `<div style="padding:8px 10px;margin-bottom:6px;background:rgba(${score >= 3 ? "68,255,136" : score >= 2 ? "255,170,0" : "255,68,68"},0.08);border:1px solid ${resultColor};border-radius:3px;text-align:center">`;
-    listHtml += `<div style="color:${resultColor};font-size:13px;font-weight:bold">${resultIcon} ${resultLabel} — ${score}/3</div>`;
-    listHtml += `<div style="color:#889;font-size:10px;margin-top:2px">${esc(roomName)}</div>`;
+    listHtml += `<div style="padding:8px 10px;margin-bottom:6px;background:rgba(${score >= 3 ? "68,255,136" : score >= 2 ? "255,170,0" : "255,68,68"},0.08);border:1px solid ${resultColor};border-radius:3px">`;
+    listHtml += `<div style="color:${resultColor};font-size:13px;font-weight:bold;text-align:center">${resultIcon} ${resultLabel} \u2014 ${score}/3</div>`;
+    listHtml += `<div style="color:#889;font-size:10px;text-align:center;margin-top:2px;margin-bottom:6px">${esc(roomName)}</div>`;
+    // Per-dimension breakdown
+    const dimRow = (label: string, ok: boolean, answer: string, correct: string) => {
+      const icon = ok ? `<span style="color:#4a4">\u2713</span>` : `<span style="color:#f44">\u2717</span>`;
+      let detail = ok
+        ? `<span style="color:#8b8">${esc(answer)}</span>`
+        : `<span style="color:#f88;text-decoration:line-through">${esc(answer)}</span> <span style="color:#889">\u2192</span> <span style="color:#4a4">${esc(correct)}</span>`;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px">${icon} <span style="color:#aab;min-width:55px">${label}:</span> ${detail}</div>`;
+    };
+    listHtml += dimRow("WHO", whoCorrect, whoAnswer, correctWho);
+    listHtml += dimRow("WHAT", whatCorrect, whatAnswer, correctWhat);
+    listHtml += dimRow("OUTCOME", outcomeCorrect, outcomeAnswer, correctOutcome);
     listHtml += `</div>`;
   } else if (hubSceneResult) {
-    hubSceneResult = null; // auto-dismiss after 5s
+    hubSceneResult = null; // auto-dismiss after 8s
   }
 
   // Evidence accumulation summary at top
@@ -5313,7 +5377,17 @@ function renderHubSceneDetail(scene: RoomScene, crew: import("./shared/types.js"
 
   // Processing option
   if (scene.processed) {
-    html += `<div style="color:#4a4;font-size:12px;margin-top:16px;padding:10px;background:rgba(68,255,136,0.05);border:1px solid rgba(68,255,136,0.2);text-align:center">\u2713 Scene fully processed</div>`;
+    const gt = scene.groundTruth;
+    const crewList = state.mystery?.crew ?? [];
+    const actLabel = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    const whoNames = gt.who.map(id => crewList.find(c => c.id === id)).filter(Boolean).map(c => `${c!.firstName} ${c!.lastName}`).join(", ") || "Unknown";
+    html += `<div style="margin-top:16px;padding:10px;background:rgba(68,255,136,0.05);border:1px solid rgba(68,255,136,0.2);border-radius:4px">`;
+    html += `<div style="color:#4a4;font-size:12px;font-weight:bold;margin-bottom:8px">\u2713 Scene Processed \u2014 Confirmed Assessment</div>`;
+    html += `<div style="display:flex;flex-direction:column;gap:4px">`;
+    html += `<div style="font-size:11px"><span style="color:#889;min-width:70px;display:inline-block">WHO:</span> <span style="color:#cdc">${esc(whoNames)}</span></div>`;
+    html += `<div style="font-size:11px"><span style="color:#889;min-width:70px;display:inline-block">WHAT:</span> <span style="color:#cdc">${esc(actLabel(gt.what))}</span></div>`;
+    html += `<div style="font-size:11px"><span style="color:#889;min-width:70px;display:inline-block">OUTCOME:</span> <span style="color:#cdc">${esc(actLabel(gt.outcome))}</span></div>`;
+    html += `</div></div>`;
   } else {
     const examinedCount = clues.filter(c => c.examined).length;
     if (examinedCount > 0) {
@@ -5851,17 +5925,41 @@ function handleHubScenesInput(e: KeyboardEvent): void {
           whatAnswer: activities[hubSceneWhatIdx] ?? SceneActivity.RoutineWork,
           outcomeAnswer: outcomes[hubSceneOutcomeIdx] ?? SceneOutcome.Unknown,
         });
-        // Extract score from the process result log
+        // Extract per-dimension results from the process result log
         let score = 0;
+        let whoCorrect = false, whatCorrect = false, outcomeCorrect = false;
         for (let i = prevLogCount; i < state.logs.length; i++) {
           const logEntry = state.logs[i];
           if (logEntry.id.startsWith("log_process_result_")) {
             const scoreMatch = logEntry.text.match(/\((\d)\/3\)/);
             if (scoreMatch) score = parseInt(scoreMatch[1], 10);
+            whoCorrect = logEntry.text.includes("WHO: correct");
+            whatCorrect = logEntry.text.includes("WHAT: correct");
+            outcomeCorrect = logEntry.text.includes("OUTCOME: correct");
             break;
           }
         }
-        hubSceneResult = { score, roomName: scene.roomName, timestamp: Date.now() };
+        // Build per-dimension display data
+        const gt = scene.groundTruth;
+        const chosenActivity = activities[hubSceneWhatIdx] ?? SceneActivity.RoutineWork;
+        const chosenOutcome = outcomes[hubSceneOutcomeIdx] ?? SceneOutcome.Unknown;
+        const activityLabel = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        const crewList = state.mystery?.crew ?? [];
+        const whoGt = gt.who.map(id => crewList.find(c => c.id === id)).filter(Boolean);
+        hubSceneResult = {
+          score,
+          roomName: scene.roomName,
+          timestamp: Date.now(),
+          whoCorrect,
+          whatCorrect,
+          outcomeCorrect,
+          whoAnswer: selectedCrew ? `${selectedCrew.firstName} ${selectedCrew.lastName}` : "None",
+          whatAnswer: activityLabel(chosenActivity),
+          outcomeAnswer: activityLabel(chosenOutcome),
+          correctWho: whoGt.map(c => `${c!.firstName} ${c!.lastName}`).join(", ") || "Unknown",
+          correctWhat: activityLabel(gt.what),
+          correctOutcome: activityLabel(gt.outcome),
+        };
         // Exit process view after submission
         hubSceneSubView = "clues";
         hubSceneDetail = null;
