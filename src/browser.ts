@@ -18,7 +18,7 @@ import {
   getDefeatText, getDefeatRelayText,
 } from "./data/endgame.js";
 import { getRoomDescription, getIncidentTrace } from "./data/roomDescriptions.js";
-import { CORVUS_REACTIONS, CORVUS_FINAL_TRANSMISSION, CORVUS_DEDUCTION_CEREMONY, ARCHETYPE_ATMOSPHERE } from "./data/narrative.js";
+import { CORVUS_REACTIONS, CORVUS_FINAL_TRANSMISSION, CORVUS_DEDUCTION_CEREMONY, ARCHETYPE_ATMOSPHERE, CORVUS_SCENE_COMMENTARY } from "./data/narrative.js";
 import {
   BOT_INTROSPECTIONS, BOT_INTROSPECTIONS_BY_ARCHETYPE,
   DRONE_STATUS_MESSAGES, FIRST_DRONE_ENCOUNTER,
@@ -2208,6 +2208,21 @@ function handleAction(action: Action): void {
           return px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height;
         });
         pendingSceneRoom = currentRoom?.name ?? null;
+
+        // Add personality-based CORVUS-7 commentary
+        const scoreMatch = simLog.text.match(/\((\d)\/3\)/);
+        const sceneScore = scoreMatch ? parseInt(scoreMatch[1], 10) : 0;
+        const isDeath = simLog.text.toLowerCase().includes("died");
+        const isInjury = simLog.text.toLowerCase().includes("injur");
+        let commentKey = sceneScore >= 3 ? "perfect" : sceneScore >= 2 ? "partial" : "failed";
+        if (isDeath && sceneScore >= 2) commentKey = "death_scene";
+        else if (isInjury && sceneScore >= 2) commentKey = "injury_scene";
+        const pool = CORVUS_SCENE_COMMENTARY[corvusPersonality]?.[commentKey];
+        if (pool && pool.length > 0) {
+          const commentary = pool[state.turn % pool.length];
+          display.addLog(commentary, "narrative");
+        }
+
         continue; // skip immediate display
       }
       // Crew identification celebration — trigger screen flash
@@ -2218,6 +2233,11 @@ function handleAction(action: Action): void {
       // First evidence celebration — screen flash
       if (simLog.id.startsWith("log_first_evidence_")) {
         display.triggerScreenFlash("milestone");
+        audio.playInteract();
+      }
+      // Clue examination — flash tile and audio
+      if (simLog.id.startsWith("log_examine_clues_")) {
+        display.flashTile(state.player.entity.pos.x, state.player.entity.pos.y, "#ccaa44");
         audio.playInteract();
       }
       // Memory echo clue examined — trigger ghost reveal in 3D renderer

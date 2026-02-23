@@ -759,6 +759,10 @@ export class BrowserDisplay3D implements IGameDisplay {
   private starfieldPoints: THREE.Points | null = null;
   private _nebulaMesh: THREE.Mesh | null = null;
 
+  // Scene clue world markers: small pulsing sprites at unexamined clue positions
+  private _clueMarkers: THREE.Sprite[] = [];
+  private _clueMarkerRoomId: string | null = null; // currently rendered room's markers
+
   // Evidence directional arrow: brief arrow on room entry pointing to nearest undiscovered evidence
   private _evidenceArrow: THREE.Sprite | null = null;
   private _evidenceArrowLife: number = 0;
@@ -2921,6 +2925,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateTiles(state);
     this.updateAirFlowArrows(state);
     this.updateEntities(state);
+    this.updateClueMarkers(state);
 
     // Phase-reactive global lighting
     const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
@@ -11498,6 +11503,63 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   // ── Private: helpers (duplicated from display.ts for independence) ──
+
+  /** Update scene clue world markers — small pulsing sprites at unexamined clue positions. */
+  private updateClueMarkers(state: GameState): void {
+    const currentRoom = this.getPlayerRoom(state);
+    const roomId = currentRoom?.id ?? null;
+    const scenes = state.mystery?.roomScenes ?? [];
+    const scene = roomId ? scenes.find(s => s.roomId === roomId) : null;
+    const unexamined = scene ? scene.physicalClues.filter(c => !c.examined) : [];
+
+    // If room changed or clue count changed, rebuild markers
+    if (roomId !== this._clueMarkerRoomId || unexamined.length !== this._clueMarkers.length) {
+      // Remove old markers
+      for (const m of this._clueMarkers) {
+        this.scene.remove(m);
+        m.material.dispose();
+      }
+      this._clueMarkers = [];
+      this._clueMarkerRoomId = roomId;
+
+      // Create new markers for unexamined clues
+      const clueColors: Record<string, number> = {
+        badge: 0x44ddff,
+        personal_effect: 0xffcc44,
+        damage_pattern: 0xff8844,
+        access_log: 0x88bbff,
+        terminal_log: 0x66ccff,
+        tool: 0xffaa44,
+        residue: 0x88ff88,
+        barricade: 0xff6644,
+        modified_equipment: 0xffaa88,
+        memory_echo: 0xcc88ff,
+      };
+
+      for (const clue of unexamined) {
+        const color = clueColors[clue.type] ?? 0xccaa44;
+        const mat = new THREE.SpriteMaterial({
+          color, transparent: true, opacity: 0.6,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(0.12, 0.12, 1);
+        sprite.position.set(clue.pos.x, 0.25, clue.pos.y);
+        (sprite as any)._cluePhase = Math.random() * Math.PI * 2; // randomize pulse phase
+        this.scene.add(sprite);
+        this._clueMarkers.push(sprite);
+      }
+    }
+
+    // Animate existing markers — gentle pulse
+    const t = performance.now() * 0.001;
+    for (const m of this._clueMarkers) {
+      const phase = (m as any)._cluePhase ?? 0;
+      const pulse = 0.5 + 0.3 * Math.sin(t * 3.0 + phase);
+      (m.material as THREE.SpriteMaterial).opacity = pulse;
+      m.position.y = 0.25 + 0.05 * Math.sin(t * 2.0 + phase);
+    }
+  }
 
   private getPlayerRoom(state: GameState): Room | null {
     const px = state.player.entity.pos.x;

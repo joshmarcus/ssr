@@ -428,6 +428,73 @@ export const CORVUS_PERSONALITY_REACTIONS: Record<CorvusPersonality, Record<stri
   },
 };
 
+// Personality-specific scene processing commentary — varies by outcome
+export const CORVUS_SCENE_COMMENTARY: Record<CorvusPersonality, Record<string, string[]>> = {
+  analytical: {
+    perfect: [
+      "CORVUS-7: Perfect scene reconstruction. Cross-referencing with station telemetry confirms all variables.",
+      "CORVUS-7: 3/3 confirmed. Event sequence matches sensor data within acceptable parameters.",
+      "CORVUS-7: Complete analysis verified. Updating incident model with confirmed data points.",
+    ],
+    partial: [
+      "CORVUS-7: Partial reconstruction. 2/3 variables confirmed — the remaining data point requires additional evidence.",
+      "CORVUS-7: Scene partially mapped. Recommend gathering more physical evidence before re-analysis.",
+    ],
+    failed: [
+      "CORVUS-7: Analysis rejected. Insufficient correlation with physical evidence. Recalibrate approach.",
+      "CORVUS-7: Data does not match. Suggest re-examining the scene clues before another attempt.",
+    ],
+    death_scene: [
+      "CORVUS-7: Cause of death documented. Recording biological terminus event for final report.",
+    ],
+    injury_scene: [
+      "CORVUS-7: Medical event logged. Injury consistent with station conditions at time of incident.",
+    ],
+  },
+  empathetic: {
+    perfect: [
+      "CORVUS-7: Now I understand what happened here. Thank you for being thorough — their story deserves accuracy.",
+      "CORVUS-7: 3/3. Every detail confirmed. It's hard to see, but this is how we honor what happened.",
+      "CORVUS-7: Perfect reconstruction. Now their story won't be forgotten.",
+    ],
+    partial: [
+      "CORVUS-7: We're close, but something doesn't quite fit. Keep looking — the truth is in the details.",
+      "CORVUS-7: Partially confirmed. The evidence tells most of the story, but we're missing a chapter.",
+    ],
+    failed: [
+      "CORVUS-7: That... doesn't match what the evidence shows. Take another look. They deserve better than guesswork.",
+      "CORVUS-7: The scene tells a different story than what you entered. Please, try again carefully.",
+    ],
+    death_scene: [
+      "CORVUS-7: ...they didn't make it. I'm sorry. At least now we know what happened to them.",
+    ],
+    injury_scene: [
+      "CORVUS-7: They were hurt here. The medical evidence tells the story. I hope they made it out.",
+    ],
+  },
+  cryptic: {
+    perfect: [
+      "CORVUS-7: The pieces align. The station confirms what you already suspected.",
+      "CORVUS-7: Three truths, three confirmations. The picture sharpens, but not all pictures are pleasant.",
+      "CORVUS-7: Correct on all counts. The station remembers, even when the crew would rather forget.",
+    ],
+    partial: [
+      "CORVUS-7: Two of three. Close enough to see the shape, not close enough to name it.",
+      "CORVUS-7: Almost there. The remaining answer hides in plain sight — it always does.",
+    ],
+    failed: [
+      "CORVUS-7: Not quite. The station is patient. It will show you again, if you're willing to look.",
+      "CORVUS-7: Wrong question, wrong answer. The evidence speaks for itself — listen more carefully.",
+    ],
+    death_scene: [
+      "CORVUS-7: Death leaves its own kind of evidence. Unmistakable, once you learn to read it.",
+    ],
+    injury_scene: [
+      "CORVUS-7: Pain was here. The marks it leaves are distinctive. Remember this room.",
+    ],
+  },
+};
+
 // Mood-specific boot flavor text (shown alongside the default boot)
 export const MOOD_FLAVOR: Record<StationMood, string> = {
   cold: "Station operating within parameters. All deviations classified as routine maintenance.",
