@@ -2642,6 +2642,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.placeSpaceViewports(state);
     this.placeWallScreens(state);
     this.placeDoorSigns(state);
+    this.placeFloorDetails(state);
     this.placeCorridorWallProps(state);
     this.placeEmergencyWallStrips(state);
     this.placeCorridorFixtures(state);
@@ -7967,6 +7968,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _wallScreens: { mesh: THREE.Mesh; phase: number; color: number }[] = [];
   private _doorSignTiles: Set<string> = new Set();
   private _doorSignSprites: THREE.Sprite[] = [];
+  private _floorDetailRooms: Set<string> = new Set();
 
   private placeWallDamageDecals(state: GameState): void {
     for (let y = 1; y < state.height - 1; y++) {
@@ -8254,6 +8256,88 @@ export class BrowserDisplay3D implements IGameDisplay {
         glowMesh.position.x -= Math.sin(pos.rotY) * backOff;
         glowMesh.position.z -= Math.cos(pos.rotY) * backOff;
         rGroup.add(glowMesh);
+      }
+    }
+  }
+
+  // ── Private: floor detail decals ──────────────────────────────
+  /** Add subtle floor detail sprites for visual variety in rooms */
+  private placeFloorDetails(state: GameState): void {
+    for (const room of state.rooms) {
+      if (this._floorDetailRooms.has(room.id)) continue;
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      if (cy < 0 || cy >= state.height || cx < 0 || cx >= state.width) continue;
+      if (!state.tiles[cy][cx].explored) continue;
+      this._floorDetailRooms.add(room.id);
+
+      const rGroup = this.roomDecoGroups.get(room.id) ?? this.decorationGroup;
+      const hash = room.x * 37 + room.y * 53;
+
+      for (let ry = room.y; ry < room.y + room.height; ry++) {
+        for (let rx = room.x; rx < room.x + room.width; rx++) {
+          if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
+          if (state.tiles[ry][rx].type !== TileType.Floor) continue;
+
+          const tileHash = rx * 13 + ry * 29 + hash;
+          // ~25% of floor tiles get a detail
+          if ((tileHash & 0xf) > 3) continue;
+
+          const detailType = tileHash % 4;
+          let geo: THREE.BufferGeometry;
+          let mat: THREE.MeshBasicMaterial;
+
+          if (detailType === 0) {
+            // Floor drain grate — small dark circle
+            geo = new THREE.CircleGeometry(0.08, 8);
+            geo.rotateX(-Math.PI / 2);
+            mat = new THREE.MeshBasicMaterial({
+              color: 0x111111,
+              transparent: true,
+              opacity: 0.4,
+              depthWrite: false,
+            });
+          } else if (detailType === 1) {
+            // Panel seam — thin dark line
+            const isVert = (tileHash & 0x10) !== 0;
+            geo = new THREE.PlaneGeometry(isVert ? 0.02 : 0.7, isVert ? 0.7 : 0.02);
+            geo.rotateX(-Math.PI / 2);
+            mat = new THREE.MeshBasicMaterial({
+              color: 0x0a0a0a,
+              transparent: true,
+              opacity: 0.25,
+              depthWrite: false,
+            });
+          } else if (detailType === 2) {
+            // Wear mark — subtle lighter patch
+            geo = new THREE.CircleGeometry(0.12 + (tileHash % 5) * 0.03, 6);
+            geo.rotateX(-Math.PI / 2);
+            mat = new THREE.MeshBasicMaterial({
+              color: 0x444444,
+              transparent: true,
+              opacity: 0.15,
+              depthWrite: false,
+              blending: THREE.AdditiveBlending,
+            });
+          } else {
+            // Access panel outline — small rectangle
+            geo = new THREE.PlaneGeometry(0.25, 0.25);
+            geo.rotateX(-Math.PI / 2);
+            mat = new THREE.MeshBasicMaterial({
+              color: 0x151515,
+              transparent: true,
+              opacity: 0.3,
+              depthWrite: false,
+            });
+          }
+
+          const mesh = new THREE.Mesh(geo, mat);
+          // Offset within tile for variety
+          const ox = ((tileHash * 7) % 60 - 30) / 100;
+          const oz = ((tileHash * 11) % 60 - 30) / 100;
+          mesh.position.set(rx + ox, 0.012, ry + oz);
+          rGroup.add(mesh);
+        }
       }
     }
   }
