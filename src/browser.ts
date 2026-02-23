@@ -307,6 +307,10 @@ let waitMsgIndex = 0;
 // ── Restart confirmation state ────────────────────────────────
 let restartPending = false;
 
+// ── Pause menu state ──────────────────────────────────────────
+let pauseMenuOpen = false;
+let pauseMenuIdx = 0; // selected menu item index
+
 // ── Auto-explore state ─────────────────────────────────────────
 let autoExploring = false;
 let autoExploreTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1556,6 +1560,11 @@ function initGame(): void {
       }
       return; // swallow all input while map is open
     }
+    // Pause menu takes priority over other overlays
+    if (pauseMenuOpen) {
+      handlePauseInput(e);
+      return;
+    }
     if (investigationHubOpen) {
       handleHubInput(e);
       return;
@@ -1568,21 +1577,17 @@ function initGame(): void {
       handleDeductionInput(e);
       return;
     }
-    // Escape: restart confirmation (two-press)
+    // Escape: open pause menu during gameplay
     if (e.key === "Escape" && !state.gameOver) {
       e.preventDefault();
-      if (restartPending) {
-        // Second Escape — restart with next seed
-        restartPending = false;
-        const newSeed = (seed + 1) % 1000000;
-        resetGameState(newSeed);
-        gameStarted = false;
-        showOpeningCrawl();
-        return;
+      pauseMenuOpen = true;
+      pauseMenuIdx = 0;
+      stopAutoExplore();
+      if (autoplayActive) {
+        stopAutoplay();
+        display.addLog("[AUTOPLAY OFF] Paused.", "system");
       }
-      restartPending = true;
-      display.addLog("Press Escape again for New Game, or any other key to cancel.", "warning");
-      renderAll();
+      renderPauseMenu();
       return;
     }
     // F5 toggles dev mode
@@ -1624,12 +1629,9 @@ function initGame(): void {
       toggleMinimapFullscreen();
       return;
     }
-    // Any non-Escape key cancels restart prompt
+    // Cancel any pending restart prompt on non-Escape key
     if (restartPending) {
       restartPending = false;
-      display.addLog("Restart cancelled.", "system");
-      renderAll();
-      // Don't return — let the key do its normal action too
     }
     // Mystery choices are handled via the Investigation Hub now
     // V key opens Investigation Hub directly to EVIDENCE section
@@ -1808,6 +1810,7 @@ function resetGameState(newSeed: number): void {
   activeChoice = null;
   investigationHubOpen = false;
   restartPending = false;
+  pauseMenuOpen = false;
   // Close overlays on restart
   const broadcastEl = document.getElementById("broadcast-overlay");
   if (broadcastEl) { broadcastEl.classList.remove("active"); broadcastEl.innerHTML = ""; }
@@ -4310,6 +4313,89 @@ function getEvidenceEntries(): { entries: EvidenceEntry[]; threads: Map<string, 
   }
 
   return { entries, threads };
+}
+
+// ── Pause Menu ────────────────────────────────────────────────
+
+const PAUSE_MENU_ITEMS = ["Resume", "Help", "New Game"] as const;
+
+function renderPauseMenu(): void {
+  const overlay = document.getElementById("broadcast-overlay");
+  if (!overlay) return;
+
+  const archetype = state.mystery?.timeline.archetype ?? "unknown";
+  const archetypeLabel = archetype.replace(/([A-Z])/g, " $1").trim();
+  const turnInfo = `Turn ${state.turn} / ${state.maxTurns}`;
+  const difficulty = state.difficulty ?? "normal";
+
+  let menuHtml = "";
+  for (let i = 0; i < PAUSE_MENU_ITEMS.length; i++) {
+    const item = PAUSE_MENU_ITEMS[i];
+    const sel = i === pauseMenuIdx;
+    const bg = sel ? "rgba(0,255,180,0.12)" : "transparent";
+    const border = sel ? "1px solid rgba(0,255,180,0.4)" : "1px solid transparent";
+    const color = sel ? "#0fa" : "#8899aa";
+    const arrow = sel ? `<span style="color:#0fa;margin-right:8px">&gt;</span>` : `<span style="margin-right:8px;opacity:0">&gt;</span>`;
+    menuHtml += `<div style="padding:8px 16px;background:${bg};border:${border};border-radius:4px;color:${color};font-size:14px;cursor:pointer;transition:all 0.15s">${arrow}${item}</div>`;
+  }
+
+  overlay.innerHTML = `
+    <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);z-index:9999">
+      <div style="background:rgba(6,6,16,0.95);border:1px solid rgba(0,255,180,0.3);border-radius:8px;padding:32px 48px;min-width:320px;text-align:center;box-shadow:0 0 40px rgba(0,255,180,0.1)">
+        <div style="font-size:28px;font-weight:bold;color:#0fa;letter-spacing:6px;margin-bottom:4px">PAUSED</div>
+        <div style="font-size:11px;color:#556;margin-bottom:24px">Seed ${seed} | ${archetypeLabel} | ${difficulty} | ${turnInfo}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:20px">
+          ${menuHtml}
+        </div>
+        <div style="font-size:10px;color:#445;margin-top:12px">[ESC] Resume | [Up/Down] Navigate | [Enter] Select</div>
+      </div>
+    </div>
+  `;
+  overlay.classList.add("active");
+}
+
+function closePauseMenu(): void {
+  pauseMenuOpen = false;
+  pauseMenuIdx = 0;
+  const overlay = document.getElementById("broadcast-overlay");
+  if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; }
+}
+
+function handlePauseInput(e: KeyboardEvent): void {
+  e.preventDefault();
+  if (e.key === "Escape") {
+    closePauseMenu();
+    renderAll();
+    return;
+  }
+  if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
+    pauseMenuIdx = (pauseMenuIdx - 1 + PAUSE_MENU_ITEMS.length) % PAUSE_MENU_ITEMS.length;
+    renderPauseMenu();
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
+    pauseMenuIdx = (pauseMenuIdx + 1) % PAUSE_MENU_ITEMS.length;
+    renderPauseMenu();
+    return;
+  }
+  if (e.key === "Enter" || e.key === " ") {
+    const selected = PAUSE_MENU_ITEMS[pauseMenuIdx];
+    if (selected === "Resume") {
+      closePauseMenu();
+      renderAll();
+    } else if (selected === "Help") {
+      closePauseMenu();
+      helpOpen = true;
+      showHelp();
+    } else if (selected === "New Game") {
+      closePauseMenu();
+      const newSeed = (seed + 1) % 1000000;
+      resetGameState(newSeed);
+      gameStarted = false;
+      showOpeningCrawl();
+    }
+    return;
+  }
 }
 
 /** Render the unified Investigation Hub with 4 tab-sections. */

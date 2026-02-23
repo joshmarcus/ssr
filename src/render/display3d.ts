@@ -2928,11 +2928,13 @@ export class BrowserDisplay3D implements IGameDisplay {
         ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold;font-size:11px">[${remaining}]</span>`
         : "";
 
+      const seedLabel = ` <span style="color:#334;font-size:10px">S:${state.seed}</span>`;
       this._hudStatus.innerHTML =
         hpBarHtml +
         ` <span class="hud-label">T:</span><span class="hud-value">${state.turn}</span>${turnWarning}` +
         sensorTag + stunTag +
-        (roomLabel ? ` <span style="color:#445">|</span> ${roomLabel}` : "");
+        (roomLabel ? ` <span style="color:#445">|</span> ${roomLabel}` : "") +
+        seedLabel;
     }
 
     // ── Interact hint + contextual action prompts ──────────────
