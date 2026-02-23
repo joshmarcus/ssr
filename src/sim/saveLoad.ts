@@ -189,3 +189,112 @@ export function getRunHistory(): RunRecord[] {
     return [];
   }
 }
+
+// ── Achievement System ──────────────────────────────────────────
+
+const ACHIEVEMENTS_KEY = "ssr_achievements";
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string; // single emoji/symbol character
+  unlockedAt?: number; // epoch ms when unlocked
+}
+
+/** All available achievements in display order. */
+const ACHIEVEMENT_DEFS: Omit<Achievement, "unlockedAt">[] = [
+  { id: "first_victory", name: "First Contact", description: "Complete your first investigation", icon: "*" },
+  { id: "perfect_deductions", name: "Master Detective", description: "Solve all deductions correctly in a single run", icon: "!" },
+  { id: "s_rank", name: "S-Rank Investigator", description: "Achieve an S performance rating", icon: "S" },
+  { id: "speed_run", name: "Rapid Response", description: "Complete a run in under 100 turns", icon: ">" },
+  { id: "all_crew_saved", name: "No One Left Behind", description: "Evacuate all living crew in a single run", icon: "+" },
+  { id: "hard_victory", name: "Hard Boiled", description: "Win on Hard difficulty", icon: "#" },
+  { id: "all_archetypes", name: "Case Library", description: "Play all 6 incident archetypes", icon: "6" },
+  { id: "ten_runs", name: "Veteran Operative", description: "Complete 10 investigations", icon: "X" },
+];
+
+/** Get all achievements with unlock status from localStorage. */
+export function getAchievements(): Achievement[] {
+  try {
+    const raw = localStorage.getItem(ACHIEVEMENTS_KEY);
+    const unlocked: Record<string, number> = raw ? JSON.parse(raw) : {};
+    return ACHIEVEMENT_DEFS.map(def => ({
+      ...def,
+      unlockedAt: unlocked[def.id] ?? undefined,
+    }));
+  } catch {
+    return ACHIEVEMENT_DEFS.map(def => ({ ...def }));
+  }
+}
+
+/** Check and unlock achievements based on run history. Returns newly unlocked achievement IDs. */
+export function checkAchievements(): string[] {
+  const history = getRunHistory();
+  const achievements = getAchievements();
+  const unlocked: Record<string, number> = {};
+  for (const a of achievements) {
+    if (a.unlockedAt) unlocked[a.id] = a.unlockedAt;
+  }
+
+  const newlyUnlocked: string[] = [];
+  const now = Date.now();
+
+  // first_victory: any victory
+  if (!unlocked["first_victory"] && history.some(r => r.victory)) {
+    unlocked["first_victory"] = now;
+    newlyUnlocked.push("first_victory");
+  }
+
+  // perfect_deductions: all correct in a single run
+  if (!unlocked["perfect_deductions"] && history.some(r => r.victory && r.deductionsCorrect === r.deductionsTotal && r.deductionsTotal > 0)) {
+    unlocked["perfect_deductions"] = now;
+    newlyUnlocked.push("perfect_deductions");
+  }
+
+  // s_rank: S rating
+  if (!unlocked["s_rank"] && history.some(r => r.rating === "S")) {
+    unlocked["s_rank"] = now;
+    newlyUnlocked.push("s_rank");
+  }
+
+  // speed_run: under 100 turns
+  if (!unlocked["speed_run"] && history.some(r => r.victory && r.turns < 100)) {
+    unlocked["speed_run"] = now;
+    newlyUnlocked.push("speed_run");
+  }
+
+  // all_crew_saved: crewEvacuated > 0 and victory (means all living crew saved)
+  if (!unlocked["all_crew_saved"] && history.some(r => r.victory && r.crewEvacuated > 0)) {
+    unlocked["all_crew_saved"] = now;
+    newlyUnlocked.push("all_crew_saved");
+  }
+
+  // hard_victory: win on hard
+  if (!unlocked["hard_victory"] && history.some(r => r.victory && r.difficulty === "hard")) {
+    unlocked["hard_victory"] = now;
+    newlyUnlocked.push("hard_victory");
+  }
+
+  // all_archetypes: 6 unique archetypes seen
+  if (!unlocked["all_archetypes"]) {
+    const seen = new Set(history.map(r => r.archetype));
+    if (seen.size >= 6) {
+      unlocked["all_archetypes"] = now;
+      newlyUnlocked.push("all_archetypes");
+    }
+  }
+
+  // ten_runs: 10+ completed runs
+  if (!unlocked["ten_runs"] && history.length >= 10) {
+    unlocked["ten_runs"] = now;
+    newlyUnlocked.push("ten_runs");
+  }
+
+  // Persist
+  try {
+    localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(unlocked));
+  } catch { /* ignore */ }
+
+  return newlyUnlocked;
+}

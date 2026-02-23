@@ -49,7 +49,7 @@ import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, 
 import { computeChoiceEndings, computeBranchedEpilogue, isMoralChoiceUnlocked } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, getTagCoverage, solveDeduction } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
-import { saveGame, loadGame, hasSave, deleteSave, recordRun, getRunHistory } from "./sim/saveLoad.js";
+import { saveGame, loadGame, hasSave, deleteSave, recordRun, getRunHistory, checkAchievements, getAchievements } from "./sim/saveLoad.js";
 import { isEntityExhausted } from "./shared/ui.js";
 import { computeGoals, computeGoalDiscoveries, type Goal, type Subgoal } from "./shared/goals.js";
 import { formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
@@ -2962,6 +2962,16 @@ function handleAction(action: Action): void {
     sc += Math.min(10, state.victory && state.turn < 200 ? 10 : state.victory && state.turn < 350 ? 5 : 0);
     const runRating = sc >= 90 ? "S" : sc >= 75 ? "A" : sc >= 55 ? "B" : sc >= 35 ? "C" : "D";
     recordRun(state, runRating);
+
+    // Check achievements after recording the run
+    const newBadges = checkAchievements();
+    for (const badgeId of newBadges) {
+      const all = getAchievements();
+      const badge = all.find(a => a.id === badgeId);
+      if (badge) {
+        display.addLog(`[${badge.icon}] ACHIEVEMENT UNLOCKED: ${badge.name} — ${badge.description}`, "milestone");
+      }
+    }
 
     if (state.victory) {
       audio.playVictory();
@@ -6661,12 +6671,27 @@ function showTitleScreen(): void {
     const archetypeList = [...seenArchetypes].map(a => archetypeShort[a] || a).join(", ");
     const rc = bestRating === "S" ? "#ff0" : bestRating === "A" ? "#0f0" : bestRating === "B" ? "#6cf" : bestRating === "C" ? "#fa0" : "#f44";
 
+    // Achievement badges
+    const achievements = getAchievements();
+    const unlockedBadges = achievements.filter(a => a.unlockedAt);
+    let badgeHtml = "";
+    if (unlockedBadges.length > 0) {
+      const badges = achievements.map(a => {
+        if (a.unlockedAt) {
+          return `<span title="${a.name}: ${a.description}" style="color:#0fa;cursor:help">[${a.icon}]</span>`;
+        }
+        return `<span title="${a.name}: ${a.description}" style="color:#222;cursor:help">[${a.icon}]</span>`;
+      }).join(" ");
+      badgeHtml = `<div style="font-size:12px;font-family:monospace;margin-top:6px;letter-spacing:1px">${badges}</div>`;
+    }
+
     statsHtml = `
       <div style="border-top:1px solid #222;padding-top:12px;text-align:center;max-width:320px">
         <div style="font-size:10px;color:#445;letter-spacing:1.5px;margin-bottom:6px">MISSION LOG</div>
         <div style="font-size:11px;color:#667">Runs: ${history.length} | Wins: ${wins} | Best: <span style="color:${rc}">${bestRating}</span></div>
         <div style="font-size:10px;color:#445;margin-top:4px">Cases: ${archetypeList}</div>
         <div style="font-size:10px;color:#334;margin-top:2px">${seenArchetypes.size}/6 archetypes</div>
+        ${badgeHtml}
       </div>
     `;
   }
