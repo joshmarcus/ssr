@@ -556,4 +556,42 @@ export class AudioManager {
     };
     window.speechSynthesis.speak(utterance);
   }
+
+  // ── Volume control ──────────────────────────────────────────
+
+  private _muted = false;
+  private _volumeLevel = 0.3; // default master volume
+
+  /** Toggle mute on/off. Returns true if now muted. */
+  toggleMute(): boolean {
+    this._muted = !this._muted;
+    if (this.masterGain) {
+      this.masterGain.gain.value = this._muted ? 0 : this._volumeLevel;
+    }
+    if (this.bgMusic) {
+      this.bgMusic.muted = this._muted;
+    }
+    return this._muted;
+  }
+
+  /** Check if audio is muted. */
+  isMuted(): boolean {
+    return this._muted;
+  }
+
+  /** Set master volume (0.0 to 1.0). Persists value for unmute. */
+  setVolume(level: number): void {
+    this._volumeLevel = Math.max(0, Math.min(1, level));
+    if (!this._muted && this.masterGain) {
+      this.masterGain.gain.value = this._volumeLevel;
+    }
+    if (this.bgMusic) {
+      this.bgMusic.volume = this._volumeLevel;
+    }
+  }
+
+  /** Get current master volume (0.0 to 1.0). */
+  getVolume(): number {
+    return this._volumeLevel;
+  }
 }

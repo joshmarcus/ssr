@@ -192,6 +192,11 @@ let inputHandler: InputHandler;
 let lastPlayerRoomId = "";
 const visitedRoomIds = new Set<string>();
 const audio = new AudioManager();
+// Restore saved volume preference
+try {
+  const savedVol = localStorage.getItem("ssr_volume");
+  if (savedVol !== null) audio.setVolume(parseFloat(savedVol));
+} catch { /* ignore */ }
 let firstDroneEncounterShown = false;
 const triggeredBotIntrospections = new Set<number>();
 const droneEncounterSet = new Set<string>(); // Track which drones have triggered unique encounter logs
@@ -1620,6 +1625,31 @@ function initGame(): void {
         display.addLog("[AUTOPLAY ON] Bot is playing. Press F7 to stop.", "milestone");
         autoplayTimer = setTimeout(autoplayStep, AUTOPLAY_DELAY);
       }
+      renderAll();
+      return;
+    }
+    // F8 toggles audio mute
+    if (e.key === "F8") {
+      e.preventDefault();
+      const muted = audio.toggleMute();
+      display.addLog(muted ? "[AUDIO MUTED] Press F8 to unmute." : `[AUDIO ON] Volume: ${Math.round(audio.getVolume() * 100)}%`, "system");
+      renderAll();
+      return;
+    }
+    // F9/F10 volume down/up (5 steps: 0%, 25%, 50%, 75%, 100%)
+    if (e.key === "F9" || e.key === "F10") {
+      e.preventDefault();
+      const step = 0.25;
+      const current = audio.getVolume();
+      const newVol = e.key === "F9"
+        ? Math.max(0, Math.round((current - step) * 100) / 100)
+        : Math.min(1, Math.round((current + step) * 100) / 100);
+      audio.setVolume(newVol);
+      const pct = Math.round(newVol * 100);
+      const bar = "=".repeat(Math.round(pct / 10)) + "-".repeat(10 - Math.round(pct / 10));
+      display.addLog(`[VOLUME ${pct}%] [${bar}]`, "system");
+      // Persist volume preference
+      try { localStorage.setItem("ssr_volume", String(newVol)); } catch { /* ignore */ }
       renderAll();
       return;
     }
@@ -3330,6 +3360,9 @@ function showHelp(): void {
         <div><span style="color:#888">[F3]</span>  Toggle 3D renderer</div>
         <div><span style="color:#888">[F4]</span>  Toggle outline effect</div>
         <div><span style="color:#888">[F7]</span>  Toggle autoplay bot</div>
+        <div><span style="color:#888">[F8]</span>  Mute / unmute audio</div>
+        <div><span style="color:#888">[F9]</span>  Volume down</div>
+        <div><span style="color:#888">[F10]</span> Volume up</div>
         <div><span style="color:#888">[R] / [N]</span>  Replay / New Game (game over screen)</div>
       </div>
     </div>`;
