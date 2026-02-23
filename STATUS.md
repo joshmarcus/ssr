@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 141 (V255 completed — achievements + gamepad + title screen)
+- **Phase**: Sprint 143 (V258 completed — enhanced map + difficulty selector)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -127,11 +127,33 @@
 - **Seed input**: Custom seed entry before new games (title screen, pause menu, game-over)
 - **Gamepad/controller support**: Full Gamepad API integration (Xbox/Steam Deck), D-pad/stick movement, all buttons mapped
 - **Achievement system**: 8 badges tracking meta-progression across runs (First Victory, S-Rank, Speed Run, etc.)
+- **Enhanced station map [M]**: Entity markers (relays, breaches, crew, terminals), hazard-tinted corridors/rooms, scene status icons, legend panel, exploration stats
+- **Difficulty selector**: Easy/Normal/Hard selection in seed input screen via Tab/arrows (replaces URL-param-only difficulty)
+- **Action bar entity states**: Grey exhausted entity descriptions (e.g., "Relay (routed)", "Terminal (read)") alongside available actions
+- **Boot sequence polish**: 7 game-state-aware messages with unit ID, sensor array, station map section count
 
 ## Known Issues
 
 - No CI pipeline deployed
 - Seed 42: Bot takes 900 turns (rescue-blocked crew require emergency override at turn 900 to transmit data core)
+
+## Sprint 142-143 Changes (V256-V258)
+
+### V258 — Difficulty Selector
+- **In-screen difficulty selection**: Seed input screen now includes Easy/Normal/Hard cycling via Tab or arrow keys
+- **Visual feedback**: Selected difficulty highlighted with glow, difficulty effects described below selector
+- **Replaces URL params**: No longer need `?difficulty=easy|hard` — accessible from the game UI
+
+### V257 — Enhanced Station Map [M]
+- **Entity markers**: Relays (triangles, green=active/yellow=inactive), Breaches (diamonds, red=active/grey=sealed), Crew (green squares), Data Core (magenta stars), Terminals (cyan outlines), MedKits (red crosses), Pickups (blue dots), Evidence traces (orange dots)
+- **Hazard visualization**: Corridors and rooms tinted by hazard type (red=heat, blue=vacuum, grey=smoke) with intensity-based opacity
+- **Scene status**: Room sidebar shows scene processing status (star=processed, dot=examined, count=remaining clues)
+- **Legend panel**: Entity type reference with relay/breach/crew counts, exploration percentage
+- **Canvas upgrade**: Larger canvas (640x440), adaptive font sizing, glow ring on player position
+
+### V256 — Action Bar Enhancement + Boot Sequence
+- **Entity state display**: Action bar shows grey state labels for exhausted nearby entities (Relay (routed), Terminal (read), etc.)
+- **Boot sequence**: Expanded to 7 game-state-aware messages showing unit ID, sensor array, station section count, CORVUS-7 handshake
 
 ## Sprint 140-141 Changes (V254-V255)
 
