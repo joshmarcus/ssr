@@ -4350,7 +4350,10 @@ function getEvidenceEntries(): { entries: EvidenceEntry[]; threads: Map<string, 
 
 // ── Pause Menu ────────────────────────────────────────────────
 
-const PAUSE_MENU_ITEMS = ["Resume", "Help", "New Game"] as const;
+const PAUSE_MENU_ITEMS = ["Resume", "Save Game", "Load Game", "Help", "New Game"] as const;
+
+let pauseSaveFlash = ""; // brief status message shown in pause menu
+let pauseSaveFlashTimer: ReturnType<typeof setTimeout> | null = null;
 
 function renderPauseMenu(): void {
   const overlay = document.getElementById("broadcast-overlay");
@@ -4360,23 +4363,29 @@ function renderPauseMenu(): void {
   const archetypeLabel = archetype.replace(/([A-Z])/g, " $1").trim();
   const turnInfo = `Turn ${state.turn} / ${state.maxTurns}`;
   const difficulty = state.difficulty ?? "normal";
+  const saveExists = hasSave();
 
   let menuHtml = "";
   for (let i = 0; i < PAUSE_MENU_ITEMS.length; i++) {
     const item = PAUSE_MENU_ITEMS[i];
+    const disabled = item === "Load Game" && !saveExists;
     const sel = i === pauseMenuIdx;
-    const bg = sel ? "rgba(0,255,180,0.12)" : "transparent";
-    const border = sel ? "1px solid rgba(0,255,180,0.4)" : "1px solid transparent";
-    const color = sel ? "#0fa" : "#8899aa";
-    const arrow = sel ? `<span style="color:#0fa;margin-right:8px">&gt;</span>` : `<span style="margin-right:8px;opacity:0">&gt;</span>`;
-    menuHtml += `<div style="padding:8px 16px;background:${bg};border:${border};border-radius:4px;color:${color};font-size:14px;cursor:pointer;transition:all 0.15s">${arrow}${item}</div>`;
+    const bg = sel && !disabled ? "rgba(0,255,180,0.12)" : "transparent";
+    const border = sel && !disabled ? "1px solid rgba(0,255,180,0.4)" : "1px solid transparent";
+    const color = disabled ? "#334" : sel ? "#0fa" : "#8899aa";
+    const arrow = sel && !disabled ? `<span style="color:#0fa;margin-right:8px">&gt;</span>` : `<span style="margin-right:8px;opacity:0">&gt;</span>`;
+    const suffix = disabled ? ` <span style="font-size:10px;color:#334">(no save)</span>` : "";
+    menuHtml += `<div style="padding:8px 16px;background:${bg};border:${border};border-radius:4px;color:${color};font-size:14px;cursor:pointer;transition:all 0.15s">${arrow}${item}${suffix}</div>`;
   }
+
+  const flashHtml = pauseSaveFlash ? `<div style="font-size:12px;color:#0fa;margin-bottom:12px;opacity:0.9">${pauseSaveFlash}</div>` : "";
 
   overlay.innerHTML = `
     <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);z-index:9999">
       <div style="background:rgba(6,6,16,0.95);border:1px solid rgba(0,255,180,0.3);border-radius:8px;padding:32px 48px;min-width:320px;text-align:center;box-shadow:0 0 40px rgba(0,255,180,0.1)">
         <div style="font-size:28px;font-weight:bold;color:#0fa;letter-spacing:6px;margin-bottom:4px">PAUSED</div>
         <div style="font-size:11px;color:#556;margin-bottom:24px">Seed ${seed} | ${archetypeLabel} | ${difficulty} | ${turnInfo}</div>
+        ${flashHtml}
         <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:20px">
           ${menuHtml}
         </div>
@@ -4403,11 +4412,19 @@ function handlePauseInput(e: KeyboardEvent): void {
   }
   if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
     pauseMenuIdx = (pauseMenuIdx - 1 + PAUSE_MENU_ITEMS.length) % PAUSE_MENU_ITEMS.length;
+    // Skip disabled items
+    if (PAUSE_MENU_ITEMS[pauseMenuIdx] === "Load Game" && !hasSave()) {
+      pauseMenuIdx = (pauseMenuIdx - 1 + PAUSE_MENU_ITEMS.length) % PAUSE_MENU_ITEMS.length;
+    }
     renderPauseMenu();
     return;
   }
   if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
     pauseMenuIdx = (pauseMenuIdx + 1) % PAUSE_MENU_ITEMS.length;
+    // Skip disabled items
+    if (PAUSE_MENU_ITEMS[pauseMenuIdx] === "Load Game" && !hasSave()) {
+      pauseMenuIdx = (pauseMenuIdx + 1) % PAUSE_MENU_ITEMS.length;
+    }
     renderPauseMenu();
     return;
   }
@@ -4416,6 +4433,34 @@ function handlePauseInput(e: KeyboardEvent): void {
     if (selected === "Resume") {
       closePauseMenu();
       renderAll();
+    } else if (selected === "Save Game") {
+      const ok = saveGame(state);
+      pauseSaveFlash = ok ? "Game saved." : "Save failed!";
+      if (pauseSaveFlashTimer) clearTimeout(pauseSaveFlashTimer);
+      pauseSaveFlashTimer = setTimeout(() => { pauseSaveFlash = ""; if (pauseMenuOpen) renderPauseMenu(); }, 1500);
+      renderPauseMenu();
+    } else if (selected === "Load Game") {
+      if (!hasSave()) {
+        pauseSaveFlash = "No save found.";
+        if (pauseSaveFlashTimer) clearTimeout(pauseSaveFlashTimer);
+        pauseSaveFlashTimer = setTimeout(() => { pauseSaveFlash = ""; if (pauseMenuOpen) renderPauseMenu(); }, 1500);
+        renderPauseMenu();
+      } else {
+        const loaded = loadGame();
+        if (loaded) {
+          closePauseMenu();
+          state = loaded;
+          seed = state.seed;
+          initGame();
+          display.addLog("[Save loaded — resuming session]", "milestone");
+          renderAll();
+        } else {
+          pauseSaveFlash = "Save corrupted — deleted.";
+          if (pauseSaveFlashTimer) clearTimeout(pauseSaveFlashTimer);
+          pauseSaveFlashTimer = setTimeout(() => { pauseSaveFlash = ""; if (pauseMenuOpen) renderPauseMenu(); }, 2000);
+          renderPauseMenu();
+        }
+      }
     } else if (selected === "Help") {
       closePauseMenu();
       helpOpen = true;
@@ -6524,33 +6569,90 @@ function esc(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// ── Start: check for save or show opening crawl ─────────────────
-let savedState: ReturnType<typeof loadGame> = null;
-try {
-  savedState = hasSave() ? loadGame() : null;
-} catch {
-  // Corrupt save — delete it and start fresh
-  console.warn("[browser] Save load crashed — starting fresh game");
-  deleteSave();
-  savedState = null;
+// ── Start: check for save or show opening crawl / title screen ───
+function showTitleScreen(): void {
+  crawlOverlay.style.display = "flex";
+  let titleIdx = 0; // 0 = Continue, 1 = New Game
+  const items = ["Continue", "New Game"];
+
+  function renderTitle(): void {
+    let menuHtml = "";
+    for (let i = 0; i < items.length; i++) {
+      const sel = i === titleIdx;
+      const color = sel ? "#0fa" : "#556";
+      const bg = sel ? "rgba(0,255,180,0.1)" : "transparent";
+      const border = sel ? "1px solid rgba(0,255,180,0.3)" : "1px solid transparent";
+      const arrow = sel ? `<span style="color:#0fa;margin-right:8px">&gt;</span>` : `<span style="margin-right:8px;opacity:0">&gt;</span>`;
+      menuHtml += `<div style="padding:10px 24px;background:${bg};border:${border};border-radius:4px;color:${color};font-size:16px;cursor:pointer;transition:all 0.15s">${arrow}${items[i]}</div>`;
+    }
+    crawlOverlay.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:32px;padding:48px">
+        <div style="text-align:center">
+          <div style="font-size:36px;font-weight:bold;color:#0fa;letter-spacing:8px;margin-bottom:8px">${STATION_NAME}</div>
+          <div style="font-size:14px;color:#556;letter-spacing:2px">${STATION_SUBTITLE}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:200px">
+          ${menuHtml}
+        </div>
+        <div style="font-size:10px;color:#334">[Up/Down] Navigate | [Enter] Select</div>
+      </div>
+    `;
+  }
+
+  renderTitle();
+
+  const titleInput = (e: KeyboardEvent) => {
+    e.preventDefault();
+    if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
+      titleIdx = (titleIdx - 1 + items.length) % items.length;
+      renderTitle();
+    } else if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
+      titleIdx = (titleIdx + 1) % items.length;
+      renderTitle();
+    } else if (e.key === "Enter" || e.key === " ") {
+      window.removeEventListener("keydown", titleInput);
+      crawlOverlay.removeEventListener("click", titleClick);
+      if (items[titleIdx] === "Continue") {
+        // Load the save
+        try {
+          const loaded = loadGame();
+          if (loaded) {
+            state = loaded;
+            seed = state.seed;
+            gameStarted = true;
+            crawlOverlay.style.display = "none";
+            initGame();
+            display.addLog("[Save loaded — resuming session]", "milestone");
+            renderAll();
+          } else {
+            // Save was corrupt — start fresh
+            deleteSave();
+            state = generate(seed, difficulty);
+            showOpeningCrawl();
+          }
+        } catch {
+          deleteSave();
+          state = generate(seed, difficulty);
+          showOpeningCrawl();
+        }
+      } else {
+        // New Game — delete save, start fresh
+        deleteSave();
+        showOpeningCrawl();
+      }
+    }
+  };
+  const titleClick = () => {
+    // Click selects current option
+    const fakeEnter = new KeyboardEvent("keydown", { key: "Enter" });
+    titleInput(fakeEnter);
+  };
+  window.addEventListener("keydown", titleInput);
+  crawlOverlay.addEventListener("click", titleClick);
 }
 
-if (savedState) {
-  try {
-    state = savedState;
-    gameStarted = true;
-    initGame();
-    // display is now assigned by initGame
-    display.addLog("[Save loaded — resuming session]", "milestone");
-    renderAll();
-  } catch (err) {
-    // State loaded but is structurally broken — start fresh
-    console.warn("[browser] Loaded save caused crash — starting fresh game:", err);
-    deleteSave();
-    state = generate(seed, difficulty);
-    initGame(); // Re-init display for the fresh state
-    showOpeningCrawl();
-  }
+if (hasSave()) {
+  showTitleScreen();
 } else {
   showOpeningCrawl();
 }
