@@ -22,6 +22,7 @@ import { generateCrewPaths } from "./crewPaths.js";
 import { generateRoomScenes } from "./roomScenes.js";
 import { assignTriplets, createDossiers } from "./crewDossiers.js";
 import { createIncidentBoard } from "./incidentBoard.js";
+import { generateContradictionPairs } from "./twoStory.js";
 
 /**
  * Room name assignments — enough for a large station.
@@ -231,6 +232,10 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
 
     // Create incident board for timeline reconstruction
     state.mystery.incidentBoard = createIncidentBoard();
+
+    // Generate contradiction pairs (Official Story vs Real Story)
+    state.mystery.contradictionPairs = generateContradictionPairs(archetype);
+    state.mystery.pendingContradictions = [];
   }
 
   // Place keyed doors (clearance + environmental)

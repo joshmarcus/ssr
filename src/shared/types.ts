@@ -540,6 +540,8 @@ export interface MysteryState {
   evidenceAccumulation?: EvidenceAccumulation; // confirming/ambiguous/contradicting counts
   dossiers?: CrewDossier[];      // crew dossiers built during investigation
   incidentBoard?: IncidentBoardState; // timeline reconstruction board
+  contradictionPairs?: import("../sim/twoStory.js").ContradictionPair[]; // official vs real story
+  pendingContradictions?: import("../sim/twoStory.js").PendingContradiction[]; // delayed reveals
 }
 
 // ── What We Know (narrative summary) ─────────────────────────
