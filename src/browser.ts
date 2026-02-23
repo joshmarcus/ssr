@@ -3074,8 +3074,8 @@ function showHelp(): void {
           <div style="color:#888;margin-left:20px">Terminals, doors, airlocks, relays,</div>
           <div style="color:#888;margin-left:20px">repair cradles, crew NPCs, escape pods</div>
           <div><span style="color:#fff">[c]</span>  Clean current tile</div>
-          <div><span style="color:#fff">[t] / [q]</span>  Cycle sensor overlay</div>
-          <div><span style="color:#fff">[x]</span>  Look (examine surroundings)</div>
+          <div><span style="color:#fff">[q] / [t]</span>  Scan room (cycles sensor mode)</div>
+          <div><span style="color:#fff">[x]</span>  Examine scene clues in current room</div>
           <div><span style="color:#fff">[.] [5]</span>  Wait one turn</div>
           <div><span style="color:#fff">[Tab]</span>  Auto-explore (any key to stop)</div>
         </div>
@@ -4146,7 +4146,6 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
 function renderHubConnections(deductions: import("./shared/types.js").Deduction[], journal: import("./shared/types.js").JournalEntry[]): string {
   const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
   const unlockedSet = new Set(getUnlockedDeductions(deductions, journal).map(d => d.id));
-  const categoryLabels: Record<string, string> = { what: "WHAT HAPPENED?", why: "WHY DID IT HAPPEN?", who: "WHO WAS RESPONSIBLE?" };
 
   // If in deduction detail/answer view
   if (hubDetailDeduction) {
@@ -4157,130 +4156,111 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
     hubDetailDeduction = null;
   }
 
-  // ── Case Board: connections + insights summary ──
-  const connections = state.mystery?.connections ?? [];
-  const insights = state.mystery?.insights ?? [];
-  const discoveredConns = connections.filter(c => c.discovered);
+  // ── Progressive disclosure: only show solved, unlocked, and immediate next ──
+  const solved = deductions.filter(d => d.solved);
+  const unlocked = deductions.filter(d => !d.solved && unlockedSet.has(d.id));
+  const locked = deductions.filter(d => !d.solved && !unlockedSet.has(d.id));
+  // Find the immediate next locked deduction (the one that would unlock after the first unlocked is solved)
+  const nextLocked = locked.length > 0 ? locked[0] : null;
 
-  let caseBoardHtml = "";
-  if (discoveredConns.length > 0 || insights.length > 0) {
-    caseBoardHtml += `<div class="case-board-header">\u25C8 CASE BOARD</div>`;
+  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:8px 12px">`;
 
-    // Insight progress cards
-    for (const insight of insights) {
-      const pct = insight.requiredConnections > 0
-        ? Math.min(100, Math.round((insight.currentConnections / insight.requiredConnections) * 100))
-        : 0;
-      const barClass = insight.revealed ? "complete" : pct > 50 ? "progress" : "empty";
-      const cardClass = insight.revealed ? "revealed" : pct > 0 ? "partial" : "empty";
-      const icon = insight.revealed ? "\u2713" : "\u25c7";
-      const iconColor = insight.revealed ? "#44ff88" : pct > 50 ? "#fa0" : "#555";
-      caseBoardHtml += `<div class="insight-card ${cardClass}">`;
-      caseBoardHtml += `<span style="color:${iconColor}">[${icon}]</span> `;
-      caseBoardHtml += `<span style="color:#aaa">${esc(insight.question)}</span> `;
-      caseBoardHtml += `<span class="insight-bar-track"><span class="insight-bar-fill ${barClass}" style="width:${pct}%"></span></span>`;
-      caseBoardHtml += ` <span style="color:${iconColor};font-size:10px">${pct}%</span>`;
-      if (insight.revealed) {
-        caseBoardHtml += `<div style="color:#4a8;font-size:10px;padding:2px 12px;font-style:italic">${esc(insight.conclusionText)}</div>`;
-      }
-      caseBoardHtml += `</div>`;
-    }
-
-    // Recent connections
-    if (discoveredConns.length > 0) {
-      caseBoardHtml += `<div style="color:#886;font-size:10px;margin-top:6px;padding-top:4px">${discoveredConns.length} evidence connection${discoveredConns.length !== 1 ? "s" : ""} found</div>`;
-      for (const conn of discoveredConns.slice(-3)) {
-        const src = journal.find(j => j.id === conn.sourceId);
-        const tgt = journal.find(j => j.id === conn.targetId);
-        if (src && tgt) {
-          caseBoardHtml += `<div class="connection-line">\u2500 "${esc(src.summary.slice(0, 30))}" \u2194 "${esc(tgt.summary.slice(0, 30))}" [${conn.sharedTags.join(", ")}]</div>`;
-        }
-      }
+  // ── Guidance header: tell the player what to do ──
+  if (unlocked.length > 0) {
+    html += `<div style="color:#44ff88;font-size:13px;margin-bottom:10px;padding:8px;border:1px solid rgba(68,255,136,0.3);border-radius:4px;background:rgba(68,255,136,0.05)">`;
+    html += `\u25B6 You have a deduction ready to answer. Select it and press [Enter].`;
+    html += `</div>`;
+  } else if (solved.length === deductions.length) {
+    html += `<div style="color:#44ff88;font-size:13px;margin-bottom:10px;padding:8px;border:1px solid rgba(68,255,136,0.3);border-radius:4px;background:rgba(68,255,136,0.05)">`;
+    html += `\u2713 All deductions complete. Your investigation is finished.`;
+    html += `</div>`;
+  } else {
+    // Nothing unlocked yet — tell player what they need
+    const nextThreshold = nextLocked?.evidenceThreshold ?? 2;
+    const chainLocked = nextLocked?.unlockAfter && !solvedIds.has(nextLocked.unlockAfter);
+    if (chainLocked) {
+      html += `<div style="color:#888;font-size:12px;margin-bottom:10px;padding:8px;border:1px solid #333;border-radius:4px;background:rgba(255,255,255,0.02)">`;
+      html += `Keep exploring the station and collecting evidence. Your next question will unlock after you answer the current one.`;
+      html += `</div>`;
+    } else {
+      const needed = Math.max(0, nextThreshold - journal.length);
+      html += `<div style="color:#888;font-size:12px;margin-bottom:10px;padding:8px;border:1px solid #333;border-radius:4px;background:rgba(255,255,255,0.02)">`;
+      html += `Collect ${needed} more piece${needed !== 1 ? "s" : ""} of evidence to unlock the next deduction. Read terminals, examine items, and scan rooms.`;
+      html += `</div>`;
     }
   }
 
-  // Progress summary
-  const solvedCount = deductions.filter(d => d.solved).length;
-  const correctCount = deductions.filter(d => d.answeredCorrectly).length;
-  const progressColor = solvedCount === deductions.length ? "#44ff88" : solvedCount > 0 ? "#fa0" : "#888";
-  let listHtml = caseBoardHtml + `<div style="color:${progressColor};padding:4px 8px;font-size:12px;border-bottom:1px solid rgba(68,255,136,0.15);margin-bottom:6px">DEDUCTIONS: ${solvedCount}/${deductions.length} solved${correctCount > 0 ? ` (${correctCount} correct)` : ""}</div>`;
+  // ── Currently unlocked deduction(s) — THE MAIN EVENT ──
+  // Track a flat index for keyboard navigation
+  let flatIdx = 0;
+  for (const d of unlocked) {
+    const isActive = flatIdx === hubIdx;
+    const catLabel = d.category.toUpperCase().replace("_", " ");
 
-  for (let di = 0; di < deductions.length; di++) {
-    const d = deductions[di];
-    const isUnlocked = unlockedSet.has(d.id);
-    const locked = !d.solved && !isUnlocked;
-    const isActive = di === hubIdx;
-
-    const tierLabel = `Tier ${di + 1}`;
-    const catLabel = categoryLabels[d.category] || d.category.toUpperCase();
-    let statusIcon: string;
-    let statusColor: string;
-
-    if (d.solved) {
-      statusIcon = d.answeredCorrectly ? "\u2713" : "\u2717";
-      statusColor = d.answeredCorrectly ? "#0f0" : "#f44";
-    } else if (isUnlocked) {
-      statusIcon = "\u25c7"; // diamond
-      statusColor = "#fa0";
-    } else {
-      statusIcon = "\u25cb"; // circle
-      statusColor = "#555";
+    html += `<div class="deduction-card unlocked-card${isActive ? " active-card" : ""}" style="margin-bottom:8px;padding:8px;border:1px solid rgba(255,170,0,0.4);border-radius:4px;background:rgba(255,170,0,0.05)">`;
+    html += `<div style="color:#fa0;font-weight:bold;font-size:14px;margin-bottom:4px">\u25C7 ${esc(d.question)}</div>`;
+    if (d.hintText) {
+      html += `<div style="color:#6cf;font-size:12px;padding:2px 0;margin-bottom:4px">\u2139 ${esc(d.hintText)}</div>`;
     }
-
-    let cardClass = "deduction-card";
-    if (locked) cardClass += " locked-card";
-    else if (d.solved) cardClass += d.answeredCorrectly ? " solved-card" : " failed-card";
-    else if (isUnlocked) cardClass += " unlocked-card";
-    if (isActive) cardClass += " active-card";
-
-    listHtml += `<div class="${cardClass}">`;
-    listHtml += `<div class="broadcast-section-title"><span style="color:${statusColor}">[${statusIcon}]</span> <span style="color:#666;font-size:11px">${tierLabel}</span> ${catLabel}</div>`;
-
-    if (d.solved) {
-      const answer = d.options.find(o => o.correct === d.answeredCorrectly) || d.options[0];
-      listHtml += `<div style="color:${statusColor};padding:2px 8px">${esc(answer.label)}</div>`;
-    } else if (locked) {
-      const chainLocked = d.unlockAfter && !solvedIds.has(d.unlockAfter);
-      const threshold = d.evidenceThreshold ?? 1;
-      if (chainLocked) {
-        listHtml += `<div style="color:#555;padding:2px 8px">Solve previous deduction first</div>`;
-      } else {
-        listHtml += `<div style="color:#555;padding:2px 8px">Evidence: ${journal.length}/${threshold} needed</div>`;
-      }
-    } else {
-      listHtml += `<div style="color:#aaa;padding:2px 8px;font-size:12px">${esc(d.question)}</div>`;
-      if (d.hintText) {
-        listHtml += `<div style="color:#6cf;padding:2px 8px;font-size:11px;font-style:italic">\u2139 ${esc(d.hintText)}</div>`;
-      }
-      // Evidence count + attempt status
-      const threshold = d.evidenceThreshold ?? 1;
-      listHtml += `<div style="color:#888;padding:2px 8px;font-size:10px">Evidence: ${journal.length}/${threshold}</div>`;
-      if ((d.wrongAttempts ?? 0) > 0) {
-        const attemptsLeft = (d.maxAttempts ?? 2) - (d.wrongAttempts ?? 0);
-        listHtml += `<div style="color:#f44;padding:2px 8px;font-size:10px">\u26a0 ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining</div>`;
-      }
+    if ((d.wrongAttempts ?? 0) > 0) {
+      const attemptsLeft = (d.maxAttempts ?? 2) - (d.wrongAttempts ?? 0);
+      html += `<div style="color:#f44;font-size:11px">\u26a0 ${attemptsLeft} attempt${attemptsLeft !== 1 ? "s" : ""} remaining</div>`;
     }
+    if (isActive) {
+      html += `<div style="color:#44ff88;font-size:12px;margin-top:4px">[Enter] Read evidence &amp; answer</div>`;
+    }
+    html += `</div>`;
+    flatIdx++;
+  }
 
-    // Dev mode: show tags for debugging
-    if (devModeEnabled) {
-      const allTags = new Set(journal.flatMap(j => j.tags));
+  // ── Solved deductions — compact summary ──
+  if (solved.length > 0) {
+    html += `<div style="color:#888;font-size:11px;margin-top:10px;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">Answered (${solved.length})</div>`;
+    for (const d of solved) {
+      const icon = d.answeredCorrectly ? "\u2713" : "\u2717";
+      const color = d.answeredCorrectly ? "#4a4" : "#a44";
+      const correctOpt = d.options.find(o => o.correct);
+      html += `<div style="color:${color};padding:3px 0;font-size:11px;border-bottom:1px solid #222">`;
+      html += `<span>[${icon}]</span> ${esc(d.question)}`;
+      if (d.answeredCorrectly && correctOpt) html += ` \u2014 <span style="color:#aaa">${esc(correctOpt.label)}</span>`;
+      else if (!d.answeredCorrectly) html += ` \u2014 <span style="color:#a44">Incorrect</span>`;
+      html += `</div>`;
+    }
+  }
+
+  // ── Next locked deduction — teaser only ──
+  if (nextLocked && solved.length < deductions.length - 1) {
+    const chainBlocked = nextLocked.unlockAfter && !solvedIds.has(nextLocked.unlockAfter);
+    const threshold = nextLocked.evidenceThreshold ?? 1;
+    html += `<div style="color:#555;font-size:11px;margin-top:12px;padding:6px;border:1px solid #222;border-radius:4px;background:rgba(255,255,255,0.01)">`;
+    html += `<span style="color:#444">\u25CB</span> Next: ???`;
+    if (!chainBlocked) {
+      html += ` <span style="color:#444;font-size:10px">(${journal.length}/${threshold} evidence)</span>`;
+    }
+    html += `</div>`;
+  }
+
+  // Dev mode: show all deductions with tags
+  if (devModeEnabled) {
+    html += `<div style="border-top:1px solid #f0f;margin-top:12px;padding-top:8px">`;
+    html += `<div style="color:#f0f;font-size:10px;font-weight:bold;margin-bottom:4px">DEV: ALL DEDUCTIONS</div>`;
+    const allTags = new Set(journal.flatMap(j => j.tags));
+    for (let di = 0; di < deductions.length; di++) {
+      const d = deductions[di];
+      const status = d.solved ? (d.answeredCorrectly ? "\u2713" : "\u2717") : unlockedSet.has(d.id) ? "\u25c7" : "\u25cb";
       let devTags = "";
       for (const tag of d.requiredTags) {
         devTags += allTags.has(tag)
           ? `<span class="tag-pill tag-covered">${esc(tag)}</span>`
           : `<span class="tag-pill tag-missing">${esc(tag)}</span>`;
       }
-      listHtml += `<div style="margin:2px 8px;border-top:1px solid #f0f;padding-top:2px"><span style="color:#f0f;font-size:10px">DEV:</span> ${devTags}</div>`;
+      html += `<div style="color:#f0f;font-size:10px">[${status}] T${di + 1} ${esc(d.category)} (${d.evidenceThreshold ?? "?"}ev): ${devTags}</div>`;
     }
-
-    if (isActive && isUnlocked && !d.solved) {
-      listHtml += `<div style="color:#44ff88;padding:4px 8px;font-size:11px">[Enter] Read evidence &amp; answer</div>`;
-    }
-
-    listHtml += `</div>`;
+    html += `</div>`;
   }
 
-  return `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:4px 8px">${listHtml}</div>`;
+  html += `</div>`;
+  return html;
 }
 
 /** Detail view for a deduction — read evidence, understand the story, answer with consequences. */
@@ -5469,20 +5449,23 @@ function handleHubConnectionsInput(e: KeyboardEvent): void {
     return;
   }
 
-  // List view navigation
+  // List view navigation — only unlocked deductions are selectable
+  const selectableDeductions = deductions.filter(d => !d.solved && unlockedSet.has(d.id));
+  const maxIdx = Math.max(0, selectableDeductions.length - 1);
+
   if (e.key === "ArrowUp" || e.key === "w") {
     hubIdx = Math.max(0, hubIdx - 1);
     renderInvestigationHub();
     return;
   }
   if (e.key === "ArrowDown" || e.key === "s") {
-    hubIdx = Math.min(deductions.length - 1, hubIdx + 1);
+    hubIdx = Math.min(maxIdx, hubIdx + 1);
     renderInvestigationHub();
     return;
   }
   if (e.key === "Enter") {
-    const d = deductions[hubIdx];
-    if (d && !d.solved && unlockedSet.has(d.id)) {
+    const d = selectableDeductions[hubIdx];
+    if (d) {
       hubDetailDeduction = d.id;
       hubOptionIdx = 0;
       renderInvestigationHub();

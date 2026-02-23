@@ -2874,14 +2874,47 @@ export class BrowserDisplay3D implements IGameDisplay {
         (roomLabel ? ` <span style="color:#445">|</span> ${roomLabel}` : "");
     }
 
-    // ── Interact hint ───────────────────────────────────────────
+    // ── Interact hint + contextual action prompts ──────────────
     if (this._hudInteract) {
       if (!state.gameOver) {
+        const actionHints: string[] = [];
+
+        // [Enter] interact with adjacent entity
         const nearby = this.getAdjacentInteractables(state);
         if (nearby.length > 0) {
           const target = nearby[0];
           const name = entityDisplayName(target);
-          this._hudInteract.innerHTML = `\u25b8 [Enter] ${this.escapeHtml(name)}`;
+          actionHints.push(`<span style="color:#fa0">\u25b8 [Enter] ${this.escapeHtml(name)}</span>`);
+        }
+
+        // [Q] Scan — show when player has sensors
+        const sensors = state.player.sensors ?? [];
+        if (sensors.length > 0) {
+          const sensorNames: Record<string, string> = {
+            [SensorType.Thermal]: "Thermal",
+            [SensorType.Cleanliness]: "Clean",
+            [SensorType.Atmospheric]: "Atmo",
+          };
+          const currentLabel = this.sensorMode ? sensorNames[this.sensorMode] ?? this.sensorMode : "Off";
+          actionHints.push(`<span style="color:#0cf">[Q] Scan <span style="color:#556;font-size:10px">(${currentLabel})</span></span>`);
+        }
+
+        // [X] Examine — show when in a room with scene clues
+        if (state.mystery) {
+          const currentRoom = this.getPlayerRoom(state);
+          if (currentRoom) {
+            const roomScene = state.mystery.roomScenes?.find(s => s.roomId === currentRoom.id);
+            if (roomScene) {
+              const unexamined = roomScene.physicalClues.filter(c => !c.examined).length;
+              if (unexamined > 0) {
+                actionHints.push(`<span style="color:#ca8">[X] Examine <span style="color:#556;font-size:10px">(${unexamined} clue${unexamined !== 1 ? "s" : ""})</span></span>`);
+              }
+            }
+          }
+        }
+
+        if (actionHints.length > 0) {
+          this._hudInteract.innerHTML = actionHints.join(`<span style="color:#334;margin:0 6px">|</span>`);
           this._hudInteract.classList.add("visible");
         } else {
           this._hudInteract.classList.remove("visible");

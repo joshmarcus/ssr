@@ -471,7 +471,7 @@
     #hud-scanner:empty { display: none; }
     .hud-bar-divider:has(+ #hud-scanner:empty) { display: none; }
     #hud-interact {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: bold;
       color: #fa0;
       text-shadow: 0 0 8px rgba(255, 170, 0, 0.3);
@@ -481,6 +481,9 @@
       padding-left: 12px;
       opacity: 0;
       transition: opacity 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0;
     }
     #hud-interact.visible { opacity: 1; }
 

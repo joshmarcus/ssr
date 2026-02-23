@@ -950,15 +950,16 @@ function placeEntities(state: GameState, rooms: DiggerRoom[]): void {
   const n = rooms.length;
 
   // ── Key room indices ──────────────────────────────────────────
-  const sensorIdx = 1;
+  const sensorIdx = 0; // Thermal sensor in Arrival Bay — immediate upgrade for early progress
   const relay1Idx = Math.max(2, Math.floor(n * 0.2));            // ~20% through
   const relay2Idx = Math.max(relay1Idx + 1, Math.floor(n * 0.5)); // ~50% through
   const relay3Idx = Math.max(relay2Idx + 1, Math.floor(n * 0.75)); // ~75% through
   const serviceBotIdx = Math.min(Math.floor(n * 0.4), relay2Idx - 1);
   const dataCoreIdx = n - 1;
 
-  // ── Sensor pickup in room 1 ───────────────────────────────────
-  const sensorPos = getRoomCenter(rooms[sensorIdx]);
+  // ── Sensor pickup in Arrival Bay — offset 1 tile from player start ──
+  const sensorCenter = getRoomCenter(rooms[sensorIdx]);
+  const sensorPos = { x: sensorCenter.x + 1, y: sensorCenter.y };
   state.entities.set("sensor_thermal", {
     id: "sensor_thermal",
     type: EntityType.SensorPickup,
