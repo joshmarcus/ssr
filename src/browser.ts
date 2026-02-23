@@ -241,6 +241,7 @@ let hubSceneWhoIdx = 0;     // selected crew index for WHO answer
 let hubSceneWhatIdx = 0;    // selected activity for WHAT answer
 let hubSceneOutcomeIdx = 0; // selected outcome for OUTCOME answer
 let hubSceneConfirming = false; // Y/N confirmation for scene processing
+let hubSceneResult: { score: number; roomName: string; timestamp: number } | null = null; // brief result display after scene processing
 let hubEvidenceFilter: "all" | "by_room" | "by_type" | "unread" = "all"; // evidence tab filter mode
 const hubViewedEvidenceIds = new Set<string>(); // tracks which evidence entries player has viewed in Hub
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
@@ -1649,6 +1650,7 @@ function resetGameState(newSeed: number): void {
   prevIdentifiedCrew = 0;
   pendingSceneResult = null;
   pendingSceneRoom = null;
+  hubSceneResult = null;
 
   // Reset per-run narrative/tutorial state
   firstDroneEncounterShown = false;
@@ -4582,6 +4584,43 @@ function getCrewProfileInsight(crew: import("./shared/types.js").CrewMember, men
   return parts.slice(0, 3).join(" ");
 }
 
+/** Render a single scene list item with visual status. */
+function renderSceneListItem(s: RoomScene, idx: number, selected: boolean, isReady: boolean): string {
+  const examined = s.physicalClues.filter(c => c.examined).length;
+  const total = s.physicalClues.length;
+  const sensorGated = s.physicalClues.filter(c => !c.examined && c.sensorRequired).length;
+
+  let statusIcon: string;
+  let statusColor: string;
+  let statusLabel = "";
+  if (s.processed) {
+    statusIcon = "\u2713"; statusColor = "#4a4"; statusLabel = "DONE";
+  } else if (isReady) {
+    statusIcon = "\u25c6"; statusColor = "#fa0"; statusLabel = "READY";
+  } else if (examined > 0) {
+    statusIcon = "\u25cb"; statusColor = "#ca8";
+  } else {
+    statusIcon = "\u25cb"; statusColor = "#555";
+  }
+
+  const bg = selected
+    ? `background:rgba(${isReady ? "255,170,0" : "68,204,255"},0.12);border-left:2px solid ${isReady ? "#fa0" : "#4cf"}`
+    : "border-left:2px solid transparent";
+
+  let html = `<div style="padding:6px 10px;${bg};margin:1px 0">`;
+  html += `<div style="display:flex;justify-content:space-between;align-items:center">`;
+  html += `<span style="color:${selected ? "#eef" : "#aab"};font-weight:${selected ? "bold" : "normal"};font-size:13px">`;
+  html += `<span style="color:${statusColor}">[${statusIcon}]</span> ${esc(s.roomName)}</span>`;
+  if (statusLabel) {
+    html += `<span style="color:${statusColor};font-size:9px;font-weight:bold;letter-spacing:1px">${statusLabel}</span>`;
+  }
+  html += `</div>`;
+  html += `<div style="font-size:10px;color:#667">`;
+  html += `Clues: ${examined}/${total}${sensorGated > 0 ? ` (+${sensorGated} sensor)` : ""}`;
+  html += `</div></div>`;
+  return html;
+}
+
 /** SCENES section — room scene investigation with WHO/WHAT/OUTCOME processing. */
 function renderHubScenes(): string {
   if (!state.mystery?.roomScenes || state.mystery.roomScenes.length === 0) {
@@ -4611,6 +4650,20 @@ function renderHubScenes(): string {
 
   // Scene list (left panel)
   let listHtml = "";
+
+  // ── Scene processing result banner (auto-dismiss after 5s) ──
+  if (hubSceneResult && (Date.now() - hubSceneResult.timestamp < 5000)) {
+    const { score, roomName } = hubSceneResult;
+    const resultColor = score >= 3 ? "#4a4" : score >= 2 ? "#fa0" : "#f44";
+    const resultLabel = score >= 3 ? "PERFECT ASSESSMENT" : score >= 2 ? "SCENE PROCESSED" : "ANALYSIS INCOMPLETE";
+    const resultIcon = score >= 3 ? "\u2605" : score >= 2 ? "\u2713" : "\u2717";
+    listHtml += `<div style="padding:8px 10px;margin-bottom:6px;background:rgba(${score >= 3 ? "68,255,136" : score >= 2 ? "255,170,0" : "255,68,68"},0.08);border:1px solid ${resultColor};border-radius:3px;text-align:center">`;
+    listHtml += `<div style="color:${resultColor};font-size:13px;font-weight:bold">${resultIcon} ${resultLabel} — ${score}/3</div>`;
+    listHtml += `<div style="color:#889;font-size:10px;margin-top:2px">${esc(roomName)}</div>`;
+    listHtml += `</div>`;
+  } else if (hubSceneResult) {
+    hubSceneResult = null; // auto-dismiss after 5s
+  }
 
   // Evidence accumulation summary at top
   if (accumulation) {
@@ -4665,36 +4718,50 @@ function renderHubScenes(): string {
     listHtml += `</div>`;
   }
 
+  // Group scenes by status for visual hierarchy
+  const processedSceneIdxs: number[] = [];
+  const readySceneIdxs: number[] = [];
+  const partialSceneIdxs: number[] = [];
+  const unvisitedSceneIdxs: number[] = [];
   for (let i = 0; i < scenes.length; i++) {
     const s = scenes[i];
-    const selected = i === hubIdx;
     const examined = s.physicalClues.filter(c => c.examined).length;
-    const total = s.physicalClues.length;
-    const sensorGated = s.physicalClues.filter(c => !c.examined && c.sensorRequired).length;
+    if (s.processed) processedSceneIdxs.push(i);
+    else if (examined > 0 && examined === s.physicalClues.filter(c => !c.sensorRequired || c.examined).length) readySceneIdxs.push(i);
+    else if (examined > 0) partialSceneIdxs.push(i);
+    else unvisitedSceneIdxs.push(i);
+  }
 
-    let statusIcon: string;
-    let statusColor: string;
-    if (s.processed) {
-      statusIcon = "\u2713"; statusColor = "#4a4";
-    } else if (examined === total) {
-      statusIcon = "\u25c7"; statusColor = "#fa0"; // all examined, ready to process
-    } else if (examined > 0) {
-      statusIcon = "\u25cb"; statusColor = "#ca8"; // partially examined
-    } else {
-      statusIcon = "\u25cb"; statusColor = "#555"; // not started
-    }
+  // Ready to process — highlighted prominently
+  if (readySceneIdxs.length > 0) {
+    listHtml += `<div style="color:#fa0;font-size:9px;letter-spacing:1.5px;padding:4px 10px;border-bottom:1px solid #332;margin-top:4px">READY TO PROCESS (${readySceneIdxs.length})</div>`;
+  }
+  for (const idx of readySceneIdxs) {
+    listHtml += renderSceneListItem(scenes[idx], idx, idx === hubIdx, true);
+  }
 
-    const bg = selected ? "background:rgba(68,204,255,0.12);border-left:2px solid #4cf" : "border-left:2px solid transparent";
-    const catColor = s.evidenceCategory === "confirming" ? "#4a4" : s.evidenceCategory === "contradicting" ? "#f44" : "#ca8";
+  // Partially examined
+  if (partialSceneIdxs.length > 0) {
+    listHtml += `<div style="color:#ca8;font-size:9px;letter-spacing:1.5px;padding:4px 10px;border-bottom:1px solid #332;margin-top:4px">IN PROGRESS (${partialSceneIdxs.length})</div>`;
+  }
+  for (const idx of partialSceneIdxs) {
+    listHtml += renderSceneListItem(scenes[idx], idx, idx === hubIdx, false);
+  }
 
-    listHtml += `<div style="padding:6px 10px;${bg};margin:1px 0">`;
-    listHtml += `<div style="color:${selected ? "#eef" : "#aab"};font-weight:${selected ? "bold" : "normal"};font-size:13px">`;
-    listHtml += `<span style="color:${statusColor}">[${statusIcon}]</span> ${esc(s.roomName)}</div>`;
-    listHtml += `<div style="font-size:10px;color:#667">`;
-    listHtml += `Clues: ${examined}/${total}${sensorGated > 0 ? ` (+${sensorGated} sensor-gated)` : ""}`;
-    listHtml += ` \u00B7 <span style="color:${catColor}">${s.evidenceCategory}</span>`;
-    if (s.processed) listHtml += ` \u00B7 <span style="color:#4a4">PROCESSED</span>`;
-    listHtml += `</div></div>`;
+  // Unvisited
+  if (unvisitedSceneIdxs.length > 0) {
+    listHtml += `<div style="color:#555;font-size:9px;letter-spacing:1.5px;padding:4px 10px;border-bottom:1px solid #222;margin-top:4px">UNEXPLORED (${unvisitedSceneIdxs.length})</div>`;
+  }
+  for (const idx of unvisitedSceneIdxs) {
+    listHtml += renderSceneListItem(scenes[idx], idx, idx === hubIdx, false);
+  }
+
+  // Processed — compact
+  if (processedSceneIdxs.length > 0) {
+    listHtml += `<div style="color:#4a4;font-size:9px;letter-spacing:1.5px;padding:4px 10px;border-bottom:1px solid #232;margin-top:4px">PROCESSED (${processedSceneIdxs.length})</div>`;
+  }
+  for (const idx of processedSceneIdxs) {
+    listHtml += renderSceneListItem(scenes[idx], idx, idx === hubIdx, false);
   }
 
   // Detail panel for selected scene (right side)
@@ -4870,7 +4937,28 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
   html += `<div style="color:#4cf;font-size:10px;letter-spacing:2px;margin-bottom:8px">PROCESS SCENE: ${esc(scene.roomName.toUpperCase())}</div>`;
 
   const turnCost = scene.processAttempts === 0 ? 3 : scene.processAttempts === 1 ? 5 : scene.processAttempts === 2 ? 8 : 8 + (scene.processAttempts - 2) * 4;
-  html += `<div style="color:#667;font-size:10px;margin-bottom:12px">Attempt ${scene.processAttempts + 1} \u00B7 Cost: ${turnCost} turns \u00B7 Score 2/3 to succeed</div>`;
+  html += `<div style="color:#667;font-size:10px;margin-bottom:8px">Attempt ${scene.processAttempts + 1} \u00B7 Cost: ${turnCost} turns \u00B7 Score 2/3 to succeed</div>`;
+
+  // ── CLUES FOUND — show examined clue text as reference ──
+  const examinedClues = scene.physicalClues.filter(c => c.examined);
+  if (examinedClues.length > 0) {
+    html += `<div style="margin-bottom:10px;padding:6px 8px;background:rgba(200,170,100,0.06);border:1px solid #443;border-radius:3px">`;
+    html += `<div style="color:#ca8;font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:4px">CLUES FOUND (${examinedClues.length})</div>`;
+    for (const clue of examinedClues) {
+      const typeLabel = clue.type.replace(/_/g, " ");
+      const crewTag = clue.crewLinked
+        ? (() => {
+            const member = crew.find(c => c.id === clue.crewLinked);
+            return member ? ` <span style="color:#6cf">[${member.lastName}]</span>` : "";
+          })()
+        : "";
+      html += `<div style="margin:2px 0;font-size:11px;color:#bba;padding:2px 4px;border-left:2px solid #665">`;
+      html += `<span style="color:#887;font-size:9px;text-transform:uppercase">${esc(typeLabel)}</span>${crewTag}`;
+      html += `<div style="color:#ddc;font-size:11px">${esc(clue.text)}</div>`;
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
 
   html += `<div style="display:flex;gap:12px">`;
 
@@ -5056,6 +5144,7 @@ function closeInvestigationHub(): void {
   hubSceneDetail = null;
   hubSceneSubView = "clues";
   hubSceneConfirming = false;
+  hubSceneResult = null;
   display.setHubMode?.(false);
   document.getElementById("game-container")?.classList.remove("hub-open");
   display.addLog("[Investigation Hub closed]", "system");
@@ -5273,6 +5362,7 @@ function handleHubScenesInput(e: KeyboardEvent): void {
           SceneOutcome.DiedHere, SceneOutcome.StillHere, SceneOutcome.SealedInside, SceneOutcome.Unknown,
         ];
         const selectedCrew = crew[hubSceneWhoIdx];
+        const prevLogCount = state.logs.length;
         handleAction({
           type: ActionType.ProcessScene,
           sceneRoomId: scene.roomId,
@@ -5280,6 +5370,17 @@ function handleHubScenesInput(e: KeyboardEvent): void {
           whatAnswer: activities[hubSceneWhatIdx] ?? SceneActivity.RoutineWork,
           outcomeAnswer: outcomes[hubSceneOutcomeIdx] ?? SceneOutcome.Unknown,
         });
+        // Extract score from the process result log
+        let score = 0;
+        for (let i = prevLogCount; i < state.logs.length; i++) {
+          const logEntry = state.logs[i];
+          if (logEntry.id.startsWith("log_process_result_")) {
+            const scoreMatch = logEntry.text.match(/\((\d)\/3\)/);
+            if (scoreMatch) score = parseInt(scoreMatch[1], 10);
+            break;
+          }
+        }
+        hubSceneResult = { score, roomName: scene.roomName, timestamp: Date.now() };
         // Exit process view after submission
         hubSceneSubView = "clues";
         hubSceneDetail = null;
