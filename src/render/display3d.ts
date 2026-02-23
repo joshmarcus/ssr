@@ -10,7 +10,7 @@ import { TileType, EntityType, AttachmentSlot, SensorType, ObjectivePhase, Scene
 import { GLYPHS, DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, HEAT_PAIN_THRESHOLD } from "../shared/constants.js";
 import type { IGameDisplay, LogType, DisplayLogEntry } from "./displayInterface.js";
 import { getObjective as getObjectiveShared, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
-import { getRunHistory } from "../sim/saveLoad.js";
+import { getRunHistory, getAchievements } from "../sim/saveLoad.js";
 import { getUnlockedDeductions } from "../sim/deduction.js";
 
 // FBXLoader is not imported — Synty FBX files are pre-converted to GLTF at build time
@@ -2463,6 +2463,38 @@ export class BrowserDisplay3D implements IGameDisplay {
     const rating = score >= 90 ? "S" : score >= 75 ? "A" : score >= 55 ? "B" : score >= 35 ? "C" : "D";
     const ratingColor = rating === "S" ? "#ff0" : rating === "A" ? "#0f0" : rating === "B" ? "#6cf" : rating === "C" ? "#fa0" : "#f44";
 
+    // Score breakdown categories
+    const scoreVictory = isVictory ? 30 : 0;
+    const scoreDeductions = Math.min(15, deductionsCorrect * (15 / Math.max(deductions.length, 1)));
+    const scoreExplore = Math.min(10, (roomsExplored / Math.max(state.rooms.length, 1)) * 10);
+    const scoreHP = Math.min(10, (hpPercent / 100) * 10);
+    const scoreSpeed = Math.min(5, isVictory && state.turn < 200 ? 5 : isVictory && state.turn < 350 ? 2 : 0);
+    const scoreScenes = scenes.length > 0 ? Math.min(10, (processedScenes / Math.max(scenes.length, 1)) * 10) : 0;
+    const scoreCrew = scenes.length > 0 ? Math.min(8, (identifiedCrew / Math.max(dossiers.length, 1)) * 8) : 0;
+    const scoreTimeline = scenes.length > 0 ? Math.min(7, (confirmedSlots / Math.max(totalSlots, 1)) * 7) : 0;
+    const scoreContradictions = scenes.length > 0 ? Math.min(5, (contradictions / Math.max(totalContradictions, 1)) * 5) : 0;
+
+    const breakdownBar = (label: string, pts: number, max: number, color: string) => {
+      const pct = Math.round((pts / max) * 100);
+      const grade = pct >= 90 ? "S" : pct >= 75 ? "A" : pct >= 50 ? "B" : pct >= 25 ? "C" : "D";
+      const gc = grade === "S" ? "#ff0" : grade === "A" ? "#0f0" : grade === "B" ? "#6cf" : grade === "C" ? "#fa0" : "#f44";
+      return `<div style="display:flex;align-items:center;gap:4px;margin:1px 0;font-size:10px"><span style="color:#778;min-width:75px">${label}</span><div style="flex:1;background:#1a1a2a;height:3px;border-radius:2px;max-width:90px"><div style="background:${color};height:100%;border-radius:2px;width:${pct}%"></div></div><span style="color:${gc};min-width:12px;text-align:right">${grade}</span><span style="color:#556;min-width:28px;text-align:right">${Math.round(pts)}/${max}</span></div>`;
+    };
+    let scoreBreakdownHtml = `<div style="margin:4px 0;padding:4px 8px;background:rgba(0,0,0,0.2);border-radius:3px">`;
+    scoreBreakdownHtml += breakdownBar("Mission", scoreVictory, 30, "#0fa");
+    scoreBreakdownHtml += breakdownBar("Deductions", scoreDeductions, 15, "#c8f");
+    scoreBreakdownHtml += breakdownBar("Exploration", scoreExplore, 10, "#4cf");
+    scoreBreakdownHtml += breakdownBar("Integrity", scoreHP, 10, "#f84");
+    scoreBreakdownHtml += breakdownBar("Speed", scoreSpeed, 5, "#ff0");
+    if (scenes.length > 0) {
+      scoreBreakdownHtml += breakdownBar("Scenes", scoreScenes, 10, "#4cf");
+      scoreBreakdownHtml += breakdownBar("Crew ID", scoreCrew, 8, "#4f8");
+      scoreBreakdownHtml += breakdownBar("Timeline", scoreTimeline, 7, "#fa0");
+      scoreBreakdownHtml += breakdownBar("Contradictions", scoreContradictions, 5, "#f44");
+    }
+    scoreBreakdownHtml += `<div style="font-size:9px;color:#556;text-align:right;margin-top:2px">Total: ${Math.round(score)}/100</div>`;
+    scoreBreakdownHtml += `</div>`;
+
     // Crew evacuation
     const evac = state.mystery?.evacuation;
     const crewEvacuated = evac?.crewEvacuated.length || 0;
@@ -2599,6 +2631,26 @@ export class BrowserDisplay3D implements IGameDisplay {
       highlightsHtml += `</div>`;
     }
 
+    // Achievements
+    const allAchievements = getAchievements();
+    const now = Date.now();
+    const newAchievements = allAchievements.filter(a => a.unlockedAt && (now - a.unlockedAt) < 60000);
+    const totalUnlocked = allAchievements.filter(a => a.unlockedAt).length;
+    let achievementHtml = "";
+    if (newAchievements.length > 0) {
+      achievementHtml += `<div style="border-top:1px solid #553;margin:6px 0;padding-top:6px">`;
+      achievementHtml += `<div style="color:#fc0;font-size:10px;letter-spacing:1.5px;text-align:center;margin-bottom:4px">ACHIEVEMENTS UNLOCKED</div>`;
+      for (const a of newAchievements) {
+        achievementHtml += `<div style="font-size:11px;color:#fc0;margin:3px 0;padding:4px 8px;background:rgba(255,204,0,0.06);border:1px solid rgba(255,204,0,0.15);border-radius:3px">`;
+        achievementHtml += `<span style="color:#fd0;font-weight:bold">[${a.icon}]</span> ${a.name} <span style="color:#997;font-size:10px">— ${a.description}</span>`;
+        achievementHtml += `</div>`;
+      }
+      achievementHtml += `<div style="font-size:9px;color:#665;text-align:center;margin-top:3px">${totalUnlocked}/${allAchievements.length} achievements</div>`;
+      achievementHtml += `</div>`;
+    } else if (totalUnlocked > 0) {
+      achievementHtml = `<div style="font-size:9px;color:#445;text-align:center;margin-top:4px">${totalUnlocked}/${allAchievements.length} achievements unlocked</div>`;
+    }
+
     // Run history
     const runHistoryHtml = this.renderRunHistory(state.seed);
 
@@ -2610,6 +2662,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           <span style="color:${ratingColor};font-size:32px;font-weight:bold;text-shadow:0 0 10px ${ratingColor}">${rating}</span>
           <div style="color:#888;font-size:12px">PERFORMANCE RATING</div>
         </div>
+        ${scoreBreakdownHtml}
         <div class="gameover-stats">
           <div class="gameover-stat"><span class="stat-label">Turns:</span> <span class="stat-value">${state.turn}</span></div>
           <div class="gameover-stat"><span class="stat-label">Hull Integrity:</span> <span class="stat-value ${hpClass}">${state.player.hp}/${state.player.maxHp} (${hpPercent}%)</span></div>
@@ -2626,6 +2679,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         ${storyHtml}
         ${retroHtml}
         ${highlightsHtml}
+        ${achievementHtml}
         ${runHistoryHtml}
         <div class="gameover-restart">[R] Replay · [N] New Game · [C] Copy Summary</div>
       </div>`;

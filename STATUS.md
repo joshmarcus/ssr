@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 155 (V282 completed — investigation hub polish + evidence connections)
+- **Phase**: Sprint 159 (V291 completed — investigation feedback + opening sequence polish)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -138,6 +138,43 @@
 - **Investigation quality HUD**: Live IQ:X% indicator showing investigation score (scenes, crew ID, timeline, contradictions)
 - **Thread progress in Hub**: Evidence tab BY THREAD filter shows narrative threads with progress bars and descriptions
 - **Clipboard run summary [C]**: Full text summary with rating, deductions, investigation stats for sharing
+
+## Sprint 156-159 Changes (V283-V291)
+
+### V283 — Deduction Answer Confidence Indicator
+- **Keyword matching**: Each answer option shows LOW/MED/HIGH confidence based on keyword frequency in collected evidence
+- **Visual cue**: Helps players gauge how much evidence supports each answer before committing
+
+### V284 — Investigation Quality Milestone Feedback
+- **IQ computation**: 30% scenes + 25% crew ID + 25% timeline + 20% contradictions
+- **Progressive milestones**: CORVUS-7 fires guidance at 25%/50%/75% investigation quality
+- **Weakest-area advice**: Each milestone identifies the least-progressed investigation area
+
+### V285 — Autoplay Verification
+- **Seeds 184201, 42, 777**: All VICTORY with 5-6/5-6 deductions correct
+- **Confirms**: V265-V284 changes don't break gameplay or bot logic
+
+### V286 — Contradiction Discovery Feedback
+- **Conflict detection**: When new evidence matches a contradiction pair, fires warning log + damage screen flash + audio
+- **Dramatic moment**: Contradictions become noticeable events rather than silent journal entries
+
+### V287 — Enhanced Opening Sequence
+- **Station context briefing**: Station ID, crew count, section count during boot sequence
+- **Archetype-specific alerts**: 6 unique alert status messages (coolant failure, hull breach, reactor shutdown, etc.)
+
+### V288 — First Evidence Celebration
+- **First evidence milestone**: CORVUS-7 congratulates on first evidence with Hub hint
+- **Screen flash**: Milestone flash + audio cue marks the moment
+
+### V289 — Exploration Progress Milestones (Already Existed)
+- **Pre-existing**: CORVUS_REACTIONS at 25/50/75/100% exploration already implemented
+
+### V290 — Room-Entry Scene Hints (Enhanced)
+- **All-clues-examined case**: Added prompt when all room clues are done, suggesting scene processing
+
+### V291 — Game-Over Investigation Highlights
+- **Narrative threads**: Completed threads shown in game-over overlay with entry counts
+- **Investigation stats**: Compact summary of scenes/crew/deductions/evidence in highlights section
 
 ## Sprint 153-155 Changes (V277-V282)
 

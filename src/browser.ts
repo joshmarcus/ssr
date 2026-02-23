@@ -7431,6 +7431,16 @@ function showSeedInput(onConfirm: (seed: number) => void): void {
     renderSeedInput();
   }, 500);
 
+  // Archetype preview lookup
+  const ARCHETYPE_PREVIEW: Record<string, { name: string; flavor: string; color: string }> = {
+    [IncidentArchetype.CoolantCascade]: { name: "THE WHISTLEBLOWER", flavor: "A cascade failure — or a cover-up?", color: "#4cf" },
+    [IncidentArchetype.HullBreach]: { name: "THE MURDER", flavor: "Not every breach is an accident.", color: "#f44" },
+    [IncidentArchetype.ReactorScram]: { name: "THE ROGUE AI", flavor: "The reactor shutdown wasn't a malfunction.", color: "#fa0" },
+    [IncidentArchetype.Sabotage]: { name: "THE STOWAWAY", flavor: "Something got aboard that shouldn't be here.", color: "#0f8" },
+    [IncidentArchetype.SignalAnomaly]: { name: "FIRST CONTACT", flavor: "The signal came from inside the station.", color: "#c8f" },
+    [IncidentArchetype.Mutiny]: { name: "THE DIVIDE", flavor: "The crew turned on each other.", color: "#ff8" },
+  };
+
   function renderSeedInput(): void {
     const cursor = cursorBlink ? `<span style="color:#0fa">|</span>` : `<span style="opacity:0">|</span>`;
     const diff = DIFF_OPTIONS[diffIdx];
@@ -7438,6 +7448,23 @@ function showSeedInput(onConfirm: (seed: number) => void): void {
       const selected = i === diffIdx;
       return `<span style="color:${selected ? d.color : '#334'};font-weight:${selected ? 'bold' : 'normal'};font-size:${selected ? '14px' : '11px'};padding:0 8px;${selected ? 'text-shadow:0 0 8px ' + d.color : ''}">${d.label}</span>`;
     }).join(`<span style="color:#222">|</span>`);
+
+    // Archetype preview based on current seed
+    const seedNum = parseInt(inputStr, 10);
+    let previewHtml = "";
+    if (!isNaN(seedNum) && seedNum >= 0) {
+      const archetypes = Object.values(IncidentArchetype);
+      const arch = archetypes[Math.abs(seedNum) % archetypes.length];
+      const preview = ARCHETYPE_PREVIEW[arch];
+      if (preview) {
+        previewHtml = `
+          <div style="background:rgba(0,0,0,0.3);border:1px solid ${preview.color}33;border-radius:4px;padding:8px 16px;text-align:center;min-width:200px">
+            <div style="font-size:10px;color:#556;letter-spacing:2px;margin-bottom:4px">CASE FILE</div>
+            <div style="font-size:13px;color:${preview.color};font-weight:bold;letter-spacing:1px">${preview.name}</div>
+            <div style="font-size:10px;color:#667;margin-top:3px;font-style:italic">${preview.flavor}</div>
+          </div>`;
+      }
+    }
 
     crawlOverlay.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:48px">
@@ -7449,6 +7476,7 @@ function showSeedInput(onConfirm: (seed: number) => void): void {
           <div style="font-size:10px;color:#556;margin-bottom:4px;letter-spacing:2px">SEED</div>
           <span style="font-size:24px;font-weight:bold;color:#0fa;letter-spacing:3px;font-family:monospace">${inputStr}${cursor}</span>
         </div>
+        ${previewHtml}
         <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:10px 16px;text-align:center">
           <div style="font-size:10px;color:#556;margin-bottom:6px;letter-spacing:2px">DIFFICULTY</div>
           <div style="display:flex;align-items:center;justify-content:center;gap:4px">
@@ -7536,12 +7564,26 @@ function showTitleScreen(): void {
       badgeHtml = `<div style="font-size:12px;font-family:monospace;margin-top:6px;letter-spacing:1px">${badges}</div>`;
     }
 
+    // Recent runs detail
+    let recentHtml = "";
+    const recentRuns = history.slice(-5).reverse();
+    if (recentRuns.length > 0) {
+      const rows = recentRuns.map(r => {
+        const result = r.victory ? `<span style="color:#0c0">WIN</span>` : `<span style="color:#f44">LOSS</span>`;
+        const rtc = r.rating === "S" ? "#ff0" : r.rating === "A" ? "#0f0" : r.rating === "B" ? "#6cf" : r.rating === "C" ? "#fa0" : "#f44";
+        const arch = archetypeShort[r.archetype] || r.archetype;
+        return `<div style="font-size:10px;color:#556;font-family:monospace">${result} <span style="color:${rtc}">${r.rating}</span> T${r.turns} ${arch}</div>`;
+      }).join("");
+      recentHtml = `<div style="margin-top:6px;text-align:left">${rows}</div>`;
+    }
+
     statsHtml = `
       <div style="border-top:1px solid #222;padding-top:12px;text-align:center;max-width:320px">
         <div style="font-size:10px;color:#445;letter-spacing:1.5px;margin-bottom:6px">MISSION LOG</div>
         <div style="font-size:11px;color:#667">Runs: ${history.length} | Wins: ${wins} | Best: <span style="color:${rc}">${bestRating}</span></div>
         <div style="font-size:10px;color:#445;margin-top:4px">Cases: ${archetypeList}</div>
         <div style="font-size:10px;color:#334;margin-top:2px">${seenArchetypes.size}/6 archetypes</div>
+        ${recentHtml}
         ${badgeHtml}
       </div>
     `;
