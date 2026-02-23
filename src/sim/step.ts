@@ -5919,7 +5919,7 @@ export function step(state: GameState, action: Action): GameState {
       // Parse answers
       const whoAnswer = action.whoAnswer ?? [];
       const whatAnswer = (action.whatAnswer as SceneActivity) ?? SceneActivity.RoutineWork;
-      const outcomeAnswer = (action.outcomeAnswer as SceneOutcome) ?? SceneOutcome.Unknown;
+      const outcomeAnswer = (action.outcomeAnswer as SceneOutcome) ?? SceneOutcome.LeftNormally;
 
       // Evaluate against ground truth
       const result = processScene(targetScene, whoAnswer, whatAnswer, outcomeAnswer);

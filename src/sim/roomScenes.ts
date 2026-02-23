@@ -424,9 +424,11 @@ export function generateRoomScenes(
 
   const damageType = hazardToDamageType(timeline.primaryHazard);
 
-  // Step 3: Generate scenes for each room
+  // Step 3: Generate scenes only for rooms with crew present.
+  // Rooms without crew have nothing meaningful to process — no busywork.
   for (const room of rooms) {
     const crewPresent = roomCrewMap.get(room.name) ?? [];
+    if (crewPresent.length === 0) continue;
     const dist = roomDistance(playerStartRoom, room);
     const roomEvCat = evidenceWeight(dist, maxDist);
 
@@ -500,7 +502,7 @@ export function generateRoomScenes(
       }
     }
 
-    // Ensure at least 2 clues per room (even non-story rooms get environmental detail)
+    // Ensure at least 2 clues per room (crew is always present since we skip empty rooms)
     while (clues.length < 2) {
       if (damageType !== "none") {
         const envClue = generateEnvironmentalClue(damageType, room, clueIdx, roomEvCat);
@@ -510,11 +512,17 @@ export function generateRoomScenes(
           continue;
         }
       }
-      // Generic environmental clue fallback
+      // Generic clue fallback — crew is present so human implications are correct
+      const fallbackClues = [
+        "Emergency kit, seal broken. Bandage wrapper on the floor. Someone treated a wound here.",
+        "Scattered tools near the maintenance panel. Work was interrupted mid-task.",
+        "Coffee mug on the console, still half-full. Whoever was here left without finishing.",
+        "Chair pushed back from the terminal. The screen still shows an unfinished report.",
+      ];
       clues.push({
         id: makeClueId(room.id, clueIdx),
         type: "tool",
-        text: "Emergency kit, seal broken. Bandage wrapper on the floor. Someone treated a wound here.",
+        text: fallbackClues[clueIdx % fallbackClues.length],
         sensorRequired: null,
         examined: false,
         pos: randomPosInRoom(room),
@@ -585,6 +593,7 @@ export interface SceneProcessingResult {
 
 /**
  * Process a scene: evaluate the player's WHO/WHAT/OUTCOME answers against ground truth.
+ * All scenes now have crew present (empty-crew rooms are filtered out during generation).
  */
 export function processScene(
   scene: RoomScene,

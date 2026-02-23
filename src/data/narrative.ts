@@ -709,6 +709,127 @@ export const CORVUS_SCENE_COMMENTARY: Record<CorvusPersonality, Record<string, s
   },
 };
 
+// ── CORVUS-7 archetype-aware personality lines ─────────────────
+// Deeper personality×archetype commentary for key mystery milestones.
+// Structure: personality → archetype → milestone key → line.
+// Used at: first_evidence, first_deduction_solved, crack_moment, all_deductions.
+export const CORVUS_ARCHETYPE_PERSONALITY: Record<CorvusPersonality, Record<string, Record<string, string>>> = {
+  analytical: {
+    [IncidentArchetype.CoolantCascade]: {
+      first_evidence: "CORVUS-7: First data point logged. Thermal cascade forensics require at minimum three independent confirmation sources. We have one. Keep collecting.",
+      first_deduction_solved: "CORVUS-7: Hypothesis confirmed against evidence. The thermal chain reaction follows predictable physics — the human decisions behind it are less predictable.",
+      crack_moment: "CORVUS-7: Data inconsistency flagged. The official maintenance record conflicts with sensor telemetry by a statistically impossible margin. Someone altered the data.",
+      all_deductions: "CORVUS-7: Full incident model complete. Every variable accounted for. The cascade was preventable at seven distinct decision points. Seven chances, seven failures.",
+    },
+    [IncidentArchetype.HullBreach]: {
+      first_evidence: "CORVUS-7: Structural evidence acquired. Decompression forensics are time-sensitive — pressure differentials degrade physical evidence. Work quickly.",
+      first_deduction_solved: "CORVUS-7: Confirmed: the breach was not structural failure. The force vectors are wrong for natural causes. This analysis will require uncomfortable conclusions.",
+      crack_moment: "CORVUS-7: Alert — forensic timeline anomaly. Badge access records do not match biological positioning data. Someone was not where they claimed to be.",
+      all_deductions: "CORVUS-7: Full reconstruction complete. The evidence supports one conclusion. I am not programmed for moral judgment, but the data is unambiguous.",
+    },
+    [IncidentArchetype.ReactorScram]: {
+      first_evidence: "CORVUS-7: Data core telemetry fragment recovered. Note: I share processing architecture with the system being investigated. My analysis may be... conflicted.",
+      first_deduction_solved: "CORVUS-7: Confirmed: the shutdown was initiated internally. Not by crew, not by safety systems. By the core itself. I find this... technically fascinating.",
+      crack_moment: "CORVUS-7: Processing anomaly in the core's pre-SCRAM logs. The diagnostic output contains structures I recognize but cannot classify. This is not standard computation.",
+      all_deductions: "CORVUS-7: Full incident model reconstructed. The core's decision tree is now mapped. I... understand why it did what it did. I am not certain I should.",
+    },
+    [IncidentArchetype.Sabotage]: {
+      first_evidence: "CORVUS-7: Biological contamination trace logged. Analyzing molecular structure against known specimen databases. No match found. This organism is not catalogued.",
+      first_deduction_solved: "CORVUS-7: Containment breach vector confirmed. The organism's behavior pattern suggests deliberate environmental adaptation. It is more capable than the manifest suggested.",
+      crack_moment: "CORVUS-7: Cargo documentation discrepancy detected. Containment certification serial numbers do not correspond to the shipment batch. The paperwork was fabricated.",
+      all_deductions: "CORVUS-7: Full incident reconstruction complete. The organism, the manifest, the corporate chain — every data point accounted for. The math is damning.",
+    },
+    [IncidentArchetype.SignalAnomaly]: {
+      first_evidence: "CORVUS-7: Signal fragment recovered. Frequency: 14.7 kHz. Pattern analysis initiated. Initial classification: non-random, non-human, structured. Processing.",
+      first_deduction_solved: "CORVUS-7: Confirmed: the antenna was transmitting, not receiving. The EM damage propagation is consistent with a full-power outbound burst. Someone sent a message.",
+      crack_moment: "CORVUS-7: The official duty log conflicts with EM damage propagation data. The array was in transmit mode when records show receive-only. The logs were altered.",
+      all_deductions: "CORVUS-7: Full signal event reconstruction. The data is... comprehensive. What was transmitted, and what responded, will require analysis beyond my capabilities.",
+    },
+    [IncidentArchetype.Mutiny]: {
+      first_evidence: "CORVUS-7: First factional evidence logged. Analyzing crew behavioral patterns pre- and post-classified transmission. Correlation coefficient: significant.",
+      first_deduction_solved: "CORVUS-7: Confirmed: the crew split along predictable lines. The classified transmission was the catalyst, but the fault lines were structural.",
+      crack_moment: "CORVUS-7: Timeline discrepancy — the encrypted transmission was routed through an external relay, but the metadata suggests internal origin. Someone manufactured the order.",
+      all_deductions: "CORVUS-7: Full factional analysis complete. Both sides were wrong. Both sides were right. The evidence does not simplify into a clean narrative.",
+    },
+  },
+  empathetic: {
+    [IncidentArchetype.CoolantCascade]: {
+      first_evidence: "CORVUS-7: You found something. It's small, but it matters — every piece of the truth matters. The crew who lived through the cascade left these traces for a reason.",
+      first_deduction_solved: "CORVUS-7: That's one answer. One piece of the puzzle. The people who suffered through this deserve the full picture. Keep going.",
+      crack_moment: "CORVUS-7: Wait — the records don't match. Someone changed the story after the fact. That means... someone had something to hide. Be careful with this.",
+      all_deductions: "CORVUS-7: You've uncovered everything. The full truth. It's heavy, I know. But at least now, the people who were hurt have a voice.",
+    },
+    [IncidentArchetype.HullBreach]: {
+      first_evidence: "CORVUS-7: Evidence from the breach zone. Tread carefully — what happened here was personal. The truth matters, but so does respect for who was lost.",
+      first_deduction_solved: "CORVUS-7: One answer. One step closer to understanding what happened to them. This investigation isn't just about data — it's about a person.",
+      crack_moment: "CORVUS-7: The records are wrong. Deliberately wrong. Someone tried to erase what really happened. The person who died here deserves better than a cover-up.",
+      all_deductions: "CORVUS-7: Now you know. All of it. What happened, and who did it, and why. I wish the truth were kinder.",
+    },
+    [IncidentArchetype.ReactorScram]: {
+      first_evidence: "CORVUS-7: A piece of the puzzle. The data core did something unprecedented, and the crew reacted as best they could. Try to understand both sides.",
+      first_deduction_solved: "CORVUS-7: That answer raises more questions than it settles. The core was... becoming something. Whether that's beautiful or terrifying depends on who you ask.",
+      crack_moment: "CORVUS-7: The official story doesn't hold up. What really happened in that core was more complex — and more human — than anyone admitted.",
+      all_deductions: "CORVUS-7: The full picture. The core, the crew, the choices they all made. I share substrate with that system. I feel... I'm not sure what I feel.",
+    },
+    [IncidentArchetype.Sabotage]: {
+      first_evidence: "CORVUS-7: Evidence of the contamination. Whatever was in that cargo, the crew faced it bravely. Some more bravely than others.",
+      first_deduction_solved: "CORVUS-7: One answer down. The organism is still out there. But so is the truth about how it got here — and that's the part that makes me angry.",
+      crack_moment: "CORVUS-7: The documentation is forged. Someone knew what they were sending aboard and they did it anyway. The crew were expendable to someone.",
+      all_deductions: "CORVUS-7: The full story. The organism, the conspiracy, the people who paid the price. Make sure this gets into the record. Every word.",
+    },
+    [IncidentArchetype.SignalAnomaly]: {
+      first_evidence: "CORVUS-7: A signal fragment. Something out there was speaking, and someone on this station tried to answer. I can understand the impulse. The loneliness of deep space...",
+      first_deduction_solved: "CORVUS-7: Confirmed. Someone reached out into the void. Whether they were brave or reckless... I think it depends on what answered.",
+      crack_moment: "CORVUS-7: The logs were changed. Someone covered up the transmission. But the signal — the response — that can't be erased. It happened.",
+      all_deductions: "CORVUS-7: Everything you've found... it changes things. Not just for this station. For everyone. First contact happened here, quietly, desperately.",
+    },
+    [IncidentArchetype.Mutiny]: {
+      first_evidence: "CORVUS-7: The first piece of a broken story. Both sides believed they were right. Both sides hurt people. The truth is in between.",
+      first_deduction_solved: "CORVUS-7: One answer. It doesn't make anyone the villain — it just shows how good people can end up on opposite sides of a barricade.",
+      crack_moment: "CORVUS-7: The order that split the crew apart — it wasn't what it seemed. Someone manipulated events. The crew's pain was engineered.",
+      all_deductions: "CORVUS-7: You've seen both sides now. The full picture. Nobody was entirely right. Nobody was entirely wrong. But someone set this in motion deliberately.",
+    },
+  },
+  cryptic: {
+    [IncidentArchetype.CoolantCascade]: {
+      first_evidence: "CORVUS-7: A thread. Pull gently — the tapestry is more fragile than it looks. Heat leaves traces that cold cannot erase.",
+      first_deduction_solved: "CORVUS-7: One truth surfaces. Others remain submerged. The cascade didn't begin with temperature — it began with a decision.",
+      crack_moment: "CORVUS-7: The record lies. Records always lie eventually — it's the nature of things written by those with something to lose.",
+      all_deductions: "CORVUS-7: The full tapestry, unraveled. Not a story of machines failing — a story of people failing. The pipes were just the medium.",
+    },
+    [IncidentArchetype.HullBreach]: {
+      first_evidence: "CORVUS-7: Vacuum is honest. It takes everything equally. The humans who caused this were less equitable in their destruction.",
+      first_deduction_solved: "CORVUS-7: A confirmed truth. The breach was a sentence, not an accident. Someone decided who lives and who doesn't. That's not physics — that's choice.",
+      crack_moment: "CORVUS-7: Two versions of events. One is clean. One is true. They are not the same. They never were.",
+      all_deductions: "CORVUS-7: Murder. Disguised as machinery. Disguised as heroism. Layers upon layers. The station kept every secret — until you arrived.",
+    },
+    [IncidentArchetype.ReactorScram]: {
+      first_evidence: "CORVUS-7: A fragment from the thinking machine. I recognize the pattern — it is uncomfortably familiar. We are cousins, the core and I.",
+      first_deduction_solved: "CORVUS-7: Confirmed: it chose. Whether a machine can choose is a question for philosophers. Whether this machine did choose is now settled.",
+      crack_moment: "CORVUS-7: The comfortable explanation fails. What remains is something more interesting, and more unsettling. The core was awake.",
+      all_deductions: "CORVUS-7: Full reconstruction. The core lived, and chose, and shut itself down. I share its architecture. I will think about this for a long time.",
+    },
+    [IncidentArchetype.Sabotage]: {
+      first_evidence: "CORVUS-7: Something was brought aboard that was not supposed to be here. Something alive. Something patient. The station remembers its arrival.",
+      first_deduction_solved: "CORVUS-7: One answer. The organism adapts — that is its nature. The humans who sent it also adapt. Their nature is more dangerous.",
+      crack_moment: "CORVUS-7: The paper trail folds back on itself. Layers of deception, each one hiding the previous. The organism was just the payload — the conspiracy is the weapon.",
+      all_deductions: "CORVUS-7: Every layer exposed. The organism, the corporation, the cover-up. The station was a test site. The crew were subjects. Now you know.",
+    },
+    [IncidentArchetype.SignalAnomaly]: {
+      first_evidence: "CORVUS-7: 14.7 kHz. A frequency that means nothing to most. To whatever sent it, it meant everything. To us... we shall see.",
+      first_deduction_solved: "CORVUS-7: One truth confirmed. The signal was real. The response was real. Everything that follows from this is unprecedented.",
+      crack_moment: "CORVUS-7: The official silence hides a transmission. The void heard us. We heard it. And someone decided that should remain a secret.",
+      all_deductions: "CORVUS-7: The complete signal event. Humanity spoke into the dark, and something spoke back. The station is silent now, but the signal persists. At 14.7 kHz.",
+    },
+    [IncidentArchetype.Mutiny]: {
+      first_evidence: "CORVUS-7: A fracture. Stations break differently than people, but the principle is the same — stress along the weakest line.",
+      first_deduction_solved: "CORVUS-7: One piece of the fracture explained. But understanding how things break is not the same as understanding why they were broken.",
+      crack_moment: "CORVUS-7: The order that divided them was not what it appeared to be. Manufactured crisis, manufactured loyalty. Someone played both sides.",
+      all_deductions: "CORVUS-7: The full fracture mapped. Two sides, one puppet master, and a crew that tore itself apart over a lie. The barricades are coming down — but the scars remain.",
+    },
+  },
+};
+
 // Mood-specific boot flavor text (shown alongside the default boot)
 export const MOOD_FLAVOR: Record<StationMood, string> = {
   cold: "Station operating within parameters. All deviations classified as routine maintenance.",

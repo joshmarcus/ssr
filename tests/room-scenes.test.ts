@@ -39,15 +39,20 @@ describe("roomScenes", () => {
     ROT.RNG.setSeed(184201);
   });
 
-  it("generates scenes for all rooms", () => {
+  it("generates scenes only for rooms with crew present", () => {
     const crew = generateCrew(10, 184201, ROOM_NAMES);
     const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
     const scenes = generateRoomScenes(rooms, crew, timeline, rooms[0]);
 
-    expect(scenes.length).toBe(rooms.length);
+    // Should have fewer scenes than rooms (rooms without crew are skipped)
+    expect(scenes.length).toBeGreaterThan(0);
+    expect(scenes.length).toBeLessThanOrEqual(rooms.length);
     for (const scene of scenes) {
       expect(scene.roomId).toBeTruthy();
       expect(scene.roomName).toBeTruthy();
+      // Every scene must have crew present — no empty scenes
+      expect(scene.crewPresent.length).toBeGreaterThan(0);
+      expect(scene.groundTruth.who.length).toBeGreaterThan(0);
     }
   });
 
@@ -95,7 +100,7 @@ describe("roomScenes", () => {
     }
   });
 
-  it("ground truth is always set", () => {
+  it("ground truth is always meaningful (no Unknown outcomes, no empty who)", () => {
     const crew = generateCrew(10, 184201, ROOM_NAMES);
     const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
     const scenes = generateRoomScenes(rooms, crew, timeline, rooms[0]);
@@ -104,7 +109,9 @@ describe("roomScenes", () => {
       expect(scene.groundTruth).toBeDefined();
       expect(scene.groundTruth.what).toBeTruthy();
       expect(scene.groundTruth.outcome).toBeTruthy();
+      expect(scene.groundTruth.outcome).not.toBe(SceneOutcome.Unknown);
       expect(Array.isArray(scene.groundTruth.who)).toBe(true);
+      expect(scene.groundTruth.who.length).toBeGreaterThan(0);
     }
   });
 
@@ -127,8 +134,9 @@ describe("roomScenes", () => {
       const timeline = generateTimeline(crew, archetype, ROOM_NAMES);
       const scenes = generateRoomScenes(rooms, crew, timeline, rooms[0]);
 
-      expect(scenes.length).toBe(rooms.length);
+      expect(scenes.length).toBeGreaterThan(0);
       for (const scene of scenes) {
+        expect(scene.crewPresent.length).toBeGreaterThan(0);
         expect(scene.physicalClues.length).toBeGreaterThanOrEqual(2);
         expect(scene.physicalClues.length).toBeLessThanOrEqual(4);
       }

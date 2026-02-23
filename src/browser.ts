@@ -32,6 +32,7 @@ import {
   type StationMood,
   CREW_ESCORT_ARC,
   CORVUS_GREETING, CORVUS_PERSONALITY_REACTIONS, CORVUS_PERSONALITIES,
+  CORVUS_ARCHETYPE_PERSONALITY,
   type CorvusPersonality,
   CONTRADICTION_FALSE_LEAD, CONTRADICTION_REFUTATION, CORVUS_CONTRADICTION_NOTICE,
   CREW_FATE_REVEALS,
@@ -1002,6 +1003,12 @@ function showDiscoveryOverlay(opts: {
 /** Trigger Crack Moment visual event — the Official Story fractures. */
 function triggerCrackMoment(): void {
   display.triggerScreenFlash("damage");
+  // Archetype-personality crack moment line
+  const crackArch = state.mystery?.timeline?.archetype;
+  if (crackArch) {
+    const apLine = CORVUS_ARCHETYPE_PERSONALITY[corvusPersonality]?.[crackArch]?.crack_moment;
+    if (apLine) display.addLog(apLine, "narrative");
+  }
   // Find the first revealed contradiction for context
   const firstContradiction = state.mystery?.contradictionPairs?.find(cp => cp.revealed);
   let bodyText = "Something doesn't add up. The official story — you've been building it in your head, piece by piece. But this... this doesn't fit. Not wrong, exactly. Just the first crack in a picture you thought was complete.";
@@ -3229,6 +3236,12 @@ function handleAction(action: Action): void {
     if (state.mystery.journal.length > 0 && !triggeredTutorialHints.has("first_evidence")) {
       triggeredTutorialHints.add("first_evidence");
       display.addLog(TUTORIAL_HINT_FIRST_EVIDENCE, "system");
+      // Archetype-personality first evidence line
+      const arch = state.mystery.timeline?.archetype;
+      if (arch) {
+        const apLine = CORVUS_ARCHETYPE_PERSONALITY[corvusPersonality]?.[arch]?.first_evidence;
+        if (apLine) display.addLog(apLine, "narrative");
+      }
     }
     // First deduction ready
     const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
@@ -4246,10 +4259,15 @@ function updateTutorialObjective(): void {
 
 function renderTutorialObjective(): void {
   let el = document.getElementById("tutorial-objective");
+  const hudObj = document.getElementById("hud-objective");
   if (tutorialObjectiveDismissed || tutorialObjective >= 3 || state.gameOver) {
     if (el) el.style.opacity = "0";
+    // Show the main HUD objective box once tutorial ends
+    if (hudObj) hudObj.style.opacity = "1";
     return;
   }
+  // Hide the main HUD objective box while tutorial is active
+  if (hudObj) hudObj.style.opacity = "0";
 
   if (!el) {
     el = document.createElement("div");
@@ -5286,6 +5304,22 @@ function commitDeductionAnswer(): void {
     audio.playDeductionCorrect();
     applyDeductionReward(solved);
     updateMomentum(12); // Correct deduction builds momentum
+
+    // Archetype-personality deduction lines
+    const deductionArch = state.mystery?.timeline?.archetype;
+    if (deductionArch) {
+      const solvedCount = state.mystery!.deductions.filter(d => d.solved && d.answeredCorrectly).length;
+      const totalDeductions = state.mystery!.deductions.length;
+      if (solvedCount === 1) {
+        // First deduction solved
+        const apLine = CORVUS_ARCHETYPE_PERSONALITY[corvusPersonality]?.[deductionArch]?.first_deduction_solved;
+        if (apLine) display.addLog(apLine, "narrative");
+      } else if (solvedCount === totalDeductions) {
+        // All deductions solved
+        const apLine = CORVUS_ARCHETYPE_PERSONALITY[corvusPersonality]?.[deductionArch]?.all_deductions;
+        if (apLine) display.addLog(apLine, "narrative");
+      }
+    }
 
     // Investigation ceremony: ghost reveal for WHO deductions
     if (solved.category === DeductionCategory.Who && state.mystery) {
@@ -7753,7 +7787,6 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     { key: SceneOutcome.DiedHere, label: "Died Here" },
     { key: SceneOutcome.StillHere, label: "Still Here" },
     { key: SceneOutcome.SealedInside, label: "Sealed Inside" },
-    { key: SceneOutcome.Unknown, label: "Unknown" },
   ];
 
   // ── Inference from clue types: reverse-map clue types → likely activities/outcomes ──
@@ -7918,17 +7951,17 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     }
   }
 
-  // Crew count hint based on clue analysis
-  const groundTruthCount = scene.groundTruth.who.length;
-  const countHint = groundTruthCount === 1 ? "1 person" : `${groundTruthCount} people`;
+  // Crew count hint from clue analysis (not ground truth — no spoilers)
+  const clueLinkedCrewCount = suggestedCrewIds.size;
 
   html += `<div style="flex:1;border:1px solid ${whoActive ? "#4cf" : "#333"};padding:8px;max-height:300px;overflow-y:auto">`;
   html += `<div style="color:${whoActive ? "#4cf" : "#889"};font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px">WHO WAS HERE?</div>`;
-  if (examinedClues.length > 0) {
-    html += `<div style="color:#6cf;font-size:9px;margin-bottom:3px">Physical evidence indicates ${countHint} present</div>`;
-  }
   if (suggestedCrewIds.size > 0) {
-    html += `<div style="color:#4cf;font-size:9px;margin-bottom:4px;font-style:italic">Evidence points to marked crew</div>`;
+    html += `<div style="color:#4cf;font-size:9px;margin-bottom:4px;font-style:italic">Evidence links to ${clueLinkedCrewCount} crew member${clueLinkedCrewCount !== 1 ? "s" : ""} \u2190</div>`;
+  } else if (examinedClues.length > 0) {
+    html += `<div style="color:#887;font-size:9px;margin-bottom:4px;font-style:italic">No direct crew link from clues \u2014 check role, room context, and dossiers [X]</div>`;
+  } else {
+    html += `<div style="color:#665;font-size:9px;margin-bottom:4px;font-style:italic">Examine clues in this room first for better evidence</div>`;
   }
   for (let i = 0; i < crew.length; i++) {
     const c = crew[i];
@@ -8004,7 +8037,7 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
   const selectedOutcome = outcomes[hubSceneOutcomeIdx];
   const crewName = dossiers.find(d => d.crewId === selectedCrew?.id)?.confirmed.name
     ? `${selectedCrew.firstName} ${selectedCrew.lastName}`
-    : `Crew #${hubSceneWhoIdx + 1}`;
+    : selectedCrew ? `Crew #${hubSceneWhoIdx + 1}` : "?";
 
   html += `<div style="margin-top:12px;padding:8px;background:rgba(255,255,255,0.03);border:1px solid #333">`;
   html += `<div style="color:#889;font-size:10px;letter-spacing:1px;margin-bottom:4px">YOUR ASSESSMENT</div>`;
@@ -8049,7 +8082,6 @@ function renderHubSceneConfirm(scene: RoomScene, crew: import("./shared/types.js
     { key: SceneOutcome.DiedHere, label: "Died Here" },
     { key: SceneOutcome.StillHere, label: "Still Here" },
     { key: SceneOutcome.SealedInside, label: "Sealed Inside" },
-    { key: SceneOutcome.Unknown, label: "Unknown" },
   ];
 
   const selectedCrew = crew[hubSceneWhoIdx];
@@ -8377,7 +8409,7 @@ function handleHubScenesInput(e: KeyboardEvent): void {
         ];
         const outcomes: SceneOutcome[] = [
           SceneOutcome.LeftNormally, SceneOutcome.LeftInHurry, SceneOutcome.Injured,
-          SceneOutcome.DiedHere, SceneOutcome.StillHere, SceneOutcome.SealedInside, SceneOutcome.Unknown,
+          SceneOutcome.DiedHere, SceneOutcome.StillHere, SceneOutcome.SealedInside,
         ];
         const selectedCrew = crew[hubSceneWhoIdx];
         const prevLogCount = state.logs.length;
@@ -8386,7 +8418,7 @@ function handleHubScenesInput(e: KeyboardEvent): void {
           sceneRoomId: scene.roomId,
           whoAnswer: selectedCrew ? [selectedCrew.id] : [],
           whatAnswer: activities[hubSceneWhatIdx] ?? SceneActivity.RoutineWork,
-          outcomeAnswer: outcomes[hubSceneOutcomeIdx] ?? SceneOutcome.Unknown,
+          outcomeAnswer: outcomes[hubSceneOutcomeIdx] ?? SceneOutcome.LeftNormally,
         });
         // Extract per-dimension results from the process result log
         let score = 0;
@@ -8405,7 +8437,7 @@ function handleHubScenesInput(e: KeyboardEvent): void {
         // Build per-dimension display data
         const gt = scene.groundTruth;
         const chosenActivity = activities[hubSceneWhatIdx] ?? SceneActivity.RoutineWork;
-        const chosenOutcome = outcomes[hubSceneOutcomeIdx] ?? SceneOutcome.Unknown;
+        const chosenOutcome = outcomes[hubSceneOutcomeIdx] ?? SceneOutcome.LeftNormally;
         const activityLabel = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
         const crewList = state.mystery?.crew ?? [];
         const whoGt = gt.who.map(id => crewList.find(c => c.id === id)).filter(Boolean);

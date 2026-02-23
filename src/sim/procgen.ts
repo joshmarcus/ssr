@@ -996,6 +996,20 @@ function generateDirtTrails(state: GameState, rooms: DiggerRoom[]): void {
       }
     }
   }
+
+  // ── Starting room guaranteed dirty (tutorial cleaning objective) ──
+  if (rooms.length > 0) {
+    const startRoom = rooms[0];
+    for (let y = startRoom.getTop(); y <= startRoom.getBottom(); y++) {
+      for (let x = startRoom.getLeft(); x <= startRoom.getRight(); x++) {
+        if (x < 0 || x >= state.width || y < 0 || y >= state.height) continue;
+        if (!state.tiles[y][x].walkable) continue;
+        if (state.tiles[y][x].dirt < 30) {
+          state.tiles[y][x].dirt = 30 + Math.floor(ROT.RNG.getUniform() * 21); // 30-50
+        }
+      }
+    }
+  }
 }
 
 function getRoomCenter(room: DiggerRoom): { x: number; y: number } {
