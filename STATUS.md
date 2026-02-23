@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 143 (V258 completed — enhanced map + difficulty selector)
+- **Phase**: Sprint 145 (V262 completed — auto-save, timer, clipboard, HUD tips)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -131,11 +131,37 @@
 - **Difficulty selector**: Easy/Normal/Hard selection in seed input screen via Tab/arrows (replaces URL-param-only difficulty)
 - **Action bar entity states**: Grey exhausted entity descriptions (e.g., "Relay (routed)", "Terminal (read)") alongside available actions
 - **Boot sequence polish**: 7 game-state-aware messages with unit ID, sensor array, station map section count
+- **Auto-save**: Automatic save on every room transition with brief "SAVED" HUD flash
+- **Run timer**: Elapsed time (mm:ss) shown in HUD status bar and game-over overlay
+- **Clipboard summary [C]**: Shareable text run summary with rating, deductions, investigation quality
+- **Contextual HUD tips**: State-aware one-line tips (examine clues, answer deductions, activate relays, nearby medkits)
 
 ## Known Issues
 
 - No CI pipeline deployed
 - Seed 42: Bot takes 900 turns (rescue-blocked crew require emergency override at turn 900 to transmit data core)
+
+## Sprint 144-145 Changes (V259-V262)
+
+### V262 — Contextual HUD Tips
+- **State-aware tips**: Brief contextual tips appear below action bar based on game state
+- **Tip types**: Unexamined clues, available deductions, nearby interactable entities, medkit proximity when low HP
+- **Throttled**: Same tip doesn't repeat within 30 turns, auto-fades after 5 seconds
+
+### V261 — Clipboard Run Summary
+- **Implemented copyRunSummary()**: Full text summary with result, seed, archetype, turns, rating, deductions, investigation quality
+- **Each deduction listed**: Shows correct/wrong/unanswered with correct answer
+- **[C] key on game-over**: Copies shareable text to clipboard
+
+### V260 — Run Timer
+- **Real-time timer**: Elapsed time (mm:ss) shown in HUD status bar next to seed label
+- **Game-over display**: Time injected into game-over stats after Turns display
+- **Reset on new game**: Timer resets when starting a new game or replaying
+
+### V259 — Auto-Save on Room Transition
+- **Automatic save**: Game state saved to localStorage on every room change
+- **Visual feedback**: Brief "SAVED" indicator fades in top-right corner for 1.5 seconds
+- **No save on game-over**: Auto-save disabled once game ends to prevent saving terminal state
 
 ## Sprint 142-143 Changes (V256-V258)
 
