@@ -4269,84 +4269,90 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
 function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduction, journal: import("./shared/types.js").JournalEntry[]): string {
   const crew = state.mystery?.crew ?? [];
 
-  // ── Header: question + hint ──
-  let html = `<div style="overflow-y:auto;max-height:calc(100% - 80px);padding:4px 8px">`;
-  html += `<div style="color:#fa0;font-weight:bold;font-size:14px;margin-bottom:4px">${esc(deduction.question)}</div>`;
-  if (deduction.hintText) {
-    html += `<div style="color:#6cf;font-size:11px;font-style:italic;margin-bottom:4px">\u2139 ${esc(deduction.hintText)}</div>`;
-  }
-
-  // Attempt status warning
-  const wrongAttempts = deduction.wrongAttempts ?? 0;
-  const maxAttempts = deduction.maxAttempts ?? 2;
-  if (wrongAttempts > 0) {
-    const attemptsLeft = maxAttempts - wrongAttempts;
-    html += `<div style="color:#f44;font-size:11px;margin-bottom:4px;padding:3px 6px;background:#2a0a0a;border-left:2px solid #f44">\u26a0 ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining. Wrong answers cost 3 HP and 10 turns.</div>`;
-  }
-
-  // ── What the evidence suggests (revelations as reading aids — all shown freely) ──
-  if (deduction.tagRevelations && deduction.tagRevelations.length > 0) {
-    html += `<div class="revelation-board" style="margin:6px 0">`;
-    html += `<div style="color:#886;font-size:10px;font-weight:bold;margin-bottom:4px">WHAT THE EVIDENCE SUGGESTS</div>`;
-    for (const rev of deduction.tagRevelations) {
-      html += `<div class="revelation-line">${esc(rev.text)}</div>`;
-    }
-    html += `</div>`;
-  }
-
-  // ── Analysis block (synthesis shown freely) ──
-  if (deduction.synthesisText) {
-    html += `<div class="synthesis-block">\u2605 ANALYSIS: ${esc(deduction.synthesisText)}</div>`;
-  }
-
-  // ── Key evidence (entries sharing tags with this deduction) ──
+  // Two-panel layout: evidence (left) + answer (right)
   const deductionTags = new Set(deduction.requiredTags ?? []);
   const keyEvidence = journal.filter(j => j.tags.some(t => deductionTags.has(t)));
   const otherEvidence = journal.filter(j => !j.tags.some(t => deductionTags.has(t)));
 
+  // ── LEFT PANEL: Question + Evidence ──
+  let leftHtml = `<div style="padding:8px 12px;overflow-y:auto;max-height:420px">`;
+
+  // Question box — large, centered, distinctive
+  leftHtml += `<div style="padding:10px 14px;margin-bottom:10px;background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.3);border-radius:4px;text-align:center">`;
+  leftHtml += `<div style="color:#fa0;font-size:16px;font-weight:bold;line-height:1.4">${esc(deduction.question)}</div>`;
+  if (deduction.hintText) {
+    leftHtml += `<div style="color:#6cf;font-size:11px;font-style:italic;margin-top:6px">\u2139 ${esc(deduction.hintText)}</div>`;
+  }
+  leftHtml += `</div>`;
+
+  // Attempt warning — prominent if active
+  const wrongAttempts = deduction.wrongAttempts ?? 0;
+  const maxAttempts = deduction.maxAttempts ?? 2;
+  if (wrongAttempts > 0) {
+    const attemptsLeft = maxAttempts - wrongAttempts;
+    leftHtml += `<div style="color:#f44;font-size:12px;margin-bottom:8px;padding:6px 10px;background:rgba(255,50,50,0.08);border:1px solid rgba(255,50,50,0.3);border-radius:3px;text-align:center;font-weight:bold">\u26a0 ${attemptsLeft} attempt${attemptsLeft !== 1 ? "s" : ""} remaining — wrong answers cost 3 HP + 10 turns</div>`;
+  }
+
+  // Analysis + revelations — compact narrative summary
+  if (deduction.tagRevelations && deduction.tagRevelations.length > 0) {
+    leftHtml += `<div style="margin-bottom:8px;padding:6px 10px;background:rgba(100,80,40,0.08);border-left:3px solid #886;border-radius:0 3px 3px 0">`;
+    leftHtml += `<div style="color:#aa8;font-size:9px;font-weight:bold;letter-spacing:1.5px;margin-bottom:4px">WHAT THE EVIDENCE SUGGESTS</div>`;
+    for (const rev of deduction.tagRevelations) {
+      leftHtml += `<div style="color:#bba;font-size:11px;line-height:1.5;margin:2px 0">\u2022 ${esc(rev.text)}</div>`;
+    }
+    if (deduction.synthesisText) {
+      leftHtml += `<div style="color:#ca8;font-size:11px;font-weight:bold;margin-top:6px;border-top:1px solid #332;padding-top:4px">\u2605 ${esc(deduction.synthesisText)}</div>`;
+    }
+    leftHtml += `</div>`;
+  }
+
+  // Key evidence — compact cards
   if (keyEvidence.length > 0) {
-    html += `<div style="border-top:1px solid #443;margin:6px 0;padding-top:4px">`;
-    html += `<div style="color:#fca;font-size:10px;font-weight:bold;margin-bottom:4px">\u2605 KEY EVIDENCE (${keyEvidence.length} entries relevant to this question)</div>`;
-    for (const entry of keyEvidence.slice(0, 6)) {
+    leftHtml += `<div style="color:#fca;font-size:9px;font-weight:bold;letter-spacing:1.5px;margin-bottom:4px">KEY EVIDENCE (${keyEvidence.length})</div>`;
+    for (const entry of keyEvidence.slice(0, 5)) {
       const crewNames = entry.crewMentioned.map(id => {
         const member = crew.find(c => c.id === id);
-        return member ? `${member.lastName}` : "";
+        return member ? member.lastName : "";
       }).filter(Boolean);
       const crewBadge = crewNames.length > 0 ? ` <span style="color:#6cf">[${crewNames.join(", ")}]</span>` : "";
-      const excerpt = entry.detail.length > 100 ? entry.detail.slice(0, 100) + "..." : entry.detail;
-      html += `<div style="margin:3px 0;padding:4px 8px;background:rgba(255,200,100,0.04);border-left:2px solid #a86;font-size:11px">`;
-      html += `<div style="color:#dda;font-weight:bold">${esc(entry.summary)}${crewBadge}</div>`;
-      html += `<div style="color:#998;font-size:10px;margin-top:2px">${esc(excerpt)}</div>`;
-      html += `<div style="color:#556;font-size:9px;margin-top:1px">${esc(entry.roomFound)} · Turn ${entry.turnDiscovered}</div>`;
-      html += `</div>`;
+      const excerpt = entry.detail.length > 80 ? entry.detail.slice(0, 80) + "\u2026" : entry.detail;
+      leftHtml += `<div style="margin:3px 0;padding:4px 8px;background:rgba(255,200,100,0.04);border-left:2px solid #a86;font-size:11px">`;
+      leftHtml += `<span style="color:#dda">${esc(entry.summary)}</span>${crewBadge}`;
+      leftHtml += `<div style="color:#887;font-size:10px;margin-top:1px">${esc(excerpt)}</div>`;
+      leftHtml += `</div>`;
     }
-    if (keyEvidence.length > 6) {
-      html += `<div style="color:#556;font-size:10px;padding:2px 8px">...and ${keyEvidence.length - 6} more relevant entries</div>`;
+    if (keyEvidence.length > 5) {
+      leftHtml += `<div style="color:#556;font-size:10px;padding:2px 8px">+${keyEvidence.length - 5} more</div>`;
     }
-    html += `</div>`;
   }
 
-  // ── Other evidence (less relevant, collapsed) ──
+  // Other evidence — very compact
   if (otherEvidence.length > 0) {
-    html += `<div style="border-top:1px solid #222;margin:4px 0;padding-top:3px">`;
-    html += `<div style="color:#667;font-size:10px;margin-bottom:2px">OTHER EVIDENCE (${otherEvidence.length} entries)</div>`;
-    html += `<div style="max-height:60px;overflow-y:auto;font-size:10px;padding:1px 0">`;
-    for (const entry of otherEvidence) {
-      html += `<div style="color:#556;padding:1px 2px">\u2022 ${esc(entry.summary)} <span style="color:#444">T${entry.turnDiscovered}</span></div>`;
-    }
-    html += `</div></div>`;
+    leftHtml += `<div style="color:#445;font-size:9px;margin-top:6px">${otherEvidence.length} other evidence entries in journal</div>`;
   }
 
-  // ── Answer section ──
-  html += `<div style="border-top:1px solid #443;margin:4px 0;padding-top:4px">`;
-  html += `<div style="color:#fa0;font-size:11px;font-weight:bold;margin-bottom:3px">\u2605 SELECT ANSWER [Enter]</div>`;
+  leftHtml += `</div>`;
+
+  // ── RIGHT PANEL: Answer Selection ──
+  let rightHtml = `<div style="padding:8px 12px;overflow-y:auto;max-height:420px;display:flex;flex-direction:column;justify-content:center">`;
+
+  rightHtml += `<div style="color:#fa0;font-size:10px;font-weight:bold;letter-spacing:2px;margin-bottom:10px;text-align:center">SELECT YOUR ANSWER</div>`;
+
   for (let i = 0; i < deduction.options.length; i++) {
     const isSelected = i === hubOptionIdx;
-    const prefix = isSelected ? "\u25b6 " : "  ";
-    const cls = isSelected ? "broadcast-option selected" : "broadcast-option";
-    html += `<div class="${cls}" style="font-size:12px">${prefix}${i + 1}. ${esc(deduction.options[i].label)}</div>`;
+    const borderColor = isSelected ? "#fa0" : "#333";
+    const bgColor = isSelected ? "rgba(255,170,0,0.1)" : "rgba(255,255,255,0.02)";
+    const textColor = isSelected ? "#eef" : "#889";
+    const numberColor = isSelected ? "#fa0" : "#556";
+
+    rightHtml += `<div style="margin:4px 0;padding:10px 14px;border:1px solid ${borderColor};background:${bgColor};border-radius:4px;cursor:pointer;transition:all 0.15s ease">`;
+    rightHtml += `<span style="color:${numberColor};font-size:11px;font-weight:bold;margin-right:8px">${i + 1}.</span>`;
+    rightHtml += `<span style="color:${textColor};font-size:13px">${esc(deduction.options[i].label)}</span>`;
+    if (isSelected) rightHtml += ` <span style="color:#fa0;float:right">\u25c0</span>`;
+    rightHtml += `</div>`;
   }
-  html += `</div>`;
+
+  rightHtml += `<div style="color:#555;font-size:10px;text-align:center;margin-top:12px">[\u2191/\u2193] Navigate \u00B7 [Enter] Confirm \u00B7 [Esc] Back</div>`;
 
   // Dev mode: show tags
   if (devModeEnabled) {
@@ -4357,14 +4363,12 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
         ? `<span class="tag-pill tag-covered">${esc(tag)}</span>`
         : `<span class="tag-pill tag-missing">${esc(tag)}</span>`;
     }
-    html += `<div style="border-top:1px solid #f0f;margin-top:4px;padding-top:2px"><span style="color:#f0f;font-size:10px">DEV TAGS:</span> ${devTags}</div>`;
+    rightHtml += `<div style="border-top:1px solid #f0f;margin-top:8px;padding-top:4px"><span style="color:#f0f;font-size:10px">DEV:</span> ${devTags}</div>`;
   }
 
-  // Controls hint
-  html += `<div style="color:#555;font-size:10px;text-align:center;margin-top:4px">[&uarr;/&darr;] Navigate answers | [Enter] Confirm | [Esc] Back</div>`;
-  html += `</div>`;
+  rightHtml += `</div>`;
 
-  return html;
+  return `<div class="journal-body"><div class="journal-list" style="overflow-y:auto;max-height:420px">${leftHtml}</div><div class="journal-detail" style="overflow-y:auto;max-height:420px">${rightHtml}</div></div>`;
 }
 
 /** CREW section — crew profiles with linked evidence and profiling insights. */
