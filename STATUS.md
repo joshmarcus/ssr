@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 165 (V311 completed — Hub UX, evidence pacing, sensor reveal feedback)
+- **Phase**: Sprint 166 (V315 completed — scene ceremony, timeline gates, fate gating, sensor hints)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable

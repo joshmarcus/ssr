@@ -52,7 +52,7 @@ import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave, recordRun, getRunHistory, checkAchievements, getAchievements } from "./sim/saveLoad.js";
 import { isEntityExhausted } from "./shared/ui.js";
 import { computeGoals, computeGoalDiscoveries, type Goal, type Subgoal } from "./shared/goals.js";
-import { formatRelationship, formatCrewMemberDetail, getDeductionsForEntry } from "./sim/whatWeKnow.js";
+import { formatRelationship, formatCrewMemberDetail, getDeductionsForEntry, generateWhatWeKnow } from "./sim/whatWeKnow.js";
 
 // ── Archetype display names ─────────────────────────────────────
 const ARCHETYPE_DISPLAY_NAMES: Record<IncidentArchetype, string> = {
@@ -253,7 +253,7 @@ let incidentCardOpen = false;
 let logReviewOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
 let investigationHubOpen = false;
-let hubSection: "evidence" | "connections" | "crew" | "scenes" = "evidence";
+let hubSection: "evidence" | "connections" | "crew" | "scenes" | "analysis" = "evidence";
 let hubIdx = 0;                       // selected item index within current section
 let hubOptionIdx = 0;                 // selected option within a deduction/choice
 let hubDetailDeduction: string | null = null; // deduction ID in detail/answer mode
@@ -4831,6 +4831,13 @@ function commitDeductionAnswer(): void {
         };
       });
 
+      // Build timeline cards from confirmed incident board slots
+      const ccTimelineCards = (state.mystery?.incidentBoard?.slots ?? [])
+        .filter(s => s.status === "confirmed" && s.confirmedCard)
+        .map(s => ({ phase: s.phase, event: s.confirmedCard!.event, keyActor: s.confirmedCard!.keyActor, location: s.confirmedCard!.location }));
+      const ccScenesProcessed = (state.mystery?.roomScenes ?? []).filter(s => s.processed).length;
+      const ccCrewIdentified = (state.mystery?.dossiers ?? []).filter(d => d.confirmed.name).length;
+
       // Delay the overlay slightly so the deduction result overlay can show first
       setTimeout(() => {
         display.showCaseClosed!({
@@ -4841,6 +4848,9 @@ function commitDeductionAnswer(): void {
           correctCount,
           totalCount: allDeductions.length,
           evidenceCount: state.mystery?.journal.length ?? 0,
+          timelineCards: ccTimelineCards,
+          scenesProcessed: ccScenesProcessed,
+          crewIdentified: ccCrewIdentified,
         });
       }, 1500);
     }
@@ -5117,7 +5127,7 @@ function renderInvestigationHub(): void {
   const journal = state.mystery.journal;
 
   // Tab bar
-  const tabs: Array<"evidence" | "connections" | "crew" | "scenes"> = ["evidence", "scenes", "connections", "crew"];
+  const tabs: Array<"evidence" | "connections" | "crew" | "scenes" | "analysis"> = ["evidence", "scenes", "connections", "crew", "analysis"];
   const newEvidenceCount = entries.length - lastEvidenceViewCount;
   const newBadge = newEvidenceCount > 0 && hubSection !== "evidence"
     ? ` <span style="color:#0f0;font-size:10px">+${newEvidenceCount} new</span>` : "";
@@ -5128,6 +5138,7 @@ function renderInvestigationHub(): void {
     scenes: `<span style="color:#556;font-size:9px">2</span> SCENES (${processedScenes}/${scenes.length})`,
     connections: `<span style="color:#556;font-size:9px">3</span> CONNECTIONS (${deductions.filter(d => d.solved).length}/${deductions.length})`,
     crew: `<span style="color:#556;font-size:9px">4</span> CREW (${state.mystery?.crew.length ?? 0})`,
+    analysis: `<span style="color:#556;font-size:9px">5</span> ANALYSIS`,
   };
   // Update evidence view count when viewing evidence tab
   if (hubSection === "evidence") {
@@ -5149,6 +5160,8 @@ function renderInvestigationHub(): void {
     bodyHtml = renderHubConnections(deductions, journal);
   } else if (hubSection === "crew") {
     bodyHtml = renderHubCrew(journal);
+  } else if (hubSection === "analysis") {
+    bodyHtml = renderHubAnalysis();
   }
 
   const controlsText = hubDetailDeduction
@@ -5159,6 +5172,8 @@ function renderInvestigationHub(): void {
     ? "[&uarr;/&darr;] Scroll clues  [p] Process scene  [Esc] Back"
     : hubSection === "evidence"
     ? "[&uarr;/&darr;] Navigate  [f] Filter  [Tab] Next section  [Esc] Close"
+    : hubSection === "analysis"
+    ? "[&uarr;/&darr;] Scroll  [Tab] Next section  [Esc] Close"
     : "[&uarr;/&darr;] Navigate  [Tab] Next section  [Enter] Select  [Esc] Close";
 
   // Progress summary bar
@@ -5571,16 +5586,76 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
     }
   }
 
+  // Evidence category explanation
+  const catColors: Record<string, string> = { confirming: "#4a4", ambiguous: "#ca8", contradicting: "#f44" };
+  const catExplanations: Record<string, string> = {
+    confirming: "Supports the official record of events",
+    ambiguous: "Could be interpreted multiple ways",
+    contradicting: "Conflicts with other evidence or the official account",
+  };
+  const catColor = catColors[entry.category] ?? "#889";
+  const catExpl = catExplanations[entry.category] ?? "";
+  const catHtml = catExpl
+    ? `<div style="display:inline-block;padding:2px 6px;background:rgba(${entry.category === "confirming" ? "68,170,68" : entry.category === "contradicting" ? "255,68,68" : "204,170,136"},0.08);border-radius:2px;margin-top:4px"><span style="color:${catColor};font-size:10px;font-weight:bold">${entry.category.toUpperCase()}</span> <span style="color:#667;font-size:10px">— ${catExpl}</span></div>`
+    : "";
+
+  // Same-room related evidence
+  let sameRoomHtml = "";
+  if (entry.room) {
+    const sameRoomEntries = journal.filter(j => j.roomFound === entry.room && j.id !== entry.id);
+    if (sameRoomEntries.length > 0) {
+      sameRoomHtml = `<div style="margin-top:8px;border-top:1px solid #222;padding-top:6px">`;
+      sameRoomHtml += `<div style="color:#889;font-size:10px;letter-spacing:1px;margin-bottom:3px">ALSO FOUND IN ${esc(entry.room.toUpperCase())} (${sameRoomEntries.length})</div>`;
+      for (const re of sameRoomEntries.slice(0, 4)) {
+        const reIcon = re.category === "log" ? "\u25a3" : re.category === "item" ? "\u2726" : re.category === "trace" ? "\u203b" : "\u25c8";
+        sameRoomHtml += `<div style="font-size:10px;color:#889;padding:2px 6px;margin:1px 0;border-left:2px solid #333">`;
+        sameRoomHtml += `<span style="color:#667">${reIcon}</span> ${esc(re.summary.slice(0, 50))}${re.summary.length > 50 ? "..." : ""}`;
+        sameRoomHtml += `</div>`;
+      }
+      if (sameRoomEntries.length > 4) {
+        sameRoomHtml += `<div style="color:#556;font-size:9px;padding-left:6px">...and ${sameRoomEntries.length - 4} more in this room</div>`;
+      }
+      sameRoomHtml += `</div>`;
+    }
+  }
+
+  // Same-crew cross-references
+  let sameCrewHtml = "";
+  if (entry.crewMentioned.length > 0) {
+    const otherCrewEntries = journal.filter(j =>
+      j.id !== entry.id && j.crewMentioned.some(c => entry.crewMentioned.includes(c))
+    );
+    if (otherCrewEntries.length > 0) {
+      sameCrewHtml = `<div style="margin-top:6px;border-top:1px solid #222;padding-top:6px">`;
+      sameCrewHtml += `<div style="color:#6cf;font-size:10px;letter-spacing:1px;margin-bottom:3px">CREW CROSS-REFERENCES (${otherCrewEntries.length})</div>`;
+      for (const ce of otherCrewEntries.slice(0, 4)) {
+        const sharedCrew = ce.crewMentioned.filter(c => entry.crewMentioned.includes(c));
+        const crewNames = sharedCrew.map(cId => crew.find(c => c.id === cId)).filter(Boolean).map(c => c!.lastName).join(", ");
+        sameCrewHtml += `<div style="font-size:10px;color:#889;padding:2px 6px;margin:1px 0;border-left:2px solid #446">`;
+        sameCrewHtml += `${esc(ce.summary.slice(0, 45))}${ce.summary.length > 45 ? "..." : ""}`;
+        sameCrewHtml += ` <span style="color:#556;font-size:9px">(${crewNames})</span>`;
+        sameCrewHtml += `</div>`;
+      }
+      if (otherCrewEntries.length > 4) {
+        sameCrewHtml += `<div style="color:#556;font-size:9px;padding-left:6px">...and ${otherCrewEntries.length - 4} more mentions</div>`;
+      }
+      sameCrewHtml += `</div>`;
+    }
+  }
+
   return `
     <div class="journal-detail-title">${esc(entry.summary)}</div>
     <div class="journal-detail-meta">
       ${esc(entry.category.toUpperCase())} | Turn ${entry.turn} | ${esc(entry.room)}
       ${entry.thread ? ` | Thread: ${esc(entry.thread)}` : ""}
     </div>
+    ${catHtml}
     <div class="journal-detail-content">${esc(entry.detail)}</div>
     ${relevanceHtml}
     ${contradictionHtml}
     ${connectedHtml}
+    ${sameRoomHtml}
+    ${sameCrewHtml}
     ${crewHtml}
     ${roomHintHtml}
     ${minimapHtml}
@@ -5923,14 +5998,38 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
     const confColor = confRatio >= 0.6 ? "#4a4" : confRatio >= 0.3 ? "#ca8" : "#556";
 
     rightHtml += `<div style="margin:4px 0;padding:10px 14px;border:1px solid ${borderColor};background:${bgColor};border-radius:4px;cursor:pointer;transition:all 0.15s ease">`;
-    rightHtml += `<span style="color:${numberColor};font-size:11px;font-weight:bold;margin-right:8px">${i + 1}.</span>`;
-    rightHtml += `<span style="color:${textColor};font-size:13px">${esc(deduction.options[i].label)}</span>`;
-    if (confLabel) rightHtml += ` <span style="color:${confColor};font-size:9px;float:right;margin-top:2px">${confLabel}</span>`;
-    if (isSelected) rightHtml += ` <span style="color:#fa0;float:right;margin-right:${confLabel ? "40px" : "0"}">\u25c0</span>`;
+    rightHtml += `<div style="display:flex;align-items:center;gap:8px">`;
+    rightHtml += `<span style="color:${numberColor};font-size:11px;font-weight:bold">${i + 1}.</span>`;
+    rightHtml += `<span style="color:${textColor};font-size:13px;flex:1">${esc(deduction.options[i].label)}</span>`;
+    if (isSelected) rightHtml += `<span style="color:#fa0">\u25c0</span>`;
+    rightHtml += `</div>`;
+    // Confidence bar + label
+    if (conf > 0) {
+      const barWidth = Math.round(confRatio * 100);
+      rightHtml += `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">`;
+      rightHtml += `<div style="flex:1;background:#222;height:3px;border-radius:2px;max-width:100px"><div style="background:${confColor};height:100%;border-radius:2px;width:${barWidth}%"></div></div>`;
+      rightHtml += `<span style="color:${confColor};font-size:9px">${confLabel}</span>`;
+      rightHtml += `</div>`;
+    }
     rightHtml += `</div>`;
   }
 
-  rightHtml += `<div style="color:#555;font-size:10px;text-align:center;margin-top:12px">[\u2191/\u2193] Navigate \u00B7 [Enter] Confirm \u00B7 [Esc] Back</div>`;
+  // Progressive guidance based on evidence depth
+  const threshold = deduction.evidenceThreshold ?? 1;
+  const evidenceRatio = journal.length / Math.max(threshold, 1);
+  if (evidenceRatio >= 2.0 && keyEvidence.length >= 3) {
+    // Strong confidence — highlight most-supported option
+    const bestIdx = optionConfidence.indexOf(Math.max(...optionConfidence));
+    if (optionConfidence[bestIdx] > 0) {
+      rightHtml += `<div style="color:#6a8;font-size:10px;text-align:center;margin-top:8px;padding:4px 8px;background:rgba(68,170,136,0.05);border-radius:3px">Evidence strongly suggests option ${bestIdx + 1}</div>`;
+    }
+  } else if (evidenceRatio >= 1.5 && keyEvidence.length >= 2) {
+    rightHtml += `<div style="color:#889;font-size:10px;text-align:center;margin-top:8px;font-style:italic">Good evidence collected — review key clues carefully</div>`;
+  } else {
+    rightHtml += `<div style="color:#556;font-size:10px;text-align:center;margin-top:8px;font-style:italic">More evidence may help narrow the answer</div>`;
+  }
+
+  rightHtml += `<div style="color:#555;font-size:10px;text-align:center;margin-top:8px">[\u2191/\u2193] Navigate \u00B7 [Enter] Confirm \u00B7 [Esc] Back</div>`;
 
   // Dev mode: show tags
   if (devModeEnabled) {
@@ -6253,6 +6352,165 @@ function getCrewProfileInsight(crew: import("./shared/types.js").CrewMember, men
   }
 
   return parts.slice(0, 3).join(" ");
+}
+
+/** ANALYSIS tab — narrative synthesis of the investigation so far. */
+function renderHubAnalysis(): string {
+  if (!state.mystery) return `<div style="padding:16px;color:#888">No investigation data available.</div>`;
+
+  const mystery = state.mystery;
+  const whatWeKnow = generateWhatWeKnow(mystery);
+  const crew = mystery.crew;
+  const dossiers = mystery.dossiers ?? [];
+  const board = mystery.incidentBoard;
+  const deductions = mystery.deductions;
+  const scenes = mystery.roomScenes ?? [];
+  const accumulation = mystery.evidenceAccumulation;
+
+  let html = `<div class="journal-body"><div style="overflow-y:auto;max-height:420px;padding:12px 16px;width:100%">`;
+
+  // Header — investigation confidence
+  const confColors: Record<string, string> = { none: "#555", low: "#ca8", medium: "#fa0", high: "#4cf", complete: "#4f4" };
+  const confLabels: Record<string, string> = { none: "INSUFFICIENT DATA", low: "LOW CONFIDENCE", medium: "DEVELOPING", high: "HIGH CONFIDENCE", complete: "CASE RESOLVED" };
+  const confColor = confColors[whatWeKnow.confidence] ?? "#555";
+  const confLabel = confLabels[whatWeKnow.confidence] ?? "UNKNOWN";
+  html += `<div style="text-align:center;margin-bottom:12px">`;
+  html += `<div style="color:#4cf;font-size:10px;letter-spacing:2px">CORVUS-7 INVESTIGATION ANALYSIS</div>`;
+  html += `<div style="color:${confColor};font-size:12px;font-weight:bold;margin-top:4px">${confLabel}</div>`;
+  html += `</div>`;
+
+  // Archetype hint (if evidence suggests something)
+  const archLabel = ARCHETYPE_DISPLAY_NAMES[mystery.timeline.archetype] ?? mystery.timeline.archetype;
+  if (deductions.some(d => d.solved)) {
+    html += `<div style="text-align:center;color:#889;font-size:11px;margin-bottom:12px;font-style:italic">Case File: "${archLabel}"</div>`;
+  }
+
+  // Narrative paragraphs from whatWeKnow
+  html += `<div style="margin-bottom:16px">`;
+  for (const para of whatWeKnow.paragraphs) {
+    html += `<div style="color:#bbc;font-size:12px;line-height:1.6;margin-bottom:8px;padding:6px 10px;background:rgba(68,204,255,0.03);border-left:2px solid #334;border-radius:0 3px 3px 0">${esc(para)}</div>`;
+  }
+  html += `</div>`;
+
+  // Incident timeline reconstruction
+  if (board) {
+    html += `<div style="color:#fa0;font-size:10px;letter-spacing:1.5px;margin-bottom:6px">INCIDENT TIMELINE</div>`;
+    const phaseLabels: Record<string, string> = {
+      normal_ops: "Before", trigger: "Trigger", escalation: "Escalation",
+      collapse: "Collapse", aftermath: "Aftermath",
+    };
+    for (const slot of board.slots) {
+      const label = phaseLabels[slot.phase] ?? slot.phase;
+      if (slot.status === "confirmed" && slot.confirmedCard) {
+        const card = slot.confirmedCard;
+        html += `<div style="padding:6px 10px;margin:3px 0;background:rgba(68,255,136,0.04);border-left:2px solid #4a4;border-radius:0 3px 3px 0">`;
+        html += `<div style="color:#4a4;font-size:10px;font-weight:bold">${esc(label.toUpperCase())}</div>`;
+        html += `<div style="color:#bbc;font-size:11px;margin-top:2px">${esc(card.event)}</div>`;
+        html += `<div style="color:#889;font-size:10px">${esc(card.keyActor)} — ${esc(card.location)}</div>`;
+        html += `</div>`;
+      } else if (slot.status === "unlocked") {
+        html += `<div style="padding:4px 10px;margin:3px 0;border-left:2px solid #fa0">`;
+        html += `<div style="color:#fa0;font-size:10px">${esc(label.toUpperCase())} — <span style="color:#889">awaiting confirmation</span></div>`;
+        html += `</div>`;
+      } else {
+        html += `<div style="padding:4px 10px;margin:3px 0;border-left:2px solid #333">`;
+        html += `<div style="color:#556;font-size:10px">${esc(label.toUpperCase())} — locked</div>`;
+        html += `</div>`;
+      }
+    }
+    html += `<div style="margin-bottom:12px"></div>`;
+  }
+
+  // Evidence balance
+  if (accumulation) {
+    html += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;margin-bottom:6px">EVIDENCE BALANCE</div>`;
+    const total = accumulation.confirming_found + accumulation.ambiguous_found + accumulation.contradicting_found;
+    if (total > 0) {
+      const confPct = Math.round(accumulation.confirming_found / total * 100);
+      const ambPct = Math.round(accumulation.ambiguous_found / total * 100);
+      const contrPct = Math.round(accumulation.contradicting_found / total * 100);
+      html += `<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-bottom:4px">`;
+      if (confPct > 0) html += `<div style="width:${confPct}%;background:#4a4"></div>`;
+      if (ambPct > 0) html += `<div style="width:${ambPct}%;background:#ca8"></div>`;
+      if (contrPct > 0) html += `<div style="width:${contrPct}%;background:#f44"></div>`;
+      html += `</div>`;
+      html += `<div style="font-size:10px;color:#889;margin-bottom:4px">`;
+      html += `<span style="color:#4a4">${accumulation.confirming_found} confirming</span> · `;
+      html += `<span style="color:#ca8">${accumulation.ambiguous_found} ambiguous</span> · `;
+      html += `<span style="color:#f44">${accumulation.contradicting_found} contradicting</span>`;
+      html += `</div>`;
+      if (accumulation.crack_moment_fired) {
+        html += `<div style="color:#f44;font-size:11px;font-weight:bold;padding:4px 8px;background:rgba(255,68,68,0.06);border:1px solid rgba(255,68,68,0.15);border-radius:3px;margin-bottom:4px">THE OFFICIAL STORY HAS BEEN CONTRADICTED</div>`;
+      }
+    }
+    html += `<div style="margin-bottom:12px"></div>`;
+  }
+
+  // Deduction conclusions
+  const solvedDeductions = deductions.filter(d => d.solved);
+  if (solvedDeductions.length > 0) {
+    html += `<div style="color:#6cf;font-size:10px;letter-spacing:1.5px;margin-bottom:6px">CONCLUSIONS REACHED (${solvedDeductions.length}/${deductions.length})</div>`;
+    for (const d of solvedDeductions) {
+      const correctOpt = d.options.find(o => o.correct);
+      const icon = d.answeredCorrectly ? `<span style="color:#4a4">\u2713</span>` : `<span style="color:#f44">\u2717</span>`;
+      const answerText = d.answeredCorrectly ? (correctOpt?.label ?? "Correct") : (d.conclusionText ?? "Incorrect assessment");
+      html += `<div style="padding:4px 10px;margin:2px 0;border-left:2px solid ${d.answeredCorrectly ? "#4a4" : "#f44"}">`;
+      html += `<div style="font-size:11px">${icon} <span style="color:#aab">${esc(d.question)}</span></div>`;
+      html += `<div style="font-size:11px;color:#bbc;padding-left:18px">${esc(answerText)}</div>`;
+      html += `</div>`;
+    }
+    html += `<div style="margin-bottom:12px"></div>`;
+  }
+
+  // Crew status overview
+  const identified = dossiers.filter(d => d.confirmed.name).length;
+  if (crew.length > 0) {
+    html += `<div style="color:#fa0;font-size:10px;letter-spacing:1.5px;margin-bottom:6px">CREW STATUS (${identified}/${crew.length} identified)</div>`;
+    const processedCount = scenes.filter(s => s.processed).length;
+    const crackFired = accumulation?.crack_moment_fired ?? false;
+    const fateTier = processedCount >= 6 && identified >= 3 && crackFired ? 3
+      : processedCount >= 3 && identified >= 1 ? 2 : 1;
+    for (const c of crew) {
+      const d = dossiers.find(ds => ds.crewId === c.id);
+      if (!d?.confirmed.name) continue; // only show identified crew
+      const sceneConfirmed = scenes.some(sc => sc.processed && sc.groundTruth.who.includes(c.id));
+      let fateText: string;
+      if (fateTier >= 3 || sceneConfirmed) {
+        fateText = c.fate.replace(/_/g, " ");
+      } else if (fateTier >= 2) {
+        fateText = "unconfirmed";
+      } else {
+        fateText = "???";
+      }
+      html += `<div style="font-size:11px;color:#889;padding:2px 10px">${esc(c.firstName)} ${esc(c.lastName)} <span style="color:#667">(${c.role})</span> — <span style="color:#bbc">${fateText}</span></div>`;
+    }
+    if (crew.length - identified > 0) {
+      html += `<div style="font-size:10px;color:#556;padding:2px 10px;font-style:italic">${crew.length - identified} crew member${crew.length - identified !== 1 ? "s" : ""} unidentified</div>`;
+    }
+    html += `<div style="margin-bottom:12px"></div>`;
+  }
+
+  // Unresolved questions
+  const unsolved = deductions.filter(d => !d.solved);
+  if (unsolved.length > 0) {
+    html += `<div style="color:#f80;font-size:10px;letter-spacing:1.5px;margin-bottom:6px">OPEN QUESTIONS (${unsolved.length})</div>`;
+    for (const d of unsolved) {
+      const ready = mystery.journal.length >= (d.evidenceThreshold ?? 1);
+      html += `<div style="font-size:11px;color:${ready ? "#fa0" : "#556"};padding:2px 10px">`;
+      html += `${ready ? "\u25c6" : "\u25cb"} ${esc(d.question)}`;
+      if (ready) html += ` <span style="color:#889;font-size:9px">READY</span>`;
+      html += `</div>`;
+    }
+  }
+
+  html += `</div></div>`;
+  return html;
+}
+
+/** Handle input for the ANALYSIS tab. */
+function handleHubAnalysisInput(e: KeyboardEvent): void {
+  // Analysis tab is read-only, no special input handling needed beyond Tab/Esc
+  // which are handled by the parent handleInvestigationHubInput
 }
 
 /** Render a single scene list item with visual status. */
@@ -7218,7 +7476,7 @@ function handleHubInput(e: KeyboardEvent): void {
   // Tab cycles sections
   if (e.key === "Tab" && !hubDetailDeduction && !hubSceneDetail) {
     e.preventDefault();
-    const tabs: Array<"evidence" | "connections" | "crew" | "scenes"> = ["evidence", "scenes", "connections", "crew"];
+    const tabs: Array<"evidence" | "connections" | "crew" | "scenes" | "analysis"> = ["evidence", "scenes", "connections", "crew", "analysis"];
     const curIdx = tabs.indexOf(hubSection);
     hubSection = tabs[(curIdx + 1) % tabs.length];
     hubIdx = 0;
@@ -7229,8 +7487,8 @@ function handleHubInput(e: KeyboardEvent): void {
 
   // Number keys 1-4 for direct tab access
   if (!hubDetailDeduction && !hubSceneDetail) {
-    const tabMap: Record<string, "evidence" | "scenes" | "connections" | "crew"> = {
-      "1": "evidence", "2": "scenes", "3": "connections", "4": "crew",
+    const tabMap: Record<string, "evidence" | "scenes" | "connections" | "crew" | "analysis"> = {
+      "1": "evidence", "2": "scenes", "3": "connections", "4": "crew", "5": "analysis",
     };
     const target = tabMap[e.key];
     if (target && target !== hubSection) {
@@ -7251,6 +7509,8 @@ function handleHubInput(e: KeyboardEvent): void {
     handleHubConnectionsInput(e);
   } else if (hubSection === "crew") {
     handleHubCrewInput(e);
+  } else if (hubSection === "analysis") {
+    handleHubAnalysisInput(e);
   }
 }
 
@@ -7693,6 +7953,11 @@ function commitHubDeductionAnswer(): void {
       correct: d.answeredCorrectly === true,
     }));
     const correctCount = deductions.filter(d => d.answeredCorrectly).length;
+    const cc2TimelineCards = (mysteryData.incidentBoard?.slots ?? [])
+      .filter(s => s.status === "confirmed" && s.confirmedCard)
+      .map(s => ({ phase: s.phase, event: s.confirmedCard!.event, keyActor: s.confirmedCard!.keyActor, location: s.confirmedCard!.location }));
+    const cc2ScenesProcessed = (mysteryData.roomScenes ?? []).filter(s => s.processed).length;
+    const cc2CrewIdentified = (mysteryData.dossiers ?? []).filter(d => d.confirmed.name).length;
     setTimeout(() => {
       display.showCaseClosed!({
         archetypeTitle: getCaseClosedTitle(archetype),
@@ -7702,6 +7967,9 @@ function commitHubDeductionAnswer(): void {
         correctCount,
         totalCount: deductions.length,
         evidenceCount: journal.length,
+        timelineCards: cc2TimelineCards,
+        scenesProcessed: cc2ScenesProcessed,
+        crewIdentified: cc2CrewIdentified,
       });
     }, 1500);
   }

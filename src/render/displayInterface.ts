@@ -56,6 +56,9 @@ export interface IGameDisplay {
     correctCount: number;
     totalCount: number;
     evidenceCount: number;
+    timelineCards?: { phase: string; event: string; keyActor: string; location: string }[];
+    scenesProcessed?: number;
+    crewIdentified?: number;
   }): void;
   showHUDNotification?(opts: {
     label: string;

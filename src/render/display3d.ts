@@ -1781,6 +1781,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     correctCount: number;
     totalCount: number;
     evidenceCount: number;
+    timelineCards?: { phase: string; event: string; keyActor: string; location: string }[];
+    scenesProcessed?: number;
+    crewIdentified?: number;
   }): void {
     if (this._caseClosedActive) return;
     this._caseClosedActive = true;
@@ -1806,6 +1809,32 @@ export class BrowserDisplay3D implements IGameDisplay {
     const rating = accuracy === 100 ? "S" : accuracy >= 80 ? "A" : accuracy >= 60 ? "B" : accuracy >= 40 ? "C" : "D";
     const ratingColor = accuracy === 100 ? "#fda" : accuracy >= 80 ? "#4f8" : accuracy >= 60 ? "#fa0" : "#f66";
 
+    // Timeline cards section
+    let timelineHtml = "";
+    if (opts.timelineCards && opts.timelineCards.length > 0) {
+      const phaseLabels: Record<string, string> = {
+        normal_ops: "BEFORE", trigger: "TRIGGER", escalation: "ESCALATION",
+        collapse: "COLLAPSE", aftermath: "AFTERMATH",
+      };
+      timelineHtml = `<div class="cc-divider"></div><div class="cc-section"><div class="cc-section-title" style="color:#dda">Reconstructed Timeline</div>`;
+      for (const card of opts.timelineCards) {
+        const label = phaseLabels[card.phase] ?? card.phase.toUpperCase();
+        timelineHtml += `<div style="font-size:10px;margin:3px 0;padding:3px 8px;border-left:2px solid #665"><span style="color:#dda">${label}:</span> <span style="color:#bbc">${esc(card.keyActor)}</span> <span style="color:#889">— ${esc(card.event.slice(0, 60))}</span></div>`;
+      }
+      timelineHtml += `</div>`;
+    }
+
+    // Investigation depth stats
+    let depthHtml = "";
+    if (opts.scenesProcessed !== undefined || opts.crewIdentified !== undefined) {
+      depthHtml = `<div style="text-align:center;font-size:10px;color:#667;margin-top:4px">`;
+      const parts: string[] = [];
+      if (opts.scenesProcessed !== undefined) parts.push(`${opts.scenesProcessed} scenes processed`);
+      if (opts.crewIdentified !== undefined) parts.push(`${opts.crewIdentified} crew identified`);
+      parts.push(`${opts.evidenceCount} evidence collected`);
+      depthHtml += parts.join(" · ") + `</div>`;
+    }
+
     el.innerHTML = `<div class="cc-inner">
       <div class="cc-header">
         <div class="cc-label">Investigation Complete</div>
@@ -1814,12 +1843,14 @@ export class BrowserDisplay3D implements IGameDisplay {
       </div>
       <div class="cc-divider"></div>
       <div class="cc-story">${esc(opts.storySummary)}</div>
+      ${timelineHtml}
       <div class="cc-divider"></div>
       <div class="cc-section">
         <div class="cc-section-title">Deduction Record</div>
         ${conclusionsHtml}
       </div>
       <div class="cc-divider"></div>
+      ${depthHtml}
       <div class="cc-stats">
         <div class="cc-stat">
           <div class="cc-stat-value" style="color:${ratingColor}">${rating}</div>
@@ -2613,6 +2644,37 @@ export class BrowserDisplay3D implements IGameDisplay {
       iqBreakdownHtml += `</div>`;
     }
 
+    // "What Happened" narrative reconstruction
+    let narrativeHtml = "";
+    if (board && confirmedSlots > 0) {
+      const phaseLabels: Record<string, string> = {
+        normal_ops: "Before the incident", trigger: "The trigger",
+        escalation: "Escalation", collapse: "The collapse", aftermath: "Aftermath",
+      };
+      narrativeHtml += `<div style="border-top:1px solid #333;margin:6px 0;padding-top:6px">`;
+      narrativeHtml += `<div style="color:#dda;font-size:10px;letter-spacing:1.5px;text-align:center;margin-bottom:6px">RECONSTRUCTED INCIDENT</div>`;
+      for (const slot of board.slots) {
+        if (slot.status === "confirmed" && slot.confirmedCard) {
+          const card = slot.confirmedCard;
+          const label = phaseLabels[slot.phase] ?? slot.phase;
+          narrativeHtml += `<div style="font-size:11px;color:#bbc;margin:4px 0;padding:4px 8px;border-left:2px solid #665;line-height:1.5">`;
+          narrativeHtml += `<span style="color:#dda;font-weight:bold">${label}:</span> `;
+          narrativeHtml += `${card.keyActor} — ${card.event} (${card.location})`;
+          narrativeHtml += `</div>`;
+        }
+      }
+      // Add deduction conclusions as narrative context
+      const correctDeductions = deductions.filter(d => d.answeredCorrectly && d.conclusionText);
+      if (correctDeductions.length > 0) {
+        narrativeHtml += `<div style="margin-top:6px;padding:6px 8px;background:rgba(221,221,170,0.04);border-radius:3px">`;
+        for (const d of correctDeductions.slice(0, 3)) {
+          narrativeHtml += `<div style="font-size:10px;color:#aab;margin:2px 0;font-style:italic">"${d.conclusionText!.slice(0, 100)}${d.conclusionText!.length > 100 ? "..." : ""}"</div>`;
+        }
+        narrativeHtml += `</div>`;
+      }
+      narrativeHtml += `</div>`;
+    }
+
     // Investigation highlights — completed threads + key milestones
     let highlightsHtml = "";
     const threads = state.mystery?.threads ?? [];
@@ -2680,6 +2742,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         </div>
         ${autopsyHtml}
         ${iqBreakdownHtml}
+        ${narrativeHtml}
         ${storyHtml}
         ${retroHtml}
         ${highlightsHtml}
