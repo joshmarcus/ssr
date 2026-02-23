@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 115 (V231 completed — Memory echoes + vestigial cleanup)
+- **Phase**: Sprint 119 (V235 completed — Mystery UI clarity sprint)
 - **Test status**: 379 tests passing across 29 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -221,6 +221,29 @@
 - **Player dot**: Green circle with white border showing current position
 - **Door states**: Red (locked) vs green (open) on map
 - **Room list sidebar**: Retained for quick text reference alongside spatial view
+
+### V235 — Deduction Answer View Redesign
+- **Split-panel deduction detail**: Evidence/analysis on left, answer buttons on right (uses journal-body two-panel layout)
+- **Prominent question box**: Centered, styled with border and background instead of plain text
+- **Answer buttons**: Styled as distinct selectable cards with hover borders instead of plain text lines
+- **Compact evidence**: Key evidence shown as compact cards, "other evidence" collapsed to count
+
+### V234 — Scene Processing UX Improvements
+- **Clue context in scene processing**: Examined clue summaries displayed above WHO/WHAT/OUTCOME picker so players can reference evidence while making deductions
+- **Scene processing result banner**: Shows score (X/3) with color-coded feedback in SCENES tab after processing (auto-dismiss after 5s)
+- **SCENES tab visual hierarchy**: Scenes grouped by status: READY TO PROCESS (highlighted), IN PROGRESS, UNEXPLORED, PROCESSED — with distinct section headers and status labels
+
+### V233 — Mystery UI Clarity + Early Progression + Scan Action Prompts
+- **CONNECTIONS tab overhaul**: Progressive disclosure — only shows unlocked deductions with clear guidance, compact solved summaries, one "Next: ???" teaser for locked items. Removed Case Board insights section.
+- **Early sensor placement**: Thermal sensor moved from room 1 to room 0 (Arrival Bay) so players get immediate upgrade on game start
+- **HUD action prompts**: Bottom bar now shows contextual [Q] Scan, [X] Examine, [Enter] Interact hints based on available actions
+- **Evidence filtering**: 4 filter modes (ALL / BY ROOM / BY TYPE / UNREAD) with [f] key cycling in EVIDENCE tab
+- **Investigation progress bar**: Compact progress summary below Hub tabs showing Scenes/Crew/Timeline/Deductions/Evidence counts
+- **Screenshot tool enhancement**: Per-tab Hub screenshots (hub-evidence, hub-scenes, hub-connections, hub-crew)
+
+### V232 — Investigation Hub UX Improvements
+- **Evidence filtering**: EVIDENCE tab filter modes (ALL / BY ROOM / BY TYPE / UNREAD) with [f] cycling
+- **Progress bar**: Hub header shows Scenes/Crew/Timeline/Deductions/Evidence counts with color coding
 
 ### V231 — Memory Echoes + Vestigial Cleanup
 - **Memory echo clues**: 30% chance per room with crew, requires Thermal sensor, triggers ghost silhouette revelation in 3D
