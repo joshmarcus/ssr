@@ -15,6 +15,7 @@ import { processScene } from "./roomScenes.js";
 import { confirmIdentity, updateTheoriesFromScene, linkEvidence, getIdentifiedCrewCount } from "./crewDossiers.js";
 import { recordEvidence, shouldFireCrackMoment, fireCrackMoment, markEvidenceFound, checkPendingContradictions, revealContradiction, getRevealedContradictionCount } from "./twoStory.js";
 import { updateSlotUnlocks, confirmCard, rejectCard, generateProposal, generateRedHerring, buildNarrativeState, isBoardComplete } from "./incidentBoard.js";
+import { isMoralChoiceUnlocked } from "./mysteryChoices.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
   CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
@@ -4288,6 +4289,18 @@ function applyChoiceConsequence(state: GameState, consequence: string, answerKey
       break;
     }
 
+    case "moral_judgment": {
+      // The moral choice has no mechanical consequence — it shapes only the ending narrative.
+      // The quality of the investigation determines scoring, not the moral choice itself.
+      next.logs = [...next.logs, {
+        id: `log_choice_fx_moral_${next.turn}`,
+        timestamp: next.turn, source: "data_core",
+        text: "Final assessment recorded. Your interpretation of the evidence has been encoded into the transmission. When the recovery team reads this report, they'll see what you saw — and what you decided it meant.",
+        read: false,
+      }];
+      break;
+    }
+
     // ── Environmental interaction choice consequences ──
     case "env_env_thermal_vent": {
       const choiceDef = ENV_CHOICES["env_thermal_vent"];
@@ -5087,18 +5100,32 @@ export function step(state: GameState, action: Action): GameState {
         break;
       }
 
-      // Check journal threshold (choices unlock at 3, 6, 10 entries)
-      const thresholds = [3, 6, 10];
-      const journalCount = next.mystery.journal.length;
-      if (choiceIdx < thresholds.length && journalCount < thresholds[choiceIdx]) {
-        next.logs = [...next.logs, {
-          id: `log_choice_locked_${next.turn}`,
-          timestamp: next.turn,
-          source: "system",
-          text: "That decision is not yet available. Gather more evidence.",
-          read: false,
-        }];
-        break;
+      // Check unlock condition — moral choice has special investigation-quality gate
+      if (choice.consequence === "moral_judgment") {
+        if (!isMoralChoiceUnlocked(next.mystery)) {
+          next.logs = [...next.logs, {
+            id: `log_choice_locked_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: "The investigation is not yet complete enough for a final assessment. Process more scenes and identify more crew.",
+            read: false,
+          }];
+          break;
+        }
+      } else {
+        // Standard choices unlock at journal thresholds: 3, 6, 10 entries
+        const thresholds = [3, 6, 10];
+        const journalCount = next.mystery.journal.length;
+        if (choiceIdx < thresholds.length && journalCount < thresholds[choiceIdx]) {
+          next.logs = [...next.logs, {
+            id: `log_choice_locked_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: "That decision is not yet available. Gather more evidence.",
+            read: false,
+          }];
+          break;
+        }
       }
 
       // Validate answer key

@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Phase**: Sprint 107 (V227 completed — Spatial map + floor details + door signs)
-- **Test status**: 292 tests passing across 24 test files (0 failing)
+- **Phase**: Sprint 114 (V230 completed — Station Autopsy discovery moments VFX + moral dimension)
+- **Test status**: 379 tests passing across 29 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
 - **Archetypes**: 6 active (Mutiny added — "The Divide")
@@ -44,11 +44,20 @@
   - Post-answer narrative overlay (correct: revelation + reward + next unlock, incorrect: penalty + attempts remaining)
   - ~100 authored revelation/synthesis/conclusion strings across 5 archetypes x 5-6 deduction tiers
 - Narrative threads grouping evidence
-- **Investigation Hub [r/v]**: unified 4-section overlay
+- **Investigation Hub [r/v]**: unified 5-section overlay
   - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, thread)
+  - SCENES: scene list with evidence accumulation, incident board timeline, dossier progress, scene processing UI (WHO/WHAT/OUTCOME picker)
   - CONNECTIONS: deduction list with evidence-count progress → detail view with evidence log + answer selection
-  - CREW: crew profiling with name/role/fate/personality/relationships, linked evidence, profiling insights (2+ evidence unlocks analysis)
+  - CREW: 3-band dossier display (IDENTIFIED/PARTIAL DATA/UNKNOWN) with theories, personal details, scene evidence links
   - WHAT WE KNOW: auto-generated narrative prose summarizing investigation progress
+- **Station Autopsy mystery system** (6-sprint implementation):
+  - Room scenes: physical clues in every room (badge, personal_effect, damage_pattern, access_log, terminal_log, tool, residue, barricade, modified_equipment, memory_echo)
+  - Crew dossiers: 30 themed character triplets across 6 personality themes, identity confirmation from badge evidence
+  - Incident board: 5-phase timeline reconstruction (NormalOps → Trigger → Escalation → Collapse → Aftermath) with player confirmation
+  - Two-story structure: Official Story vs Real Story with contradiction pairs per archetype, crack moment trigger
+  - Evidence accumulation: confirming/ambiguous/contradicting categories, crack moment (confirming ≥ 3 AND contradicting ≥ 1)
+  - Scene processing: WHO/WHAT/OUTCOME evaluation against ground truth, escalating turn costs (3/5/8/12...)
+  - Investigation quality scoring: 30% weight in endgame performance rating
 - **Evidence card overlay (V205)**: Important discoveries show as full-screen data file cards with category, title, description, location, crew mentions. Queued with keypress dismiss.
 - **Predictive logs (V206)**: 8 "manuscript page" foreshadowing templates reference rooms by name. On entering a foreshadowed room, "MANUSCRIPT ECHO" milestone fires.
 - **Subtitle queue (V204b)**: Subtitles queue instead of overwriting. Priority messages (sensor/milestone/critical) go to front.
@@ -109,7 +118,6 @@
 
 ## Known Issues
 
-- Controller/gamepad input not yet implemented
 - No CI pipeline deployed
 
 ## Sprint 88-90 Changes (V208-V213)
@@ -215,12 +223,49 @@
 - **Door states**: Red (locked) vs green (open) on map
 - **Room list sidebar**: Retained for quick text reference alongside spatial view
 
+### V230 — Discovery Moments VFX + Moral Dimension + Delayed Feedback
+- **Moral Dimension**: archetype-specific final moral question (no correct answer) — 6 unique moral dilemmas
+  - CoolantCascade: accountability vs systemic failure vs inevitability
+  - HullBreach: murder vs triage vs negligence
+  - ReactorScram: malfunction vs emergence vs uncertainty (AI consciousness)
+  - Sabotage: individual vs institutional blame vs both
+  - SignalAnomaly: full disclosure vs suppression vs raw data (first contact)
+  - Mutiny: obedience vs defiance vs systemic critique
+  - Unlocked by investigation quality (crack moment fired OR 5+ scenes + 3+ crew)
+  - Unique epilogue text per answer choice
+- **Crack Moment VFX**: Full-screen "NARRATIVE BREACH" cinematic overlay — amber glitch animation, fracture text, screen shake
+- **Contradiction Found VFX**: Full-screen "CONTRADICTION DETECTED" overlay — red tint, split-view of official vs contradicting evidence, VHS glitch
+- **Timeline Complete VFX**: Full-screen "TIMELINE COMPLETE" overlay when all 5 phases confirmed — milestone flash for individual phases
+- **Crew Identification VFX**: Milestone log with crew identification count progress
+- **Discovery overlay system**: Reusable full-screen cinematic overlay with glitch/flicker CSS animations, auto-dismiss timer, keypress dismiss
+- **Delayed scene feedback**: Scene processing results no longer shown instantly — stored as pending and displayed when player exits the room (per design doc)
+- **State transition detection**: Pre/post step() comparison detects crack moment, contradiction reveals, timeline confirmations, crew identifications
+
+### V228 — Unified Sci-Fi Bottom HUD Bar
+- **Bottom HUD bar**: Unified sci-fi status display replacing sidebar text panels
+- **HP bar**: Visual health indicator with color-coded segments
+- **Sensor status**: Active sensor display with mode indicator
+- **Action bar**: Context-sensitive available actions with key bindings
+
+### V229 — Station Autopsy Mystery System (Sprints 0-6)
+- **Room scenes**: Physical clue generation for every room with 10 clue types + 4 damage types + 2 sensor-gated types
+- **Crew dossiers**: 30 themed character triplets, identity confirmation from badges, 3-band Investigation Hub display
+- **Incident board**: 5-phase timeline reconstruction with player confirm/reject and red herring generation
+- **Two-story structure**: Contradiction pairs per archetype, Official vs Real Story evidence, crack moment trigger
+- **Evidence accumulation**: confirming/ambiguous/contradicting tracking with crack moment (≥3 confirming AND ≥1 contradicting)
+- **Game loop integration**: ExamineScene, ProcessScene, ConfirmTimeline, RejectTimeline actions in step.ts
+- **Investigation Hub SCENES tab**: Scene list, evidence summary, incident board timeline, dossier progress, scene processing UI (3-column WHO/WHAT/OUTCOME picker)
+- **Investigation Hub CREW enhancement**: 3-band dossier display (IDENTIFIED/PARTIAL DATA/UNKNOWN) with theories and personal details
+- **Investigation quality scoring**: 30% weight in endgame performance (scenes processed, crew identified, timeline confirmed, contradictions found)
+- **Playtest bot**: Scene examination and processing support — 11/24 scenes processed, CRACK MOMENT triggered
+
 ### Technical Notes
 - Screenshot tool now dismisses evidence cards after autoplay via synthetic keydown
 - Discovered 4 empty corridor light arrays — V215 corridor light animation was dead code; fixed in V219
 - Sprint 100 reflection added to CLAUDE.md (V171-V221 learnings)
 - Playtest: Golden seed 184201 VICTORY confirmed — 5/5 deductions, HP 973/1000, 268 turns
-- 292 tests passing, TypeScript clean
+- 379 tests passing across 29 test files, TypeScript clean
+- 14 new mystery integration tests covering examine→process→accumulate→confirm flow
 
 ## Sprint 73 Changes (In Progress)
 

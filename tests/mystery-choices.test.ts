@@ -16,11 +16,13 @@ describe("mystery choices", () => {
     ROT.RNG.setSeed(42);
   });
 
-  it("generates exactly 3 choices", () => {
+  it("generates exactly 4 choices (3 standard + 1 moral)", () => {
     const crew = generateCrew(10, 42, ROOM_NAMES);
     const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
     const choices = generateMysteryChoices(crew, timeline, ROOM_NAMES);
-    expect(choices.length).toBe(3);
+    expect(choices.length).toBe(4);
+    expect(choices[3].id).toBe("choice_moral");
+    expect(choices[3].consequence).toBe("moral_judgment");
   });
 
   it("always includes blame and data handling choices", () => {

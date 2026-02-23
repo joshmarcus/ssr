@@ -46,7 +46,7 @@ import {
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember, Entity, CrewDossier, RoomScene } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType, SceneActivity, SceneOutcome, TimelinePhase } from "./shared/types.js";
-import { computeChoiceEndings, computeBranchedEpilogue } from "./sim/mysteryChoices.js";
+import { computeChoiceEndings, computeBranchedEpilogue, isMoralChoiceUnlocked } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave, recordRun } from "./sim/saveLoad.js";
@@ -213,6 +213,11 @@ let journalTab: "evidence" | "deductions" = "evidence";
 let activeChoice: MysteryChoice | null = null;
 let choiceSelectedIdx = 0;
 let choicesPresented = new Set<string>();
+// ── Discovery moment transition tracking ──
+let prevCrackMomentFired = false;
+let prevRevealedContradictions = 0;
+let prevConfirmedSlots = 0;
+let prevIdentifiedCrew = 0;
 let lastObjectivePhase: ObjectivePhase | null = null;
 let activeDeduction: Deduction | null = null;
 let deductionSelectedIdx = 0;
@@ -718,6 +723,236 @@ function getCrewMemoryFragment(c: CrewMember, roomName: string): string | null {
   return null;
 }
 
+// ── Delayed Scene Feedback ─────────────────────────────────────
+// Design doc: "Feedback is delayed until room exit — no instant green/amber."
+let pendingSceneResult: string | null = null;
+let pendingSceneRoom: string | null = null;
+
+// ── Discovery Moment Overlays ─────────────────────────────────────
+// Full-screen cinematic overlays for the Station Autopsy mystery system's key dramatic beats.
+
+let discoveryOverlayActive = false;
+let discoveryOverlayTimeout: ReturnType<typeof setTimeout> | null = null;
+
+/** Show a full-screen discovery moment overlay with VFX and text. */
+function showDiscoveryOverlay(opts: {
+  title: string;
+  subtitle?: string;
+  body?: string;
+  bodyB?: string;
+  color: string;       // primary accent color
+  bgColor: string;     // background tint
+  duration: number;     // ms before auto-dismiss
+  glitch?: boolean;     // VHS glitch effect
+}): void {
+  if (discoveryOverlayActive) return;
+  discoveryOverlayActive = true;
+
+  let el = document.getElementById("discovery-overlay");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "discovery-overlay";
+    el.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 9999; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: 'Courier New', monospace; text-align: center;
+      pointer-events: auto; cursor: pointer;
+      transition: opacity 0.4s ease;
+    `;
+    document.body.appendChild(el);
+  }
+
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  let html = `
+    <div style="background: ${opts.bgColor}; width: 100%; height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      ${opts.glitch ? `animation: discoveryGlitch 0.15s ease-in-out 3;` : ""}
+    ">
+      <div style="font-size: 28px; font-weight: bold; color: ${opts.color};
+        letter-spacing: 6px; text-shadow: 0 0 20px ${opts.color}, 0 0 40px ${opts.color};
+        margin-bottom: 16px;
+        ${opts.glitch ? `animation: discoveryFlicker 0.08s ease-in-out 6 alternate;` : ""}
+      ">${esc(opts.title)}</div>
+  `;
+
+  if (opts.subtitle) {
+    html += `<div style="font-size: 16px; color: ${opts.color}aa; letter-spacing: 3px;
+      margin-bottom: 24px;">${esc(opts.subtitle)}</div>`;
+  }
+
+  if (opts.body) {
+    html += `<div style="font-size: 14px; color: #ccc; max-width: 600px; line-height: 1.6;
+      margin-bottom: 12px; padding: 12px 20px; border-left: 2px solid ${opts.color}44;
+      text-align: left;">${esc(opts.body)}</div>`;
+  }
+
+  if (opts.bodyB) {
+    html += `<div style="font-size: 14px; color: #ccc; max-width: 600px; line-height: 1.6;
+      margin-bottom: 12px; padding: 12px 20px; border-left: 2px solid #ff4444aa;
+      text-align: left;">${esc(opts.bodyB)}</div>`;
+  }
+
+  html += `<div style="font-size: 11px; color: #666; margin-top: 20px;
+    letter-spacing: 2px;">PRESS ANY KEY TO CONTINUE</div>`;
+  html += `</div>`;
+
+  // Inject animation keyframes if not already present
+  if (!document.getElementById("discovery-keyframes")) {
+    const style = document.createElement("style");
+    style.id = "discovery-keyframes";
+    style.textContent = `
+      @keyframes discoveryGlitch {
+        0% { transform: translate(0,0) skew(0deg); }
+        25% { transform: translate(-3px, 1px) skew(-0.5deg); }
+        50% { transform: translate(2px, -1px) skew(0.3deg); }
+        75% { transform: translate(-1px, 2px) skew(-0.2deg); }
+        100% { transform: translate(0,0) skew(0deg); }
+      }
+      @keyframes discoveryFlicker {
+        0% { opacity: 1; }
+        100% { opacity: 0.7; }
+      }
+      @keyframes discoveryScanline {
+        0% { background-position-y: 0; }
+        100% { background-position-y: 4px; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  el.innerHTML = html;
+  el.style.opacity = "0";
+  el.style.display = "flex";
+  requestAnimationFrame(() => { el!.style.opacity = "1"; });
+
+  const dismiss = () => {
+    if (!discoveryOverlayActive) return;
+    discoveryOverlayActive = false;
+    if (discoveryOverlayTimeout) { clearTimeout(discoveryOverlayTimeout); discoveryOverlayTimeout = null; }
+    el!.style.opacity = "0";
+    setTimeout(() => { el!.style.display = "none"; }, 400);
+    el!.removeEventListener("click", dismiss);
+    document.removeEventListener("keydown", dismissKey);
+  };
+
+  const dismissKey = (e: KeyboardEvent) => {
+    e.preventDefault();
+    dismiss();
+  };
+
+  el.addEventListener("click", dismiss);
+  document.addEventListener("keydown", dismissKey, { once: true });
+
+  discoveryOverlayTimeout = setTimeout(dismiss, opts.duration);
+}
+
+/** Trigger Crack Moment visual event — the Official Story fractures. */
+function triggerCrackMoment(): void {
+  display.triggerScreenFlash("damage");
+  showDiscoveryOverlay({
+    title: "NARRATIVE BREACH",
+    subtitle: "Official account is inconsistent. Reconstruct true sequence.",
+    body: "Something doesn't add up. The official story — you've been building it in your head, piece by piece. But this... this doesn't fit. Not wrong, exactly. Just the first crack in a picture you thought was complete.",
+    color: "#ffaa00",
+    bgColor: "rgba(20, 12, 0, 0.92)",
+    duration: 12000,
+    glitch: true,
+  });
+}
+
+/** Trigger Contradiction Found visual event — two pieces of evidence clash. */
+function triggerContradictionFound(officialText: string, realText: string): void {
+  display.triggerScreenFlash("damage");
+  showDiscoveryOverlay({
+    title: "CONTRADICTION DETECTED",
+    subtitle: "Two pieces of evidence tell different stories.",
+    body: officialText,
+    bodyB: realText,
+    color: "#ff4444",
+    bgColor: "rgba(20, 0, 0, 0.92)",
+    duration: 15000,
+    glitch: true,
+  });
+}
+
+/** Trigger Timeline Slot Confirmed visual event. */
+function triggerTimelineConfirmed(phase: string, slotsFilled: number, totalSlots: number): void {
+  if (slotsFilled >= totalSlots) {
+    // All 5 filled — circuit completion sweep
+    display.triggerScreenFlash("milestone");
+    showDiscoveryOverlay({
+      title: "TIMELINE COMPLETE",
+      subtitle: "The full sequence of events has been reconstructed.",
+      body: `All ${totalSlots} phases of the incident have been confirmed. The station's story — from normal operations through the final aftermath — is now a complete record.`,
+      color: "#44ffaa",
+      bgColor: "rgba(0, 20, 12, 0.92)",
+      duration: 10000,
+    });
+  } else {
+    display.triggerScreenFlash("milestone");
+    display.addLog(`Timeline confirmed: ${phase} (${slotsFilled}/${totalSlots} phases reconstructed)`, "milestone");
+  }
+}
+
+/** Trigger Crew Fate Confirmed visual event. */
+function triggerCrewFateConfirmed(crewName: string, identified: number, total: number): void {
+  display.triggerScreenFlash("milestone");
+  display.addLog(`Crew identified: ${crewName} (${identified}/${total} crew confirmed)`, "milestone");
+}
+
+/** Check for discovery moment transitions after step() and trigger overlays. */
+function checkDiscoveryMoments(): void {
+  const mystery = state.mystery;
+  if (!mystery) return;
+
+  // Crack Moment: fires once when evidence_accumulation.crack_moment_fired transitions true
+  const currentCrack = mystery.evidenceAccumulation?.crack_moment_fired ?? false;
+  if (currentCrack && !prevCrackMomentFired) {
+    triggerCrackMoment();
+  }
+  prevCrackMomentFired = currentCrack;
+
+  // Contradiction Found: fires when revealed count increases
+  const currentContradictions = mystery.contradictionPairs?.filter(cp => cp.revealed).length ?? 0;
+  if (currentContradictions > prevRevealedContradictions) {
+    // Find the newly revealed contradiction
+    const newlyRevealed = mystery.contradictionPairs?.find(cp =>
+      cp.revealed && cp.official && cp.contradicting);
+    if (newlyRevealed) {
+      triggerContradictionFound(
+        newlyRevealed.official.text,
+        newlyRevealed.contradicting.text,
+      );
+    }
+  }
+  prevRevealedContradictions = currentContradictions;
+
+  // Timeline Confirmed: fires when confirmed slot count increases
+  const currentSlots = mystery.incidentBoard?.slots.filter(s => s.status === "confirmed").length ?? 0;
+  const totalSlots = mystery.incidentBoard?.slots.length ?? 5;
+  if (currentSlots > prevConfirmedSlots) {
+    const newSlot = mystery.incidentBoard?.slots.find(s => s.status === "confirmed");
+    triggerTimelineConfirmed(newSlot?.phase ?? "Unknown", currentSlots, totalSlots);
+  }
+  prevConfirmedSlots = currentSlots;
+
+  // Crew Fate Confirmed: fires when identified crew count increases
+  const currentCrew = mystery.dossiers?.filter(d => d.confirmed.name).length ?? 0;
+  const totalCrew = mystery.dossiers?.length ?? 0;
+  if (currentCrew > prevIdentifiedCrew) {
+    const newlyId = mystery.dossiers?.find(d =>
+      d.confirmed.name && d.roomsSeen.length > 0);
+    triggerCrewFateConfirmed(
+      newlyId?.confirmed.name ?? "Unknown crew member",
+      currentCrew,
+      totalCrew,
+    );
+  }
+  prevIdentifiedCrew = currentCrew;
+}
+
 /** Check if the player entered a new room and log its description. */
 function checkRoomEntry(): void {
   const px = state.player.entity.pos.x;
@@ -730,6 +965,19 @@ function checkRoomEntry(): void {
       break;
     }
   }
+  // Show deferred scene processing result when leaving the room where processing happened
+  if (currentRoom && pendingSceneResult && pendingSceneRoom && currentRoom.name !== pendingSceneRoom) {
+    display.addLog(`Scene processed: ${pendingSceneResult}`, "milestone");
+    pendingSceneResult = null;
+    pendingSceneRoom = null;
+  }
+  // Also show if player moves to a corridor (no room)
+  if (!currentRoom && pendingSceneResult) {
+    display.addLog(`Scene processed: ${pendingSceneResult}`, "milestone");
+    pendingSceneResult = null;
+    pendingSceneRoom = null;
+  }
+
   if (currentRoom && currentRoom.id !== lastPlayerRoomId) {
     lastPlayerRoomId = currentRoom.id;
     if (!visitedRoomIds.has(currentRoom.id)) {
@@ -1394,6 +1642,12 @@ function resetGameState(newSeed: number): void {
   const journalEl = document.getElementById("journal-overlay");
   if (journalEl) { journalEl.classList.remove("active"); journalEl.innerHTML = ""; }
   choicesPresented.clear();
+  prevCrackMomentFired = false;
+  prevRevealedContradictions = 0;
+  prevConfirmedSlots = 0;
+  prevIdentifiedCrew = 0;
+  pendingSceneResult = null;
+  pendingSceneRoom = null;
 
   // Reset per-run narrative/tutorial state
   firstDroneEncounterShown = false;
@@ -1546,6 +1800,10 @@ function handleAction(action: Action): void {
   const prevLogs = state.logs.length;
   const prevHp = state.player.hp;
   const prevStun = state.player.stunTurns;
+  const prevCrackState = state.mystery?.evidenceAccumulation?.crack_moment_fired ?? false;
+  const prevContradictionCount = state.mystery?.contradictionPairs?.filter(cp => cp.revealed).length ?? 0;
+  const prevSlotCount = state.mystery?.incidentBoard?.slots.filter(s => s.status === "confirmed").length ?? 0;
+  const prevCrewIdCount = state.mystery?.dossiers?.filter(d => d.confirmed.name).length ?? 0;
   const ppx = state.player.entity.pos.x;
   const ppy = state.player.entity.pos.y;
   const prevDirt = state.tiles[ppy]?.[ppx]?.dirt ?? 0;
@@ -1576,6 +1834,9 @@ function handleAction(action: Action): void {
     display.triggerScreenFlash("milestone");
   }
 
+  // Discovery moment VFX (Crack Moment, Contradiction, Timeline, Crew Fate)
+  checkDiscoveryMoments();
+
   // One-time utility attachment activation hints
   if (!scrubberHintFired && state.player.entity.props["hasScrubber"] === true && state.turn % 3 === 0) {
     const px = state.player.entity.pos.x;
@@ -1593,10 +1854,22 @@ function handleAction(action: Action): void {
   }
 
   // Show sim-generated log messages (from interactions) with proper classification
+  // Scene processing results are deferred until room exit (design doc requirement)
   if (state.logs.length > prevLogs) {
     let hasPA = false;
     for (let i = prevLogs; i < state.logs.length; i++) {
       const simLog = state.logs[i];
+      // Defer scene processing result logs until room exit
+      if (simLog.id.startsWith("log_process_result_")) {
+        pendingSceneResult = simLog.text;
+        const currentRoom = state.rooms.find(r => {
+          const px = state.player.entity.pos.x;
+          const py = state.player.entity.pos.y;
+          return px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height;
+        });
+        pendingSceneRoom = currentRoom?.name ?? null;
+        continue; // skip immediate display
+      }
       const logType = classifySimLog(simLog.text, simLog.source);
       display.addLog(simLog.text, logType);
       if (simLog.text.startsWith("CORVUS-7 CENTRAL:")) hasPA = true;
@@ -2288,10 +2561,19 @@ function handleAction(action: Action): void {
 
     // Mystery choice unlock notifications
     const choiceThresholds = [3, 6, 10];
-    for (let ci = 0; ci < mystery.choices.length && ci < choiceThresholds.length; ci++) {
+    for (let ci = 0; ci < mystery.choices.length; ci++) {
       const choice = mystery.choices[ci];
       if (choice.chosen) continue;
-      if (mystery.journal.length >= choiceThresholds[ci] && !choicesPresented.has(choice.id)) {
+      if (choicesPresented.has(choice.id)) continue;
+
+      // Moral choice has investigation-quality gate instead of journal threshold
+      if (choice.consequence === "moral_judgment") {
+        if (isMoralChoiceUnlocked(mystery)) {
+          choicesPresented.add(choice.id);
+          display.addLog("CORVUS-7 CENTRAL: Investigation substantially complete. Final moral assessment now available at the Data Core.", "milestone");
+          display.triggerScreenFlash("milestone");
+        }
+      } else if (ci < choiceThresholds.length && mystery.journal.length >= choiceThresholds[ci]) {
         choicesPresented.add(choice.id);
         display.addLog(`CORVUS-7 CENTRAL: Decision ${ci + 1} now available. Open the Evidence Hub [v] to review.`, "milestone");
         display.triggerScreenFlash("milestone");

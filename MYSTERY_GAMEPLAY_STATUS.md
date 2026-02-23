@@ -3,7 +3,7 @@
 > **Master design document**: [`MYSTERY_GAMEPLAY.md`](./MYSTERY_GAMEPLAY.md) — do not lose the overall vision.
 > This file tracks sprint-by-sprint implementation progress.
 
-## Current Phase: Sprint 6 — Investigation Hub UI + Moral Dimension
+## Current Phase: Sprint 7 — Discovery Moments VFX + Moral Dimension + Delayed Feedback
 
 ### Sprint Overview
 
@@ -16,6 +16,7 @@
 | Sprint 4 | Two-Story Structure (evidence accumulation, contradiction pairs, Crack Moment) | DONE |
 | Sprint 5 | Game Loop Integration (step.ts wiring, harness updates, integration tests) | DONE |
 | Sprint 6 | Investigation Hub UI + Moral Dimension (overlay rendering, endgame) | DONE |
+| Sprint 7 | Discovery Moments VFX + Moral Dimension + Delayed Feedback | DONE |
 
 ---
 
@@ -195,4 +196,57 @@
 - 9 confirming / 8 ambiguous / 6 contradicting evidence
 - CRACK MOMENT triggered
 - 5/5 deductions correct, 36 evidence pieces
+- All 379 tests passing across 29 test files
+
+---
+
+## Sprint 7 — Discovery Moments VFX + Moral Dimension + Delayed Feedback
+
+**Status**: DONE
+
+**Goal**: Implement all missing visual/UX feedback from the design doc, plus the Moral Dimension endgame system.
+
+### Gaps Identified (from design doc audit)
+
+The simulation layer was 95% complete but the visual feedback layer had significant gaps:
+
+1. **Moral Dimension (Part 6)** — Final moral deduction at DataCore terminal was entirely unimplemented
+2. **Crack Moment VFX (Part 3)** — Was only a text log, needed to be the game's biggest dramatic beat
+3. **Contradiction Found VFX (Part 4)** — Needed VHS-style tear, split view, "CONTRADICTION DETECTED" overlay
+4. **Timeline Confirmed VFX (Part 4)** — Needed card confirmation visual + completion sweep
+5. **Crew Fate Confirmed VFX (Part 4)** — Needed identification milestone log
+6. **Delayed Scene Feedback** — Design says delay until room exit; implementation was instant
+7. **Memory Echo rendering** — memory_echo clue type exists but has no ghost animation in 3D (deferred)
+
+### Tasks
+- [x] Implement Moral Dimension: final moral deduction at DataCore with archetype-specific moral questions
+- [x] Implement Crack Moment VFX: screen glitch, fracture overlay, amber tint, "NARRATIVE BREACH" banner
+- [x] Implement Contradiction Found VFX: VHS-style glitch, split-view clue comparison, "CONTRADICTION DETECTED"
+- [x] Implement Timeline Confirmed VFX: milestone flash, completion sweep overlay when all 5 phases filled
+- [x] Implement Crew Fate Confirmed VFX: milestone log with identified count
+- [x] Delay scene processing feedback until room exit
+- [x] Update STATUS.md with Sprint 7 changes
+- [ ] Memory Echo ghost rendering in 3D (deferred to future sprint)
+
+### Changes Made
+- **`src/sim/mysteryChoices.ts`**:
+  - `generateMoralChoice()` — archetype-specific moral questions for all 6 archetypes
+  - Each moral choice has 3 options with no correct answer (accountability/systemic/nuance framing)
+  - `isMoralChoiceUnlocked()` — investigation-quality gate (crack moment fired OR 5+ scenes + 3+ crew ID'd)
+  - Moral choice ending text in `computeChoiceEndings()` — unique per-answer epilogue lines
+- **`src/sim/step.ts`**:
+  - `isMoralChoiceUnlocked` import and special-case unlock check in SubmitChoice handler
+  - `moral_judgment` consequence in `applyChoiceConsequence()` — no mechanical effect, narrative only
+- **`src/browser.ts`**: Major discovery moment system
+  - `showDiscoveryOverlay()` — reusable full-screen cinematic overlay with title, subtitle, body, glitch animation, auto-dismiss
+  - `triggerCrackMoment()` — "NARRATIVE BREACH" overlay with amber tint, glitch animation, fracture text
+  - `triggerContradictionFound()` — "CONTRADICTION DETECTED" overlay with red tint, split evidence view
+  - `triggerTimelineConfirmed()` — "TIMELINE COMPLETE" overlay when all 5 phases filled, milestone flash for individual phases
+  - `triggerCrewFateConfirmed()` — milestone log with crew identification progress
+  - `checkDiscoveryMoments()` — state transition detector comparing pre/post step() values
+  - Delayed scene feedback: ProcessScene result logs stored as `pendingSceneResult`, shown when player exits room
+  - Moral choice unlock notification: "Final moral assessment now available at the Data Core"
+  - CSS animation keyframes: discoveryGlitch (screen shake), discoveryFlicker (opacity pulse)
+  - All transition tracking variables reset on game restart
+- **Tests**: Updated mystery-choices.test.ts and timeline.test.ts for 4 choices (3 standard + 1 moral)
 - All 379 tests passing across 29 test files

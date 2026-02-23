@@ -168,13 +168,13 @@ describe("timeline", () => {
 });
 
 describe("mysteryChoices", () => {
-  it("generates 3 choices per run", () => {
+  it("generates 4 choices per run (3 standard + 1 moral)", () => {
     ROT.RNG.setSeed(184201);
     const crew = generateCrew(10, 184201, ROOM_NAMES);
     const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
     const choices = generateMysteryChoices(crew, timeline, ROOM_NAMES);
 
-    expect(choices.length).toBe(3);
+    expect(choices.length).toBe(4);
     for (const choice of choices) {
       expect(choice.id).toBeTruthy();
       expect(choice.prompt).toBeTruthy();
@@ -182,6 +182,8 @@ describe("mysteryChoices", () => {
       expect(choice.consequence).toBeTruthy();
       expect(choice.chosen).toBeUndefined();
     }
+    // Last choice should be the moral dimension
+    expect(choices[3].consequence).toBe("moral_judgment");
   });
 
   it("sabotage archetype gets accusation choice", () => {
