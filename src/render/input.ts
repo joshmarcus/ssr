@@ -173,13 +173,17 @@ export class InputHandler {
       }
     }
 
+    // Tab key: cycle sensor overlay (free, no turn cost)
+    // Skip if already handled by an overlay (e.g. journal, hub)
+    if (e.key === "Tab" && !e.defaultPrevented) {
+      e.preventDefault();
+      this.scanCallback();
+      return;
+    }
+
     const action = this.mapKeyToAction(e.key);
     if (action) {
       e.preventDefault();
-      if (action.type === ActionType.Scan) {
-        // Scan toggles thermal overlay and also sends the action
-        this.scanCallback();
-      }
       this.callback(action);
     }
   }

@@ -1559,7 +1559,7 @@ function initGame(): void {
       if (e.key === "Escape" || e.key === "g") {
         goalPanelOpen = false;
         const overlay = document.getElementById("goal-panel-overlay");
-        if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; }
+        if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; overlay.style.display = "none"; }
         return;
       }
       const goals = computeGoals(state, discoveredGoalIds, { visitedRoomIds });
@@ -1794,7 +1794,7 @@ function initGame(): void {
         showGoalPanel();
       } else {
         const overlay = document.getElementById("goal-panel-overlay");
-        if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; }
+        if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; overlay.style.display = "none"; }
       }
       return;
     }
@@ -4077,6 +4077,7 @@ function showGoalPanel(): void {
     document.body.appendChild(overlay);
   }
   overlay.classList.add("active");
+  overlay.style.display = "flex";
 
   const goals = computeGoals(state, discoveredGoalIds, { visitedRoomIds });
   if (goalPanelIdx >= goals.length) goalPanelIdx = Math.max(0, goals.length - 1);
@@ -4214,9 +4215,9 @@ function updateGoalHUD(): void {
     el.id = "goal-hud";
     el.style.cssText =
       "position:fixed;top:8px;right:8px;z-index:80;pointer-events:none;" +
-      "font-family:'Courier New',monospace;max-width:240px;" +
-      "background:rgba(8,12,20,0.8);border:1px solid rgba(255,255,255,0.1);" +
-      "border-radius:4px;padding:6px 10px;";
+      "font-family:'Courier New',monospace;max-width:320px;" +
+      "background:rgba(8,12,20,0.85);border:1px solid rgba(255,255,255,0.12);" +
+      "border-radius:4px;padding:8px 14px;";
     document.body.appendChild(el);
   }
   el.style.display = "block";
@@ -4228,9 +4229,9 @@ function updateGoalHUD(): void {
   // Find next incomplete discovered subgoal
   const nextSub = goal.subgoals.find(s => s.discovered && !s.completed);
 
-  let html = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">`;
-  html += `<span style="color:${goal.color};font-size:12px">${goal.icon}</span>`;
-  html += `<span style="color:${goal.color};font-size:10px;letter-spacing:1px;font-weight:bold">${esc(goal.title).toUpperCase()}</span>`;
+  let html = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">`;
+  html += `<span style="color:${goal.color};font-size:14px">${goal.icon}</span>`;
+  html += `<span style="color:${goal.color};font-size:13px;letter-spacing:1px;font-weight:bold">${esc(goal.title).toUpperCase()}</span>`;
   if (goal.completed) {
     html += `<span style="color:#4f8;font-size:9px">\u2713</span>`;
   }
@@ -4239,15 +4240,15 @@ function updateGoalHUD(): void {
   // Progress bar
   const barBg = goal.completed ? "#4f8" : goal.color;
   html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">`;
-  html += `<div style="height:2px;background:#333;border-radius:1px;flex:1">`;
-  html += `<div style="height:100%;background:${barBg};border-radius:1px;width:${pct}%"></div>`;
+  html += `<div style="height:3px;background:#333;border-radius:2px;flex:1">`;
+  html += `<div style="height:100%;background:${barBg};border-radius:2px;width:${pct}%"></div>`;
   html += `</div>`;
-  html += `<span style="color:#667;font-size:9px">${pct}%</span>`;
+  html += `<span style="color:#667;font-size:11px">${pct}%</span>`;
   html += `</div>`;
 
   // Next subgoal hint
   if (nextSub) {
-    html += `<div style="color:#889;font-size:9px;line-height:1.3">`;
+    html += `<div style="color:#889;font-size:11px;line-height:1.4">`;
     html += `\u25B8 ${esc(nextSub.title)}`;
     if (nextSub.progressText) {
       html += ` <span style="color:#556">(${esc(nextSub.progressText)})</span>`;
@@ -4256,7 +4257,7 @@ function updateGoalHUD(): void {
   }
 
   // [G] hint
-  html += `<div style="color:#445;font-size:8px;margin-top:2px">[G] Goals</div>`;
+  html += `<div style="color:#445;font-size:10px;margin-top:3px">[G] Goals</div>`;
 
   el.innerHTML = html;
 }
@@ -6965,6 +6966,7 @@ function handleHubInput(e: KeyboardEvent): void {
 
   // Tab cycles sections
   if (e.key === "Tab" && !hubDetailDeduction && !hubSceneDetail) {
+    e.preventDefault();
     const tabs: Array<"evidence" | "connections" | "crew" | "scenes"> = ["evidence", "scenes", "connections", "crew"];
     const curIdx = tabs.indexOf(hubSection);
     hubSection = tabs[(curIdx + 1) % tabs.length];
