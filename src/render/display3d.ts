@@ -7169,12 +7169,35 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Recessed ceiling light panels — flush with ceiling, glowing downward
       // Placed at beam intersection grid (every 4 tiles in both directions)
       const lightPanelGeo = new THREE.PlaneGeometry(0.5, 0.5);
+      const tr = ((tint >> 16) & 0xff) / 255;
+      const tg = ((tint >> 8) & 0xff) / 255;
+      const tb = (tint & 0xff) / 255;
       const lightPanelMat = new THREE.MeshBasicMaterial({
-        color: tint,
+        color: new THREE.Color(tr * 0.7 + 0.3, tg * 0.7 + 0.3, tb * 0.7 + 0.3),
         transparent: true,
-        opacity: 0.6,
+        opacity: 0.75,
         depthWrite: false,
         side: THREE.DoubleSide,
+      });
+      // Volumetric light cone geometry (shared per room)
+      const coneGeo = new THREE.CylinderGeometry(0.12, 0.35, 1.6, 8, 1, true);
+      const coneMat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(tr * 0.3 + 0.05, tg * 0.3 + 0.05, tb * 0.3 + 0.08),
+        transparent: true,
+        opacity: 0.025,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      // Floor pool geometry (shared per room)
+      const poolGeo = new THREE.CircleGeometry(0.3, 12);
+      poolGeo.rotateX(-Math.PI / 2);
+      const poolMat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(tr * 0.4 + 0.1, tg * 0.4 + 0.1, tb * 0.4 + 0.15),
+        transparent: true,
+        opacity: 0.08,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
       });
       for (let ry = room.y; ry < room.y + room.height; ry++) {
         if ((ry - room.y) % 4 !== 2) continue; // offset from beams for centered placement
@@ -7182,10 +7205,19 @@ export class BrowserDisplay3D implements IGameDisplay {
           if ((rx - room.x) % 4 !== 2) continue;
           if (ry < 0 || ry >= state.height || rx < 0 || rx >= state.width) continue;
           if (state.tiles[ry][rx].type !== TileType.Floor) continue;
+          // Ceiling panel
           const panel = new THREE.Mesh(lightPanelGeo, lightPanelMat);
           panel.rotation.x = Math.PI / 2; // face downward
           panel.position.set(rx, ceilingY - 0.01, ry);
           ceilSubGroup.add(panel);
+          // Volumetric light cone downward
+          const cone = new THREE.Mesh(coneGeo, coneMat);
+          cone.position.set(rx, ceilingY - 0.8, ry); // hangs from ceiling
+          ceilSubGroup.add(cone);
+          // Floor pool
+          const pool = new THREE.Mesh(poolGeo, poolMat);
+          pool.position.set(rx, 0.015, ry);
+          ceilSubGroup.add(pool);
         }
       }
     }
