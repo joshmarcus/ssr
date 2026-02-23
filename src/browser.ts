@@ -152,22 +152,31 @@ function showOpeningCrawl(): void {
     window.removeEventListener("keydown", startGame);
     crawlOverlay.removeEventListener("click", startGame);
 
-    // Boot sequence: typed-out messages before player control
+    // Boot sequence: typed-out system messages before player control
     crawlOverlay.innerHTML = "";
     const bootPre = document.createElement("pre");
     bootPre.className = "crawl-text";
+    bootPre.style.fontSize = "12px";
+    bootPre.style.lineHeight = "1.6";
     bootPre.textContent = "";
     crawlOverlay.appendChild(bootPre);
 
+    const sensorStr = (state.player.sensors ?? []).length > 1 ? "MULTI-BAND" : "CLEANLINESS";
+    const roomCount = state.rooms.length;
     const bootMessages = [
       { text: "SIGNAL ACQUIRED...", delay: 0 },
-      { text: "TERMINAL SYNC...", delay: 600 },
-      { text: "LINK ESTABLISHED", delay: 1200 },
+      { text: "TERMINAL SYNC — LOW-BITRATE RELAY", delay: 400 },
+      { text: `UNIT ID: SWEEPO-${seed % 10000}  [MAINTENANCE ROVER]`, delay: 800 },
+      { text: `SENSOR ARRAY: ${sensorStr}`, delay: 1100 },
+      { text: `STATION MAP: ${roomCount} SECTIONS DETECTED`, delay: 1400 },
+      { text: "CORVUS-7 HANDSHAKE — OK", delay: 1700 },
+      { text: "LINK ESTABLISHED — AWAITING INPUT", delay: 2100 },
     ];
 
     for (const msg of bootMessages) {
       setTimeout(() => {
         bootPre.textContent += (bootPre.textContent ? "\n" : "") + "> " + msg.text;
+        bootPre.scrollIntoView({ block: "end" });
       }, msg.delay);
     }
 
@@ -176,7 +185,7 @@ function showOpeningCrawl(): void {
       crawlOverlay.style.display = "none";
       gameStarted = true;
       initGame();
-    }, 1800);
+    }, 2600);
   };
 
   window.addEventListener("keydown", startGame);

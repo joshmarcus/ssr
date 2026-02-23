@@ -2969,13 +2969,23 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (this._hudInteract) {
       if (!state.gameOver) {
         const actionHints: string[] = [];
+        const stateHints: string[] = []; // grey hints for exhausted nearby entities
 
         // [Enter] interact with adjacent entity
         const nearby = this.getAdjacentInteractables(state);
-        if (nearby.length > 0) {
-          const target = nearby[0];
-          const name = entityDisplayName(target);
-          actionHints.push(`<span style="color:#fa0">\u25b8 [Enter] ${this.escapeHtml(name)}</span>`);
+        let hasAvailable = false;
+        for (const ent of nearby) {
+          if (!isEntityExhausted(ent)) {
+            if (!hasAvailable) {
+              const name = entityDisplayName(ent);
+              actionHints.push(`<span style="color:#fa0">\u25b8 [Enter] ${this.escapeHtml(name)}</span>`);
+              hasAvailable = true;
+            }
+          } else {
+            // Show exhausted entity with state description
+            const desc = this.getEntityStateDesc(ent);
+            if (desc) stateHints.push(desc);
+          }
         }
 
         // [Q] Scan — show when player has sensors
@@ -3004,8 +3014,14 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
 
-        if (actionHints.length > 0) {
-          this._hudInteract.innerHTML = actionHints.join(`<span style="color:#334;margin:0 6px">|</span>`);
+        if (actionHints.length > 0 || stateHints.length > 0) {
+          let html = actionHints.join(`<span style="color:#334;margin:0 6px">|</span>`);
+          if (stateHints.length > 0) {
+            const stateStr = stateHints.slice(0, 2).join(`<span style="color:#222;margin:0 4px">·</span>`);
+            if (html) html += `<span style="color:#222;margin:0 8px">|</span>`;
+            html += stateStr;
+          }
+          this._hudInteract.innerHTML = html;
           this._hudInteract.classList.add("visible");
         } else {
           this._hudInteract.classList.remove("visible");
@@ -11299,6 +11315,42 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
 
     return false;
+  }
+
+  /** Get a short grey state description for an exhausted entity. */
+  private getEntityStateDesc(ent: Entity): string | null {
+    const name = entityDisplayName(ent);
+    switch (ent.type) {
+      case EntityType.Relay:
+        if (ent.props["activated"]) return `<span style="color:#334;font-size:10px">${this.escapeHtml(name)} (routed)</span>`;
+        if (ent.props["locked"]) return `<span style="color:#433;font-size:10px">${this.escapeHtml(name)} (locked)</span>`;
+        return null;
+      case EntityType.LogTerminal:
+      case EntityType.Console:
+        return `<span style="color:#334;font-size:10px">${this.escapeHtml(name)} (read)</span>`;
+      case EntityType.SensorPickup:
+      case EntityType.ToolPickup:
+      case EntityType.PowerCell:
+        return `<span style="color:#334;font-size:10px">${this.escapeHtml(name)} (collected)</span>`;
+      case EntityType.MedKit:
+        return `<span style="color:#334;font-size:10px">${this.escapeHtml(name)} (used)</span>`;
+      case EntityType.Breach:
+        return `<span style="color:#343;font-size:10px">${this.escapeHtml(name)} (sealed)</span>`;
+      case EntityType.ServiceBot:
+        return `<span style="color:#334;font-size:10px">${this.escapeHtml(name)} (active)</span>`;
+      case EntityType.CrewNPC:
+        if (ent.props["following"]) return `<span style="color:#343;font-size:10px">${ent.props["firstName"] ?? name} (following)</span>`;
+        if (ent.props["evacuated"]) return `<span style="color:#343;font-size:10px">${ent.props["firstName"] ?? name} (safe)</span>`;
+        return null;
+      case EntityType.CrewItem:
+        return ent.props["examined"] ? `<span style="color:#334;font-size:10px">${this.escapeHtml(name)} (examined)</span>` : null;
+      case EntityType.EvidenceTrace:
+        return ent.props["discovered"] ? `<span style="color:#334;font-size:10px">${this.escapeHtml(name)} (found)</span>` : null;
+      case EntityType.ClosedDoor:
+        return ent.props["locked"] ? `<span style="color:#433;font-size:10px">Door (locked)</span>` : null;
+      default:
+        return null;
+    }
   }
 
   private getAdjacentInteractables(state: GameState): Entity[] {
