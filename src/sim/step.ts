@@ -118,9 +118,36 @@ function updateMysteryBoardState(state: GameState): GameState {
     contradictionsFound,
   );
 
-  const updatedBoard = updateSlotUnlocks(state.mystery.incidentBoard, narrativeState);
+  const prevBoard = state.mystery.incidentBoard;
+  const updatedBoard = updateSlotUnlocks(prevBoard, narrativeState);
+
+  // Detect newly unlocked slots and generate log entries
+  const phaseLabels: Record<string, string> = {
+    normal_ops: "NORMAL OPERATIONS",
+    trigger: "THE TRIGGER",
+    escalation: "ESCALATION",
+    collapse: "COLLAPSE",
+    aftermath: "AFTERMATH",
+  };
+  let logs = state.logs;
+  for (let i = 0; i < updatedBoard.slots.length; i++) {
+    const prev = prevBoard.slots[i];
+    const next = updatedBoard.slots[i];
+    if (prev.status === "locked" && next.status === "unlocked") {
+      const label = phaseLabels[next.phase] ?? next.phase.toUpperCase();
+      logs = [...logs, {
+        id: `log_timeline_unlock_${next.phase}_${state.turn}`,
+        timestamp: state.turn,
+        source: "system",
+        text: `[TIMELINE] Phase unlocked: ${label} — enough evidence gathered to reconstruct this period`,
+        read: false,
+      }];
+    }
+  }
+
   return {
     ...state,
+    logs,
     mystery: { ...state.mystery, incidentBoard: updatedBoard },
   };
 }
@@ -433,9 +460,9 @@ export function checkIQMilestones(state: GameState): GameState {
   const milestones = new Set(state.milestones);
   const newLogs: LogEntry[] = [...state.logs];
   const thresholds = [
-    { pct: 25, key: "iq_milestone_25", text: "CORVUS-7: Investigation quality at 25%. " },
-    { pct: 50, key: "iq_milestone_50", text: "CORVUS-7: Investigation quality at 50%. " },
-    { pct: 75, key: "iq_milestone_75", text: "CORVUS-7: Investigation quality at 75%. " },
+    { pct: 25, key: "iq_milestone_25", text: "CORVUS-7: Investigation 25% complete. The picture is forming. " },
+    { pct: 50, key: "iq_milestone_50", text: "CORVUS-7: Investigation 50% complete. Significant progress. " },
+    { pct: 75, key: "iq_milestone_75", text: "CORVUS-7: Investigation 75% complete. The truth is close. " },
   ];
 
   for (const t of thresholds) {
@@ -5593,6 +5620,7 @@ export function step(state: GameState, action: Action): GameState {
 
       // Update incident board slot unlocks
       next = updateMysteryBoardState(next);
+      next = checkIQMilestones(next);
 
       // Free action — examining doesn't advance turn
       return next;
@@ -5871,6 +5899,7 @@ export function step(state: GameState, action: Action): GameState {
 
       // Update incident board slot unlocks
       next = updateMysteryBoardState(next);
+      next = checkIQMilestones(next);
 
       // Check pending contradictions — decrement rooms until reveal
       if (next.mystery?.pendingContradictions && next.mystery.pendingContradictions.length > 0) {
@@ -6013,6 +6042,7 @@ export function step(state: GameState, action: Action): GameState {
       }
 
       // Free action — no additional turn advance
+      next = checkIQMilestones(next);
       return next;
     }
 

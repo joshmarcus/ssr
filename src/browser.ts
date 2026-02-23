@@ -1002,6 +1002,22 @@ function triggerCrackMoment(): void {
     duration: 12000,
     glitch: true,
   });
+  // Persistent amber world tint after crack moment
+  enablePostCrackTint();
+}
+
+/** Add a subtle persistent amber tint overlay after the crack moment fires. */
+function enablePostCrackTint(): void {
+  let tint = document.getElementById("crack-tint-overlay");
+  if (tint) return; // already active
+  tint = document.createElement("div");
+  tint.id = "crack-tint-overlay";
+  tint.style.cssText =
+    "position:fixed;inset:0;z-index:1;pointer-events:none;" +
+    "background:radial-gradient(ellipse at center, rgba(40,25,5,0) 40%, rgba(40,25,5,0.12) 100%);" +
+    "mix-blend-mode:multiply;opacity:0;transition:opacity 3s ease-in;";
+  document.body.appendChild(tint);
+  requestAnimationFrame(() => { tint!.style.opacity = "1"; });
 }
 
 /** Trigger Contradiction Found visual event — two pieces of evidence clash. */
@@ -1975,6 +1991,9 @@ function resetGameState(newSeed: number): void {
   if (journalEl) { journalEl.classList.remove("active"); journalEl.innerHTML = ""; }
   choicesPresented.clear();
   prevCrackMomentFired = false;
+  // Remove crack tint on new game
+  const crackTint = document.getElementById("crack-tint-overlay");
+  if (crackTint) crackTint.remove();
   prevRevealedContradictions = 0;
   prevConfirmedSlots = 0;
   prevIdentifiedCrew = 0;
@@ -2270,6 +2289,16 @@ function handleAction(action: Action): void {
       if (simLog.id.startsWith("log_first_evidence_")) {
         display.triggerScreenFlash("milestone");
         audio.playInteract();
+      }
+      // Timeline phase unlocked — screen flash + audio
+      if (simLog.id.startsWith("log_timeline_unlock_")) {
+        display.triggerScreenFlash("milestone");
+        audio.playInteract();
+      }
+      // Investigation quality milestone — screen flash
+      if (simLog.id.startsWith("log_iq_milestone_")) {
+        display.triggerScreenFlash("milestone");
+        audio.playPhaseTransition();
       }
       // Clue examination — flash tile and audio
       if (simLog.id.startsWith("log_examine_clues_")) {
@@ -5025,6 +5054,11 @@ function handlePauseInput(e: KeyboardEvent): void {
           seed = state.seed;
           initGame();
           display.addLog("[Save loaded — resuming session]", "milestone");
+          // Restore crack moment tint if applicable
+          if (state.mystery?.evidenceAccumulation?.crack_moment_fired) {
+            prevCrackMomentFired = true;
+            enablePostCrackTint();
+          }
           renderAll();
         } else {
           pauseSaveFlash = "Save corrupted — deleted.";
@@ -5186,18 +5220,27 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
   // Track current selection as viewed
   const readIds = hubViewedEvidenceIds;
 
-  // Build contradiction marker set — evidence entries whose text matches a contradiction pair
-  const contradictionEntryIds = new Set<string>();
+  // Build contradiction marker map — evidence entries whose text matches a contradiction pair
+  const contradictionMarkers = new Map<string, "official" | "contradicting">();
   const pairs = state.mystery?.contradictionPairs ?? [];
   for (const pair of pairs) {
     if (pair.officialFound || pair.contradictingFound) {
       for (const e of entries) {
-        if (pair.officialFound && e.detail.includes(pair.official.text)) contradictionEntryIds.add(e.id);
-        if (pair.contradictingFound && e.detail.includes(pair.contradicting.text)) contradictionEntryIds.add(e.id);
+        if (pair.officialFound && e.detail.includes(pair.official.text) && !contradictionMarkers.has(e.id)) {
+          contradictionMarkers.set(e.id, "official");
+        }
+        if (pair.contradictingFound && e.detail.includes(pair.contradicting.text)) {
+          contradictionMarkers.set(e.id, "contradicting");
+        }
       }
     }
   }
-  const contradictMark = (id: string) => contradictionEntryIds.has(id) ? ` <span style="color:#f44;font-size:9px" title="Part of a contradiction">\u26A0</span>` : "";
+  const contradictMark = (id: string) => {
+    const mark = contradictionMarkers.get(id);
+    if (!mark) return "";
+    if (mark === "contradicting") return ` <span style="color:#f44;font-size:8px;background:rgba(255,68,68,0.1);padding:0 3px;border-radius:2px">\u26A0 CONTRADICTS</span>`;
+    return ` <span style="color:#4cf;font-size:8px;background:rgba(68,200,255,0.1);padding:0 3px;border-radius:2px">OFFICIAL</span>`;
+  };
 
   let listHtml = "";
   if (hubEvidenceFilter === "by_room") {
@@ -6308,13 +6351,24 @@ function renderHubScenes(): string {
       let icon: string, color: string;
       if (slot.status === "confirmed") { icon = "\u2713"; color = "#4a4"; }
       else if (slot.status === "proposed") { icon = "?"; color = "#fa0"; }
-      else if (slot.status === "unlocked") { icon = "\u25cb"; color = "#ca8"; }
+      else if (slot.status === "unlocked") { icon = "\u25cb"; color = "#fa0"; }
       else { icon = "\u25cb"; color = "#555"; }
       const phaseScenes = scenesPerPhase.get(slot.phase);
       const sceneCount = phaseScenes ? ` <span style="color:#556;font-size:9px">(${phaseScenes.processed}/${phaseScenes.total} scenes)</span>` : "";
       listHtml += `<div style="font-size:11px;padding:2px 0"><span style="color:${color}">[${icon}]</span> <span style="color:${slot.status === "confirmed" ? "#bbc" : "#667"}">${esc(label)}</span>${sceneCount}`;
       if (slot.status === "confirmed" && slot.confirmedCard) {
         listHtml += ` <span style="color:#4a4;font-size:10px">— ${esc(slot.confirmedCard.event.slice(0, 30))}</span>`;
+      } else if (slot.status === "unlocked") {
+        listHtml += ` <span style="color:#fa0;font-size:9px;font-weight:bold">READY</span>`;
+      } else if (slot.status === "locked") {
+        const reqHints: Record<string, string> = {
+          trigger: "2+ rooms processed, 1+ crew ID'd",
+          escalation: "4+ rooms processed, 1+ contradiction",
+          collapse: "6+ rooms processed, 3+ crew ID'd",
+          aftermath: "all prior phases confirmed",
+        };
+        const hint = reqHints[slot.phase];
+        if (hint) listHtml += ` <span style="color:#445;font-size:9px">(${hint})</span>`;
       }
       listHtml += `</div>`;
     }
@@ -6613,7 +6667,19 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
   html += `<div style="color:#4cf;font-size:10px;letter-spacing:2px;margin-bottom:8px">PROCESS SCENE: ${esc(scene.roomName.toUpperCase())}</div>`;
 
   const turnCost = scene.processAttempts === 0 ? 3 : scene.processAttempts === 1 ? 5 : scene.processAttempts === 2 ? 8 : 8 + (scene.processAttempts - 2) * 4;
-  html += `<div style="color:#667;font-size:10px;margin-bottom:8px">Attempt ${scene.processAttempts + 1} \u00B7 Cost: ${turnCost} turns \u00B7 Score 2/3 to succeed</div>`;
+  const costColor = turnCost <= 3 ? "#4a4" : turnCost <= 5 ? "#ca8" : "#f66";
+  const costSteps = [3, 5, 8, 12];
+  const costPreview = costSteps.map((c, i) => {
+    const isCurrent = i === scene.processAttempts;
+    const isPast = i < scene.processAttempts;
+    const color = isPast ? "#445" : isCurrent ? costColor : "#556";
+    const style = isCurrent ? "font-weight:bold;text-decoration:underline" : isPast ? "text-decoration:line-through" : "";
+    return `<span style="color:${color};${style}">${c}</span>`;
+  }).join(" \u2192 ");
+  html += `<div style="padding:4px 8px;margin-bottom:8px;background:rgba(${turnCost <= 3 ? "68,170,68" : turnCost <= 5 ? "200,170,100" : "255,100,100"},0.06);border:1px solid ${costColor}44;border-radius:3px">`;
+  html += `<div style="color:${costColor};font-size:11px;font-weight:bold">Attempt ${scene.processAttempts + 1} \u2014 Cost: ${turnCost} turns</div>`;
+  html += `<div style="font-size:9px;color:#667;margin-top:2px">Escalation: ${costPreview} turns \u00B7 Need 2/3 correct to succeed</div>`;
+  html += `</div>`;
 
   // ── PREVIOUS ATTEMPT RESULTS — show what was wrong last time ──
   if (scene.lastAttemptResult && !scene.processed) {
@@ -6664,20 +6730,26 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
   }
   const relevantEntries = [...roomEvidence, ...journal.filter(je => crewEvidence.has(je.id))];
   if (relevantEntries.length > 0) {
-    html += `<div style="margin-bottom:10px;padding:6px 8px;background:rgba(100,180,255,0.04);border:1px solid #334;border-radius:3px;max-height:100px;overflow-y:auto">`;
+    const roomOnlyCount = roomEvidence.length;
+    const crewOnlyCount = relevantEntries.length - roomOnlyCount;
+    html += `<div style="margin-bottom:10px;padding:6px 8px;background:rgba(100,180,255,0.04);border:1px solid #334;border-radius:3px;max-height:130px;overflow-y:auto">`;
     html += `<div style="color:#6af;font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:3px">RELEVANT EVIDENCE (${relevantEntries.length})</div>`;
-    for (const entry of relevantEntries.slice(0, 6)) {
+    if (roomOnlyCount > 0 && crewOnlyCount > 0) {
+      html += `<div style="color:#556;font-size:9px;margin-bottom:3px">${roomOnlyCount} from this room \u00B7 ${crewOnlyCount} from linked crew</div>`;
+    }
+    for (const entry of relevantEntries.slice(0, 8)) {
       const crewTags = entry.crewMentioned.map(id => {
         const c = crew.find(m => m.id === id);
         return c ? c.lastName : "";
       }).filter(Boolean);
       const crewStr = crewTags.length > 0 ? ` <span style="color:#6cf;font-size:9px">[${crewTags.join(", ")}]</span>` : "";
+      const srcIcon = entry.roomFound === scene.roomName ? "\u25A0" : "\u25CB";
       html += `<div style="margin:1px 0;font-size:10px;color:#99a;padding:1px 4px;border-left:2px solid #446">`;
-      html += `<span style="color:#aac">${esc(entry.summary)}</span>${crewStr}`;
+      html += `<span style="color:#556">${srcIcon}</span> <span style="color:#aac">${esc(entry.summary)}</span>${crewStr}`;
       html += `</div>`;
     }
-    if (relevantEntries.length > 6) {
-      html += `<div style="color:#556;font-size:9px;padding:1px 4px">...and ${relevantEntries.length - 6} more</div>`;
+    if (relevantEntries.length > 8) {
+      html += `<div style="color:#556;font-size:9px;padding:1px 4px">...and ${relevantEntries.length - 8} more</div>`;
     }
     html += `</div>`;
   }
