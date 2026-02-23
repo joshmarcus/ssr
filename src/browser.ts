@@ -437,6 +437,21 @@ function autoExploreStep(): void {
       autoExploreTimer = setTimeout(autoExploreStep, AUTO_EXPLORE_DELAY);
       return;
     }
+
+    // Auto-examine room scene clues when in a room with unexamined clues
+    if (state.mystery?.roomScenes) {
+      const currentRoom = state.rooms.find(r =>
+        px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height
+      );
+      if (currentRoom) {
+        const scene = state.mystery.roomScenes.find(s => s.roomId === currentRoom.id);
+        if (scene && !scene.processed && scene.physicalClues.some(c => !c.examined)) {
+          handleAction({ type: ActionType.ExamineScene, sceneRoomId: currentRoom.id });
+          autoExploreTimer = setTimeout(autoExploreStep, AUTO_EXPLORE_DELAY);
+          return;
+        }
+      }
+    }
   }
 
   const dir = autoExploreBFS();
