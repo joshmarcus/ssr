@@ -315,10 +315,28 @@ function addJournalEntry(
     ];
   }
 
+  // Hint when first deduction becomes available
+  let hintLogs = phaseLogs;
+  const newMilestones = new Set(state.milestones);
+  if (!state.milestones.has("hint_deduction_ready")) {
+    const prevUnlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
+    const nextUnlocked = getUnlockedDeductions(state.mystery.deductions, newJournal);
+    if (nextUnlocked.length > 0 && prevUnlocked.length === 0) {
+      newMilestones.add("hint_deduction_ready");
+      hintLogs = [...hintLogs, {
+        id: `log_hint_deduction_${state.turn}`,
+        timestamp: state.turn,
+        source: "milestone",
+        text: "A deduction is now available! Open the Hub [R] and check Connections to answer.",
+        read: false,
+      }];
+    }
+  }
 
   return {
     ...state,
-    logs: phaseLogs,
+    logs: hintLogs,
+    milestones: newMilestones,
     mystery: {
       ...state.mystery,
       journal: newJournal,
@@ -1044,6 +1062,19 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           ];
         }
         next = fireMilestone(next, "first_terminal");
+
+        // First-time hint: evidence is added to journal
+        if (!next.milestones.has("hint_first_evidence")) {
+          next = { ...next, milestones: new Set([...next.milestones, "hint_first_evidence"]) };
+          next.logs = [...next.logs, {
+            id: `log_hint_first_evidence_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: "Evidence logged. Press [R] to open the Investigation Hub. Press [G] for mission goals.",
+            read: false,
+          }];
+        }
+
         // Add journal entry for this log
         const logSource = target.props["source"] as string || "unknown";
         const firstLine = terminalText.split("\n")[0] || terminalText.slice(0, 60);
@@ -5351,6 +5382,18 @@ export function step(state: GameState, action: Action): GameState {
           text: `Examined ${newlyExamined.length} clue${newlyExamined.length > 1 ? "s" : ""} in ${scene.roomName}.`,
           read: false,
         }];
+
+        // First-time hint: open Hub to review evidence
+        if (!next.milestones.has("hint_hub_evidence")) {
+          next = { ...next, milestones: new Set([...next.milestones, "hint_hub_evidence"]) };
+          next.logs = [...next.logs, {
+            id: `log_hint_hub_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: "Press [R] to open the Investigation Hub and review collected evidence.",
+            read: false,
+          }];
+        }
       } else {
         const sensorGated = scene.physicalClues.filter(c => !c.examined && c.sensorRequired);
         if (sensorGated.length > 0) {
@@ -5502,6 +5545,18 @@ export function step(state: GameState, action: Action): GameState {
         text: `${scoreText} [${parts.join(", ")}]`,
         read: false,
       }];
+
+      // Hint after first successful scene processing
+      if (result.score >= 2 && !next.milestones.has("hint_first_process")) {
+        next = { ...next, milestones: new Set([...next.milestones, "hint_first_process"]) };
+        next.logs = [...next.logs, {
+          id: `log_hint_process_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Scene processed! Check Connections in the Hub [R] — new deductions may be available.",
+          read: false,
+        }];
+      }
 
       // Generate narrative journal entry for processed scene
       if (result.score >= 2) {

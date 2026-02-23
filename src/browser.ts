@@ -3964,12 +3964,20 @@ function handleDeductionInput(e: KeyboardEvent): boolean {
   }
   if (e.key === "Enter") {
     e.preventDefault();
-    // Show confirmation prompt instead of immediately solving
+    // Show confirmation prompt with penalty warning
     confirmingDeduction = true;
+    const attemptsUsed = activeDeduction.wrongAttempts ?? 0;
+    const maxAttempts = activeDeduction.maxAttempts ?? 2;
+    const attemptsLeft = maxAttempts - attemptsUsed;
     display.addLog("", "system");
     display.addLog(`═══ CONFIRM DEDUCTION ═══`, "milestone");
     display.addLog(`Your answer: ${activeDeduction.options[deductionSelectedIdx].label}`, "narrative");
-    display.addLog("This answer is permanent. Are you sure? [Y/N]", "warning");
+    if (attemptsLeft <= 1) {
+      display.addLog(`⚠ FINAL ATTEMPT — wrong answer locks out this deduction forever`, "warning");
+    } else {
+      display.addLog(`Wrong answers cost 3 HP + 10 turns. ${attemptsLeft} attempt${attemptsLeft !== 1 ? "s" : ""} remaining.`, "system");
+    }
+    display.addLog("Lock in this answer? [Y/N]", "warning");
     renderAll();
     return true;
   }

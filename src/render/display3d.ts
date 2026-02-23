@@ -2862,7 +2862,17 @@ export class BrowserDisplay3D implements IGameDisplay {
             ? `<span style="color:#6cf">Evidence: ${journal.length}/${nextThreshold}</span>`
             : `<span style="color:#6cf">Evidence: ${journal.length}</span>`;
           const deductionProgress = `<span style="color:#fa0">Deductions: ${solved}/${total}</span>`;
-          progressHtml = `<br><span class="hud-obj-progress">${evidenceProgress} | ${deductionProgress}</span>`;
+
+          // Scene progress
+          const scenes = state.mystery.roomScenes ?? [];
+          const processedScenes = scenes.filter(s => s.processed).length;
+          const totalScenes = scenes.length;
+          const sceneColor = processedScenes === totalScenes && totalScenes > 0 ? "#4f4" : "#c8f";
+          const sceneProgress = totalScenes > 0
+            ? `<span style="color:${sceneColor}">Scenes: ${processedScenes}/${totalScenes}</span>`
+            : "";
+
+          progressHtml = `<br><span class="hud-obj-progress">${evidenceProgress} | ${deductionProgress}${sceneProgress ? ` | ${sceneProgress}` : ""}</span>`;
         }
 
         // Deduction-ready notification
