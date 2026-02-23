@@ -2168,6 +2168,11 @@ function handleAction(action: Action): void {
         pendingSceneRoom = currentRoom?.name ?? null;
         continue; // skip immediate display
       }
+      // Crew identification celebration — trigger screen flash
+      if (simLog.id.startsWith("log_crew_identified_")) {
+        display.triggerScreenFlash("milestone");
+        audio.playDeductionCorrect();
+      }
       // Memory echo clue examined — trigger ghost reveal in 3D renderer
       if (simLog.id.startsWith("log_memory_echo_")) {
         const crewId = simLog.id.replace("log_memory_echo_", "").replace(/_\d+$/, "");

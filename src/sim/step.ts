@@ -5341,7 +5341,17 @@ export function step(state: GameState, action: Action): GameState {
 
             // Badge clue confirms identity
             if (clue.type === "badge") {
+              const wasIdentified = dossier.confirmed.name;
               dossier = confirmIdentity(dossier, crewMember);
+              if (!wasIdentified && dossier.confirmed.name) {
+                next.logs = [...next.logs, {
+                  id: `log_crew_identified_${crewMember.id}_${next.turn}`,
+                  timestamp: next.turn,
+                  source: "milestone",
+                  text: `CORVUS-7: Crew member identified — ${crewMember.firstName} ${crewMember.lastName}, ${crewMember.role}. Badge ${crewMember.badgeId} confirmed.`,
+                  read: false,
+                }];
+              }
             }
 
             // Link this journal entry to the dossier

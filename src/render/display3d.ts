@@ -3063,7 +3063,17 @@ export class BrowserDisplay3D implements IGameDisplay {
           const iqColor = iqPct >= 80 ? "#4f4" : iqPct >= 50 ? "#fa0" : iqPct >= 25 ? "#c80" : "#556";
           const iqLabel = `<span style="color:${iqColor};font-size:10px">IQ:${iqPct}%</span>`;
 
-          progressHtml = `<br><span class="hud-obj-progress">${evidenceProgress} | ${deductionProgress}${sceneProgress ? ` | ${sceneProgress}` : ""} | ${iqLabel}</span>`;
+          // Evidence accumulation dots (confirming/ambiguous/contradicting)
+          const accum = state.mystery?.evidenceAccumulation;
+          let accumHtml = "";
+          if (accum) {
+            const total = accum.confirming_found + accum.ambiguous_found + accum.contradicting_found;
+            if (total > 0) {
+              accumHtml = ` | <span style="color:#4a4">${accum.confirming_found}C</span>/<span style="color:#ca8">${accum.ambiguous_found}A</span>/<span style="color:#f44">${accum.contradicting_found}X</span>`;
+            }
+          }
+
+          progressHtml = `<br><span class="hud-obj-progress">${evidenceProgress} | ${deductionProgress}${sceneProgress ? ` | ${sceneProgress}` : ""}${accumHtml} | ${iqLabel}</span>`;
         }
 
         // Deduction-ready notification
