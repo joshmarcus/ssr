@@ -1,5 +1,5 @@
 import { generate } from "./sim/procgen.js";
-import { step, applyDeductionReward as applyDeductionRewardSim } from "./sim/step.js";
+import { step, applyDeductionReward as applyDeductionRewardSim, checkIQMilestones } from "./sim/step.js";
 import { STORY_ROLES } from "./sim/deduction.js";
 import { BrowserDisplay3D } from "./render/display3d.js";
 import type { IGameDisplay } from "./render/displayInterface.js";
@@ -4664,6 +4664,9 @@ function commitDeductionAnswer(): void {
     }
   }
 
+  // Check IQ milestones after deduction state change
+  state = checkIQMilestones(state);
+
   activeDeduction = null;
   renderAll();
 }
@@ -5695,6 +5698,21 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
 
   rightHtml += `<div style="color:#fa0;font-size:10px;font-weight:bold;letter-spacing:2px;margin-bottom:10px;text-align:center">SELECT YOUR ANSWER</div>`;
 
+  // Compute confidence scores: count journal entries with keywords matching each option
+  const allDetailText = journal.map(j => j.detail.toLowerCase()).join(" ");
+  const optionConfidence: number[] = deduction.options.map(opt => {
+    const words = opt.label.toLowerCase().split(/\s+/).filter(w => w.length >= 4);
+    if (words.length === 0) return 0;
+    let hits = 0;
+    for (const w of words) {
+      // Count approximate occurrences in combined journal text
+      let idx = 0;
+      while ((idx = allDetailText.indexOf(w, idx)) !== -1) { hits++; idx += w.length; }
+    }
+    return hits;
+  });
+  const maxConf = Math.max(...optionConfidence, 1);
+
   for (let i = 0; i < deduction.options.length; i++) {
     const isSelected = i === hubOptionIdx;
     const borderColor = isSelected ? "#fa0" : "#333";
@@ -5702,10 +5720,17 @@ function renderHubConnectionDetail(deduction: import("./shared/types.js").Deduct
     const textColor = isSelected ? "#eef" : "#889";
     const numberColor = isSelected ? "#fa0" : "#556";
 
+    // Confidence indicator based on keyword hits
+    const conf = optionConfidence[i];
+    const confRatio = conf / maxConf;
+    const confLabel = confRatio >= 0.6 ? "HIGH" : confRatio >= 0.3 ? "MED" : conf > 0 ? "LOW" : "";
+    const confColor = confRatio >= 0.6 ? "#4a4" : confRatio >= 0.3 ? "#ca8" : "#556";
+
     rightHtml += `<div style="margin:4px 0;padding:10px 14px;border:1px solid ${borderColor};background:${bgColor};border-radius:4px;cursor:pointer;transition:all 0.15s ease">`;
     rightHtml += `<span style="color:${numberColor};font-size:11px;font-weight:bold;margin-right:8px">${i + 1}.</span>`;
     rightHtml += `<span style="color:${textColor};font-size:13px">${esc(deduction.options[i].label)}</span>`;
-    if (isSelected) rightHtml += ` <span style="color:#fa0;float:right">\u25c0</span>`;
+    if (confLabel) rightHtml += ` <span style="color:${confColor};font-size:9px;float:right;margin-top:2px">${confLabel}</span>`;
+    if (isSelected) rightHtml += ` <span style="color:#fa0;float:right;margin-right:${confLabel ? "40px" : "0"}">\u25c0</span>`;
     rightHtml += `</div>`;
   }
 
@@ -7017,6 +7042,8 @@ function handleHubScenesInput(e: KeyboardEvent): void {
           correctWhat: activityLabel(gt.what),
           correctOutcome: activityLabel(gt.outcome),
         };
+        // Check IQ milestones after scene processing
+        state = checkIQMilestones(state);
         // Exit process view after submission
         hubSceneSubView = "clues";
         hubSceneDetail = null;

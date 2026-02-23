@@ -393,6 +393,70 @@ function addJournalEntry(
 }
 
 /**
+ * Check investigation quality milestones and fire CORVUS-7 logs at thresholds.
+ * Call after actions that change IQ (scene processing, deductions, crew ID).
+ */
+export function checkIQMilestones(state: GameState): GameState {
+  if (!state.mystery) return state;
+  const m = state.mystery;
+
+  // Compute IQ same as display3d
+  const totalScenes = m.roomScenes?.length ?? 0;
+  const processedScenes = m.roomScenes?.filter(s => s.processed).length ?? 0;
+  const identifiedCrew = m.dossiers?.filter(d => d.confirmed.name).length ?? 0;
+  const totalCrew = m.dossiers?.length ?? 0;
+  const board = m.incidentBoard;
+  const totalSlots = board?.slots.length ?? 0;
+  const confirmedSlots = board?.slots.filter(s => s.status === "confirmed").length ?? 0;
+  const totalContradictions = m.contradictionPairs?.length ?? 0;
+  const revealedContradictions = m.contradictionPairs?.filter(p => p.revealed).length ?? 0;
+
+  let iq = 0;
+  if (totalScenes > 0) iq += (processedScenes / totalScenes) * 30;
+  if (totalCrew > 0) iq += (identifiedCrew / totalCrew) * 25;
+  if (totalSlots > 0) iq += (confirmedSlots / totalSlots) * 25;
+  if (totalContradictions > 0) iq += (revealedContradictions / totalContradictions) * 20;
+  iq = Math.round(iq);
+
+  const milestones = new Set(state.milestones);
+  const newLogs: LogEntry[] = [...state.logs];
+  const thresholds = [
+    { pct: 25, key: "iq_milestone_25", text: "CORVUS-7: Investigation quality at 25%. " },
+    { pct: 50, key: "iq_milestone_50", text: "CORVUS-7: Investigation quality at 50%. " },
+    { pct: 75, key: "iq_milestone_75", text: "CORVUS-7: Investigation quality at 75%. " },
+  ];
+
+  for (const t of thresholds) {
+    if (iq >= t.pct && !milestones.has(t.key)) {
+      milestones.add(t.key);
+      // Identify weakest area for advice
+      const sceneScore = totalScenes > 0 ? (processedScenes / totalScenes) : 1;
+      const crewScore = totalCrew > 0 ? (identifiedCrew / totalCrew) : 1;
+      const timelineScore = totalSlots > 0 ? (confirmedSlots / totalSlots) : 1;
+      const contraScore = totalContradictions > 0 ? (revealedContradictions / totalContradictions) : 1;
+      const weakest = Math.min(sceneScore, crewScore, timelineScore, contraScore);
+      let advice = "";
+      if (weakest === sceneScore && totalScenes > 0) advice = "Focus on processing room scenes.";
+      else if (weakest === crewScore && totalCrew > 0) advice = "More crew identification needed — find badges.";
+      else if (weakest === timelineScore && totalSlots > 0) advice = "Confirm more timeline events in the incident board.";
+      else if (weakest === contraScore && totalContradictions > 0) advice = "Seek out contradicting evidence.";
+      else advice = "Keep investigating.";
+
+      newLogs.push({
+        id: `log_${t.key}_${state.turn}`,
+        timestamp: state.turn,
+        source: "milestone" as const,
+        text: t.text + advice,
+        read: false,
+      });
+    }
+  }
+
+  if (milestones.size === state.milestones.size) return state;
+  return { ...state, logs: newLogs, milestones };
+}
+
+/**
  * Apply the reward for a solved deduction (sim-side, no display calls).
  * Returns updated GameState.
  */
