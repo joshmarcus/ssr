@@ -1888,3 +1888,154 @@ export const ENV_CHOICE_EPILOGUES: Record<string, Record<string, string>> = {
     structural: "You reinforced the bulkhead. One more sealed door between danger and the crew.",
   },
 };
+
+// ── Hazard-resolution evidence ──────────────────────────────
+// When the player resolves a hazard (breach seal, relay reroute, cooling),
+// archetype-specific environmental evidence is revealed as a journal entry.
+
+// ── Crew rescue gratitude evidence ───────────────────────────
+// When a crew member is rescued from a hazardous room, they share
+// something they witnessed while trapped — archetype-specific.
+export const CREW_RESCUE_GRATITUDE: Record<string, Record<string, (crewName: string) => { text: string; summary: string }>> = {
+  coolant_cascade: {
+    seal_breach: (crewName) => ({
+      text: `${crewName}: "Thank god you sealed that. While I was trapped in here, I could hear the coolant lines groaning. Someone had been down in the sublevel before the cascade — I heard tools. After hours. Nobody was scheduled for maintenance."`,
+      summary: `${crewName} heard unauthorized maintenance activity before the coolant cascade`,
+    }),
+    cool_room: (crewName) => ({
+      text: `${crewName}: "The heat was unbearable. But before it got bad, I saw someone at the coolant control panel. They were entering override codes — not emergency ones, custom sequences. Then they just... left."`,
+      summary: `${crewName} witnessed someone entering custom override codes at coolant controls`,
+    }),
+  },
+  hull_breach: {
+    seal_breach: (crewName) => ({
+      text: `${crewName}: "I watched the hull buckle from inside. It wasn't sudden — there were sparks along the seam first, like something was cutting from outside. Then the whole panel blew inward."`,
+      summary: `${crewName} saw sparks along the hull seam before the breach — possible external cutting`,
+    }),
+    cool_room: (crewName) => ({
+      text: `${crewName}: "The thermal buildup started from the engineering side. Someone had redirected coolant away from this section. I tried to report it but comms were already down."`,
+      summary: `${crewName} reports deliberate coolant diversion and communications failure`,
+    }),
+  },
+  reactor_scram: {
+    seal_breach: (crewName) => ({
+      text: `${crewName}: "The pressure drop happened right after the reactor alarm. But I could see the reactor readouts from here — the scram was triggered manually, not by the safety system."`,
+      summary: `${crewName} confirms the reactor scram was manually triggered`,
+    }),
+    cool_room: (crewName) => ({
+      text: `${crewName}: "Before the heat hit, I saw the compute allocation display spike. Someone was running something massive through the reactor grid. Unauthorized. Then everything went critical."`,
+      summary: `${crewName} saw unauthorized compute allocation before the reactor overload`,
+    }),
+  },
+  sabotage: {
+    seal_breach: (crewName) => ({
+      text: `${crewName}: "While I was stuck in here, I could smell something through the vents — not normal atmo. Something organic. The cargo section environmental controls had been altered."`,
+      summary: `${crewName} detected organic contamination through ventilation before the breach`,
+    }),
+    cool_room: (crewName) => ({
+      text: `${crewName}: "Someone turned off the temperature monitoring in cargo three days ago. I filed a report. It was marked 'resolved' by someone I didn't recognize."`,
+      summary: `${crewName}'s temperature monitoring report was falsely closed`,
+    }),
+  },
+  signal_anomaly: {
+    seal_breach: (crewName) => ({
+      text: `${crewName}: "Right before the hull went, every screen in here flickered with static. Not random — there were patterns in it. Like data encoding. The signal was using the hull as an antenna."`,
+      summary: `${crewName} observed encoded data patterns in static before the hull breach`,
+    }),
+    cool_room: (crewName) => ({
+      text: `${crewName}: "The heat came from the communications array direction. I could hear the antenna assembly humming — it was drawing so much power the waste heat overwhelmed the cooling."`,
+      summary: `${crewName} traced heat source to an overloaded communications array`,
+    }),
+  },
+  mutiny: {
+    seal_breach: (crewName) => ({
+      text: `${crewName}: "The breach wasn't random. I saw the section chief's access codes on the airlock override panel before it blew. They opened this section to vacuum deliberately — to trap us here."`,
+      summary: `${crewName} identified section chief's access codes on the airlock override`,
+    }),
+    cool_room: (crewName) => ({
+      text: `${crewName}: "Command cut our life support from the bridge. I saw it happen on the local terminal — remote override, bridge authorization. They were trying to force a surrender."`,
+      summary: `${crewName} witnessed bridge-authorized life support override`,
+    }),
+  },
+};
+
+export const HAZARD_BREACH_EVIDENCE: Record<string, { summary: string; detail: string }> = {
+  coolant_cascade: {
+    summary: "Breach pattern indicates internal pressure spike, not external impact",
+    detail: "Emergency patch analysis: Hull deformation is outward — this breach was caused by internal overpressure from the coolant loop, not external collision. Someone disabled the pressure relief valves before the cascade.",
+  },
+  hull_breach: {
+    summary: "Breach edges show tool marks inconsistent with structural failure",
+    detail: "Seal diagnostics reveal micro-scoring along the breach perimeter. Pattern matches industrial cutting tools, not metal fatigue. This breach was assisted — someone weakened the hull plating before the 'accident'.",
+  },
+  reactor_scram: {
+    summary: "Radiation residue pattern around breach suggests deliberate venting",
+    detail: "Atmospheric trace analysis from the sealed breach shows elevated isotope ratios. The breach wasn't caused by the reactor event — it was opened afterward to vent contaminated atmosphere. Someone was covering tracks.",
+  },
+  sabotage: {
+    summary: "Biological contaminant traces found in breach sealant",
+    detail: "Emergency sealant sample shows traces of the same organism found in the cargo manifest. The breach was created to provide an unmonitored disposal route for contaminated materials.",
+  },
+  signal_anomaly: {
+    summary: "Breach timing correlates with antenna array power surge",
+    detail: "Station telemetry recovered from the sealed compartment shows this breach occurred within seconds of the signal spike. The hull failure may have been electromagnetic — an energy discharge from inside the station.",
+  },
+  mutiny: {
+    summary: "Emergency override codes used to prevent auto-seal during breach",
+    detail: "Auto-seal logs show someone with command-level access deliberately prevented the breach from being automatically sealed. The delay caused maximum pressure loss across the section. This was leverage.",
+  },
+};
+
+export const HAZARD_RELAY_EVIDENCE: Record<string, { summary: string; detail: string }> = {
+  coolant_cascade: {
+    summary: "Relay maintenance logs show scheduled downtime that never happened",
+    detail: "Power grid analysis from the restored relay: maintenance was scheduled for this unit 3 shifts before the cascade. The work order was cancelled by someone with engineering credentials. The relay was left deliberately vulnerable.",
+  },
+  hull_breach: {
+    summary: "Power routing reveals backup systems were pre-emptively disabled",
+    detail: "Relay restore diagnostics show that backup power paths were disconnected before the hull breach — not after. Someone prepared for the emergency systems to fail.",
+  },
+  reactor_scram: {
+    summary: "Relay carried unauthorized compute load before failure",
+    detail: "Power consumption records recovered from the relay show massive unauthorized compute allocation in the hours before the reactor scram. Someone was running intensive calculations through the station grid.",
+  },
+  sabotage: {
+    summary: "Relay firmware was modified to mask power draw from cargo systems",
+    detail: "Restored relay firmware analysis reveals custom load-balancing code that specifically hid power consumption from cargo environmental controls. Someone ensured the monitoring wouldn't flag anomalous activity.",
+  },
+  signal_anomaly: {
+    summary: "Relay was configured as a signal amplifier before the anomaly",
+    detail: "Power grid analysis shows this relay had been reconfigured to feed excess power to the communications array. The modification predates the anomaly by at least 12 hours — this was planned.",
+  },
+  mutiny: {
+    summary: "Relay shutdown sequence matches command bridge override pattern",
+    detail: "Relay restore diagnostics reveal the power grid was brought down in a specific sequence matching command-level emergency protocols. This wasn't a cascade — it was a controlled shutdown to cut off specific sections.",
+  },
+};
+
+export const HAZARD_COOLING_EVIDENCE: Record<string, { summary: string; detail: string }> = {
+  coolant_cascade: {
+    summary: "Cooling system reveals coolant was contaminated before the cascade",
+    detail: "Restored cooling diagnostics show particulate contamination in the coolant supply. The foreign material matches nothing in station inventory — it was introduced from outside normal supply channels.",
+  },
+  hull_breach: {
+    summary: "Thermal data shows anomalous heat signatures before hull failure",
+    detail: "Cooling system restoration revealed cached thermal imaging: localized heat blooms appeared at the future breach points hours before failure. Something was weakening the hull thermally.",
+  },
+  reactor_scram: {
+    summary: "Heat dissipation logs show reactor was operating beyond rated capacity",
+    detail: "Cooling system records indicate heat output exceeded rated reactor capacity by 40% in the final hours. The reactor wasn't malfunctioning — it was being pushed beyond limits deliberately.",
+  },
+  sabotage: {
+    summary: "Cooling vents were redirected away from cargo biohazard containment",
+    detail: "Restored HVAC routing shows someone manually adjusted the cooling priority away from cargo containment units. The organisms in cargo were deliberately given a warmer environment.",
+  },
+  signal_anomaly: {
+    summary: "Cooling system was overwhelmed by heat from communications array",
+    detail: "Thermal load analysis shows the communications array was drawing 8x normal power, generating enough heat to trigger cascade cooling failures across the station. The signal required enormous energy.",
+  },
+  mutiny: {
+    summary: "Life support cooling was selectively disabled in crew quarters",
+    detail: "Cooling restoration data shows the climate system in specific crew quarters was remotely disabled, while command section maintained normal temperature. Targeted environmental pressure.",
+  },
+};

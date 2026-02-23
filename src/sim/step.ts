@@ -20,6 +20,8 @@ import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
   CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
   CREW_POST_BREACH_TESTIMONY, CREW_POST_BREACH_GENERIC,
+  HAZARD_BREACH_EVIDENCE, HAZARD_RELAY_EVIDENCE, HAZARD_COOLING_EVIDENCE,
+  CREW_RESCUE_GRATITUDE,
   CORVUS_REACTIONS,
   SENSOR_CLUES,
   PUZZLE_REVEAL_COOLANT, PUZZLE_REVEAL_FUSE, PUZZLE_REVEAL_SMOKE_VENT,
@@ -1030,6 +1032,37 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       ];
       next = fireMilestone(next, "first_relay");
       if (allActivated) next = fireMilestone(next, "all_relays");
+
+      // Hazard-evidence: relay activation reveals system log evidence
+      const relayArchetype = next.mystery?.timeline.archetype;
+      if (relayArchetype) {
+        const relayEvRoom = state.rooms.find(r =>
+          target.pos.x >= r.x && target.pos.x < r.x + r.width &&
+          target.pos.y >= r.y && target.pos.y < r.y + r.height,
+        );
+        const relayRoomName = relayEvRoom?.name ?? "Unknown Section";
+        const prevRelayJournal = next.mystery?.journal.length ?? 0;
+
+        // Cooling relays give cooling-specific evidence
+        if (target.props["coolsRoom"] === true && HAZARD_COOLING_EVIDENCE[relayArchetype]) {
+          const ev = HAZARD_COOLING_EVIDENCE[relayArchetype];
+          next = addJournalEntry(next, `hazard_cool_${targetId}`, "trace", ev.summary, ev.detail, relayRoomName, targetId);
+        } else if (HAZARD_RELAY_EVIDENCE[relayArchetype]) {
+          const ev = HAZARD_RELAY_EVIDENCE[relayArchetype];
+          next = addJournalEntry(next, `hazard_relay_${targetId}`, "log", ev.summary, ev.detail, relayRoomName, targetId);
+        }
+
+        if ((next.mystery?.journal.length ?? 0) > prevRelayJournal) {
+          const evType = target.props["coolsRoom"] === true ? "Cooling system" : "Power grid";
+          next.logs = [...next.logs, {
+            id: `log_hazard_ev_relay_${targetId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: `[SYSTEM RECOVERY] ${evType} diagnostics revealed new evidence. Check your journal.`,
+            read: false,
+          }];
+        }
+      }
       break;
     }
 
@@ -1545,6 +1578,32 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
           },
         ];
         next = fireMilestone(next, "first_breach_seal");
+
+        // Hazard-evidence: sealing a breach reveals environmental trace evidence
+        const breachArchetype = next.mystery?.timeline.archetype;
+        if (breachArchetype && HAZARD_BREACH_EVIDENCE[breachArchetype]) {
+          const ev = HAZARD_BREACH_EVIDENCE[breachArchetype];
+          const breachRoomName = breachRoom?.name ?? "Unknown Section";
+          const prevJournalLen = next.mystery?.journal.length ?? 0;
+          next = addJournalEntry(
+            next,
+            `hazard_breach_${targetId}`,
+            "trace",
+            ev.summary,
+            ev.detail,
+            breachRoomName,
+            targetId,
+          );
+          if ((next.mystery?.journal.length ?? 0) > prevJournalLen) {
+            next.logs = [...next.logs, {
+              id: `log_hazard_ev_breach_${targetId}_${next.turn}`,
+              timestamp: next.turn,
+              source: "system",
+              text: `[ENVIRONMENTAL ANALYSIS] Breach seal diagnostics revealed new evidence. Check your journal.`,
+              read: false,
+            }];
+          }
+        }
       }
       break;
     }
@@ -2779,6 +2838,60 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
               read: false,
             },
           ];
+        }
+
+        // Rescue reward: if crew had a rescue requirement, they share gratitude evidence
+        const rescueReqForReward = target.props["rescueRequirement"] as string | undefined;
+        const rescueArchetype = next.mystery?.timeline.archetype;
+        if (rescueReqForReward && rescueArchetype && CREW_RESCUE_GRATITUDE[rescueArchetype]) {
+          const gratPool = CREW_RESCUE_GRATITUDE[rescueArchetype];
+          const gratFn = gratPool[rescueReqForReward];
+          if (gratFn) {
+            const grat = gratFn(crewName);
+            next.logs = [...next.logs, {
+              id: `log_rescue_grat_${targetId}_${next.turn}`,
+              timestamp: next.turn,
+              source: "narrative",
+              text: grat.text,
+              read: false,
+            }];
+            const crewRoom = state.rooms.find(r =>
+              target.pos.x >= r.x && target.pos.x < r.x + r.width &&
+              target.pos.y >= r.y && target.pos.y < r.y + r.height,
+            );
+            next = addJournalEntry(
+              next,
+              `rescue_gratitude_${targetId}`,
+              "crew",
+              grat.summary,
+              grat.text,
+              crewRoom?.name ?? "Unknown Section",
+            );
+          }
+        }
+
+        // Rescue risk: hazardous environment costs HP during the rescue
+        const crewRescueTile = next.tiles[target.pos.y]?.[target.pos.x];
+        if (crewRescueTile) {
+          let rescueDmg = 0;
+          let rescueDmgMsg = "";
+          if (crewRescueTile.heat >= 30) {
+            rescueDmg = Math.floor(crewRescueTile.heat / 10);
+            rescueDmgMsg = `Heat exposure during rescue: -${rescueDmg} HP`;
+          } else if (crewRescueTile.pressure < 50) {
+            rescueDmg = Math.floor((60 - crewRescueTile.pressure) / 10);
+            rescueDmgMsg = `Low pressure exposure during rescue: -${rescueDmg} HP`;
+          }
+          if (rescueDmg > 0) {
+            next.player = { ...next.player, hp: Math.max(1, next.player.hp - rescueDmg) };
+            next.logs = [...next.logs, {
+              id: `log_rescue_risk_${targetId}_${next.turn}`,
+              timestamp: next.turn,
+              source: "system",
+              text: rescueDmgMsg,
+              read: false,
+            }];
+          }
         }
       } else if (isFollowing) {
         // Check if crew can be questioned for an archetype-specific clue

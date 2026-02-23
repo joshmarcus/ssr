@@ -562,6 +562,7 @@ export interface MysteryState {
   contradictionPairs?: import("../sim/twoStory.js").ContradictionPair[]; // official vs real story
   pendingContradictions?: import("../sim/twoStory.js").PendingContradiction[]; // delayed reveals
   perfectSceneStreak?: number; // consecutive 3/3 scene processing results
+  investigationMomentum?: number; // 0-100 momentum from consecutive correct answers
 }
 
 // ── What We Know (narrative summary) ─────────────────────────

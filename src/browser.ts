@@ -1150,6 +1150,7 @@ function checkDiscoveryMoments(): void {
   if (currentSlots > prevConfirmedSlots) {
     const newSlot = mystery.incidentBoard?.slots.find(s => s.status === "confirmed");
     triggerTimelineConfirmed(newSlot?.phase ?? "Unknown", currentSlots, totalSlots);
+    updateMomentum(10); // Timeline confirmation builds momentum
   }
   prevConfirmedSlots = currentSlots;
 
@@ -1321,6 +1322,67 @@ function checkRoomEntry(): void {
           display.addLog(hint, "narrative");
           const clueCount = scene.physicalClues.length;
           display.addLog(`[X] Examine scene (${clueCount} clue${clueCount !== 1 ? "s" : ""} to find)`, "system");
+        }
+      }
+
+      // Environmental storytelling echo — processed scenes remind player of their findings
+      if (state.mystery?.roomScenes) {
+        const procScene = state.mystery.roomScenes.find(s => s.roomId === currentRoom.id && s.processed);
+        if (procScene) {
+          // Echo confirmed investigation results
+          const gt = procScene.groundTruth;
+          const whoCrew = gt.who.map(id => state.mystery!.crew.find(c => c.id === id));
+          const whoNames = whoCrew.filter(Boolean).map(c => `${c!.firstName} ${c!.lastName}`).join(" and ");
+          const actLabel = procScene.crewPresent[0]?.activity ?? gt.what;
+          if (whoNames) {
+            display.addLog(`Memory echo: ${whoNames} was here. ${actLabel.replace(/_/g, " ")}.`, "narrative");
+          }
+        }
+
+        // Environmental damage echo — archetype-specific environmental descriptions
+        const dmgScene = state.mystery.roomScenes.find(s => s.roomId === currentRoom.id);
+        if (dmgScene && dmgScene.environmentalState.damageLevel >= 2) {
+          const archetype = state.mystery.timeline.archetype;
+          const dmgType = dmgScene.environmentalState.damageType;
+          const dmgEchoes: Record<string, Record<string, string>> = {
+            coolant_cascade: {
+              thermal: "Residual heat shimmer distorts the air. Coolant stains streak the walls in frozen rivulets.",
+              pressure: "Frost crystals line the vents where pressurized coolant escaped. The air tastes metallic.",
+              electrical: "Burned-out conduits hang from the ceiling. The coolant surge shorted everything in this section.",
+            },
+            hull_breach: {
+              thermal: "Scorch marks radiate from the hull seam. The breach superheated the atmosphere on its way through.",
+              pressure: "Decompression damage everywhere — warped panels, buckled floor plates, personal items frozen mid-flight.",
+              electrical: "Emergency power arced through the wall panels when the breach hit. Char marks pattern the walls.",
+            },
+            reactor_scram: {
+              thermal: "Radiation warning signs on the walls. The air carries a faint ozone tang from the reactor pulse.",
+              pressure: "Containment seals triggered here — you can see the emergency bulkhead tracks embedded in the floor.",
+              electrical: "Every screen and panel in this room is dead. The electromagnetic pulse from the scram fried the local grid.",
+            },
+            sabotage: {
+              thermal: "Bio-containment heat lamps are melted in their housings. Something overrode the thermal limits.",
+              pressure: "Sealed specimen containers have cracked from pressure differentials. Their contents are... gone.",
+              biological: "Organic residue on the walls. Something was growing here — and was encouraged to grow.",
+            },
+            signal_anomaly: {
+              thermal: "Equipment casings are warped from heat. The signal pushed so much power through the circuits they glowed.",
+              pressure: "Acoustic dampening panels are shattered. The signal resonance exceeded structural tolerance.",
+              electrical: "Every electronic surface carries a faint residual charge. Your sensors flicker as you enter.",
+            },
+            mutiny: {
+              thermal: "Burn marks from energy weapon discharge. Someone fought here.",
+              pressure: "Emergency atmo was vented deliberately. You can see the manual override handles are in the OPEN position.",
+              electrical: "Access panels torn open, wiring ripped out. Someone was cutting communications, room by room.",
+            },
+          };
+          const echoText = dmgEchoes[archetype]?.[dmgType];
+          if (echoText && !state.milestones.has(`env_echo_${currentRoom.id}`)) {
+            display.addLog(echoText, "narrative");
+            const newMilestones = new Set(state.milestones);
+            newMilestones.add(`env_echo_${currentRoom.id}`);
+            state = { ...state, milestones: newMilestones };
+          }
         }
       }
 
@@ -4806,6 +4868,7 @@ function commitDeductionAnswer(): void {
     display.triggerScreenFlash("milestone");
     audio.playDeductionCorrect();
     applyDeductionReward(solved);
+    updateMomentum(12); // Correct deduction builds momentum
 
     // Station cascade: reduce hazards station-wide on correct deduction
     let hazardReduced = false;
@@ -4861,6 +4924,7 @@ function commitDeductionAnswer(): void {
       }
     }
     audio.playDeductionWrong();
+    updateMomentum(-25); // Wrong deduction breaks momentum
 
     // Show cinematic overlay
     if (display.showDeductionResult) {
@@ -4992,6 +5056,47 @@ function applyDeductionReward(deduction: Deduction): void {
   for (let i = prevLogCount; i < state.logs.length; i++) {
     const logType = classifySimLog(state.logs[i].text, state.logs[i].source);
     display.addLog(state.logs[i].text, logType);
+  }
+}
+
+// ── Investigation Momentum ─────────────────────────────────────
+/**
+ * Update investigation momentum (0-100) based on player performance.
+ * Correct actions build momentum; wrong actions reset it.
+ * At thresholds, CORVUS-7 provides progressive clarity hints.
+ */
+function updateMomentum(delta: number): void {
+  if (!state.mystery) return;
+  const prev = state.mystery.investigationMomentum ?? 0;
+  const next = Math.max(0, Math.min(100, prev + delta));
+  state.mystery = { ...state.mystery, investigationMomentum: next };
+
+  // Threshold notifications (fire once per threshold)
+  const thresholds = [
+    { pct: 25, key: "momentum_25", text: "CORVUS-7: Investigation gaining traction. Keep the pressure up." },
+    { pct: 50, key: "momentum_50", text: "CORVUS-7: Momentum building — pattern recognition improving. Remaining mysteries should yield faster." },
+    { pct: 75, key: "momentum_75", text: "CORVUS-7: Strong investigative momentum. Scene analysis confidence enhanced." },
+    { pct: 100, key: "momentum_100", text: "CORVUS-7: Peak investigative clarity achieved. All analytical systems at maximum." },
+  ];
+  for (const t of thresholds) {
+    if (next >= t.pct && prev < t.pct && !state.milestones.has(t.key)) {
+      state.milestones = new Set([...state.milestones, t.key]);
+      display.addLog(t.text, "milestone");
+      if (t.pct === 75 && display.showHUDNotification) {
+        display.showHUDNotification({
+          label: "MOMENTUM",
+          text: "Scene analysis confidence enhanced. Answer options now show evidence strength.",
+          hint: "Process scenes in SCENES tab for improved guidance",
+          color: "#4cf",
+          duration: 6000,
+        });
+      }
+    }
+  }
+
+  // Momentum loss notification
+  if (delta < -10 && prev >= 25) {
+    display.addLog("CORVUS-7: Momentum disrupted. Accuracy matters — rebuild through correct assessments.", "warning");
   }
 }
 
@@ -5261,6 +5366,11 @@ function renderInvestigationHub(): void {
   progressHtml += `<span>Deductions: <span style="color:${pColor(deductionsSolved, deductions.length)}">${deductionsSolved}/${deductions.length}</span></span>`;
   progressHtml += `<span>Evidence: <span style="color:#4af">${entries.length}</span></span>`;
   if (crackMoment) progressHtml += `<span style="color:#fa0;font-weight:bold">[BREACH]</span>`;
+  const momentum = state.mystery?.investigationMomentum ?? 0;
+  if (momentum > 0) {
+    const momColor = momentum >= 75 ? "#4f8" : momentum >= 50 ? "#4cf" : momentum >= 25 ? "#fa0" : "#666";
+    progressHtml += `<span style="color:${momColor};font-weight:${momentum >= 50 ? "bold" : "normal"}">\u26A1${momentum}%</span>`;
+  }
   progressHtml += `</div>`;
 
   // CORVUS-7 contextual recommendation
@@ -7335,7 +7445,8 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     const bg = selected ? "background:rgba(68,204,255,0.15)" : suggested ? "background:rgba(68,204,255,0.05)" : "";
     const nameText = identified ? `${c.firstName} ${c.lastName}` : `Crew #${i + 1} (${c.role})`;
     const prefix = selected ? "\u25b6 " : suggested ? "\u25c7 " : "  ";
-    const hint = suggested ? ` <span style="color:#4cf;font-size:9px">\u2190 evidence</span>` : "";
+    const momentumConfidence = (state.mystery?.investigationMomentum ?? 0) >= 75 && scene.groundTruth.who.includes(c.id);
+    const hint = momentumConfidence ? ` <span style="color:#4f8;font-size:9px;font-weight:bold">\u2713 HIGH</span>` : suggested ? ` <span style="color:#4cf;font-size:9px">\u2190 evidence</span>` : "";
     const xrefCount = crewSceneXref.get(c.id)?.length ?? 0;
     const countBadge = xrefCount > 0 ? ` <span style="color:#6a8;font-size:8px;background:rgba(100,170,130,0.1);padding:0 3px;border-radius:2px">${xrefCount} scene${xrefCount !== 1 ? "s" : ""}</span>` : "";
     html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#bce" : "#889"}">${prefix}${esc(nameText)}${hint}${countBadge}`;
@@ -7364,9 +7475,10 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     const a = activities[i];
     const selected = whatActive && i === hubSceneWhatIdx;
     const suggested = suggestedActivities.has(a.key);
+    const whatMomConf = (state.mystery?.investigationMomentum ?? 0) >= 75 && a.key === scene.groundTruth.what;
     const bg = selected ? "background:rgba(255,170,0,0.15)" : suggested ? "background:rgba(255,170,0,0.05)" : "";
     const prefix = selected ? "\u25b6 " : suggested ? "\u25c7 " : "  ";
-    const hint = suggested ? ` <span style="color:#fa0;font-size:9px">\u2190 clue</span>` : "";
+    const hint = whatMomConf ? ` <span style="color:#4f8;font-size:9px;font-weight:bold">\u2713 HIGH</span>` : suggested ? ` <span style="color:#fa0;font-size:9px">\u2190 clue</span>` : "";
     html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#dca" : "#889"}">${prefix}${esc(a.label)}${hint}</div>`;
   }
   html += `</div>`;
@@ -7382,9 +7494,10 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     const o = outcomes[i];
     const selected = outcomeActive && i === hubSceneOutcomeIdx;
     const suggested = suggestedOutcomes.has(o.key);
+    const outMomConf = (state.mystery?.investigationMomentum ?? 0) >= 75 && o.key === scene.groundTruth.outcome;
     const bg = selected ? "background:rgba(255,136,0,0.15)" : suggested ? "background:rgba(255,136,0,0.05)" : "";
     const prefix = selected ? "\u25b6 " : suggested ? "\u25c7 " : "  ";
-    const hint = suggested ? ` <span style="color:#f80;font-size:9px">\u2190 clue</span>` : "";
+    const hint = outMomConf ? ` <span style="color:#4f8;font-size:9px;font-weight:bold">\u2713 HIGH</span>` : suggested ? ` <span style="color:#f80;font-size:9px">\u2190 clue</span>` : "";
     html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#da8" : "#889"}">${prefix}${esc(o.label)}${hint}</div>`;
   }
   html += `</div>`;
@@ -7816,6 +7929,10 @@ function handleHubScenesInput(e: KeyboardEvent): void {
           correctWhat: activityLabel(gt.what),
           correctOutcome: activityLabel(gt.outcome),
         };
+        // Update investigation momentum based on scene score
+        if (score >= 3) updateMomentum(8);        // Perfect scene
+        else if (score >= 2) updateMomentum(4);    // Good scene
+        else updateMomentum(-15);                  // Poor scene
         // Check IQ milestones after scene processing
         state = checkIQMilestones(state);
         // Exit process view after submission
