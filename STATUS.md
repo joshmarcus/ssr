@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 167 (V319 completed — analysis tab, narrative epilogue, evidence cross-refs, deduction confidence)
+- **Phase**: Sprint 169 (V327 completed — crack moment choreography, post-breach testimony, sensor reveals, contradiction annotations)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
