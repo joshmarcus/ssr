@@ -86,7 +86,7 @@ let stationMood: StationMood = MOOD_TYPES[seed % 3];
 // Derive CORVUS-7 personality from seed (3 variants: analytical/empathetic/cryptic)
 let corvusPersonality: CorvusPersonality = CORVUS_PERSONALITIES[(seed >> 2) % 3];
 const difficultyParam = params.get("difficulty") || "normal";
-const difficulty: Difficulty = difficultyParam === "easy" ? Difficulty.Easy
+let difficulty: Difficulty = difficultyParam === "easy" ? Difficulty.Easy
   : difficultyParam === "hard" ? Difficulty.Hard
   : Difficulty.Normal;
 
@@ -3445,6 +3445,22 @@ function showStationMap(): void {
 
   const visited = visitedRoomIds;
   const visitedCount = state.rooms.filter(r => visited.has(r.id)).length;
+  const exploredTiles = state.tiles.flat().filter(t => t.explored).length;
+  const walkableTiles = state.tiles.flat().filter(t => t.type !== TileType.Wall).length;
+  const explorePercent = walkableTiles > 0 ? Math.round((exploredTiles / walkableTiles) * 100) : 0;
+
+  // Count key entities for legend stats
+  let totalRelays = 0, activeRelays = 0;
+  let totalBreaches = 0, sealedBreaches = 0;
+  let crewFound = 0, crewTotal = 0;
+  let evidenceFound = 0;
+  for (const [, ent] of state.entities) {
+    if (ent.type === EntityType.Relay) { totalRelays++; if (ent.props["activated"]) activeRelays++; }
+    if (ent.type === EntityType.Breach) { totalBreaches++; if (ent.props["sealed"]) sealedBreaches++; }
+    if (ent.type === EntityType.CrewNPC) crewTotal++;
+    if (ent.type === EntityType.EvidenceTrace) evidenceFound++;
+  }
+  if (state.mystery?.evacuation) crewFound = state.mystery.evacuation.crewEvacuated.length;
 
   // Room list (text sidebar)
   let roomListHtml = "";
@@ -3461,8 +3477,35 @@ function showStationMap(): void {
         if (cameraRevealed) break;
       }
     }
+    // Scene status for visited rooms
+    let sceneTag = "";
+    if (isVisited && state.mystery?.roomScenes) {
+      const scene = state.mystery.roomScenes.find(s => s.roomId === room.id);
+      if (scene) {
+        const unexamined = scene.physicalClues.filter(c => !c.examined).length;
+        if (scene.processed) {
+          sceneTag = ` <span style="color:#4f4">\u2605</span>`;
+        } else if (unexamined === 0) {
+          sceneTag = ` <span style="color:#fa0">\u25cf</span>`;
+        } else {
+          sceneTag = ` <span style="color:#556">(${unexamined})</span>`;
+        }
+      }
+    }
+    // Hazard indicator
+    let hazardTag = "";
     if (isVisited) {
-      roomListHtml += `<div style="padding:2px 6px;color:#0f0;font-size:11px">\u2713 ${esc(room.name)}</div>`;
+      const rcx = room.x + Math.floor(room.width / 2);
+      const rcy = room.y + Math.floor(room.height / 2);
+      if (rcy >= 0 && rcy < state.height && rcx >= 0 && rcx < state.width) {
+        const tile = state.tiles[rcy][rcx];
+        if (tile.heat > 50) hazardTag = ` <span style="color:#f44">\u2622</span>`;
+        else if (tile.pressure < 60) hazardTag = ` <span style="color:#44f">\u25bc</span>`;
+        else if (tile.smoke > 30) hazardTag = ` <span style="color:#888">\u2601</span>`;
+      }
+    }
+    if (isVisited) {
+      roomListHtml += `<div style="padding:2px 6px;color:#0f0;font-size:11px">\u2713 ${esc(room.name)}${sceneTag}${hazardTag}</div>`;
     } else if (cameraRevealed) {
       roomListHtml += `<div style="padding:2px 6px;color:#6cf;font-size:11px">\u25cb ${esc(room.name)}</div>`;
     } else {
@@ -3470,19 +3513,32 @@ function showStationMap(): void {
     }
   }
 
+  // Legend HTML
+  const legendHtml = `<div style="border-top:1px solid #333;padding:6px;font-size:10px;color:#889">
+    <div style="color:#aab;font-weight:bold;margin-bottom:4px">LEGEND</div>
+    <div><span style="color:#44ff88">\u25cf</span> You</div>
+    <div><span style="color:#ffcc00">\u25b2</span> Relay (${activeRelays}/${totalRelays})</div>
+    <div><span style="color:#ff2200">\u25c6</span> Breach (${sealedBreaches}/${totalBreaches} sealed)</div>
+    <div><span style="color:#44ffaa">\u25a0</span> Crew (${crewTotal})</div>
+    <div><span style="color:#ff44ff">\u2736</span> Data Core</div>
+    <div><span style="color:#0cf">\u25a1</span> Terminal</div>
+    <div style="margin-top:4px;color:#667">Explore: ${explorePercent}%</div>
+    <div style="color:#667">Rooms: ${visitedCount}/${state.rooms.length}</div>
+  </div>`;
+
   overlay.innerHTML = `
-    <div class="journal-container">
-      <div class="journal-header">\u2550\u2550\u2550 STATION MAP \u2550\u2550\u2550</div>
+    <div class="journal-container" style="max-width:900px">
+      <div class="journal-header">\u2550\u2550\u2550 STATION MAP \u2550\u2550\u2550 <span style="color:#556;font-size:11px">T:${state.turn}</span></div>
       <div class="journal-body" style="display:flex;flex-direction:row;padding:0;gap:0">
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:8px;min-height:300px">
-          <canvas id="station-map-canvas" width="560" height="380" style="image-rendering:pixelated;border:1px solid rgba(68,255,136,0.15)"></canvas>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:8px;min-height:420px">
+          <canvas id="station-map-canvas" width="640" height="440" style="image-rendering:pixelated;border:1px solid rgba(68,255,136,0.15)"></canvas>
         </div>
-        <div style="width:180px;overflow-y:auto;border-left:1px solid #333;padding:4px 0;max-height:380px">
+        <div style="width:200px;overflow-y:auto;border-left:1px solid #333;padding:4px 0;max-height:440px">
           ${roomListHtml}
-          <div style="padding:4px 6px;color:#888;border-top:1px solid #333;margin-top:4px;font-size:11px">${visitedCount}/${state.rooms.length} rooms</div>
+          ${legendHtml}
         </div>
       </div>
-      <div class="journal-controls">[Esc/m] Close</div>
+      <div class="journal-controls">[Esc/M] Close</div>
     </div>`;
   overlay.classList.add("active");
 
@@ -3495,20 +3551,29 @@ function showStationMap(): void {
   ctx.fillRect(0, 0, cw, ch);
 
   // Compute scale to fit all tiles
-  const margin = 20;
+  const margin = 24;
   const scaleX = (cw - margin * 2) / state.width;
   const scaleY = (ch - margin * 2) / state.height;
-  const scale = Math.min(scaleX, scaleY, 8);
+  const scale = Math.min(scaleX, scaleY, 10);
   const ox = margin + (cw - margin * 2 - state.width * scale) / 2;
   const oy = margin + (ch - margin * 2 - state.height * scale) / 2;
 
-  // Draw explored corridor tiles
+  // Draw explored corridor tiles with hazard tinting
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       const tile = state.tiles[y][x];
       if (!tile.explored) continue;
       if (tile.type === TileType.Corridor) {
-        ctx.fillStyle = "rgba(60,80,100,0.5)";
+        // Tint corridors by hazard
+        if (tile.heat > 50) {
+          ctx.fillStyle = `rgba(180,60,30,${0.3 + Math.min(tile.heat, 100) / 300})`;
+        } else if (tile.pressure < 60) {
+          ctx.fillStyle = `rgba(40,50,160,${0.3 + (100 - tile.pressure) / 300})`;
+        } else if (tile.smoke > 30) {
+          ctx.fillStyle = `rgba(80,80,80,${0.3 + tile.smoke / 300})`;
+        } else {
+          ctx.fillStyle = "rgba(60,80,100,0.5)";
+        }
         ctx.fillRect(ox + x * scale, oy + y * scale, scale, scale);
       } else if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
         ctx.fillStyle = tile.type === TileType.LockedDoor ? "rgba(255,60,60,0.7)" : "rgba(100,200,100,0.7)";
@@ -3547,16 +3612,30 @@ function showStationMap(): void {
     const rw = room.width * scale;
     const rh = room.height * scale;
 
-    // Room fill
+    // Room fill with hazard tinting for visited rooms
     const tintStr = ROOM_TINTS[room.name];
     if (isVisited) {
-      ctx.fillStyle = tintStr ? tintStr.replace(")", ",0.2)").replace("rgb", "rgba").replace("#", "") : "rgba(40,80,60,0.3)";
-      // Parse hex to rgba
-      if (tintStr && tintStr.startsWith("#")) {
-        const hr = parseInt(tintStr.slice(1, 3), 16);
-        const hg = parseInt(tintStr.slice(3, 5), 16);
-        const hb = parseInt(tintStr.slice(5, 7), 16);
-        ctx.fillStyle = `rgba(${hr},${hg},${hb},0.2)`;
+      // Check for room-level hazards
+      let hazardFill = false;
+      if (rcy >= 0 && rcy < state.height && rcx >= 0 && rcx < state.width) {
+        const centerTile = state.tiles[rcy][rcx];
+        if (centerTile.heat > 50) {
+          ctx.fillStyle = `rgba(180,50,20,0.25)`;
+          hazardFill = true;
+        } else if (centerTile.pressure < 60) {
+          ctx.fillStyle = `rgba(40,40,180,0.2)`;
+          hazardFill = true;
+        }
+      }
+      if (!hazardFill) {
+        if (tintStr && tintStr.startsWith("#")) {
+          const hr = parseInt(tintStr.slice(1, 3), 16);
+          const hg = parseInt(tintStr.slice(3, 5), 16);
+          const hb = parseInt(tintStr.slice(5, 7), 16);
+          ctx.fillStyle = `rgba(${hr},${hg},${hb},0.2)`;
+        } else {
+          ctx.fillStyle = "rgba(40,80,60,0.3)";
+        }
       }
     } else {
       ctx.fillStyle = "rgba(30,40,60,0.3)";
@@ -3570,7 +3649,8 @@ function showStationMap(): void {
 
     // Room name label
     if (isVisited || isExplored) {
-      ctx.font = "bold 8px 'Courier New', monospace";
+      const fontSize = scale >= 6 ? 9 : 7;
+      ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = isVisited ? "#ccc" : "#668";
@@ -3579,13 +3659,132 @@ function showStationMap(): void {
     }
   }
 
-  // Draw player position
+  // Draw entities on explored tiles (only visible ones)
+  const entMarkerSize = Math.max(2, scale * 0.4);
+  for (const [, ent] of state.entities) {
+    const ex = ent.pos.x, ey = ent.pos.y;
+    if (ey < 0 || ey >= state.height || ex < 0 || ex >= state.width) continue;
+    if (!state.tiles[ey][ex].explored) continue;
+
+    const epx = ox + ex * scale + scale / 2;
+    const epy = oy + ey * scale + scale / 2;
+
+    // Skip exhausted entities (already handled) and player bot
+    if (ent.type === EntityType.PlayerBot) continue;
+
+    // Draw different shapes/colors per entity type
+    switch (ent.type) {
+      case EntityType.Relay: {
+        const activated = ent.props["activated"];
+        ctx.fillStyle = activated ? "#44aa00" : "#ffcc00";
+        // Triangle
+        ctx.beginPath();
+        ctx.moveTo(epx, epy - entMarkerSize);
+        ctx.lineTo(epx - entMarkerSize, epy + entMarkerSize * 0.7);
+        ctx.lineTo(epx + entMarkerSize, epy + entMarkerSize * 0.7);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case EntityType.Breach: {
+        const sealed = ent.props["sealed"];
+        ctx.fillStyle = sealed ? "#446" : "#ff2200";
+        // Diamond
+        ctx.beginPath();
+        ctx.moveTo(epx, epy - entMarkerSize);
+        ctx.lineTo(epx + entMarkerSize, epy);
+        ctx.lineTo(epx, epy + entMarkerSize);
+        ctx.lineTo(epx - entMarkerSize, epy);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case EntityType.CrewNPC: {
+        ctx.fillStyle = "#44ffaa";
+        ctx.fillRect(epx - entMarkerSize * 0.7, epy - entMarkerSize * 0.7, entMarkerSize * 1.4, entMarkerSize * 1.4);
+        break;
+      }
+      case EntityType.DataCore: {
+        ctx.fillStyle = "#ff44ff";
+        // Star shape (simplified)
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const angle = -Math.PI / 2 + (i * Math.PI * 2) / 5;
+          const r = i % 2 === 0 ? entMarkerSize * 1.2 : entMarkerSize * 0.5;
+          const sx = epx + Math.cos(angle) * r;
+          const sy = epy + Math.sin(angle) * r;
+          if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+        }
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case EntityType.LogTerminal:
+      case EntityType.Console:
+      case EntityType.SecurityTerminal: {
+        const read = ent.props["read"] || ent.props["activated"] || isEntityExhausted(ent);
+        ctx.strokeStyle = read ? "#446" : "#0cf";
+        ctx.lineWidth = 1;
+        const sz = entMarkerSize * 0.8;
+        ctx.strokeRect(epx - sz, epy - sz, sz * 2, sz * 2);
+        break;
+      }
+      case EntityType.EscapePod: {
+        ctx.fillStyle = "#44ffaa";
+        ctx.beginPath();
+        ctx.arc(epx, epy, entMarkerSize, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        break;
+      }
+      case EntityType.EvidenceTrace: {
+        const collected = isEntityExhausted(ent);
+        if (!collected) {
+          ctx.fillStyle = "#ffaa00";
+          ctx.beginPath();
+          ctx.arc(epx, epy, entMarkerSize * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case EntityType.MedKit: {
+        if (!isEntityExhausted(ent)) {
+          ctx.fillStyle = "#ff6688";
+          ctx.fillRect(epx - entMarkerSize * 0.3, epy - entMarkerSize, entMarkerSize * 0.6, entMarkerSize * 2);
+          ctx.fillRect(epx - entMarkerSize, epy - entMarkerSize * 0.3, entMarkerSize * 2, entMarkerSize * 0.6);
+        }
+        break;
+      }
+      case EntityType.SensorPickup:
+      case EntityType.ToolPickup:
+      case EntityType.UtilityPickup: {
+        if (!isEntityExhausted(ent)) {
+          ctx.fillStyle = "#aaf";
+          ctx.beginPath();
+          ctx.arc(epx, epy, entMarkerSize * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      // Skip other types to avoid clutter
+    }
+  }
+
+  // Draw player position (on top of everything)
   const px = state.player.entity.pos.x;
   const py = state.player.entity.pos.y;
   const ppx = ox + px * scale + scale / 2;
   const ppy = oy + py * scale + scale / 2;
+  // Glow ring
   ctx.beginPath();
-  ctx.arc(ppx, ppy, Math.max(3, scale * 0.6), 0, Math.PI * 2);
+  ctx.arc(ppx, ppy, Math.max(5, scale * 0.8), 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(68,255,136,0.15)";
+  ctx.fill();
+  // Player dot
+  ctx.beginPath();
+  ctx.arc(ppx, ppy, Math.max(3, scale * 0.5), 0, Math.PI * 2);
   ctx.fillStyle = "#44ff88";
   ctx.fill();
   ctx.strokeStyle = "#fff";
@@ -3597,6 +3796,8 @@ function showStationMap(): void {
   ctx.fillStyle = "#334";
   ctx.textAlign = "left";
   ctx.fillText(`${state.width}x${state.height}`, 4, ch - 4);
+  ctx.textAlign = "right";
+  ctx.fillText(`${explorePercent}% explored`, cw - 4, ch - 4);
 }
 
 function closeMapOverlay(): void {
@@ -6608,6 +6809,14 @@ function showSeedInput(onConfirm: (seed: number) => void): void {
   let inputStr = String(defaultSeed);
   let cursorBlink = true;
 
+  const DIFF_OPTIONS: { value: Difficulty; label: string; color: string; desc: string }[] = [
+    { value: Difficulty.Easy, label: "EASY", color: "#4a4", desc: "HP +50% | Turns +30% | Damage -50%" },
+    { value: Difficulty.Normal, label: "NORMAL", color: "#6cf", desc: "Standard parameters" },
+    { value: Difficulty.Hard, label: "HARD", color: "#f44", desc: "HP -30% | Turns -30% | Damage +50%" },
+  ];
+  let diffIdx = DIFF_OPTIONS.findIndex(d => d.value === difficulty);
+  if (diffIdx < 0) diffIdx = 1;
+
   const blinkInterval = setInterval(() => {
     cursorBlink = !cursorBlink;
     renderSeedInput();
@@ -6615,18 +6824,34 @@ function showSeedInput(onConfirm: (seed: number) => void): void {
 
   function renderSeedInput(): void {
     const cursor = cursorBlink ? `<span style="color:#0fa">|</span>` : `<span style="opacity:0">|</span>`;
+    const diff = DIFF_OPTIONS[diffIdx];
+    const diffHtml = DIFF_OPTIONS.map((d, i) => {
+      const selected = i === diffIdx;
+      return `<span style="color:${selected ? d.color : '#334'};font-weight:${selected ? 'bold' : 'normal'};font-size:${selected ? '14px' : '11px'};padding:0 8px;${selected ? 'text-shadow:0 0 8px ' + d.color : ''}">${d.label}</span>`;
+    }).join(`<span style="color:#222">|</span>`);
+
     crawlOverlay.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;gap:24px;padding:48px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:48px">
         <div style="text-align:center">
           <div style="font-size:20px;font-weight:bold;color:#0fa;letter-spacing:4px;margin-bottom:8px">NEW INVESTIGATION</div>
-          <div style="font-size:12px;color:#556">Enter a seed number for this run</div>
+          <div style="font-size:12px;color:#556">Configure your next mission</div>
         </div>
         <div style="background:rgba(0,255,180,0.05);border:1px solid rgba(0,255,180,0.3);border-radius:4px;padding:12px 24px;min-width:200px;text-align:center">
+          <div style="font-size:10px;color:#556;margin-bottom:4px;letter-spacing:2px">SEED</div>
           <span style="font-size:24px;font-weight:bold;color:#0fa;letter-spacing:3px;font-family:monospace">${inputStr}${cursor}</span>
         </div>
+        <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:10px 16px;text-align:center">
+          <div style="font-size:10px;color:#556;margin-bottom:6px;letter-spacing:2px">DIFFICULTY</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+            <span style="color:#334;font-size:10px">\u25c0</span>
+            ${diffHtml}
+            <span style="color:#334;font-size:10px">\u25b6</span>
+          </div>
+          <div style="font-size:9px;color:${diff.color};margin-top:4px;opacity:0.7">${diff.desc}</div>
+        </div>
         <div style="font-size:10px;color:#445;text-align:center">
-          Type numbers to change seed<br>
-          [Enter] Accept | [Backspace] Delete | [Esc] Random
+          Type numbers to change seed | [Tab/\u2190\u2192] Difficulty<br>
+          [Enter] Accept | [Backspace] Delete | [Esc] Random seed
         </div>
       </div>
     `;
@@ -6641,17 +6866,25 @@ function showSeedInput(onConfirm: (seed: number) => void): void {
       window.removeEventListener("keydown", seedKeyHandler);
       const parsed = parseInt(inputStr, 10);
       const finalSeed = isNaN(parsed) || parsed < 0 ? defaultSeed : parsed % 1000000;
+      difficulty = DIFF_OPTIONS[diffIdx].value;
       onConfirm(finalSeed);
     } else if (e.key === "Escape") {
       // Random seed
       clearInterval(blinkInterval);
       window.removeEventListener("keydown", seedKeyHandler);
+      difficulty = DIFF_OPTIONS[diffIdx].value;
       onConfirm(Math.floor(Math.random() * 1000000));
     } else if (e.key === "Backspace") {
       inputStr = inputStr.slice(0, -1);
       renderSeedInput();
     } else if (/^[0-9]$/.test(e.key) && inputStr.length < 6) {
       inputStr += e.key;
+      renderSeedInput();
+    } else if (e.key === "Tab" || e.key === "ArrowRight") {
+      diffIdx = (diffIdx + 1) % DIFF_OPTIONS.length;
+      renderSeedInput();
+    } else if (e.key === "ArrowLeft") {
+      diffIdx = (diffIdx - 1 + DIFF_OPTIONS.length) % DIFF_OPTIONS.length;
       renderSeedInput();
     }
   };
