@@ -279,6 +279,7 @@ let hubSceneResult: {
   correctWhat: string;
   correctOutcome: string;
 } | null = null; // per-dimension result display after scene processing
+let hubSceneFilter: "all" | "unprocessed" | "crew" = "all"; // scene tab filter
 let hubEvidenceFilter: "all" | "by_room" | "by_type" | "by_thread" | "unread" = "all"; // evidence tab filter mode
 const hubViewedEvidenceIds = new Set<string>(); // tracks which evidence entries player has viewed in Hub
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
@@ -993,13 +994,22 @@ function showDiscoveryOverlay(opts: {
 /** Trigger Crack Moment visual event — the Official Story fractures. */
 function triggerCrackMoment(): void {
   display.triggerScreenFlash("damage");
+  // Find the first revealed contradiction for context
+  const firstContradiction = state.mystery?.contradictionPairs?.find(cp => cp.revealed);
+  let bodyText = "Something doesn't add up. The official story — you've been building it in your head, piece by piece. But this... this doesn't fit. Not wrong, exactly. Just the first crack in a picture you thought was complete.";
+  let bodyBText: string | undefined;
+  if (firstContradiction?.official && firstContradiction?.contradicting) {
+    bodyText = `OFFICIAL: "${firstContradiction.official.text}"`;
+    bodyBText = `BUT: "${firstContradiction.contradicting.text}"`;
+  }
   showDiscoveryOverlay({
     title: "NARRATIVE BREACH",
     subtitle: "Official account is inconsistent. Reconstruct true sequence.",
-    body: "Something doesn't add up. The official story — you've been building it in your head, piece by piece. But this... this doesn't fit. Not wrong, exactly. Just the first crack in a picture you thought was complete.",
+    body: bodyText,
+    bodyB: bodyBText,
     color: "#ffaa00",
     bgColor: "rgba(20, 12, 0, 0.92)",
-    duration: 12000,
+    duration: 15000,
     glitch: true,
   });
   // Persistent amber world tint after crack moment
@@ -2299,6 +2309,11 @@ function handleAction(action: Action): void {
       if (simLog.id.startsWith("log_iq_milestone_")) {
         display.triggerScreenFlash("milestone");
         audio.playPhaseTransition();
+      }
+      // Sensor-gated clue reveal — screen flash + audio
+      if (simLog.id.startsWith("log_sensor_reveal_")) {
+        display.triggerScreenFlash("milestone");
+        audio.playInteract();
       }
       // Clue examination — flash tile and audio
       if (simLog.id.startsWith("log_examine_clues_")) {
@@ -6041,6 +6056,22 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
     }
   }
 
+  // Scenes where this crew member was confirmed present (via scene processing) — shown prominently
+  const sceneAppearances = (state.mystery?.roomScenes ?? []).filter(sc =>
+    sc.processed && sc.groundTruth.who.includes(selected.id)
+  );
+  if (sceneAppearances.length > 0) {
+    detailHtml += `<div style="color:#fa0;font-size:10px;letter-spacing:1.5px;margin:8px 0 4px">CONFIRMED IN ${sceneAppearances.length} SCENE${sceneAppearances.length !== 1 ? "S" : ""}</div>`;
+    for (const sc of sceneAppearances) {
+      const actLabel = sc.groundTruth.what.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const outLabel = sc.groundTruth.outcome.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px;padding:3px 8px;border-left:2px solid #a80;background:rgba(170,136,0,0.04)">`;
+      detailHtml += `<span style="color:#bbc">${esc(sc.roomName)}</span>`;
+      detailHtml += `<div style="color:#667;font-size:10px">${esc(actLabel)} \u2192 ${esc(outLabel)}</div>`;
+      detailHtml += `</div>`;
+    }
+  }
+
   // Personality and traits (from base crew data)
   if (selected.personality) {
     detailHtml += `<div style="color:#889;font-size:11px;margin-top:8px;margin-bottom:6px">Personality: <span style="color:#bbc">${selected.personality}</span></div>`;
@@ -6063,21 +6094,6 @@ function renderHubCrew(journal: import("./shared/types.js").JournalEntry[]): str
           <span style="color:#667"> \u2014 ${rel.type}</span>
         </div>`;
       }
-    }
-  }
-
-  // Scenes where this crew member was confirmed present (via scene processing)
-  const sceneAppearances = (state.mystery?.roomScenes ?? []).filter(sc =>
-    sc.processed && sc.groundTruth.who.includes(selected.id)
-  );
-  if (sceneAppearances.length > 0) {
-    detailHtml += `<div style="color:#fa0;font-size:10px;letter-spacing:1.5px;margin:8px 0 4px">CONFIRMED SCENES (${sceneAppearances.length})</div>`;
-    for (const sc of sceneAppearances) {
-      const actLabel = sc.groundTruth.what.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-      const outLabel = sc.groundTruth.outcome.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-      detailHtml += `<div style="color:#889;font-size:11px;margin-bottom:3px;padding-left:8px;border-left:2px solid #a80">`;
-      detailHtml += `<span style="color:#bbc">${esc(sc.roomName)}</span> <span style="color:#667">\u2014 ${esc(actLabel)} \u2192 ${esc(outLabel)}</span>`;
-      detailHtml += `</div>`;
     }
   }
 
@@ -6388,6 +6404,21 @@ function renderHubScenes(): string {
     listHtml += `</div>`;
   }
 
+  // Scene filter bar
+  const sceneFilterOpts: Array<{ key: typeof hubSceneFilter; label: string }> = [
+    { key: "all", label: "ALL" },
+    { key: "unprocessed", label: "UNPROCESSED" },
+    { key: "crew", label: "CREW PRESENT" },
+  ];
+  let filterBarHtml = `<div style="display:flex;gap:6px;padding:4px 10px;border-bottom:1px solid #333;font-size:10px">`;
+  filterBarHtml += `<span style="color:#888;margin-right:2px">[f]</span>`;
+  for (const f of sceneFilterOpts) {
+    const active = f.key === hubSceneFilter;
+    filterBarHtml += `<span style="color:${active ? "#4af" : "#556"};${active ? "text-decoration:underline" : ""}">${f.label}</span>`;
+  }
+  filterBarHtml += `</div>`;
+  listHtml += filterBarHtml;
+
   // Group scenes by status for visual hierarchy
   const processedSceneIdxs: number[] = [];
   const readySceneIdxs: number[] = [];
@@ -6395,6 +6426,9 @@ function renderHubScenes(): string {
   const unvisitedSceneIdxs: number[] = [];
   for (let i = 0; i < scenes.length; i++) {
     const s = scenes[i];
+    // Apply filter
+    if (hubSceneFilter === "unprocessed" && s.processed) continue;
+    if (hubSceneFilter === "crew" && s.crewPresent.length === 0) continue;
     const examined = s.physicalClues.filter(c => c.examined).length;
     if (s.processed) processedSceneIdxs.push(i);
     else if (examined > 0 && examined === s.physicalClues.filter(c => !c.sensorRequired || c.examined).length) readySceneIdxs.push(i);
@@ -6793,7 +6827,9 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     const nameText = identified ? `${c.firstName} ${c.lastName}` : `Crew #${i + 1} (${c.role})`;
     const prefix = selected ? "\u25b6 " : suggested ? "\u25c7 " : "  ";
     const hint = suggested ? ` <span style="color:#4cf;font-size:9px">\u2190 evidence</span>` : "";
-    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#bce" : "#889"}">${prefix}${esc(nameText)}${hint}`;
+    const xrefCount = crewSceneXref.get(c.id)?.length ?? 0;
+    const countBadge = xrefCount > 0 ? ` <span style="color:#6a8;font-size:8px;background:rgba(100,170,130,0.1);padding:0 3px;border-radius:2px">${xrefCount} scene${xrefCount !== 1 ? "s" : ""}</span>` : "";
+    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#bce" : "#889"}">${prefix}${esc(nameText)}${hint}${countBadge}`;
     // Cross-reference: show where this crew member was confirmed in other scenes
     const xrefs = crewSceneXref.get(c.id);
     if (xrefs && xrefs.length > 0 && (selected || suggested)) {
@@ -7356,6 +7392,15 @@ function handleHubScenesInput(e: KeyboardEvent): void {
   }
 
   // Scene list view
+  // [f] cycles scene filter
+  if (e.key === "f" || e.key === "F") {
+    const modes: Array<typeof hubSceneFilter> = ["all", "unprocessed", "crew"];
+    const curIdx = modes.indexOf(hubSceneFilter);
+    hubSceneFilter = modes[(curIdx + 1) % modes.length];
+    hubIdx = 0;
+    renderInvestigationHub();
+    return;
+  }
   const maxIdx = scenes.length - 1;
   if (e.key === "ArrowUp" || e.key === "w") {
     hubIdx = Math.max(0, hubIdx - 1);

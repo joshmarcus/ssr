@@ -5572,6 +5572,24 @@ export function step(state: GameState, action: Action): GameState {
             read: false,
           }];
         }
+        // Sensor-gated discovery feedback — highlight when upgraded sensors reveal hidden evidence
+        const sensorRevealedClues = newlyExamined.filter(c => c.sensorRequired);
+        if (sensorRevealedClues.length > 0) {
+          const sensorTypes = [...new Set(sensorRevealedClues.map(c => c.sensorRequired))];
+          const sensorLabel = sensorTypes.map(s => {
+            if (s === SensorType.Thermal) return "thermal";
+            if (s === SensorType.Atmospheric) return "atmospheric";
+            return String(s);
+          }).join("/");
+          next.logs = [...next.logs, {
+            id: `log_sensor_reveal_${next.turn}`,
+            timestamp: next.turn,
+            source: "milestone",
+            text: `[SENSOR] ${sensorLabel.toUpperCase()} layer reveals ${sensorRevealedClues.length} hidden clue${sensorRevealedClues.length > 1 ? "s" : ""}! Evidence previously invisible to standard scanners.`,
+            read: false,
+          }];
+        }
+
         next.logs = [...next.logs, {
           id: `log_examine_clues_${next.turn}`,
           timestamp: next.turn,
