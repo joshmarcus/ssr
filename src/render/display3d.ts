@@ -2589,7 +2589,101 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   async copyRunSummary(): Promise<boolean> {
-    return false; // 3D renderer delegates to 2D for game-over
+    try {
+      const state = this._lastState;
+      if (!state) return false;
+
+      const isVictory = state.victory;
+      const hpPercent = Math.round((state.player.hp / state.player.maxHp) * 100);
+      let relaysActivated = 0, totalRelays = 0;
+      for (const [, e] of state.entities) {
+        if (e.type === EntityType.Relay && e.props["locked"] !== true) {
+          totalRelays++;
+          if (e.props["activated"] === true) relaysActivated++;
+        }
+      }
+      const breachesSealed = Array.from(state.entities.values()).filter(e =>
+        e.type === EntityType.Breach && e.props["sealed"] === true
+      ).length;
+      const totalBreaches = Array.from(state.entities.values()).filter(e => e.type === EntityType.Breach).length;
+
+      const deductions = state.mystery?.deductions ?? [];
+      const deductionsCorrect = deductions.filter(d => d.answeredCorrectly).length;
+      const evidenceCount = state.mystery?.journal.length ?? 0;
+      const roomsExplored = state.rooms.filter(r => {
+        for (let ry = r.y; ry < r.y + r.height; ry++) {
+          for (let rx = r.x; rx < r.x + r.width; rx++) {
+            if (ry >= 0 && ry < state.height && rx >= 0 && rx < state.width) {
+              if (state.tiles[ry][rx].explored) return true;
+            }
+          }
+        }
+        return false;
+      }).length;
+
+      // Compute rating (same as game-over)
+      const scenes = state.mystery?.roomScenes ?? [];
+      const processedScenes = scenes.filter(s => s.processed).length;
+      const dossiers = state.mystery?.dossiers ?? [];
+      const identifiedCrew = dossiers.filter(d => d.confirmed.name).length;
+      const board = state.mystery?.incidentBoard;
+      const confirmedSlots = board?.slots.filter(s => s.status === "confirmed").length ?? 0;
+      const totalSlots = board?.slots.length ?? 0;
+      const contradictions = state.mystery?.contradictionPairs?.filter(cp => cp.revealed).length ?? 0;
+      const totalContradictions = state.mystery?.contradictionPairs?.length ?? 0;
+
+      let score = 0;
+      if (isVictory) score += 30;
+      score += Math.min(15, deductionsCorrect * (15 / Math.max(deductions.length, 1)));
+      score += Math.min(10, (roomsExplored / Math.max(state.rooms.length, 1)) * 10);
+      score += Math.min(10, (hpPercent / 100) * 10);
+      score += Math.min(5, isVictory && state.turn < 200 ? 5 : isVictory && state.turn < 350 ? 2 : 0);
+      if (scenes.length > 0) {
+        score += Math.min(10, (processedScenes / Math.max(scenes.length, 1)) * 10);
+        score += Math.min(8, (identifiedCrew / Math.max(dossiers.length, 1)) * 8);
+        score += Math.min(7, (confirmedSlots / Math.max(totalSlots, 1)) * 7);
+        score += Math.min(5, (contradictions / Math.max(totalContradictions, 1)) * 5);
+      }
+      const rating = score >= 90 ? "S" : score >= 75 ? "A" : score >= 55 ? "B" : score >= 35 ? "C" : "D";
+
+      const archetype = state.mystery?.timeline.archetype ?? "unknown";
+      const archetypeNames: Record<string, string> = {
+        coolant_cascade: "The Whistleblower", hull_breach: "The Murder",
+        reactor_scram: "The Rogue AI", sabotage: "The Stowaway",
+        signal_anomaly: "First Contact", mutiny: "The Divide",
+      };
+      const archetypeName = archetypeNames[archetype] ?? archetype;
+      const difficulty = state.difficulty ?? "normal";
+
+      const evac = state.mystery?.evacuation;
+      const crewEvacuated = evac?.crewEvacuated.length || 0;
+      const crewDead = evac?.crewDead.length || 0;
+
+      const deductionLines = deductions.map(d => {
+        const correct = d.options.find(o => o.correct)?.label ?? "—";
+        if (!d.solved) return `  ? ${d.question.slice(0, 40)} [unanswered]`;
+        if (d.answeredCorrectly) return `  ✓ ${d.question.slice(0, 40)} — ${correct}`;
+        return `  ✗ ${d.question.slice(0, 40)} [wrong] — ${correct}`;
+      });
+
+      const lines = [
+        `SSR — ${isVictory ? "VICTORY" : "DEFEAT"} [${rating}]`,
+        `Seed: ${state.seed} | ${archetypeName} | ${difficulty}`,
+        `Turns: ${state.turn} | HP: ${state.player.hp}/${state.player.maxHp}`,
+        `Rooms: ${roomsExplored}/${state.rooms.length} | Evidence: ${evidenceCount}`,
+        `Relays: ${relaysActivated}/${totalRelays} | Breaches: ${breachesSealed}/${totalBreaches}`,
+        crewEvacuated + crewDead > 0 ? `Crew: ${crewEvacuated}/${crewEvacuated + crewDead} evacuated` : "",
+        `Deductions: ${deductionsCorrect}/${deductions.length}`,
+        ...deductionLines,
+        scenes.length > 0 ? `Investigation: ${processedScenes}/${scenes.length} scenes, ${identifiedCrew} crew ID'd` : "",
+        totalSlots > 0 ? `Timeline: ${confirmedSlots}/${totalSlots} | Contradictions: ${contradictions}/${totalContradictions}` : "",
+      ].filter(l => l.length > 0);
+
+      await navigator.clipboard.writeText(lines.join("\n"));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /** Get current player facing angle in radians (for camera-relative input) */

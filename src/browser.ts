@@ -243,6 +243,10 @@ let mapOpen = false;
 let helpOpen = false;
 let autoSaveFlashTimer = 0; // performance.now() timestamp of last auto-save (0 = no flash)
 let runStartTime = Date.now(); // real-time start of current run (for elapsed timer)
+let hudTipText = ""; // contextual tip text shown below action bar
+let hudTipShowTime = 0; // performance.now() when tip was shown
+let lastHudTipKey = ""; // prevent same tip from repeating within 30 turns
+let lastHudTipTurn = 0; // turn when last tip was shown
 let incidentCardOpen = false;
 let logReviewOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
@@ -1813,6 +1817,12 @@ function renderAll(): void {
     hudStatus.innerHTML += ` <span style="color:#334;font-size:10px">${timeStr}</span>`;
   }
 
+  // Contextual HUD tip system
+  if (!state.gameOver && !investigationHubOpen && !mapOpen && !helpOpen) {
+    updateHudTip();
+  }
+  renderHudTip();
+
   // Update investigation aura: pass evidence room data to 3D renderer
   if (state.mystery && (display as any).setInvestigationRooms) {
     const journal = state.mystery.journal;
@@ -1928,6 +1938,10 @@ function resetGameState(newSeed: number): void {
   mapOpen = false;
   helpOpen = false;
   autoSaveFlashTimer = 0;
+  hudTipText = "";
+  hudTipShowTime = 0;
+  lastHudTipKey = "";
+  lastHudTipTurn = 0;
   incidentCardOpen = false;
   logReviewOpen = false;
   activeDeduction = null;
@@ -3493,6 +3507,99 @@ function showLogReview(): void {
 }
 
 // ── Station map display (HTML overlay — canvas-based spatial map) ──
+// ── Contextual HUD tip system ─────────────────────────────────────
+function showHudTip(key: string, text: string): void {
+  if (key === lastHudTipKey && state.turn - lastHudTipTurn < 30) return;
+  hudTipText = text;
+  hudTipShowTime = performance.now();
+  lastHudTipKey = key;
+  lastHudTipTurn = state.turn;
+}
+
+function updateHudTip(): void {
+  // Don't show tips if one is already active
+  if (hudTipText && performance.now() - hudTipShowTime < 5000) return;
+
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+
+  // Tip: Unexamined clues in current room
+  if (state.mystery?.roomScenes) {
+    const currentRoom = state.rooms.find(r =>
+      px >= r.x && px < r.x + r.width && py >= r.y && py < r.y + r.height
+    );
+    if (currentRoom) {
+      const scene = state.mystery.roomScenes.find(s => s.roomId === currentRoom.id);
+      if (scene && !scene.processed) {
+        const unexamined = scene.physicalClues.filter(c => !c.examined).length;
+        if (unexamined > 0) {
+          showHudTip("examine", `[X] Examine scene — ${unexamined} clue${unexamined !== 1 ? "s" : ""} remaining`);
+          return;
+        }
+      }
+    }
+  }
+
+  // Tip: Deduction available
+  if (state.mystery) {
+    const unlocked = getUnlockedDeductions(state.mystery.deductions, state.mystery.journal);
+    if (unlocked.length > 0) {
+      showHudTip("deduction", "[V] Answer deduction — evidence sufficient");
+      return;
+    }
+  }
+
+  // Tip: Adjacent interactable entity
+  for (const [id, ent] of state.entities) {
+    if (id === "player") continue;
+    const dist = Math.abs(ent.pos.x - px) + Math.abs(ent.pos.y - py);
+    if (dist <= 1 && !isEntityExhausted(ent)) {
+      if (ent.type === EntityType.Relay && !ent.props["activated"]) {
+        showHudTip("relay", "[Enter] Activate relay — reroute power to locked doors");
+        return;
+      }
+      if (ent.type === EntityType.Breach && !ent.props["sealed"]) {
+        showHudTip("breach", "[Enter] Seal breach — restore pressure to area");
+        return;
+      }
+      if (ent.type === EntityType.CrewNPC && !ent.props["following"]) {
+        showHudTip("crew", "[Enter] Contact crew — escort to escape pods");
+        return;
+      }
+    }
+  }
+
+  // Tip: Low HP near medkit
+  if (state.player.hp < state.player.maxHp * 0.5) {
+    for (const [, ent] of state.entities) {
+      if (ent.type === EntityType.MedKit && !isEntityExhausted(ent)) {
+        const dist = Math.abs(ent.pos.x - px) + Math.abs(ent.pos.y - py);
+        if (dist <= 5) {
+          showHudTip("medkit", "MedKit detected nearby — [Enter] to restore HP");
+          return;
+        }
+      }
+    }
+  }
+}
+
+function renderHudTip(): void {
+  let tipEl = document.getElementById("hud-tip");
+  if (hudTipText && performance.now() - hudTipShowTime < 5000) {
+    if (!tipEl) {
+      tipEl = document.createElement("div");
+      tipEl.id = "hud-tip";
+      tipEl.style.cssText = "position:fixed;bottom:44px;left:50%;transform:translateX(-50%);color:rgba(0,200,255,0.6);font-family:'Courier New',monospace;font-size:10px;letter-spacing:1px;z-index:40;pointer-events:none;text-align:center;transition:opacity 0.5s";
+      document.body.appendChild(tipEl);
+    }
+    tipEl.textContent = hudTipText;
+    const elapsed = performance.now() - hudTipShowTime;
+    tipEl.style.opacity = elapsed < 4000 ? "1" : String(1 - (elapsed - 4000) / 1000);
+  } else if (tipEl) {
+    tipEl.style.opacity = "0";
+  }
+}
+
 function showStationMap(): void {
   const overlay = document.getElementById("journal-overlay");
   if (!overlay) return;
