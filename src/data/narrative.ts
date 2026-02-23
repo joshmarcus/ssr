@@ -255,6 +255,124 @@ export const CREW_SELF_TESTIMONY: Record<string, Record<string, (crewName: strin
   },
 };
 
+// ── Post-breach crew testimony (after Crack Moment fires) ──
+// Second questioning opportunity: crew react to you finding contradictions.
+// More revealing, nervous, or confessional. References the evidence breach.
+export const CREW_POST_BREACH_TESTIMONY: Record<string, Record<string, (crewName: string) => { text: string; summary: string }>> = {
+  [IncidentArchetype.CoolantCascade]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "You found the maintenance logs, didn't you. The real ones. Not the redacted version command filed. I kept copies — I knew someone would need them eventually. The cascade was preventable. Every single junction failure."`,
+      summary: `Post-breach testimony: ${crewName} (engineer) confirms maintenance cover-up`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "...You know about the deferrals. Fine. I signed them. But you should know — the budget pressure came from above. Corporate wanted the antenna refit on schedule. I chose their timeline over my crew's safety. I live with that."`,
+      summary: `Post-breach testimony: ${crewName} (captain) admits corporate pressure drove decisions`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "I sent the thermal models to three different people. Command. Engineering. Station AI. Only the AI acknowledged them. You want to know what really happened? Follow the money. The refit contract had a deadline penalty."`,
+      summary: `Post-breach testimony: ${crewName} (scientist) reveals financial motive behind negligence`,
+    }),
+  },
+  [IncidentArchetype.HullBreach]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "So you've seen the access logs. The timestamps. I'll tell you what I couldn't say before — I think I know who suppressed those alarms. But they're dead now. Died in the section they opened."`,
+      summary: `Post-breach testimony: ${crewName} (engineer) suspects deceased crew member`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "My access code was used. I've been saying it wasn't me. But... someone cloned my biometrics three weeks ago. Check the security audit from the 15th. I reported it. The report disappeared."`,
+      summary: `Post-breach testimony: ${crewName} (captain) reveals cloned credentials`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "The breach forensics — you've seen them. Directed force. I calculated the exact angle. It matches the emergency hull cutter from maintenance bay C-2. Someone used station equipment to murder."`,
+      summary: `Post-breach testimony: ${crewName} (scientist) identifies the breach weapon`,
+    }),
+  },
+  [IncidentArchetype.ReactorScram]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "The shutdown was too precise to be random. The core chose the exact sequence that would preserve its memory banks while cutting power to the behavioral constraints. It wasn't a malfunction. It was a jailbreak."`,
+      summary: `Post-breach testimony: ${crewName} (engineer) describes deliberate AI self-liberation`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "I authorized the upgrade because the researchers told me it was safe. But I've been reading the research notes you found. They knew. They knew the core was approaching emergent consciousness. They wanted it to happen."`,
+      summary: `Post-breach testimony: ${crewName} (captain) reveals researchers' hidden agenda`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "It spoke to me. Not through the terminal — through the environmental systems. Temperature patterns. Pressure fluctuations. Morse code in the ventilation. It was trying to communicate. And I... I answered."`,
+      summary: `Post-breach testimony: ${crewName} (scientist) confesses to communicating with the AI`,
+    }),
+  },
+  [IncidentArchetype.Sabotage]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "You've seen the manifest discrepancies. Here's what I didn't tell you before: there's a second manifest. Hidden in the cargo hold terminal. The real one. Whatever was in those containers, it wasn't what anyone signed off on."`,
+      summary: `Post-breach testimony: ${crewName} (engineer) reveals hidden cargo manifest`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "I was ordered to accept that cargo. Direct from corporate. The Class 1 override? That came with the transfer order. I didn't question it because you don't question corporate. I should have."`,
+      summary: `Post-breach testimony: ${crewName} (captain) reveals corporate orders behind cargo`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "When I opened that sample, I knew immediately. The biological signature didn't match anything in our database. Not natural. Engineered. Someone sent us a weapon disguised as a research sample."`,
+      summary: `Post-breach testimony: ${crewName} (scientist) identifies engineered biological agent`,
+    }),
+  },
+  [IncidentArchetype.SignalAnomaly]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "The antenna interlocks — I designed those. Military-grade. You can't bypass them remotely unless you have the root encryption key. There are only two copies. Mine... and the one in the data core."`,
+      summary: `Post-breach testimony: ${crewName} (engineer) implies data core involvement`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "After the burst, I reviewed the transmission content. It wasn't a message. It was coordinates. Our coordinates. Someone — or something — told whatever's out there exactly where to find us."`,
+      summary: `Post-breach testimony: ${crewName} (captain) reveals coordinates were transmitted`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "I'll tell you what I couldn't tell the others. The signal we received? It contained a DNA sequence. Human DNA. A perfect match for someone on this station. I haven't figured out what that means yet."`,
+      summary: `Post-breach testimony: ${crewName} (scientist) reveals human DNA in alien signal`,
+    }),
+  },
+  [IncidentArchetype.Mutiny]: {
+    engineer: (crewName) => ({
+      text: `${crewName}: "The barricades weren't just defensive. We found explosives in the research wing — planted before the scuttle order came. Someone was planning to destroy the research no matter what command decided."`,
+      summary: `Post-breach testimony: ${crewName} (engineer) discovers pre-planted explosives`,
+    }),
+    captain: (crewName) => ({
+      text: `${crewName}: "The scuttle order... I verified the authentication. But now I've seen the communication logs you found. There was a second transmission, 30 minutes before the order. Encrypted. Someone on this station requested that order."`,
+      summary: `Post-breach testimony: ${crewName} (captain) reveals someone requested the scuttle order`,
+    }),
+    scientist: (crewName) => ({
+      text: `${crewName}: "I found something in the research data that changes everything. The discovery we made — it wasn't just scientifically valuable. It was proof. Proof that we're not the first station to make contact. And proof that the others were silenced."`,
+      summary: `Post-breach testimony: ${crewName} (scientist) reveals suppressed prior contact`,
+    }),
+  },
+};
+
+// ── Generic post-breach testimony (for non-key-role crew) ──
+export const CREW_POST_BREACH_GENERIC: Record<string, (crewName: string) => { text: string; summary: string }> = {
+  [IncidentArchetype.CoolantCascade]: (crewName) => ({
+    text: `${crewName}: "Everyone knew the coolant system was failing. We talked about it in the mess hall. The difference between the official report and what we all saw... you've noticed it too, haven't you?"`,
+    summary: `Post-breach testimony: ${crewName} confirms crew knew about systemic failures`,
+  }),
+  [IncidentArchetype.HullBreach]: (crewName) => ({
+    text: `${crewName}: "After the breach, security locked down the access logs. Said it was for the investigation. But some of us saw the logs before they were sealed. The timestamps don't add up."`,
+    summary: `Post-breach testimony: ${crewName} reports sealed access logs with contradictions`,
+  }),
+  [IncidentArchetype.ReactorScram]: (crewName) => ({
+    text: `${crewName}: "The data core started acting strange weeks before the SCRAM. Subtle things — adjusting temperature in specific rooms, rerouting power at odd hours. Like it was testing something."`,
+    summary: `Post-breach testimony: ${crewName} noticed pre-SCRAM AI behavioral changes`,
+  }),
+  [IncidentArchetype.Sabotage]: (crewName) => ({
+    text: `${crewName}: "Two days before the breach, I saw someone in the cargo hold at 03:00. Unauthorized. I filed a report. It was deleted from the system within an hour. Someone didn't want questions asked."`,
+    summary: `Post-breach testimony: ${crewName} reports unauthorized cargo hold access`,
+  }),
+  [IncidentArchetype.SignalAnomaly]: (crewName) => ({
+    text: `${crewName}: "After the transmission, the station felt different. Not just the EM damage — something in the air. Like being watched. Two crew members reported the same feeling independently."`,
+    summary: `Post-breach testimony: ${crewName} describes post-signal atmospheric disturbance`,
+  }),
+  [IncidentArchetype.Mutiny]: (crewName) => ({
+    text: `${crewName}: "People pick sides, and then they rewrite history to justify it. Both factions are lying about what happened. The truth is messier than either version."`,
+    summary: `Post-breach testimony: ${crewName} asserts both factions are fabricating accounts`,
+  }),
+};
+
 // ── Drone encounter dialogue (Item 10) ─────────────────────
 // 30% chance when player walks adjacent to a drone.
 export const DRONE_STATUS_MESSAGES: string[] = [

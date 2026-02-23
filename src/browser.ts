@@ -1014,6 +1014,53 @@ function triggerCrackMoment(): void {
   });
   // Persistent amber world tint after crack moment
   enablePostCrackTint();
+
+  // CORVUS-7 reframing: delayed narrative logs building the dramatic arc
+  display.addLog("CORVUS-7: ... recalibrating narrative framework.", "system");
+  setTimeout(() => {
+    display.addLog("STATION PA: All personne\u2014 ...all per\u2014 [SIGNAL CORRUPTED]", "warning");
+  }, 1500);
+  setTimeout(() => {
+    display.addLog("CORVUS-7: Official timeline shows inconsistencies. Cross-referencing all evidence.", "warning");
+  }, 3000);
+  setTimeout(() => {
+    display.addLog("CORVUS-7: ADVISORY \u2014 Accounts from station logs may be fabricated. Trust physical evidence.", "critical");
+    // HUD notification about new investigation phase
+    if (display.showHUDNotification) {
+      display.showHUDNotification({
+        label: "NARRATIVE BREACH",
+        text: "Official story compromised. Evidence contradictions now flagged.",
+        hint: "Open Investigation Hub [R] \u2192 CONNECTIONS to review",
+        color: "#fa0",
+        duration: 8000,
+      });
+    }
+  }, 5000);
+
+  // Count and log contradiction annotations
+  const contradictions = state.mystery?.contradictionPairs?.filter(cp => cp.revealed) ?? [];
+  if (contradictions.length > 0) {
+    setTimeout(() => {
+      display.addLog(`ANALYSIS: ${contradictions.length} contradiction${contradictions.length > 1 ? "s" : ""} flagged in evidence record. Review in CONNECTIONS tab.`, "sensor");
+    }, 6500);
+  }
+
+  // If we have the archetype, log a reframing hint
+  const archetype = state.mystery?.timeline.archetype;
+  if (archetype) {
+    const reframes: Record<string, string> = {
+      coolant_cascade: "CORVUS-7: Coolant failure reports don't match maintenance logs. Someone knew.",
+      hull_breach: "CORVUS-7: Breach pattern doesn't match structural fatigue models. This was deliberate.",
+      reactor_scram: "CORVUS-7: Reactor SCRAM sequence shows anomalous initiation parameters. Not a malfunction.",
+      sabotage: "CORVUS-7: Cargo manifest discrepancies predate the incident. This was planned.",
+      signal_anomaly: "CORVUS-7: Signal origin coordinates don't match any known communication protocols.",
+      mutiny: "CORVUS-7: Command chain records show conflicting orders. Two factions emerged.",
+    };
+    const reframe = reframes[archetype];
+    if (reframe) {
+      setTimeout(() => { display.addLog(reframe, "critical"); }, 8000);
+    }
+  }
 }
 
 /** Add a subtle persistent amber tint overlay after the crack moment fires. */
@@ -1322,14 +1369,26 @@ function checkRoomEntry(): void {
     if (state.mystery?.roomScenes) {
       const roomScene = state.mystery.roomScenes.find(s => s.roomName === currentRoom.name);
       if (roomScene && !roomScene.processed) {
+        const playerSensors = state.player.sensors ?? [];
         const unexamined = roomScene.physicalClues.filter(c => !c.examined && !c.sensorRequired).length;
         const sensorGated = roomScene.physicalClues.filter(c => !c.examined && c.sensorRequired).length;
+        const sensorAccessible = roomScene.physicalClues.filter(c =>
+          !c.examined && c.sensorRequired && playerSensors.includes(c.sensorRequired)).length;
+        const sensorLocked = sensorGated - sensorAccessible;
         const examined = roomScene.physicalClues.filter(c => c.examined).length;
+        if (sensorAccessible > 0) {
+          // Player has sensor upgrades that reveal new clues in this room!
+          const sensorTypes = [...new Set(roomScene.physicalClues
+            .filter(c => !c.examined && c.sensorRequired && playerSensors.includes(c.sensorRequired))
+            .map(c => c.sensorRequired))];
+          const sensorLabel = sensorTypes.map(s => s === "thermal" ? "THERMAL" : s === "atmospheric" ? "ATMOSPHERIC" : String(s).toUpperCase()).join("/");
+          display.addLog(`[SENSOR REVEAL] ${sensorAccessible} hidden clue${sensorAccessible > 1 ? "s" : ""} now visible via ${sensorLabel} sensor! Press [x] to examine.`, "milestone");
+        }
         if (unexamined > 0) {
-          display.addLog(`SCENE: ${unexamined} physical clue${unexamined > 1 ? "s" : ""} detected. Press [x] to examine.${sensorGated > 0 ? ` (${sensorGated} more require sensor upgrades)` : ""}`, "milestone");
-        } else if (sensorGated > 0) {
+          display.addLog(`SCENE: ${unexamined + sensorAccessible} physical clue${(unexamined + sensorAccessible) > 1 ? "s" : ""} detected. Press [x] to examine.${sensorLocked > 0 ? ` (${sensorLocked} more require sensor upgrades)` : ""}`, "milestone");
+        } else if (sensorAccessible === 0 && sensorGated > 0) {
           display.addLog(`SCENE: ${sensorGated} clue${sensorGated > 1 ? "s" : ""} require sensor upgrades to examine.`, "sensor");
-        } else if (examined > 0) {
+        } else if (sensorAccessible === 0 && examined > 0) {
           display.addLog(`SCENE: All clues examined in ${currentRoom.name}. Ready for scene processing [R \u2192 SCENES].`, "milestone");
         }
       }
@@ -5538,6 +5597,17 @@ function renderHubEvidenceDetail(entry: EvidenceEntry): string {
       contradictionHtml += `<div style="color:${color};font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:2px">\u26A0 ${label}</div>`;
       if (cp.revealed) {
         contradictionHtml += `<div style="color:#dda;font-size:11px">This evidence ${isOfficial ? "tells the official story" : "contradicts the official account"}.</div>`;
+        // Show the conflicting text from the other side
+        const opposingText = isOfficial ? cp.contradicting.text : cp.official.text;
+        const opposingLabel = isOfficial ? "CONTRADICTED BY" : "CONFLICTS WITH OFFICIAL";
+        const opposingColor = isOfficial ? "#f44" : "#4cf";
+        const otherFound = isOfficial ? cp.contradictingFound : cp.officialFound;
+        if (otherFound) {
+          contradictionHtml += `<div style="margin-top:6px;padding:4px 6px;border-left:2px solid ${opposingColor};background:rgba(${isOfficial ? "255,68,68" : "68,200,255"},0.04)">`;
+          contradictionHtml += `<div style="color:${opposingColor};font-size:9px;letter-spacing:1px;margin-bottom:2px">${opposingLabel}</div>`;
+          contradictionHtml += `<div style="color:#bba;font-size:11px;font-style:italic">"${esc(opposingText.slice(0, 120))}${opposingText.length > 120 ? "..." : ""}"</div>`;
+          contradictionHtml += `</div>`;
+        }
       } else if (cp.officialFound && cp.contradictingFound) {
         contradictionHtml += `<div style="color:#889;font-size:11px">A contradiction is emerging...</div>`;
       } else {
@@ -6480,6 +6550,39 @@ function renderHubAnalysis(): string {
       }
     }
     html += `<div style="margin-bottom:12px"></div>`;
+  }
+
+  // Contradiction pairs — explicit list of story conflicts
+  const contradictionPairs = mystery.contradictionPairs ?? [];
+  const revealedPairs = contradictionPairs.filter(cp => cp.revealed);
+  if (revealedPairs.length > 0) {
+    html += `<div style="color:#f44;font-size:10px;letter-spacing:1.5px;margin-bottom:6px">CONTRADICTIONS IDENTIFIED (${revealedPairs.length})</div>`;
+    for (const cp of revealedPairs) {
+      html += `<div style="margin:4px 0;padding:6px 8px;background:rgba(255,68,68,0.04);border:1px solid rgba(255,68,68,0.12);border-radius:3px">`;
+      html += `<div style="display:flex;gap:8px;align-items:flex-start">`;
+      // Official side
+      html += `<div style="flex:1;padding:3px 6px;border-left:2px solid #4cf">`;
+      html += `<div style="color:#4cf;font-size:9px;letter-spacing:1px">OFFICIAL</div>`;
+      html += `<div style="color:#99a;font-size:11px;font-style:italic">"${esc(cp.official.text.slice(0, 80))}${cp.official.text.length > 80 ? "..." : ""}"</div>`;
+      html += `</div>`;
+      // VS divider
+      html += `<div style="color:#f44;font-size:12px;font-weight:bold;align-self:center">\u2260</div>`;
+      // Contradicting side
+      html += `<div style="flex:1;padding:3px 6px;border-left:2px solid #f44">`;
+      html += `<div style="color:#f44;font-size:9px;letter-spacing:1px">REAL</div>`;
+      html += `<div style="color:#99a;font-size:11px;font-style:italic">"${esc(cp.contradicting.text.slice(0, 80))}${cp.contradicting.text.length > 80 ? "..." : ""}"</div>`;
+      html += `</div>`;
+      html += `</div></div>`;
+    }
+    // Show unrevealed count
+    const pendingCount = contradictionPairs.filter(cp => !cp.revealed && (cp.officialFound || cp.contradictingFound)).length;
+    if (pendingCount > 0) {
+      html += `<div style="color:#667;font-size:10px;font-style:italic;margin-top:2px">${pendingCount} more contradiction${pendingCount > 1 ? "s" : ""} partially uncovered...</div>`;
+    }
+    html += `<div style="margin-bottom:12px"></div>`;
+  } else if (contradictionPairs.some(cp => cp.officialFound || cp.contradictingFound)) {
+    html += `<div style="color:#889;font-size:10px;letter-spacing:1.5px;margin-bottom:6px">CONTRADICTIONS</div>`;
+    html += `<div style="color:#667;font-size:11px;font-style:italic;margin-bottom:12px">Evidence of inconsistencies detected. Continue investigating to reveal full contradictions.</div>`;
   }
 
   // Deduction conclusions

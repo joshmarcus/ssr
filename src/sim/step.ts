@@ -19,6 +19,7 @@ import { isMoralChoiceUnlocked } from "./mysteryChoices.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
   CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
+  CREW_POST_BREACH_TESTIMONY, CREW_POST_BREACH_GENERIC,
   CORVUS_REACTIONS,
   SENSOR_CLUES,
   PUZZLE_REVEAL_COOLANT, PUZZLE_REVEAL_FUSE, PUZZLE_REVEAL_SMOKE_VENT,
@@ -881,6 +882,30 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
 
       next.logs = [...state.logs, ...sensorLogs];
       next = fireMilestone(next, "first_sensor_upgrade");
+
+      // Sensor reveal: count newly-accessible clues across previously-visited rooms
+      if (next.mystery?.roomScenes) {
+        const revealedClues: { room: string; count: number }[] = [];
+        for (const scene of next.mystery.roomScenes) {
+          const newlyAccessible = scene.physicalClues.filter(c =>
+            !c.examined && c.sensorRequired === sensorType);
+          if (newlyAccessible.length > 0) {
+            revealedClues.push({ room: scene.roomName, count: newlyAccessible.length });
+          }
+        }
+        if (revealedClues.length > 0) {
+          const totalNew = revealedClues.reduce((sum, r) => sum + r.count, 0);
+          const roomList = revealedClues.slice(0, 3).map(r => r.room).join(", ");
+          const moreRooms = revealedClues.length > 3 ? ` +${revealedClues.length - 3} more` : "";
+          next.logs = [...next.logs, {
+            id: `log_sensor_reveal_${sensorType}_${next.turn}`,
+            timestamp: next.turn,
+            source: "sensor" as const,
+            text: `[SENSOR REVEAL] ${totalNew} hidden clue${totalNew > 1 ? "s" : ""} now detectable across ${revealedClues.length} room${revealedClues.length > 1 ? "s" : ""}: ${roomList}${moreRooms}. Return and examine!`,
+            read: false,
+          }];
+        }
+      }
       break;
     }
 
@@ -2815,16 +2840,71 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             targetId,
           );
         } else {
-          next.logs = [
-            ...state.logs,
-            {
-              id: `log_crew_following_${targetId}_${next.turn}`,
-              timestamp: next.turn,
-              source: "system",
-              text: `${crewName} is already following you. Find the Escape Pod Bay.`,
-              read: false,
-            },
-          ];
+          // Check for post-breach second testimony (after Crack Moment fires)
+          const crackFired = next.mystery?.evidenceAccumulation?.crack_moment_fired ?? false;
+          const postBreachDone = target.props["crewPostBreach"] === true;
+          if (crackFired && !postBreachDone && archetype && next.mystery) {
+            const crewId = target.props["crewId"] as string || targetId;
+            const crewRole = target.props["role"] as string || "";
+            // Try role-specific post-breach testimony first
+            const roleTestimony = CREW_POST_BREACH_TESTIMONY[archetype]?.[crewRole];
+            const genericTestimony = CREW_POST_BREACH_GENERIC[archetype];
+            const testimonyResult = roleTestimony
+              ? roleTestimony(crewName)
+              : genericTestimony
+              ? genericTestimony(crewName)
+              : null;
+            if (testimonyResult) {
+              // Mark as post-breach questioned
+              const newEntities = new Map(next.entities);
+              newEntities.set(targetId, {
+                ...target,
+                props: { ...target.props, crewPostBreach: true },
+              });
+              next.entities = newEntities;
+              next.logs = [
+                ...state.logs,
+                {
+                  id: `log_crew_postbreach_${targetId}_${next.turn}`,
+                  timestamp: next.turn,
+                  source: "narrative",
+                  text: testimonyResult.text,
+                  read: false,
+                },
+              ];
+              next = addJournalEntry(
+                next,
+                `journal_postbreach_${crewId}`,
+                "crew",
+                testimonyResult.summary,
+                testimonyResult.text,
+                getPlayerRoomName(next),
+                targetId,
+              );
+            } else {
+              next.logs = [
+                ...state.logs,
+                {
+                  id: `log_crew_following_${targetId}_${next.turn}`,
+                  timestamp: next.turn,
+                  source: "system",
+                  text: `${crewName} is already following you. Find the Escape Pod Bay.`,
+                  read: false,
+                },
+              ];
+            }
+          } else {
+            next.logs = [
+              ...state.logs,
+              {
+                id: `log_crew_following_${targetId}_${next.turn}`,
+                timestamp: next.turn,
+                source: "system",
+                text: `${crewName} is already following you. Find the Escape Pod Bay.`,
+                read: false,
+              },
+            ];
+          }
         }
       }
       break;
