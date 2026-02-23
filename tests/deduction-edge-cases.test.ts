@@ -233,9 +233,9 @@ describe("SubmitDeduction edge cases", () => {
 
   it("unlocks second deduction after first is solved", () => {
     const state = makeTestState();
-    // Add enough journal entries to meet ded_second threshold (evidenceThreshold=2)
+    // Add enough journal entries to meet ded_second threshold (evidenceThreshold=2) AND tag coverage (requires ["sabotage", "motive"])
     state.mystery!.journal.push(
-      { id: "j_sab", turnDiscovered: 10, category: "log", summary: "Sabotage evidence", detail: "", crewMentioned: [], roomFound: "Bridge", tags: ["sabotage"] },
+      { id: "j_sab", turnDiscovered: 10, category: "log", summary: "Sabotage evidence", detail: "", crewMentioned: [], roomFound: "Bridge", tags: ["sabotage", "motive"] },
     );
 
     // Solve first deduction
@@ -245,7 +245,7 @@ describe("SubmitDeduction edge cases", () => {
       answerKey: "correct_a",
     });
 
-    // Now submit second deduction — should be accepted (2 journal entries >= threshold of 2)
+    // Now submit second deduction — should be accepted (2 journal entries >= threshold of 2, all tags covered)
     next = step(next, {
       type: ActionType.SubmitDeduction,
       deductionId: "ded_second",

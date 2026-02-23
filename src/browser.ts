@@ -47,7 +47,7 @@ import {
 import type { Action, MysteryChoice, Deduction, CrewMember, Entity, CrewDossier, RoomScene } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType, SceneActivity, SceneOutcome, TimelinePhase } from "./shared/types.js";
 import { computeChoiceEndings, computeBranchedEpilogue, isMoralChoiceUnlocked } from "./sim/mysteryChoices.js";
-import { getUnlockedDeductions, solveDeduction } from "./sim/deduction.js";
+import { getUnlockedDeductions, getTagCoverage, solveDeduction } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
 import { saveGame, loadGame, hasSave, deleteSave, recordRun } from "./sim/saveLoad.js";
 import { isEntityExhausted } from "./shared/ui.js";
@@ -4001,18 +4001,18 @@ function commitDeductionAnswer(): void {
   let nextTeaser: string | undefined;
   if (correct && state.mystery) {
     const updatedDeductions = state.mystery.deductions;
-    const nextUnlocked = updatedDeductions.find(d => {
-      if (d.solved) return false;
-      if (d.unlockAfter && !updatedDeductions.find(dd => dd.id === d.unlockAfter && dd.solved)) return false;
-      return journal.length >= (d.evidenceThreshold ?? 1);
-    });
-    if (nextUnlocked) {
-      nextTeaser = `New line of inquiry available: "${nextUnlocked.question}"`;
+    const nextUnlocked = getUnlockedDeductions(updatedDeductions, journal);
+    if (nextUnlocked.length > 0) {
+      nextTeaser = `New line of inquiry available: "${nextUnlocked[0].question}"`;
     } else {
       // Check if a locked deduction is next in the chain
       const nextInChain = updatedDeductions.find(d => !d.solved && d.unlockAfter === solved.id);
       if (nextInChain) {
-        nextTeaser = `Gather more evidence to unlock: "${nextInChain.question}"`;
+        const coverage = getTagCoverage(nextInChain, journal);
+        const clueInfo = coverage.missing.length > 0
+          ? ` (${coverage.covered.length}/${coverage.covered.length + coverage.missing.length} key clues found)`
+          : "";
+        nextTeaser = `Gather more evidence to unlock: "${nextInChain.question}"${clueInfo}`;
       }
     }
   }
@@ -4575,16 +4575,20 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
     html += `</div>`;
   } else {
     // Nothing unlocked yet — tell player what they need
-    const nextThreshold = nextLocked?.evidenceThreshold ?? 2;
     const chainLocked = nextLocked?.unlockAfter && !solvedIds.has(nextLocked.unlockAfter);
     if (chainLocked) {
       html += `<div style="color:#889;font-size:12px;margin-bottom:10px;padding:8px;border:1px solid #333;border-radius:4px;background:rgba(255,255,255,0.02)">`;
       html += `Solve the current deduction to unlock the next question in the chain.`;
       html += `</div>`;
-    } else {
-      const needed = Math.max(0, nextThreshold - journal.length);
+    } else if (nextLocked) {
+      const coverage = getTagCoverage(nextLocked, journal);
+      const found = coverage.covered.length;
+      const total = found + coverage.missing.length;
       html += `<div style="color:#889;font-size:12px;margin-bottom:10px;padding:8px;border:1px solid #333;border-radius:4px;background:rgba(255,255,255,0.02)">`;
-      html += `Collect ${needed} more piece${needed !== 1 ? "s" : ""} of evidence to unlock the next deduction. Read terminals, examine items, and scan rooms.`;
+      html += `<div style="margin-bottom:4px">\uD83D\uDD0D Key clues found: <span style="color:${found === total ? "#4f8" : "#fa0"};font-weight:bold">${found}/${total}</span></div>`;
+      if (coverage.missing.length > 0) {
+        html += `<div style="color:#667;font-size:11px">Find relevant evidence to unlock this deduction. Read terminals, examine items, and explore new rooms.</div>`;
+      }
       html += `</div>`;
     }
   }
@@ -4643,7 +4647,6 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
   // ── Next locked deduction — teaser with progress bar ──
   if (nextLocked && solved.length < deductions.length - 1) {
     const chainBlocked = nextLocked.unlockAfter && !solvedIds.has(nextLocked.unlockAfter);
-    const threshold = nextLocked.evidenceThreshold ?? 1;
     html += `<div style="color:#555;font-size:11px;margin-top:12px;padding:8px;border:1px solid #222;border-radius:4px;background:rgba(255,255,255,0.01)">`;
     html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">`;
     html += `<span style="color:#444;font-size:14px">\u25CB</span>`;
@@ -4652,12 +4655,15 @@ function renderHubConnections(deductions: import("./shared/types.js").Deduction[
     if (chainBlocked) {
       html += `<div style="color:#556;font-size:10px;padding-left:20px">Locked \u2014 solve the current deduction first</div>`;
     } else {
-      const progress = Math.min(journal.length / threshold, 1);
+      const coverage = getTagCoverage(nextLocked, journal);
+      const found = coverage.covered.length;
+      const total = found + coverage.missing.length;
+      const progress = total > 0 ? found / total : 1;
       const barWidth = Math.round(progress * 100);
       html += `<div style="padding-left:20px">`;
-      html += `<div style="color:#556;font-size:10px;margin-bottom:3px">${journal.length}/${threshold} evidence collected</div>`;
+      html += `<div style="color:#556;font-size:10px;margin-bottom:3px">Key clues: ${found}/${total} found</div>`;
       html += `<div style="background:#222;border-radius:2px;height:4px;width:100%;max-width:200px">`;
-      html += `<div style="background:#fa0;height:100%;border-radius:2px;width:${barWidth}%;transition:width 0.3s"></div>`;
+      html += `<div style="background:${found === total ? "#4f8" : "#fa0"};height:100%;border-radius:2px;width:${barWidth}%;transition:width 0.3s"></div>`;
       html += `</div></div>`;
     }
     html += `</div>`;
@@ -5354,6 +5360,42 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     { key: SceneOutcome.Unknown, label: "Unknown" },
   ];
 
+  // ── Inference from clue types: reverse-map clue types → likely activities/outcomes ──
+  const examinedClues = scene.physicalClues.filter(c => c.examined);
+  const clueTypes = new Set(examinedClues.map(c => c.type));
+  const clueTextsLower = examinedClues.map(c => c.text.toLowerCase()).join(" ");
+
+  // Clue type → suggested activities (reverse of clueTypeForActivity mapping)
+  const suggestedActivities = new Set<SceneActivity>();
+  if (clueTypes.has("damage_pattern")) { suggestedActivities.add(SceneActivity.EmergencyResponse); suggestedActivities.add(SceneActivity.Confrontation); }
+  if (clueTypes.has("personal_effect")) { suggestedActivities.add(SceneActivity.Fleeing); }
+  if (clueTypes.has("barricade")) { suggestedActivities.add(SceneActivity.Hiding); suggestedActivities.add(SceneActivity.Barricading); }
+  if (clueTypes.has("modified_equipment")) { suggestedActivities.add(SceneActivity.Sabotage); }
+  if (clueTypes.has("tool")) { suggestedActivities.add(SceneActivity.MedicalTreatment); suggestedActivities.add(SceneActivity.EquipmentRepair); }
+  if (clueTypes.has("access_log")) { suggestedActivities.add(SceneActivity.RoutineWork); }
+  if (clueTypes.has("terminal_log")) { suggestedActivities.add(SceneActivity.Investigation); suggestedActivities.add(SceneActivity.DataAccess); suggestedActivities.add(SceneActivity.Communication); }
+
+  // Text-based outcome hints from clue descriptions
+  const suggestedOutcomes = new Set<SceneOutcome>();
+  if (clueTextsLower.includes("blood") || clueTextsLower.includes("body") || clueTextsLower.includes("died") || clueTextsLower.includes("deceased") || clueTextsLower.includes("fatal")) {
+    suggestedOutcomes.add(SceneOutcome.DiedHere);
+  }
+  if (clueTextsLower.includes("hurry") || clueTextsLower.includes("rush") || clueTextsLower.includes("fled") || clueTextsLower.includes("abandoned") || clueTextsLower.includes("dropped")) {
+    suggestedOutcomes.add(SceneOutcome.LeftInHurry);
+  }
+  if (clueTextsLower.includes("barricade") || clueTextsLower.includes("sealed") || clueTextsLower.includes("locked from inside")) {
+    suggestedOutcomes.add(SceneOutcome.SealedInside); suggestedOutcomes.add(SceneOutcome.StillHere);
+  }
+  if (clueTextsLower.includes("injur") || clueTextsLower.includes("wound") || clueTextsLower.includes("bandage") || clueTextsLower.includes("medical")) {
+    suggestedOutcomes.add(SceneOutcome.Injured);
+  }
+
+  // WHO hints: clues with crewLinked
+  const suggestedCrewIds = new Set<string>();
+  for (const clue of examinedClues) {
+    if (clue.crewLinked) suggestedCrewIds.add(clue.crewLinked);
+  }
+
   // Three-column layout: WHO | WHAT | OUTCOME
   // Track which column is focused: 0=WHO, 1=WHAT, 2=OUTCOME
   const focusCol = hubOptionIdx; // reuse hubOptionIdx as column focus (0-2)
@@ -5365,7 +5407,6 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
   html += `<div style="color:#667;font-size:10px;margin-bottom:8px">Attempt ${scene.processAttempts + 1} \u00B7 Cost: ${turnCost} turns \u00B7 Score 2/3 to succeed</div>`;
 
   // ── CLUES FOUND — show examined clue text as reference ──
-  const examinedClues = scene.physicalClues.filter(c => c.examined);
   if (examinedClues.length > 0) {
     html += `<div style="margin-bottom:10px;padding:6px 8px;background:rgba(200,170,100,0.06);border:1px solid #443;border-radius:3px">`;
     html += `<div style="color:#ca8;font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:4px">CLUES FOUND (${examinedClues.length})</div>`;
@@ -5387,45 +5428,60 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
 
   html += `<div style="display:flex;gap:12px">`;
 
-  // WHO column
+  // WHO column — highlight crew linked to clues
   const whoActive = focusCol === 0;
   html += `<div style="flex:1;border:1px solid ${whoActive ? "#4cf" : "#333"};padding:8px;max-height:300px;overflow-y:auto">`;
   html += `<div style="color:${whoActive ? "#4cf" : "#889"};font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px">WHO WAS HERE?</div>`;
+  if (suggestedCrewIds.size > 0) {
+    html += `<div style="color:#4cf;font-size:9px;margin-bottom:4px;font-style:italic">Evidence points to marked crew</div>`;
+  }
   for (let i = 0; i < crew.length; i++) {
     const c = crew[i];
     const dossier = dossiers.find(d => d.crewId === c.id);
     const identified = dossier?.confirmed.name;
     const selected = whoActive && i === hubSceneWhoIdx;
-    const bg = selected ? "background:rgba(68,204,255,0.15)" : "";
+    const suggested = suggestedCrewIds.has(c.id);
+    const bg = selected ? "background:rgba(68,204,255,0.15)" : suggested ? "background:rgba(68,204,255,0.05)" : "";
     const nameText = identified ? `${c.firstName} ${c.lastName}` : `Crew #${i + 1} (${c.role})`;
-    const prefix = selected ? "\u25b6 " : "  ";
-    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : "#889"}">${prefix}${esc(nameText)}</div>`;
+    const prefix = selected ? "\u25b6 " : suggested ? "\u25c7 " : "  ";
+    const hint = suggested ? ` <span style="color:#4cf;font-size:9px">\u2190 evidence</span>` : "";
+    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#bce" : "#889"}">${prefix}${esc(nameText)}${hint}</div>`;
   }
   html += `</div>`;
 
-  // WHAT column
+  // WHAT column — highlight activities suggested by clue types
   const whatActive = focusCol === 1;
   html += `<div style="flex:1;border:1px solid ${whatActive ? "#fa0" : "#333"};padding:8px;max-height:300px;overflow-y:auto">`;
   html += `<div style="color:${whatActive ? "#fa0" : "#889"};font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px">WHAT HAPPENED?</div>`;
+  if (suggestedActivities.size > 0) {
+    html += `<div style="color:#fa0;font-size:9px;margin-bottom:4px;font-style:italic">Clues suggest marked activities</div>`;
+  }
   for (let i = 0; i < activities.length; i++) {
     const a = activities[i];
     const selected = whatActive && i === hubSceneWhatIdx;
-    const bg = selected ? "background:rgba(255,170,0,0.15)" : "";
-    const prefix = selected ? "\u25b6 " : "  ";
-    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : "#889"}">${prefix}${esc(a.label)}</div>`;
+    const suggested = suggestedActivities.has(a.key);
+    const bg = selected ? "background:rgba(255,170,0,0.15)" : suggested ? "background:rgba(255,170,0,0.05)" : "";
+    const prefix = selected ? "\u25b6 " : suggested ? "\u25c7 " : "  ";
+    const hint = suggested ? ` <span style="color:#fa0;font-size:9px">\u2190 clue</span>` : "";
+    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#dca" : "#889"}">${prefix}${esc(a.label)}${hint}</div>`;
   }
   html += `</div>`;
 
-  // OUTCOME column
+  // OUTCOME column — highlight outcomes suggested by clue text analysis
   const outcomeActive = focusCol === 2;
   html += `<div style="flex:1;border:1px solid ${outcomeActive ? "#f80" : "#333"};padding:8px;max-height:300px;overflow-y:auto">`;
   html += `<div style="color:${outcomeActive ? "#f80" : "#889"};font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px">OUTCOME?</div>`;
+  if (suggestedOutcomes.size > 0) {
+    html += `<div style="color:#f80;font-size:9px;margin-bottom:4px;font-style:italic">Evidence suggests marked outcomes</div>`;
+  }
   for (let i = 0; i < outcomes.length; i++) {
     const o = outcomes[i];
     const selected = outcomeActive && i === hubSceneOutcomeIdx;
-    const bg = selected ? "background:rgba(255,136,0,0.15)" : "";
-    const prefix = selected ? "\u25b6 " : "  ";
-    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : "#889"}">${prefix}${esc(o.label)}</div>`;
+    const suggested = suggestedOutcomes.has(o.key);
+    const bg = selected ? "background:rgba(255,136,0,0.15)" : suggested ? "background:rgba(255,136,0,0.05)" : "";
+    const prefix = selected ? "\u25b6 " : suggested ? "\u25c7 " : "  ";
+    const hint = suggested ? ` <span style="color:#f80;font-size:9px">\u2190 clue</span>` : "";
+    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#da8" : "#889"}">${prefix}${esc(o.label)}${hint}</div>`;
   }
   html += `</div>`;
 

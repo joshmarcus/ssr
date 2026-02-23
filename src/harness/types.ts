@@ -36,8 +36,9 @@ export interface HarnessObservation {
     options: { key: string; label: string }[];
     solved: boolean;
     answeredCorrectly?: boolean;
-    evidenceCount: number;
-    evidenceThreshold: number;
+    cluesFound: number;
+    cluesNeeded: number;
+    unlocked: boolean;
     wrongAttempts: number;
     maxAttempts: number;
   }[];

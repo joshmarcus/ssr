@@ -668,11 +668,35 @@ function shuffleArray<T>(arr: T[]): void {
 }
 
 /**
+ * Compute tag coverage for a deduction given the player's journal.
+ * Returns which required tags are covered, which are missing, and the ratio.
+ */
+export function getTagCoverage(
+  deduction: Deduction,
+  journal: JournalEntry[],
+): { covered: string[]; missing: string[]; ratio: number } {
+  const allTags = new Set(journal.flatMap(j => j.tags));
+  const covered: string[] = [];
+  const missing: string[] = [];
+  for (const tag of deduction.requiredTags) {
+    if (allTags.has(tag)) {
+      covered.push(tag);
+    } else {
+      missing.push(tag);
+    }
+  }
+  const total = deduction.requiredTags.length;
+  return { covered, missing, ratio: total > 0 ? covered.length / total : 1 };
+}
+
+/**
  * Check if a deduction is available for the player to attempt.
  * A deduction is unlocked when:
  * 1. It's not already solved (including locked-out deductions)
  * 2. Its prerequisite deduction (unlockAfter) is solved
- * 3. The player has enough journal entries (evidence count threshold)
+ * 3. The player has enough journal entries (evidence count threshold for pacing)
+ * 4. The player's journal entries collectively cover ALL of the deduction's required tags
+ *    (i.e. the player has found the RIGHT evidence, not just any evidence)
  */
 export function getUnlockedDeductions(
   deductions: Deduction[],
@@ -684,8 +708,11 @@ export function getUnlockedDeductions(
     if (d.solved) return false;
     // Check chain prerequisite
     if (d.unlockAfter && !solvedIds.has(d.unlockAfter)) return false;
-    // Check evidence count threshold
-    return journal.length >= (d.evidenceThreshold ?? 1);
+    // Check minimum evidence count threshold (pacing)
+    if (journal.length < (d.evidenceThreshold ?? 1)) return false;
+    // Check that the right evidence has been found (all required tags covered)
+    const { missing } = getTagCoverage(d, journal);
+    return missing.length === 0;
   });
 }
 

@@ -3,7 +3,7 @@ import * as ROT from "rot-js";
 import { generateCrew } from "../src/sim/crewGen.js";
 import { generateTimeline } from "../src/sim/timeline.js";
 import {
-  generateDeductions, getUnlockedDeductions, solveDeduction,
+  generateDeductions, getUnlockedDeductions, getTagCoverage, solveDeduction,
   validateEvidenceLink, linkEvidence, generateEvidenceTags,
 } from "../src/sim/deduction.js";
 // Note: validateEvidenceLink and linkEvidence still exist for internal/procgen use
@@ -96,29 +96,37 @@ describe("deduction system", () => {
     }
   });
 
-  it("getUnlockedDeductions respects chain and evidence count", () => {
+  it("getUnlockedDeductions requires both evidence count AND tag coverage", () => {
     const crew = generateCrew(10, 184201, ROOM_NAMES);
     const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
     const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
 
-    // First deduction needs evidenceThreshold=2, so 0 entries = locked
+    // First deduction (WHAT) needs threshold=2 and tag "coolant"
+    // 0 entries = locked
     const emptyJournal: JournalEntry[] = [];
     const atEmpty = getUnlockedDeductions(deductions, emptyJournal);
     expect(atEmpty.length).toBe(0);
 
-    // With 1 journal entry — still not enough (threshold is 2)
+    // With 1 journal entry — has right tag but count < threshold
     const journal1 = [fakeJournal("j1", ["coolant"])];
     const atOne = getUnlockedDeductions(deductions, journal1);
     expect(atOne.length).toBe(0);
 
-    // With 2 entries — first deduction unlocks (threshold=2)
+    // With 2 entries but WRONG tags — count OK but missing required tag
+    const journal2Wrong = [fakeJournal("j1", ["thermal"]), fakeJournal("j2", ["pressure"])];
+    const atTwoWrong = getUnlockedDeductions(deductions, journal2Wrong);
+    expect(atTwoWrong.length).toBe(0); // "coolant" tag not present
+
+    // With 2 entries and RIGHT tag — first deduction unlocks
     const journal2 = [fakeJournal("j1", ["coolant"]), fakeJournal("j2", ["thermal"])];
     const atTwo = getUnlockedDeductions(deductions, journal2);
     expect(atTwo.length).toBe(1);
     expect(atTwo[0].id).toBe(deductions[0].id);
 
-    // Second deduction is locked because first isn't solved yet (even with enough evidence)
-    const journal5 = Array.from({ length: 5 }, (_, i) => fakeJournal(`j${i}`, ["coolant"]));
+    // Second deduction is locked because first isn't solved yet (even with enough evidence + tags)
+    const journal5 = Array.from({ length: 5 }, (_, i) =>
+      fakeJournal(`j${i}`, ["coolant", "thermal", "timeline_trigger"]),
+    );
     const atFive = getUnlockedDeductions(deductions, journal5);
     expect(atFive.length).toBe(1); // still only first (chain prerequisite)
   });
@@ -128,8 +136,11 @@ describe("deduction system", () => {
     const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
     let deductions = generateDeductions(crew, timeline, ROOM_NAMES);
 
-    // Enough evidence to unlock all tiers (12+ entries)
-    const journal = Array.from({ length: 12 }, (_, i) => fakeJournal(`j${i}`, ["coolant"]));
+    // Collect all required tags from all deductions to build a comprehensive journal
+    const allRequiredTags = new Set(deductions.flatMap(d => d.requiredTags));
+    const allTags = [...allRequiredTags];
+    // Enough entries (12+) with ALL required tags covered
+    const journal = Array.from({ length: 12 }, (_, i) => fakeJournal(`j${i}`, allTags));
 
     // Before solving: only first is unlocked (chain prerequisite)
     expect(getUnlockedDeductions(deductions, journal).length).toBe(1);
@@ -138,7 +149,7 @@ describe("deduction system", () => {
     deductions = deductions.map((d, i) =>
       i === 0 ? { ...d, solved: true, answeredCorrectly: true } : d
     );
-    // Now second should be unlocked
+    // Now second should be unlocked (has enough count + tags)
     const afterFirst = getUnlockedDeductions(deductions, journal);
     expect(afterFirst.length).toBe(1);
     expect(afterFirst[0].id).toBe(deductions[1].id);
@@ -252,6 +263,38 @@ describe("deduction system", () => {
     expect(deductions.length).toBe(6);
     const agenda = deductions.find(d => d.id === "deduction_agenda");
     expect(agenda).toBeDefined();
+  });
+
+  it("getTagCoverage reports covered and missing tags", () => {
+    const crew = generateCrew(10, 184201, ROOM_NAMES);
+    const timeline = generateTimeline(crew, IncidentArchetype.CoolantCascade, ROOM_NAMES);
+    const deductions = generateDeductions(crew, timeline, ROOM_NAMES);
+
+    // Tier 2 (WHERE) requires ["thermal", "timeline_trigger"]
+    const tier2 = deductions[1];
+    expect(tier2.requiredTags).toContain("thermal");
+    expect(tier2.requiredTags).toContain("timeline_trigger");
+
+    // No journal — all missing
+    const empty = getTagCoverage(tier2, []);
+    expect(empty.covered.length).toBe(0);
+    expect(empty.missing.length).toBe(tier2.requiredTags.length);
+    expect(empty.ratio).toBe(0);
+
+    // Partial coverage — one of two tags found
+    const partial = getTagCoverage(tier2, [fakeJournal("j1", ["thermal"])]);
+    expect(partial.covered).toContain("thermal");
+    expect(partial.missing).toContain("timeline_trigger");
+    expect(partial.ratio).toBeCloseTo(0.5);
+
+    // Full coverage
+    const full = getTagCoverage(tier2, [
+      fakeJournal("j1", ["thermal"]),
+      fakeJournal("j2", ["timeline_trigger"]),
+    ]);
+    expect(full.covered.length).toBe(tier2.requiredTags.length);
+    expect(full.missing.length).toBe(0);
+    expect(full.ratio).toBe(1);
   });
 
   it("generates valid deductions for all archetypes", () => {

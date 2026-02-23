@@ -12,7 +12,7 @@ import { generate } from "../sim/procgen.js";
 import { step } from "../sim/step.js";
 import { isValidAction } from "../sim/actions.js";
 import { getRoomCleanliness } from "../sim/rooms.js";
-import { getUnlockedDeductions } from "../sim/deduction.js";
+import { getUnlockedDeductions, getTagCoverage } from "../sim/deduction.js";
 import { GOLDEN_SEED } from "../shared/constants.js";
 import { getObjective, getRoomExits, getDiscoveries, entityDisplayName, isEntityExhausted } from "../shared/ui.js";
 import type {
@@ -228,18 +228,25 @@ function buildObservation(state: GameState, _visibility: "full" | "player" = "fu
 
   const allDeductions = state.mystery?.deductions ?? [];
   const journal = state.mystery?.journal ?? [];
-  const deductions = allDeductions.map(d => ({
-    id: d.id,
-    category: d.category,
-    question: d.question,
-    options: d.options.map(o => ({ key: o.key, label: o.label })),
-    solved: d.solved,
-    answeredCorrectly: d.answeredCorrectly,
-    evidenceCount: journal.length,
-    evidenceThreshold: d.evidenceThreshold ?? 1,
-    wrongAttempts: d.wrongAttempts ?? 0,
-    maxAttempts: d.maxAttempts ?? 2,
-  }));
+  const unlockedIds = new Set(
+    state.mystery ? getUnlockedDeductions(allDeductions, journal).map(d => d.id) : [],
+  );
+  const deductions = allDeductions.map(d => {
+    const coverage = getTagCoverage(d, journal);
+    return {
+      id: d.id,
+      category: d.category,
+      question: d.question,
+      options: d.options.map(o => ({ key: o.key, label: o.label })),
+      solved: d.solved,
+      answeredCorrectly: d.answeredCorrectly,
+      cluesFound: coverage.covered.length,
+      cluesNeeded: coverage.covered.length + coverage.missing.length,
+      unlocked: unlockedIds.has(d.id),
+      wrongAttempts: d.wrongAttempts ?? 0,
+      maxAttempts: d.maxAttempts ?? 2,
+    };
+  });
   const answered = allDeductions.filter(d => d.solved).length;
   const correct = allDeductions.filter(d => d.answeredCorrectly).length;
   const deductionProgress = { total: allDeductions.length, answered, correct };
@@ -465,12 +472,12 @@ function renderObservationAsText(obs: HarnessObservation): string {
     for (const d of obs.deductions) {
       const status = d.solved
         ? (d.answeredCorrectly ? "[CORRECT]" : "[WRONG]")
-        : d.evidenceCount >= d.evidenceThreshold ? "[UNLOCKED]" : `[LOCKED ${d.evidenceCount}/${d.evidenceThreshold}]`;
+        : d.unlocked ? "[UNLOCKED]" : `[LOCKED clues:${d.cluesFound}/${d.cluesNeeded}]`;
       const attemptInfo = !d.solved && d.wrongAttempts > 0
         ? ` (${d.maxAttempts - d.wrongAttempts} attempts left)`
         : "";
       lines.push(`  ${d.id} ${status}${attemptInfo} ${d.question}`);
-      if (!d.solved && d.evidenceCount >= d.evidenceThreshold) {
+      if (!d.solved && d.unlocked) {
         for (const o of d.options) {
           lines.push(`    SUBMIT_DEDUCTION {"deductionId":"${d.id}","answerKey":"${o.key}"} — ${o.label}`);
         }
