@@ -45,7 +45,7 @@ import {
   CORVUS_WITNESS_COMMENTARY,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember, Entity } from "./shared/types.js";
-import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate } from "./shared/types.js";
+import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType } from "./shared/types.js";
 import { computeChoiceEndings, computeBranchedEpilogue } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, solveDeduction } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
@@ -2798,16 +2798,18 @@ function showLogReview(): void {
   if (container) container.scrollTop = container.scrollHeight;
 }
 
-// ── Station map display (HTML overlay — no longer destroys log panel) ──
+// ── Station map display (HTML overlay — canvas-based spatial map) ──
 function showStationMap(): void {
   const overlay = document.getElementById("journal-overlay");
   if (!overlay) return;
 
   const visited = visitedRoomIds;
-  let roomsHtml = "";
+  const visitedCount = state.rooms.filter(r => visited.has(r.id)).length;
+
+  // Room list (text sidebar)
+  let roomListHtml = "";
   for (const room of state.rooms) {
     const isVisited = visited.has(room.id);
-
     let cameraRevealed = false;
     if (!isVisited) {
       for (let ry = room.y; ry < room.y + room.height; ry++) {
@@ -2819,27 +2821,142 @@ function showStationMap(): void {
         if (cameraRevealed) break;
       }
     }
-
     if (isVisited) {
-      roomsHtml += `<div style="padding:3px 8px;color:#0f0">\u2713 ${esc(room.name)}</div>`;
+      roomListHtml += `<div style="padding:2px 6px;color:#0f0;font-size:11px">\u2713 ${esc(room.name)}</div>`;
     } else if (cameraRevealed) {
-      roomsHtml += `<div style="padding:3px 8px;color:#6cf">\u25cb ${esc(room.name)}</div>`;
+      roomListHtml += `<div style="padding:2px 6px;color:#6cf;font-size:11px">\u25cb ${esc(room.name)}</div>`;
     } else {
-      roomsHtml += `<div style="padding:3px 8px;color:#555">\u00b7 ???</div>`;
+      roomListHtml += `<div style="padding:2px 6px;color:#555;font-size:11px">\u00b7 ???</div>`;
     }
   }
 
-  const visitedCount = state.rooms.filter(r => visited.has(r.id)).length;
   overlay.innerHTML = `
     <div class="journal-container">
       <div class="journal-header">\u2550\u2550\u2550 STATION MAP \u2550\u2550\u2550</div>
-      <div class="journal-body" style="flex-direction:column;padding:8px">
-        ${roomsHtml}
-        <div style="padding:8px;color:#888;border-top:1px solid #333;margin-top:8px">${visitedCount}/${state.rooms.length} rooms explored</div>
+      <div class="journal-body" style="display:flex;flex-direction:row;padding:0;gap:0">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:8px;min-height:300px">
+          <canvas id="station-map-canvas" width="560" height="380" style="image-rendering:pixelated;border:1px solid rgba(68,255,136,0.15)"></canvas>
+        </div>
+        <div style="width:180px;overflow-y:auto;border-left:1px solid #333;padding:4px 0;max-height:380px">
+          ${roomListHtml}
+          <div style="padding:4px 6px;color:#888;border-top:1px solid #333;margin-top:4px;font-size:11px">${visitedCount}/${state.rooms.length} rooms</div>
+        </div>
       </div>
       <div class="journal-controls">[Esc/m] Close</div>
     </div>`;
   overlay.classList.add("active");
+
+  // Render spatial map on canvas
+  const canvas = document.getElementById("station-map-canvas") as HTMLCanvasElement;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d")!;
+  const cw = canvas.width, ch = canvas.height;
+  ctx.fillStyle = "#060810";
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Compute scale to fit all tiles
+  const margin = 20;
+  const scaleX = (cw - margin * 2) / state.width;
+  const scaleY = (ch - margin * 2) / state.height;
+  const scale = Math.min(scaleX, scaleY, 8);
+  const ox = margin + (cw - margin * 2 - state.width * scale) / 2;
+  const oy = margin + (ch - margin * 2 - state.height * scale) / 2;
+
+  // Draw explored corridor tiles
+  for (let y = 0; y < state.height; y++) {
+    for (let x = 0; x < state.width; x++) {
+      const tile = state.tiles[y][x];
+      if (!tile.explored) continue;
+      if (tile.type === TileType.Corridor) {
+        ctx.fillStyle = "rgba(60,80,100,0.5)";
+        ctx.fillRect(ox + x * scale, oy + y * scale, scale, scale);
+      } else if (tile.type === TileType.Door || tile.type === TileType.LockedDoor) {
+        ctx.fillStyle = tile.type === TileType.LockedDoor ? "rgba(255,60,60,0.7)" : "rgba(100,200,100,0.7)";
+        ctx.fillRect(ox + x * scale, oy + y * scale, scale, scale);
+      }
+    }
+  }
+
+  // Draw rooms
+  const ROOM_TINTS: Record<string, string> = {
+    "Engineering Storage": "#eedd99", "Power Relay Junction": "#ffee88",
+    "Engine Core": "#ffbb66", "Life Support": "#99ddff",
+    "Communications Hub": "#99bbff", "Research Lab": "#99eebb",
+    "Med Bay": "#ffaacc", "Data Core": "#dd99ff",
+    "Robotics Bay": "#ccdddd", "Bridge": "#bbccee",
+    "Observation Deck": "#aaddee", "Escape Pod Bay": "#99ffcc",
+    "Auxiliary Power": "#eedd88", "Signal Room": "#99aaff",
+    "Server Annex": "#dd99ff", "Armory": "#ff9999",
+    "Emergency Shelter": "#aaeebb", "Cargo Hold": "#eecc88",
+    "Crew Quarters": "#eeddaa", "Arrival Bay": "#aaddcc",
+  };
+
+  for (const room of state.rooms) {
+    const isVisited = visited.has(room.id);
+    let isExplored = false;
+    const rcx = room.x + Math.floor(room.width / 2);
+    const rcy = room.y + Math.floor(room.height / 2);
+    if (rcy >= 0 && rcy < state.height && rcx >= 0 && rcx < state.width) {
+      isExplored = state.tiles[rcy][rcx].explored;
+    }
+
+    if (!isExplored && !isVisited) continue;
+
+    const rx = ox + room.x * scale;
+    const ry = oy + room.y * scale;
+    const rw = room.width * scale;
+    const rh = room.height * scale;
+
+    // Room fill
+    const tintStr = ROOM_TINTS[room.name];
+    if (isVisited) {
+      ctx.fillStyle = tintStr ? tintStr.replace(")", ",0.2)").replace("rgb", "rgba").replace("#", "") : "rgba(40,80,60,0.3)";
+      // Parse hex to rgba
+      if (tintStr && tintStr.startsWith("#")) {
+        const hr = parseInt(tintStr.slice(1, 3), 16);
+        const hg = parseInt(tintStr.slice(3, 5), 16);
+        const hb = parseInt(tintStr.slice(5, 7), 16);
+        ctx.fillStyle = `rgba(${hr},${hg},${hb},0.2)`;
+      }
+    } else {
+      ctx.fillStyle = "rgba(30,40,60,0.3)";
+    }
+    ctx.fillRect(rx, ry, rw, rh);
+
+    // Room border
+    ctx.strokeStyle = isVisited ? (tintStr ?? "#4a8") : "#335";
+    ctx.lineWidth = isVisited ? 1.5 : 0.5;
+    ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+
+    // Room name label
+    if (isVisited || isExplored) {
+      ctx.font = "bold 8px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = isVisited ? "#ccc" : "#668";
+      const label = isVisited ? room.name : "???";
+      ctx.fillText(label, rx + rw / 2, ry + rh / 2, rw - 4);
+    }
+  }
+
+  // Draw player position
+  const px = state.player.entity.pos.x;
+  const py = state.player.entity.pos.y;
+  const ppx = ox + px * scale + scale / 2;
+  const ppy = oy + py * scale + scale / 2;
+  ctx.beginPath();
+  ctx.arc(ppx, ppy, Math.max(3, scale * 0.6), 0, Math.PI * 2);
+  ctx.fillStyle = "#44ff88";
+  ctx.fill();
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Grid reference
+  ctx.font = "9px 'Courier New', monospace";
+  ctx.fillStyle = "#334";
+  ctx.textAlign = "left";
+  ctx.fillText(`${state.width}x${state.height}`, 4, ch - 4);
 }
 
 function closeMapOverlay(): void {
