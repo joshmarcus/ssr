@@ -360,6 +360,7 @@ export interface PhysicalClue {
   examined: boolean;
   pos: Position;
   evidenceCategory: EvidenceCategory;
+  forceTags?: string[];               // injected by ensureTagCoverage for tag guarantee
 }
 
 export interface RoomScene {

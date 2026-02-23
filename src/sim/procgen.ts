@@ -753,27 +753,63 @@ function ensureTagCoverage(state: GameState): void {
     evidenceInfos.push({ entityId, tags, category });
   }
 
-  // 3. Compute which tags are already covered
+  // 2b. Also scan room scene physical clues for tag coverage
+  interface ClueInfo {
+    sceneIdx: number;
+    clueIdx: number;
+    tags: string[];
+    category: "log" | "trace" | "item" | "crew";
+  }
+  const clueInfos: ClueInfo[] = [];
+  if (state.mystery.roomScenes) {
+    for (let si = 0; si < state.mystery.roomScenes.length; si++) {
+      const scene = state.mystery.roomScenes[si];
+      for (let ci = 0; ci < scene.physicalClues.length; ci++) {
+        const clue = scene.physicalClues[ci];
+        const crewMentioned: string[] = [];
+        for (const member of crew) {
+          if (clue.text.includes(member.lastName) || clue.text.includes(member.firstName)) {
+            crewMentioned.push(member.id);
+          }
+        }
+        const clueCategory: ClueInfo["category"] =
+          clue.type === "badge" || clue.type === "personal_effect" ? "crew"
+            : clue.type === "terminal_log" || clue.type === "access_log" ? "log"
+              : "trace";
+        const tags = generateEvidenceTags(clueCategory, clue.text, scene.roomName, crewMentioned, crew, archetype);
+        if (clue.forceTags) {
+          for (const t of clue.forceTags) {
+            if (!tags.includes(t)) tags.push(t);
+          }
+        }
+        clueInfos.push({ sceneIdx: si, clueIdx: ci, tags, category: clueCategory });
+      }
+    }
+  }
+
+  // 3. Compute which tags are already covered (entities + clues)
   const covered = new Set<string>();
   for (const info of evidenceInfos) {
     for (const tag of info.tags) {
       covered.add(tag);
     }
   }
+  for (const info of clueInfos) {
+    for (const tag of info.tags) {
+      covered.add(tag);
+    }
+  }
 
-  // 4. Find missing tags and inject forceTags
+  // 4. Find missing tags and inject forceTags on entities OR clues
   for (const tag of allRequired) {
     if (covered.has(tag)) continue;
 
-    // Find the best entity to receive this tag
-    // Prefer log terminals (most text, most natural place for tags)
-    // then evidence traces, then crew items
+    // Try entities first (prefer log terminals)
     const prioritized = [...evidenceInfos].sort((a, b) => {
       const catOrder = { log: 0, trace: 1, item: 2, crew: 3 };
       return catOrder[a.category] - catOrder[b.category];
     });
 
-    // Pick an entity that doesn't already have too many forceTags (spread coverage)
     let bestEntity: EvidenceInfo | null = null;
     let bestForceCount = Infinity;
     for (const info of prioritized) {
@@ -794,6 +830,70 @@ function ensureTagCoverage(state: GameState): void {
       });
       bestEntity.tags.push(tag);
       covered.add(tag);
+    }
+
+    // If no entity available, inject on a room scene clue
+    if (!bestEntity && clueInfos.length > 0) {
+      // Prefer clues with fewest existing forceTags
+      let bestClue: ClueInfo | null = null;
+      let bestClueForce = Infinity;
+      for (const ci of clueInfos) {
+        const clue = state.mystery.roomScenes![ci.sceneIdx].physicalClues[ci.clueIdx];
+        const existing = clue.forceTags?.length ?? 0;
+        if (existing < bestClueForce) {
+          bestClueForce = existing;
+          bestClue = ci;
+        }
+      }
+      if (bestClue) {
+        const scene = state.mystery.roomScenes![bestClue.sceneIdx];
+        const clue = scene.physicalClues[bestClue.clueIdx];
+        const existing = clue.forceTags ?? [];
+        // Mutate in place — procgen phase, not gameplay
+        scene.physicalClues[bestClue.clueIdx] = {
+          ...clue,
+          forceTags: [...existing, tag],
+        };
+        bestClue.tags.push(tag);
+        covered.add(tag);
+      }
+    }
+  }
+
+  // 5. Ensure every required tag is also covered by at least one CLUE.
+  // Tags on entities alone are insufficient because the player/bot may only
+  // examine room scene clues (ExamineScene) rather than interacting with entities.
+  if (state.mystery.roomScenes && clueInfos.length > 0) {
+    const clueCovered = new Set<string>();
+    for (const ci of clueInfos) {
+      for (const tag of ci.tags) clueCovered.add(tag);
+    }
+
+    for (const tag of allRequired) {
+      if (clueCovered.has(tag)) continue;
+
+      // This tag is covered by entities but NOT by any clue — inject on a clue
+      let bestClue: ClueInfo | null = null;
+      let bestForce = Infinity;
+      for (const ci of clueInfos) {
+        const clue = state.mystery.roomScenes![ci.sceneIdx].physicalClues[ci.clueIdx];
+        const existing = clue.forceTags?.length ?? 0;
+        if (existing < bestForce) {
+          bestForce = existing;
+          bestClue = ci;
+        }
+      }
+      if (bestClue) {
+        const scene = state.mystery.roomScenes![bestClue.sceneIdx];
+        const clue = scene.physicalClues[bestClue.clueIdx];
+        const existing = clue.forceTags ?? [];
+        scene.physicalClues[bestClue.clueIdx] = {
+          ...clue,
+          forceTags: [...existing, tag],
+        };
+        bestClue.tags.push(tag);
+        clueCovered.add(tag);
+      }
     }
   }
 }

@@ -188,6 +188,7 @@ function addJournalEntry(
   detail: string,
   roomFound: string,
   entityId?: string,
+  extraTags?: string[],
 ): GameState {
   if (!state.mystery) return state;
   // Don't add duplicate entries
@@ -218,6 +219,13 @@ function addJournalEntry(
       for (const t of forced) {
         if (!tags.includes(t)) tags.push(t);
       }
+    }
+  }
+
+  // Merge extra tags (e.g. from PhysicalClue forceTags)
+  if (extraTags) {
+    for (const t of extraTags) {
+      if (!tags.includes(t)) tags.push(t);
     }
   }
 
@@ -5253,6 +5261,8 @@ export function step(state: GameState, action: Action): GameState {
           `Physical clue: ${clue.type.replace(/_/g, " ")}`,
           clue.text,
           scene.roomName,
+          undefined,       // no entityId for scene clues
+          clue.forceTags,  // tag coverage guarantee
         );
 
         // Memory echo clue — special log for ghost reveal trigger

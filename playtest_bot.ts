@@ -460,6 +460,21 @@ function chooseAction(state: GameState, visited: Set<string>): Action {
     }
   }
 
+  // Phase 2b1: Confirm timeline slots on the Incident Board
+  if (state.mystery?.incidentBoard) {
+    const board = state.mystery.incidentBoard;
+    for (const slot of board.slots) {
+      if (slot.status === "unlocked" || slot.status === "proposed") {
+        // Confirm with correct card (oracle mode — always confirm correct)
+        return {
+          type: ActionType.ConfirmTimeline,
+          timelinePhase: slot.phase,
+          cardCorrect: true, // request correct card generation
+        };
+      }
+    }
+  }
+
   // Phase 2b2: Pressure puzzle — seal breaches blocking access to crew in decompressed rooms
   {
     // Find unsealed breaches that are blocking access to crew NPCs
@@ -995,6 +1010,8 @@ for (let turn = 0; turn < state.maxTurns; turn++) {
     action.type === ActionType.SubmitChoice ? `SUBMIT_CHOICE ${action.choiceId}=${action.answerKey}` :
     action.type === ActionType.ExamineScene ? `EXAMINE_SCENE ${action.sceneRoomId}` :
     action.type === ActionType.ProcessScene ? `PROCESS_SCENE ${action.sceneRoomId}` :
+    action.type === ActionType.ConfirmTimeline ? `CONFIRM_TIMELINE ${action.timelinePhase}` :
+    action.type === ActionType.RejectTimeline ? `REJECT_TIMELINE ${action.timelinePhase}` :
     action.type.toUpperCase();
 
   const pos = `(${state.player.entity.pos.x},${state.player.entity.pos.y})`;
@@ -1024,6 +1041,8 @@ for (let turn = 0; turn < state.maxTurns; turn++) {
       log.text.includes("EVACUATION") ||
       log.text.includes("evacuation") ||
       log.text.includes("Decision recorded") ||
+      log.text.includes("Timeline") ||
+      log.text.includes("timeline") ||
       log.text.includes("CORVUS-7")
     )) {
       console.log(`  >> ${log.text}`);
