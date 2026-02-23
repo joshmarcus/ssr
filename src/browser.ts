@@ -1241,6 +1241,27 @@ function checkRoomEntry(): void {
         }
       }
 
+      // Sensor locator: on 3rd room visit, CORVUS-7 highlights sensor locations
+      if (visitedRoomIds.size === 3 && !state.milestones.has("sensor_locator_hint")) {
+        const uncollectedSensors: { type: string; room: string }[] = [];
+        for (const [, ent] of state.entities) {
+          if (ent.type !== EntityType.SensorPickup || ent.props["collected"] === true) continue;
+          const sType = ent.props["sensorType"] as string ?? "unknown";
+          const sRoom = state.rooms.find(r =>
+            ent.pos.x >= r.x && ent.pos.x < r.x + r.width &&
+            ent.pos.y >= r.y && ent.pos.y < r.y + r.height,
+          );
+          uncollectedSensors.push({ type: sType, room: sRoom?.name ?? "unknown section" });
+        }
+        if (uncollectedSensors.length > 0) {
+          const sensorList = uncollectedSensors.map(s => `${s.type} sensor in ${s.room}`).join(", ");
+          display.addLog(`CORVUS-7: Sensor sweep detects upgrade modules aboard the station: ${sensorList}. These will reveal hidden evidence.`, "milestone");
+          const newMilestones = new Set(state.milestones);
+          newMilestones.add("sensor_locator_hint");
+          state = { ...state, milestones: newMilestones };
+        }
+      }
+
       // Item 11: Environmental sound cues BEFORE room description
       emitRoomEntryCues(currentRoom);
 
@@ -3929,6 +3950,38 @@ function updateHudTip(): void {
     }
   }
 
+  // Tip: Sensor locator — point player toward uncollected sensors after some exploration
+  if (visitedRoomIds.size >= 3) {
+    for (const [, ent] of state.entities) {
+      if (ent.type !== EntityType.SensorPickup || ent.props["collected"] === true) continue;
+      const sensorType = ent.props["sensorType"] as string ?? "sensor";
+      const dx = ent.pos.x - px;
+      const dy = ent.pos.y - py;
+      const dist = Math.abs(dx) + Math.abs(dy);
+      if (dist <= 2) {
+        showHudTip("sensor_near", `Sensor upgrade nearby! [Enter] to collect ${sensorType} sensor`);
+        return;
+      }
+      // Directional compass for farther sensors
+      const dirX = dx > 2 ? "east" : dx < -2 ? "west" : "";
+      const dirY = dy > 2 ? "south" : dy < -2 ? "north" : "";
+      const dir = dirY && dirX ? `${dirY}-${dirX}` : dirY || dirX || "nearby";
+      const arrowMap: Record<string, string> = {
+        north: "\u2191", south: "\u2193", east: "\u2192", west: "\u2190",
+        "north-east": "\u2197", "north-west": "\u2196", "south-east": "\u2198", "south-west": "\u2199",
+        nearby: "\u25CE",
+      };
+      // Find which room the sensor is in
+      const sensorRoom = state.rooms.find(r =>
+        ent.pos.x >= r.x && ent.pos.x < r.x + r.width &&
+        ent.pos.y >= r.y && ent.pos.y < r.y + r.height,
+      );
+      const roomHint = sensorRoom ? ` in ${sensorRoom.name}` : "";
+      showHudTip("sensor_compass", `${arrowMap[dir] ?? "\u2192"} ${sensorType.charAt(0).toUpperCase() + sensorType.slice(1)} sensor${roomHint} — ${dir}`);
+      return;
+    }
+  }
+
   // Tip: Low HP near medkit
   if (state.player.hp < state.player.maxHp * 0.5) {
     for (const [, ent] of state.entities) {
@@ -3975,11 +4028,13 @@ function showStationMap(): void {
   let totalBreaches = 0, sealedBreaches = 0;
   let crewFound = 0, crewTotal = 0;
   let evidenceFound = 0;
+  let uncollectedSensors = 0;
   for (const [, ent] of state.entities) {
     if (ent.type === EntityType.Relay) { totalRelays++; if (ent.props["activated"]) activeRelays++; }
     if (ent.type === EntityType.Breach) { totalBreaches++; if (ent.props["sealed"]) sealedBreaches++; }
     if (ent.type === EntityType.CrewNPC) crewTotal++;
     if (ent.type === EntityType.EvidenceTrace) evidenceFound++;
+    if (ent.type === EntityType.SensorPickup && ent.props["collected"] !== true) uncollectedSensors++;
   }
   if (state.mystery?.evacuation) crewFound = state.mystery.evacuation.crewEvacuated.length;
 
@@ -4025,10 +4080,22 @@ function showStationMap(): void {
         else if (tile.smoke > 30) hazardTag = ` <span style="color:#888">\u2601</span>`;
       }
     }
+    // Check for uncollected sensor in this room
+    let sensorTag = "";
+    for (const [, ent] of state.entities) {
+      if (ent.type === EntityType.SensorPickup && ent.props["collected"] !== true) {
+        if (ent.pos.x >= room.x && ent.pos.x < room.x + room.width &&
+            ent.pos.y >= room.y && ent.pos.y < room.y + room.height) {
+          const sType = ent.props["sensorType"] as string ?? "";
+          sensorTag = ` <span style="color:#4f4;font-weight:bold">[${sType.charAt(0).toUpperCase()}]</span>`;
+          break;
+        }
+      }
+    }
     if (isVisited) {
-      roomListHtml += `<div style="padding:2px 6px;color:#0f0;font-size:11px">\u2713 ${esc(room.name)}${sceneTag}${hazardTag}</div>`;
+      roomListHtml += `<div style="padding:2px 6px;color:#0f0;font-size:11px">\u2713 ${esc(room.name)}${sensorTag}${sceneTag}${hazardTag}</div>`;
     } else if (cameraRevealed) {
-      roomListHtml += `<div style="padding:2px 6px;color:#6cf;font-size:11px">\u25cb ${esc(room.name)}</div>`;
+      roomListHtml += `<div style="padding:2px 6px;color:#6cf;font-size:11px">\u25cb ${esc(room.name)}${sensorTag}</div>`;
     } else {
       roomListHtml += `<div style="padding:2px 6px;color:#555;font-size:11px">\u00b7 ???</div>`;
     }
@@ -4042,7 +4109,8 @@ function showStationMap(): void {
     <div><span style="color:#ff2200">\u25c6</span> Breach (${sealedBreaches}/${totalBreaches} sealed)</div>
     <div><span style="color:#44ffaa">\u25a0</span> Crew (${crewTotal})</div>
     <div><span style="color:#ff44ff">\u2736</span> Data Core</div>
-    <div><span style="color:#0cf">\u25a1</span> Terminal</div>
+    <div><span style="color:#0cf">\u25a1</span> Terminal</div>${uncollectedSensors > 0 ? `
+    <div><span style="color:#4f4;font-weight:bold">\u25cf</span> <span style="color:#4f4;font-weight:bold">Sensor (${uncollectedSensors})</span></div>` : ""}
     <div style="margin-top:4px;color:#667">Explore: ${explorePercent}%</div>
     <div style="color:#667">Rooms: ${visitedCount}/${state.rooms.length}</div>
   </div>`;
@@ -4289,7 +4357,31 @@ function showStationMap(): void {
         }
         break;
       }
-      case EntityType.SensorPickup:
+      case EntityType.SensorPickup: {
+        if (!isEntityExhausted(ent)) {
+          // Pulsing glow ring for uncollected sensors — draw attention
+          const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+          const glowR = entMarkerSize * (1.2 + pulse * 0.4);
+          ctx.strokeStyle = `rgba(100,255,100,${0.3 + pulse * 0.3})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(epx, epy, glowR, 0, Math.PI * 2);
+          ctx.stroke();
+          // Bright green filled circle
+          ctx.fillStyle = "#4f4";
+          ctx.beginPath();
+          ctx.arc(epx, epy, entMarkerSize * 0.7, 0, Math.PI * 2);
+          ctx.fill();
+          // Label
+          const sLabel = (ent.props["sensorType"] as string ?? "")[0]?.toUpperCase() ?? "S";
+          ctx.fillStyle = "#000";
+          ctx.font = `bold ${Math.max(6, entMarkerSize)}px monospace`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(sLabel, epx, epy + 0.5);
+        }
+        break;
+      }
       case EntityType.ToolPickup:
       case EntityType.UtilityPickup: {
         if (!isEntityExhausted(ent)) {
