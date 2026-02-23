@@ -249,6 +249,12 @@ let hudTipText = ""; // contextual tip text shown below action bar
 let hudTipShowTime = 0; // performance.now() when tip was shown
 let lastHudTipKey = ""; // prevent same tip from repeating within 30 turns
 let lastHudTipTurn = 0; // turn when last tip was shown
+// ── Tutorial objectives ──────────────────────────────────────────
+// 0 = clean room, 1 = scan room, 2 = explore next room, 3 = done
+let tutorialObjective = 0;
+let tutorialFirstRoomName = "";
+let tutorialObjectiveCompleteTime = 0; // performance.now() when current objective completed
+let tutorialObjectiveDismissed = false; // true after all objectives done
 let incidentCardOpen = false;
 let logReviewOpen = false;
 // ── Investigation Hub state ──────────────────────────────────────
@@ -1710,6 +1716,18 @@ function initGame(): void {
   display.addLog("Use arrow keys or h/j/k/l to move. Approach objects and press [i] to interact.", "system");
   lastObjectivePhase = ObjectivePhase.Clean;
 
+  // Initialize tutorial objectives — detect starting room
+  const px0 = state.player.entity.pos.x;
+  const py0 = state.player.entity.pos.y;
+  const startRoom = state.rooms.find(r => px0 >= r.x && px0 < r.x + r.width && py0 >= r.y && py0 < r.y + r.height);
+  if (startRoom) {
+    tutorialFirstRoomName = startRoom.name;
+    tutorialObjective = 0;
+    tutorialObjectiveDismissed = false;
+    tutorialObjectiveCompleteTime = 0;
+    display.addLog(`CORVUS-7: Maintenance protocol active. Clean ${startRoom.name} first — press [C] to sweep debris.`, "system");
+  }
+
   // Start archetype-specific ambient soundscape
   if (state.mystery?.timeline?.archetype) {
     audio.startAmbient(state.mystery.timeline.archetype);
@@ -2085,6 +2103,10 @@ function renderAll(): void {
   }
   renderHudTip();
 
+  // Tutorial objective system
+  updateTutorialObjective();
+  renderTutorialObjective();
+
   // Update investigation aura: pass evidence room data to 3D renderer
   if (state.mystery && (display as any).setInvestigationRooms) {
     const journal = state.mystery.journal;
@@ -2207,6 +2229,10 @@ function resetGameState(newSeed: number): void {
   hudTipShowTime = 0;
   lastHudTipKey = "";
   lastHudTipTurn = 0;
+  tutorialObjective = 0;
+  tutorialFirstRoomName = "";
+  tutorialObjectiveCompleteTime = 0;
+  tutorialObjectiveDismissed = false;
   incidentCardOpen = false;
   logReviewOpen = false;
   activeDeduction = null;
@@ -4032,6 +4058,81 @@ function renderHudTip(): void {
   } else if (tipEl) {
     tipEl.style.opacity = "0";
   }
+}
+
+// ── Tutorial objective banner ─────────────────────────────────────
+function updateTutorialObjective(): void {
+  if (tutorialObjectiveDismissed || state.gameOver) return;
+
+  const now = performance.now();
+
+  // Check completion of current objective
+  if (tutorialObjective === 0) {
+    // Objective 0: Clean this room to 60%
+    if (tutorialFirstRoomName) {
+      const cleanliness = getRoomCleanliness(state, tutorialFirstRoomName);
+      if (cleanliness >= (state.mystery?.roomCleanlinessGoal ?? 60)) {
+        tutorialObjectiveCompleteTime = now;
+        tutorialObjective = 1;
+        display.addLog("OBJECTIVE COMPLETE — Room cleaned. CORVUS-7: Good work. Now scan the room to analyze the environment.", "milestone");
+        display.triggerScreenFlash?.("milestone");
+      }
+    }
+  } else if (tutorialObjective === 1) {
+    // Objective 1: Scan the room [Q]
+    if (triggeredTutorialHints.has("first_scan")) {
+      tutorialObjectiveCompleteTime = now;
+      tutorialObjective = 2;
+      display.addLog("OBJECTIVE COMPLETE — Room scanned. CORVUS-7: Sensors calibrated. Explore the next room to continue the survey.", "milestone");
+      display.triggerScreenFlash?.("milestone");
+    }
+  } else if (tutorialObjective === 2) {
+    // Objective 2: Explore the next room
+    if (visitedRoomIds.size >= 2) {
+      tutorialObjectiveCompleteTime = now;
+      tutorialObjective = 3;
+      setTimeout(() => { tutorialObjectiveDismissed = true; }, 3000);
+    }
+  }
+}
+
+function renderTutorialObjective(): void {
+  let el = document.getElementById("tutorial-objective");
+  if (tutorialObjectiveDismissed || tutorialObjective >= 3 || state.gameOver) {
+    if (el) el.style.opacity = "0";
+    return;
+  }
+
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "tutorial-objective";
+    el.style.cssText = "position:fixed;top:8px;left:50%;transform:translateX(-50%);font-family:'Courier New',monospace;font-size:13px;letter-spacing:2px;z-index:50;pointer-events:none;text-align:center;transition:opacity 0.5s;padding:8px 24px;border:1px solid rgba(0,200,255,0.3);background:rgba(0,8,16,0.85);border-radius:4px";
+    document.body.appendChild(el);
+  }
+
+  const now = performance.now();
+  // Brief flash on completion transition
+  const justCompleted = tutorialObjectiveCompleteTime > 0 && now - tutorialObjectiveCompleteTime < 1500;
+
+  if (tutorialObjective === 0) {
+    const cleanliness = tutorialFirstRoomName ? getRoomCleanliness(state, tutorialFirstRoomName) : 0;
+    const goal = state.mystery?.roomCleanlinessGoal ?? 60;
+    const pct = Math.min(Math.round((cleanliness / goal) * 100), 100);
+    const barWidth = 80;
+    const filled = Math.round((pct / 100) * barWidth);
+    const bar = "\u2588".repeat(filled) + "\u2591".repeat(barWidth - filled);
+    el.innerHTML = `<span style="color:#0cf">OBJECTIVE</span> <span style="color:#fff">Clean this room</span> <span style="color:#4a4">[C]</span><br><span style="color:#4a4;font-size:10px">${bar} ${cleanliness}%</span>`;
+  } else if (tutorialObjective === 1) {
+    el.innerHTML = justCompleted
+      ? `<span style="color:#0f0">\u2713 ROOM CLEANED</span>`
+      : `<span style="color:#0cf">OBJECTIVE</span> <span style="color:#fff">Scan this room</span> <span style="color:#fa0">[Q]</span>`;
+  } else if (tutorialObjective === 2) {
+    el.innerHTML = justCompleted
+      ? `<span style="color:#0f0">\u2713 ROOM SCANNED</span>`
+      : `<span style="color:#0cf">OBJECTIVE</span> <span style="color:#fff">Explore the next room</span> <span style="color:#4cf">[Arrow Keys]</span>`;
+  }
+
+  el.style.opacity = "1";
 }
 
 function showStationMap(): void {

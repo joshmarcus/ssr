@@ -9628,9 +9628,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         continue;
       }
 
-      // Only show on visible tiles
+      // Only show on visible tiles (crew NPCs exempt — always visible when in view)
       const tile = state.tiles[entity.pos.y]?.[entity.pos.x];
-      if (!tile || !tile.visible) {
+      if (!tile || (!tile.visible && entity.type !== EntityType.CrewNPC)) {
         // Hide entity if tile not visible
         const existing = this.entityMeshes.get(id);
         if (existing) existing.visible = false;
