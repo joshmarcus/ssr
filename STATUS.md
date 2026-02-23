@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 152 (V276 completed — mystery investigation depth + feedback)
+- **Phase**: Sprint 155 (V282 completed — investigation hub polish + evidence connections)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -138,6 +138,35 @@
 - **Investigation quality HUD**: Live IQ:X% indicator showing investigation score (scenes, crew ID, timeline, contradictions)
 - **Thread progress in Hub**: Evidence tab BY THREAD filter shows narrative threads with progress bars and descriptions
 - **Clipboard run summary [C]**: Full text summary with rating, deductions, investigation stats for sharing
+
+## Sprint 153-155 Changes (V277-V282)
+
+### V277 — Scene Cross-Reference Suggestions
+- **WHO column cross-references**: During scene processing, crew members show rooms where they were confirmed in other processed scenes
+- **Activity labels**: Each cross-reference shows what the crew member was doing in the other scene
+
+### V278 — CORVUS-7 Investigation Prompts
+- **Evidence milestones**: CORVUS-7 fires milestone logs at 5, 8, and 12 evidence entries
+- **Contextual guidance**: Each milestone suggests what to do next (review Hub, process scenes, check deductions)
+
+### V279 — Hub Investigation Overview
+- **CORVUS-7 recommendation**: Contextual one-liner at top of Hub suggesting next action based on investigation state
+- **Dynamic guidance**: Adapts to evidence count, unprocessed scenes, available deductions, crew identification progress
+
+### V280 — Timeline Phase Indicators
+- **Scene list phases**: Each processed scene shows its incident timeline phase (Normal Ops through Aftermath)
+- **Phase scene counts**: Incident board shows processed/total scene count per timeline phase
+- **Unprocessed hint**: Unprocessed scenes show "Phase: ???" to encourage processing
+
+### V281 — Crew Testimony Cross-References
+- **TESTIMONY section**: Crew dossier shows full testimony quotes with cross-referenced crew members
+- **MENTIONED BY OTHERS**: Shows when other crew members reference this person in their testimony
+- **Relationship web**: Creates visible investigation connections between crew through testimony
+
+### V282 — Connected Evidence View
+- **CONNECTED EVIDENCE**: Evidence detail shows related journal entries sharing 2+ tags
+- **Connection metadata**: Each connected entry shows room and shared tag count
+- **Direct tracing**: Players can trace evidence connections without switching to Case Board
 
 ## Sprint 150-152 Changes (V271-V276)
 
