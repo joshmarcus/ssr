@@ -240,6 +240,8 @@ let deductionSelectedIdx = 0;
 let pendingCrewDoor: { entityId: string; crewName: string } | null = null;
 let confirmingDeduction = false; // Y/N confirmation before locking in deduction answer
 let mapOpen = false;
+let mapZoom = 1.0; // 1.0 = fit-all, >1 = zoomed in
+let lastMoveAngle = Math.PI; // facing angle for minimap arrow (default: north, π=up on map)
 let helpOpen = false;
 let autoSaveFlashTimer = 0; // performance.now() timestamp of last auto-save (0 = no flash)
 let runStartTime = Date.now(); // real-time start of current run (for elapsed timer)
@@ -1604,9 +1606,32 @@ function initGame(): void {
       if (e.key === "Escape" || e.key === "m" || e.key === "M") {
         e.preventDefault();
         mapOpen = false;
+        mapZoom = 1.0;
         closeMapOverlay();
+      } else if (e.key === "=" || e.key === "+") {
+        e.preventDefault();
+        mapZoom = Math.min(4.0, mapZoom + 0.5);
+        showStationMap();
+      } else if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        mapZoom = Math.max(0.5, mapZoom - 0.5);
+        showStationMap();
+      } else if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight" ||
+                 e.key === "w" || e.key === "s" || e.key === "a" || e.key === "d") {
+        // Allow movement while map is open — move player, then re-render map
+        const dirMap: Record<string, Direction> = {
+          ArrowUp: Direction.North, ArrowDown: Direction.South,
+          ArrowLeft: Direction.West, ArrowRight: Direction.East,
+          w: Direction.North, s: Direction.South, a: Direction.West, d: Direction.East,
+        };
+        const dir = dirMap[e.key];
+        if (dir) {
+          e.preventDefault();
+          handleAction({ type: ActionType.Move, direction: dir });
+          showStationMap();
+        }
       }
-      return; // swallow all input while map is open
+      return; // swallow all other input while map is open
     }
     // Pause menu takes priority over other overlays
     if (pauseMenuOpen) {
@@ -2130,6 +2155,17 @@ function handleAction(action: Action): void {
   const hadEvacFarewell = state.milestones.has("corvus_evac_farewell");
   const prevJournalCount = state.mystery?.journal.length ?? 0;
   state = step(state, resolvedAction);
+
+  // Update minimap facing arrow when player successfully moves
+  if (resolvedAction.type === ActionType.Move && state.turn !== prevTurn && 'direction' in resolvedAction) {
+    const dirAngles: Record<string, number> = {
+      north: Math.PI, northeast: 3 * Math.PI / 4, east: Math.PI / 2,
+      southeast: Math.PI / 4, south: 0, southwest: -Math.PI / 4,
+      west: -Math.PI / 2, northwest: -3 * Math.PI / 4,
+    };
+    const a = dirAngles[resolvedAction.direction as string];
+    if (a !== undefined) lastMoveAngle = a;
+  }
 
   // Start background music on first player interaction
   // audio.startBgMusic(); // temporarily disabled
@@ -3289,6 +3325,7 @@ function handleAction(action: Action): void {
   // Update camera-relative input mode from 3D renderer
   if (display && 'getPlayerFacing' in display) {
     inputHandler.facingAngle = (display as any).getPlayerFacing();
+    lastMoveAngle = inputHandler.facingAngle; // sync minimap arrow with 3D facing
     inputHandler.cameraRelativeMode = (display as any).isChaseCam();
     // Wire up turn callback for tank-style controls (turn without moving)
     if (!inputHandler.turnCallback) {
@@ -3793,7 +3830,7 @@ function showStationMap(): void {
           ${legendHtml}
         </div>
       </div>
-      <div class="journal-controls">[Esc/M] Close</div>
+      <div class="journal-controls">[Esc/M] Close | [+/-] Zoom (${mapZoom.toFixed(1)}x) | [WASD/Arrows] Move</div>
     </div>`;
   overlay.classList.add("active");
 
@@ -3805,13 +3842,24 @@ function showStationMap(): void {
   ctx.fillStyle = "#060810";
   ctx.fillRect(0, 0, cw, ch);
 
-  // Compute scale to fit all tiles
+  // Compute scale to fit all tiles, with zoom
   const margin = 24;
-  const scaleX = (cw - margin * 2) / state.width;
-  const scaleY = (ch - margin * 2) / state.height;
-  const scale = Math.min(scaleX, scaleY, 10);
-  const ox = margin + (cw - margin * 2 - state.width * scale) / 2;
-  const oy = margin + (ch - margin * 2 - state.height * scale) / 2;
+  const baseScaleX = (cw - margin * 2) / state.width;
+  const baseScaleY = (ch - margin * 2) / state.height;
+  const baseScale = Math.min(baseScaleX, baseScaleY, 10);
+  const scale = baseScale * mapZoom;
+
+  // When zoomed, center on player position
+  const playerPx = state.player.entity.pos.x;
+  const playerPy = state.player.entity.pos.y;
+  let ox: number, oy: number;
+  if (mapZoom > 1.0) {
+    ox = cw / 2 - playerPx * scale;
+    oy = ch / 2 - playerPy * scale;
+  } else {
+    ox = margin + (cw - margin * 2 - state.width * scale) / 2;
+    oy = margin + (ch - margin * 2 - state.height * scale) / 2;
+  }
 
   // Draw explored corridor tiles with hazard tinting
   for (let y = 0; y < state.height; y++) {
@@ -4027,7 +4075,7 @@ function showStationMap(): void {
     }
   }
 
-  // Draw player position (on top of everything)
+  // Draw player position as directional arrow (on top of everything)
   const px = state.player.entity.pos.x;
   const py = state.player.entity.pos.y;
   const ppx = ox + px * scale + scale / 2;
@@ -4037,14 +4085,27 @@ function showStationMap(): void {
   ctx.arc(ppx, ppy, Math.max(5, scale * 0.8), 0, Math.PI * 2);
   ctx.fillStyle = "rgba(68,255,136,0.15)";
   ctx.fill();
-  // Player dot
+  // Player arrow — points in lastMoveAngle direction
+  // Canvas: 0 angle = right, positive = clockwise; our angle: π = up on canvas
+  // Convert: canvas rotation = -lastMoveAngle + π/2 (so π → pointing up)
+  const arrowSize = Math.max(4, scale * 0.6);
+  const canvasAngle = -lastMoveAngle + Math.PI / 2;
+  ctx.save();
+  ctx.translate(ppx, ppy);
+  ctx.rotate(canvasAngle);
   ctx.beginPath();
-  ctx.arc(ppx, ppy, Math.max(3, scale * 0.5), 0, Math.PI * 2);
+  // Triangle: tip at top (0, -size), base at bottom
+  ctx.moveTo(0, -arrowSize * 1.3);           // tip
+  ctx.lineTo(-arrowSize * 0.7, arrowSize * 0.7);  // bottom-left
+  ctx.lineTo(0, arrowSize * 0.3);             // notch
+  ctx.lineTo(arrowSize * 0.7, arrowSize * 0.7);   // bottom-right
+  ctx.closePath();
   ctx.fillStyle = "#44ff88";
   ctx.fill();
   ctx.strokeStyle = "#fff";
   ctx.lineWidth = 1;
   ctx.stroke();
+  ctx.restore();
 
   // Grid reference
   ctx.font = "9px 'Courier New', monospace";
