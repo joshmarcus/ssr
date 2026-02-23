@@ -44,12 +44,11 @@
   - Post-answer narrative overlay (correct: revelation + reward + next unlock, incorrect: penalty + attempts remaining)
   - ~100 authored revelation/synthesis/conclusion strings across 5 archetypes x 5-6 deduction tiers
 - Narrative threads grouping evidence
-- **Investigation Hub [r/v]**: unified 5-section overlay
+- **Investigation Hub [r/v]**: unified 4-section overlay
   - EVIDENCE: two-panel layout (entry list + full detail with crew relationships, minimap, thread)
   - SCENES: scene list with evidence accumulation, incident board timeline, dossier progress, scene processing UI (WHO/WHAT/OUTCOME picker)
   - CONNECTIONS: deduction list with evidence-count progress → detail view with evidence log + answer selection
   - CREW: 3-band dossier display (IDENTIFIED/PARTIAL DATA/UNKNOWN) with theories, personal details, scene evidence links
-  - WHAT WE KNOW: auto-generated narrative prose summarizing investigation progress
 - **Station Autopsy mystery system** (6-sprint implementation):
   - Room scenes: physical clues in every room (badge, personal_effect, damage_pattern, access_log, terminal_log, tool, residue, barricade, modified_equipment, memory_echo)
   - Crew dossiers: 30 themed character triplets across 6 personality themes, identity confirmation from badge evidence

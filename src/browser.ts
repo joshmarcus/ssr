@@ -241,6 +241,8 @@ let hubSceneWhoIdx = 0;     // selected crew index for WHO answer
 let hubSceneWhatIdx = 0;    // selected activity for WHAT answer
 let hubSceneOutcomeIdx = 0; // selected outcome for OUTCOME answer
 let hubSceneConfirming = false; // Y/N confirmation for scene processing
+let hubEvidenceFilter: "all" | "by_room" | "by_type" | "unread" = "all"; // evidence tab filter mode
+const hubViewedEvidenceIds = new Set<string>(); // tracks which evidence entries player has viewed in Hub
 let hubRevelationOverlay = false; // showing post-answer revelation overlay
 let pendingCeremonyDeduction: { id: string; correct: boolean } | null = null; // for post-overlay CORVUS-7 commentary
 let contradictionFalseLeadFired = false; // has the misleading log been shown
@@ -1677,6 +1679,8 @@ function resetGameState(newSeed: number): void {
   hubDetailDeduction = null;
   hubConfirming = false;
   hubIdx = 0;
+  hubEvidenceFilter = "all";
+  hubViewedEvidenceIds.clear();
   contradictionFalseLeadFired = false;
   contradictionRefutationFired = false;
   dwellTurnsStationary = 0;
@@ -3928,12 +3932,34 @@ function renderInvestigationHub(): void {
     ? "[&uarr;/&darr;] Navigate  [&larr;/&rarr;] Switch field  [Enter] Submit  [Esc] Back"
     : hubSceneDetail
     ? "[&uarr;/&darr;] Scroll clues  [p] Process scene  [Esc] Back"
+    : hubSection === "evidence"
+    ? "[&uarr;/&darr;] Navigate  [f] Filter  [Tab] Next section  [Esc] Close"
     : "[&uarr;/&darr;] Navigate  [Tab] Next section  [Enter] Select  [Esc] Close";
+
+  // Progress summary bar
+  const processedCount = processedScenes;
+  const crewIds = state.mystery?.dossiers?.filter(d => d.confirmed.name).length ?? 0;
+  const crewTotal = state.mystery?.crew.length ?? 0;
+  const timelineSlots = state.mystery?.incidentBoard?.slots ?? [];
+  const confirmedSlots = timelineSlots.filter(s => s.status === "confirmed").length;
+  const crackMoment = state.mystery?.evidenceAccumulation?.crack_moment_fired ?? false;
+  const deductionsSolved = deductions.filter(d => d.solved).length;
+
+  const pColor = (done: number, total: number) => done >= total && total > 0 ? "#4f4" : done > 0 ? "#fa0" : "#666";
+  let progressHtml = `<div style="display:flex;gap:12px;padding:3px 8px;font-size:10px;border-bottom:1px solid #222;color:#888">`;
+  progressHtml += `<span>Scenes: <span style="color:${pColor(processedCount, scenes.length)}">${processedCount}/${scenes.length}</span></span>`;
+  progressHtml += `<span>Crew: <span style="color:${pColor(crewIds, crewTotal)}">${crewIds}/${crewTotal}</span></span>`;
+  progressHtml += `<span>Timeline: <span style="color:${pColor(confirmedSlots, 5)}">${confirmedSlots}/5</span></span>`;
+  progressHtml += `<span>Deductions: <span style="color:${pColor(deductionsSolved, deductions.length)}">${deductionsSolved}/${deductions.length}</span></span>`;
+  progressHtml += `<span>Evidence: <span style="color:#4af">${entries.length}</span></span>`;
+  if (crackMoment) progressHtml += `<span style="color:#fa0;font-weight:bold">[BREACH]</span>`;
+  progressHtml += `</div>`;
 
   overlay.innerHTML = `
     <div class="broadcast-box">
       <div class="broadcast-title">\u2550\u2550\u2550 INVESTIGATION HUB \u2550\u2550\u2550${devModeEnabled ? ' <span style="color:#f0f;font-size:11px">[DEV]</span>' : ''}</div>
       <div class="journal-tabs" style="display:flex;gap:4px;padding:4px 8px;border-bottom:1px solid #333">${tabsHtml}</div>
+      ${progressHtml}
       ${bodyHtml}
       <div class="broadcast-controls">${controlsText}</div>
     </div>`;
@@ -3946,23 +3972,110 @@ function renderHubEvidence(entries: EvidenceEntry[]): string {
     return `<div class="journal-body"><div class="journal-list"><div class="journal-empty">No evidence collected yet.<br>Read terminals [i] and examine items.</div></div><div class="journal-detail"><div class="journal-empty">Explore the station to gather clues.</div></div></div>`;
   }
 
+  // Filter bar
+  const filters: Array<{ key: typeof hubEvidenceFilter; label: string }> = [
+    { key: "all", label: "ALL" },
+    { key: "by_room", label: "BY ROOM" },
+    { key: "by_type", label: "BY TYPE" },
+    { key: "unread", label: "UNREAD" },
+  ];
+  let filterHtml = `<div style="display:flex;gap:6px;padding:4px 8px;border-bottom:1px solid #333;font-size:11px">`;
+  filterHtml += `<span style="color:#888;margin-right:2px">[f]</span>`;
+  for (const f of filters) {
+    const active = f.key === hubEvidenceFilter;
+    filterHtml += `<span style="color:${active ? "#4af" : "#666"};${active ? "text-decoration:underline" : ""}">${f.label}</span>`;
+  }
+  filterHtml += `</div>`;
+
+  // Track current selection as viewed
+  const readIds = hubViewedEvidenceIds;
+
   let listHtml = "";
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i];
-    const cls = i === hubIdx ? "journal-entry selected" : "journal-entry";
-    listHtml += `<div class="${cls}">
-      <span class="journal-entry-icon">${esc(e.icon)}</span>
-      ${esc(e.summary)}
-      <div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div>
-    </div>`;
+  if (hubEvidenceFilter === "by_room") {
+    // Group by room
+    const roomMap = new Map<string, EvidenceEntry[]>();
+    for (const e of entries) {
+      const r = e.room || "Unknown";
+      if (!roomMap.has(r)) roomMap.set(r, []);
+      roomMap.get(r)!.push(e);
+    }
+    let flatIdx = 0;
+    for (const [room, roomEntries] of roomMap) {
+      listHtml += `<div style="color:#8af;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">${esc(room)} (${roomEntries.length})</div>`;
+      for (const e of roomEntries) {
+        const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
+        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span></div></div>`;
+        flatIdx++;
+      }
+    }
+  } else if (hubEvidenceFilter === "by_type") {
+    // Group by category
+    const catLabels: Record<string, string> = { log: "LOGS", item: "ITEMS", trace: "TRACES", crew: "CREW", access: "ACCESS" };
+    const catMap = new Map<string, EvidenceEntry[]>();
+    for (const e of entries) {
+      const c = e.category || "other";
+      if (!catMap.has(c)) catMap.set(c, []);
+      catMap.get(c)!.push(e);
+    }
+    let flatIdx = 0;
+    for (const [cat, catEntries] of catMap) {
+      const label = catLabels[cat] || cat.toUpperCase();
+      listHtml += `<div style="color:#fa8;font-size:11px;padding:4px 8px;border-bottom:1px solid #222">${label} (${catEntries.length})</div>`;
+      for (const e of catEntries) {
+        const cls = flatIdx === hubIdx ? "journal-entry selected" : "journal-entry";
+        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+        flatIdx++;
+      }
+    }
+  } else if (hubEvidenceFilter === "unread") {
+    // Show only unread entries
+    const unread = entries.filter(e => !readIds.has(e.id));
+    if (unread.length === 0) {
+      listHtml = `<div class="journal-empty" style="padding:12px;color:#888">All evidence has been reviewed.</div>`;
+    } else {
+      for (let i = 0; i < unread.length; i++) {
+        const e = unread[i];
+        const cls = i === hubIdx ? "journal-entry selected" : "journal-entry";
+        listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+      }
+    }
+  } else {
+    // Default: ALL — chronological
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      const cls = i === hubIdx ? "journal-entry selected" : "journal-entry";
+      listHtml += `<div class="${cls}"><span class="journal-entry-icon">${esc(e.icon)}</span>${esc(e.summary)}<div><span class="journal-entry-turn">T${e.turn}</span> <span class="journal-entry-room">${esc(e.room)}</span></div></div>`;
+    }
+  }
+
+  // Get the right entry for detail view (respecting filter ordering)
+  let detailEntry: EvidenceEntry | undefined;
+  if (hubEvidenceFilter === "by_room") {
+    const flatList: EvidenceEntry[] = [];
+    const roomMap = new Map<string, EvidenceEntry[]>();
+    for (const e of entries) { const r = e.room || "Unknown"; if (!roomMap.has(r)) roomMap.set(r, []); roomMap.get(r)!.push(e); }
+    for (const [, roomEntries] of roomMap) flatList.push(...roomEntries);
+    detailEntry = flatList[hubIdx];
+  } else if (hubEvidenceFilter === "by_type") {
+    const flatList: EvidenceEntry[] = [];
+    const catMap = new Map<string, EvidenceEntry[]>();
+    for (const e of entries) { const c = e.category || "other"; if (!catMap.has(c)) catMap.set(c, []); catMap.get(c)!.push(e); }
+    for (const [, catEntries] of catMap) flatList.push(...catEntries);
+    detailEntry = flatList[hubIdx];
+  } else if (hubEvidenceFilter === "unread") {
+    const unread = entries.filter(e => !readIds.has(e.id));
+    detailEntry = unread[hubIdx];
+  } else {
+    detailEntry = entries[hubIdx];
   }
 
   let detailHtml = "";
-  if (entries[hubIdx]) {
-    detailHtml = renderHubEvidenceDetail(entries[hubIdx]);
+  if (detailEntry) {
+    hubViewedEvidenceIds.add(detailEntry.id);
+    detailHtml = renderHubEvidenceDetail(detailEntry);
   }
 
-  return `<div class="journal-body"><div class="journal-list">${listHtml}</div><div class="journal-detail">${detailHtml || '<div class="journal-empty">Select an entry to view details.</div>'}</div></div>`;
+  return `<div class="journal-body">${filterHtml}<div class="journal-list">${listHtml}</div><div class="journal-detail">${detailHtml || '<div class="journal-empty">Select an entry to view details.</div>'}</div></div>`;
 }
 
 /** Render the full detail panel for a selected evidence entry. */
@@ -5094,9 +5207,26 @@ function handleHubInput(e: KeyboardEvent): void {
   }
 }
 
-function handleHubEvidenceInput(e: KeyboardEvent): void {
+function getFilteredEvidenceCount(): number {
   const { entries } = getEvidenceEntries();
-  const maxIdx = entries.length - 1;
+  if (hubEvidenceFilter === "unread") {
+    return entries.filter(e => !hubViewedEvidenceIds.has(e.id)).length;
+  }
+  return entries.length;
+}
+
+function handleHubEvidenceInput(e: KeyboardEvent): void {
+  // [f] cycles evidence filter
+  if (e.key === "f" || e.key === "F") {
+    const modes: Array<typeof hubEvidenceFilter> = ["all", "by_room", "by_type", "unread"];
+    const curIdx = modes.indexOf(hubEvidenceFilter);
+    hubEvidenceFilter = modes[(curIdx + 1) % modes.length];
+    hubIdx = 0;
+    renderInvestigationHub();
+    return;
+  }
+
+  const maxIdx = Math.max(0, getFilteredEvidenceCount() - 1);
 
   if (e.key === "ArrowUp" || e.key === "w" || e.key === "k") {
     hubIdx = Math.max(0, hubIdx - 1);

@@ -247,10 +247,23 @@ async function main(): Promise<void> {
         await page.waitForTimeout(300);
         break;
       case "hub":
+      case "hub-evidence":
+      case "hub-scenes":
+      case "hub-connections":
+      case "hub-crew": {
         console.log("[screenshot] Opening investigation hub...");
         await page.keyboard.press("v");
         await page.waitForTimeout(300);
+        // Tab switching: default is evidence, Tab cycles through evidence→scenes→connections→crew
+        const tabOrder = ["hub-evidence", "hub-scenes", "hub-connections", "hub-crew"];
+        const targetTab = opts.overlay === "hub" ? "hub-evidence" : opts.overlay;
+        const tabPresses = tabOrder.indexOf(targetTab);
+        for (let t = 0; t < tabPresses; t++) {
+          await page.keyboard.press("Tab");
+          await page.waitForTimeout(200);
+        }
         break;
+      }
       case "help":
         console.log("[screenshot] Opening help overlay...");
         await page.keyboard.press("?");
