@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 145 (V262 completed — auto-save, timer, clipboard, HUD tips)
+- **Phase**: Sprint 146 (V264 completed — investigation quality HUD, thread progress)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -135,6 +135,9 @@
 - **Run timer**: Elapsed time (mm:ss) shown in HUD status bar and game-over overlay
 - **Clipboard summary [C]**: Shareable text run summary with rating, deductions, investigation quality
 - **Contextual HUD tips**: State-aware one-line tips (examine clues, answer deductions, activate relays, nearby medkits)
+- **Investigation quality HUD**: Live IQ:X% indicator showing investigation score (scenes, crew ID, timeline, contradictions)
+- **Thread progress in Hub**: Evidence tab BY THREAD filter shows narrative threads with progress bars and descriptions
+- **Clipboard run summary [C]**: Full text summary with rating, deductions, investigation stats for sharing
 
 ## Known Issues
 
