@@ -406,6 +406,32 @@ export interface CrewDossier {
   roomsSeen: string[];       // rooms where this crew member was placed by Scene Processing
 }
 
+// ── Incident Board (timeline reconstruction) ─────────────────
+export type TimelineSlotStatus = "locked" | "unlocked" | "proposed" | "confirmed" | "rejected";
+
+export interface TimelineSlotCard {
+  phase: TimelinePhase;
+  event: string;
+  keyActor: string;
+  action: string;
+  location: string;
+  correct: boolean;
+}
+
+export interface TimelineSlotState {
+  phase: TimelinePhase;
+  status: TimelineSlotStatus;
+  proposedCard?: TimelineSlotCard;
+  confirmedCard?: TimelineSlotCard;
+  revelationText?: string;
+}
+
+export interface IncidentBoardState {
+  slots: TimelineSlotState[];
+  wrongConfirmations: number;
+  totalTurnPenalty: number;
+}
+
 // ── Scene Echoes (environmental storytelling) ────────────────
 export enum SceneEchoType {
   GhostSilhouette = "ghost_silhouette",  // translucent crew figure at last known position
@@ -513,6 +539,7 @@ export interface MysteryState {
   roomScenes?: RoomScene[];       // room scene data for scene processing
   evidenceAccumulation?: EvidenceAccumulation; // confirming/ambiguous/contradicting counts
   dossiers?: CrewDossier[];      // crew dossiers built during investigation
+  incidentBoard?: IncidentBoardState; // timeline reconstruction board
 }
 
 // ── What We Know (narrative summary) ─────────────────────────

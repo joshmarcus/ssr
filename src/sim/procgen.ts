@@ -21,6 +21,7 @@ import { LANDMARK_CONSOLES } from "../data/consoleText.js";
 import { generateCrewPaths } from "./crewPaths.js";
 import { generateRoomScenes } from "./roomScenes.js";
 import { assignTriplets, createDossiers } from "./crewDossiers.js";
+import { createIncidentBoard } from "./incidentBoard.js";
 
 /**
  * Room name assignments — enough for a large station.
@@ -227,6 +228,9 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
     // Generate crew dossiers with themed triplet personalities
     const triplets = assignTriplets(crew);
     state.mystery.dossiers = createDossiers(crew, triplets);
+
+    // Create incident board for timeline reconstruction
+    state.mystery.incidentBoard = createIncidentBoard();
   }
 
   // Place keyed doors (clearance + environmental)
