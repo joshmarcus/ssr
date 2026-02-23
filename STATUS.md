@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 136 (V251 completed — game-over retrospective + save/load UI)
+- **Phase**: Sprint 139 (V253 completed — gamepad support + title screen + seed input)
 - **Test status**: 394 tests passing across 30 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
@@ -135,6 +135,18 @@
 ### V250 — Save/Load UI Integration
 - **Pause menu save/load**: Pause menu expanded to Resume/Save Game/Load Game/Help/New Game. Save Game triggers immediate save with confirmation flash. Load Game loads last save (greyed out when no save exists). Navigation skips disabled items.
 - **Title screen continue**: When a save exists, game shows Continue/New Game title screen instead of going directly to the opening crawl. Continue loads the save, New Game deletes save and starts fresh.
+
+### V253 — Gamepad/Controller Support
+- **Gamepad API integration**: Full controller support via standard Gamepad API (Xbox/PlayStation/Steam Deck compatible)
+- **Button mapping**: D-pad/stick = move, A = interact, B = back, X = clean, Y = scan, LB = hub, RB = auto-explore, Start = pause
+- **Stick auto-repeat**: 0.4 deadzone, 300ms initial delay, 150ms repeat rate
+- **Synthetic keyboard events**: Gamepad dispatches standard keyboard events, so ALL existing handlers (overlays, menus, hub, etc.) work automatically
+- **Help overlay**: Controller section added showing all gamepad mappings
+
+### V252 — Title Screen + Seed Input
+- **Title screen**: Shows Continue/New Game when save exists, with MISSION LOG stats (total runs, wins, best rating, archetypes seen)
+- **Seed input screen**: Before starting new game, shows seed input (type numbers, Enter to accept, Esc for random). Accessible from title screen, pause menu, and game-over [N]
+- **Run history integration**: Uses `getRunHistory()` to display archetype coverage (X/6 archetypes)
 
 ### V249 — Audio Controls
 - **Audio mute [F8]**: Toggle mute/unmute with log feedback
