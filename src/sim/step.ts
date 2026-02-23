@@ -333,9 +333,28 @@ function addJournalEntry(
     }
   }
 
+  // Thread completion milestone: when a thread reaches 3+ entries for the first time
+  let threadLogs = hintLogs;
+  if (threadName) {
+    const updatedThread = newThreads.find(t => t.name === threadName);
+    if (updatedThread && updatedThread.entries.length === 3) {
+      const milestoneKey = `thread_milestone_${threadName.replace(/\s+/g, "_").toLowerCase()}`;
+      if (!newMilestones.has(milestoneKey)) {
+        newMilestones.add(milestoneKey);
+        threadLogs = [...threadLogs, {
+          id: `log_thread_${milestoneKey}_${state.turn}`,
+          timestamp: state.turn,
+          source: "milestone",
+          text: `CORVUS-7: Thread "${threadName}" is taking shape. ${updatedThread.description}`,
+          read: false,
+        }];
+      }
+    }
+  }
+
   return {
     ...state,
-    logs: hintLogs,
+    logs: threadLogs,
     milestones: newMilestones,
     mystery: {
       ...state.mystery,
@@ -5285,11 +5304,17 @@ export function step(state: GameState, action: Action): GameState {
             ? "log"
             : "trace";
 
+        // Generate a more descriptive summary from clue text
+        const clueTypeLabel = clue.type.replace(/_/g, " ");
+        const clueSummary = clue.text.length > 50
+          ? `${clueTypeLabel}: ${clue.text.slice(0, 47)}...`
+          : `${clueTypeLabel}: ${clue.text}`;
+
         next = addJournalEntry(
           next,
           `journal_clue_${clue.id}`,
           clueCategory,
-          `Physical clue: ${clue.type.replace(/_/g, " ")}`,
+          clueSummary,
           clue.text,
           scene.roomName,
           undefined,       // no entityId for scene clues

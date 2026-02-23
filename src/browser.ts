@@ -1707,7 +1707,29 @@ function initGame(): void {
       if (playerRoom && state.mystery?.roomScenes) {
         const roomScene = state.mystery.roomScenes.find(s => s.roomName === playerRoom.name);
         if (roomScene) {
+          // Track clue state before examining
+          const preExamined = roomScene.physicalClues.filter(c => c.examined).length;
           handleAction({ type: ActionType.ExamineScene, sceneRoomId: roomScene.roomId });
+          // Show individual clue feedback for newly examined clues
+          const updatedScene = state.mystery?.roomScenes?.find(s => s.roomId === roomScene.roomId);
+          if (updatedScene) {
+            const newlyExamined = updatedScene.physicalClues.filter((c, i) => c.examined && !roomScene.physicalClues[i]?.examined);
+            for (const clue of newlyExamined) {
+              const typeLabel = clue.type.replace(/_/g, " ").toUpperCase();
+              const crewMember = clue.crewLinked
+                ? state.mystery?.crew.find(c => c.id === clue.crewLinked)
+                : null;
+              const crewTag = crewMember ? ` [${crewMember.lastName}]` : "";
+              display.addLog(`CLUE: ${typeLabel}${crewTag} — ${clue.text.slice(0, 60)}${clue.text.length > 60 ? "..." : ""}`, "narrative");
+            }
+            const remaining = updatedScene.physicalClues.filter(c => !c.examined).length;
+            if (remaining > 0) {
+              const sensorGated = updatedScene.physicalClues.filter(c => !c.examined && c.sensorRequired).length;
+              if (sensorGated === remaining) {
+                display.addLog(`${remaining} clue${remaining !== 1 ? "s" : ""} require${remaining === 1 ? "s" : ""} sensor upgrade to examine.`, "system");
+              }
+            }
+          }
           return;
         }
       }
