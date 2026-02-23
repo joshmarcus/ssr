@@ -299,6 +299,89 @@ export interface Deduction {
   maxAttempts: number;         // max wrong answers before lockout (default 2)
 }
 
+// ── Scene Activity & Outcome (room scene processing) ─────────
+export enum SceneActivity {
+  EmergencyResponse = "emergency_response",
+  Fleeing = "fleeing",
+  Hiding = "hiding",
+  Sabotage = "sabotage",
+  MedicalTreatment = "medical_treatment",
+  RoutineWork = "routine_work",
+  Investigation = "investigation",
+  EquipmentRepair = "equipment_repair",
+  DataAccess = "data_access",
+  Confrontation = "confrontation",
+  Communication = "communication",
+  Barricading = "barricading",
+}
+
+export enum SceneOutcome {
+  LeftNormally = "left_normally",
+  LeftInHurry = "left_in_hurry",
+  Injured = "injured",
+  DiedHere = "died_here",
+  StillHere = "still_here",
+  SealedInside = "sealed_inside",
+  Unknown = "unknown",
+}
+
+export type PhysicalClueType =
+  | "badge"
+  | "personal_effect"
+  | "damage_pattern"
+  | "access_log"
+  | "terminal_log"
+  | "tool"
+  | "residue"
+  | "barricade"
+  | "modified_equipment"
+  | "memory_echo";
+
+export type EvidenceCategory = "confirming" | "ambiguous" | "contradicting";
+
+export interface PhysicalClue {
+  id: string;
+  type: PhysicalClueType;
+  text: string;
+  sensorRequired: SensorType | null; // null = always visible
+  crewLinked?: string;                // crew ID if this clue names someone
+  examined: boolean;
+  pos: Position;
+  evidenceCategory: EvidenceCategory;
+}
+
+export interface RoomScene {
+  roomId: string;
+  roomName: string;
+  crewPresent: {
+    crewId: string;
+    phase: TimelinePhase;
+    activity: SceneActivity;
+  }[];
+  physicalClues: PhysicalClue[];
+  environmentalState: {
+    damageType: "thermal" | "pressure" | "electrical" | "biological" | "none";
+    damageLevel: 0 | 1 | 2 | 3;
+    hasBarricade: boolean;
+    sealState: "open" | "sealed_inside" | "sealed_outside";
+  };
+  evidenceCategory: EvidenceCategory;
+  processed: boolean;
+  processAttempts: number;
+  groundTruth: {
+    who: string[];         // crew IDs
+    what: SceneActivity;
+    outcome: SceneOutcome;
+  };
+}
+
+export interface EvidenceAccumulation {
+  confirming_found: number;
+  ambiguous_found: number;
+  contradicting_found: number;
+  crack_moment_fired: boolean;
+}
+
 // ── Scene Echoes (environmental storytelling) ────────────────
 export enum SceneEchoType {
   GhostSilhouette = "ghost_silhouette",  // translucent crew figure at last known position
@@ -403,6 +486,8 @@ export interface MysteryState {
   sceneEchoes: SceneEcho[];     // environmental storytelling objects placed during procgen
   connections: EvidenceConnection[]; // discovered evidence connections
   insights: Insight[];           // investigation insights (wrapping deductions)
+  roomScenes?: RoomScene[];       // room scene data for scene processing
+  evidenceAccumulation?: EvidenceAccumulation; // confirming/ambiguous/contradicting counts
 }
 
 // ── What We Know (narrative summary) ─────────────────────────

@@ -19,6 +19,7 @@ import { generateDeductions, generateEvidenceTags } from "./deduction.js";
 import { generateThreads } from "./threads.js";
 import { LANDMARK_CONSOLES } from "../data/consoleText.js";
 import { generateCrewPaths } from "./crewPaths.js";
+import { generateRoomScenes } from "./roomScenes.js";
 
 /**
  * Room name assignments — enough for a large station.
@@ -208,6 +209,20 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
 
   // Generate crew escape paths and place breadcrumb evidence along them
   generateCrewPaths(state);
+
+  // Generate room scenes (crime scene data for scene processing)
+  if (state.mystery) {
+    const playerStartRoom = state.rooms[0]; // first room is typically the start
+    state.mystery.roomScenes = generateRoomScenes(
+      state.rooms, crew, timeline, playerStartRoom,
+    );
+    state.mystery.evidenceAccumulation = {
+      confirming_found: 0,
+      ambiguous_found: 0,
+      contradicting_found: 0,
+      crack_moment_fired: false,
+    };
+  }
 
   // Place keyed doors (clearance + environmental)
   placeClearanceDoors(state, rooms);
