@@ -2512,6 +2512,27 @@ function handleAction(action: Action): void {
           display.addLog(`Deductions: ${correct.length}/${deductions.length} correct`, "sensor");
         }
 
+        // Station Autopsy investigation summary
+        const endScenes = state.mystery.roomScenes ?? [];
+        const endProcessed = endScenes.filter(s => s.processed).length;
+        const endDossiers = state.mystery.dossiers ?? [];
+        const endIdentified = endDossiers.filter(d => d.confirmed.name).length;
+        const endBoard = state.mystery.incidentBoard;
+        const endConfirmed = endBoard?.slots.filter(s => s.status === "confirmed").length ?? 0;
+        const endTotalSlots = endBoard?.slots.length ?? 0;
+        const endContradictions = state.mystery.contradictionPairs?.filter(cp => cp.revealed).length ?? 0;
+        const endAccum = state.mystery.evidenceAccumulation;
+
+        if (endScenes.length > 0) {
+          display.addLog("", "system");
+          display.addLog("\u2550\u2550 Investigation Quality \u2550\u2550", "milestone");
+          display.addLog(`Scenes processed: ${endProcessed}/${endScenes.length}`, "sensor");
+          display.addLog(`Crew identified: ${endIdentified}/${endDossiers.length}`, "sensor");
+          if (endTotalSlots > 0) display.addLog(`Timeline confirmed: ${endConfirmed}/${endTotalSlots}`, "sensor");
+          if (endContradictions > 0) display.addLog(`Contradictions found: ${endContradictions}`, "sensor");
+          if (endAccum?.crack_moment_fired) display.addLog("CRACK MOMENT: The official story crumbled.", "milestone");
+        }
+
         // CORVUS-7 final transmission — archetype-specific farewell
         const finalArchetype = state.mystery.timeline.archetype;
         const finalMsg = CORVUS_FINAL_TRANSMISSION[finalArchetype];

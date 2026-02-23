@@ -2383,13 +2383,32 @@ export class BrowserDisplay3D implements IGameDisplay {
       return false;
     }).length;
 
-    // Performance rating
+    // Station Autopsy investigation quality
+    const scenes = state.mystery?.roomScenes ?? [];
+    const processedScenes = scenes.filter(s => s.processed).length;
+    const dossiers = state.mystery?.dossiers ?? [];
+    const identifiedCrew = dossiers.filter(d => d.confirmed.name).length;
+    const accumulation = state.mystery?.evidenceAccumulation;
+    const board = state.mystery?.incidentBoard;
+    const confirmedSlots = board?.slots.filter(s => s.status === "confirmed").length ?? 0;
+    const totalSlots = board?.slots.length ?? 0;
+    const contradictions = state.mystery?.contradictionPairs?.filter(cp => cp.revealed).length ?? 0;
+    const totalContradictions = state.mystery?.contradictionPairs?.length ?? 0;
+
+    // Performance rating (enhanced with investigation quality)
     let score = 0;
-    if (isVictory) score += 40;
-    score += Math.min(20, deductionsCorrect * (20 / Math.max(deductions.length, 1)));
-    score += Math.min(15, (roomsExplored / Math.max(state.rooms.length, 1)) * 15);
-    score += Math.min(15, (hpPercent / 100) * 15);
-    score += Math.min(10, isVictory && state.turn < 200 ? 10 : isVictory && state.turn < 350 ? 5 : 0);
+    if (isVictory) score += 30;
+    score += Math.min(15, deductionsCorrect * (15 / Math.max(deductions.length, 1)));
+    score += Math.min(10, (roomsExplored / Math.max(state.rooms.length, 1)) * 10);
+    score += Math.min(10, (hpPercent / 100) * 10);
+    score += Math.min(5, isVictory && state.turn < 200 ? 5 : isVictory && state.turn < 350 ? 2 : 0);
+    // Investigation quality bonus (up to 30 points)
+    if (scenes.length > 0) {
+      score += Math.min(10, (processedScenes / Math.max(scenes.length, 1)) * 10);
+      score += Math.min(8, (identifiedCrew / Math.max(dossiers.length, 1)) * 8);
+      score += Math.min(7, (confirmedSlots / Math.max(totalSlots, 1)) * 7);
+      score += Math.min(5, (contradictions / Math.max(totalContradictions, 1)) * 5);
+    }
     const rating = score >= 90 ? "S" : score >= 75 ? "A" : score >= 55 ? "B" : score >= 35 ? "C" : "D";
     const ratingColor = rating === "S" ? "#ff0" : rating === "A" ? "#0f0" : rating === "B" ? "#6cf" : rating === "C" ? "#fa0" : "#f44";
 
@@ -2408,6 +2427,28 @@ export class BrowserDisplay3D implements IGameDisplay {
     const choicesHtml = choicesMade > 0
       ? `<div class="gameover-stat"><span class="stat-label">Decisions Made:</span> <span class="stat-value">${choicesMade}/${choices.length}</span></div>`
       : "";
+
+    let autopsyHtml = "";
+    if (scenes.length > 0) {
+      autopsyHtml += `<div style="border-top:1px solid #333;margin:6px 0;padding-top:6px">`;
+      autopsyHtml += `<div style="color:#4cf;font-size:10px;letter-spacing:1.5px;text-align:center;margin-bottom:4px">INVESTIGATION QUALITY</div>`;
+      autopsyHtml += `<div class="gameover-stat"><span class="stat-label">Scenes Processed:</span> <span class="stat-value ${processedScenes === scenes.length ? 'good' : processedScenes > 0 ? 'warn' : 'bad'}">${processedScenes}/${scenes.length}</span></div>`;
+      autopsyHtml += `<div class="gameover-stat"><span class="stat-label">Crew Identified:</span> <span class="stat-value ${identifiedCrew === dossiers.length ? 'good' : identifiedCrew > 0 ? 'warn' : 'bad'}">${identifiedCrew}/${dossiers.length}</span></div>`;
+      if (totalSlots > 0) {
+        autopsyHtml += `<div class="gameover-stat"><span class="stat-label">Timeline Confirmed:</span> <span class="stat-value ${confirmedSlots === totalSlots ? 'good' : confirmedSlots > 0 ? 'warn' : 'bad'}">${confirmedSlots}/${totalSlots}</span></div>`;
+      }
+      if (totalContradictions > 0) {
+        autopsyHtml += `<div class="gameover-stat"><span class="stat-label">Contradictions Found:</span> <span class="stat-value ${contradictions === totalContradictions ? 'good' : contradictions > 0 ? 'warn' : 'bad'}">${contradictions}/${totalContradictions}</span></div>`;
+      }
+      if (accumulation) {
+        const evidTotal = accumulation.confirming_found + accumulation.ambiguous_found + accumulation.contradicting_found;
+        autopsyHtml += `<div class="gameover-stat"><span class="stat-label">Evidence Examined:</span> <span class="stat-value">${evidTotal} (${accumulation.confirming_found}C/${accumulation.ambiguous_found}A/${accumulation.contradicting_found}X)</span></div>`;
+        if (accumulation.crack_moment_fired) {
+          autopsyHtml += `<div class="gameover-stat"><span class="stat-label">Crack Moment:</span> <span class="stat-value good">TRIGGERED</span></div>`;
+        }
+      }
+      autopsyHtml += `</div>`;
+    }
 
     // Run history
     const runHistoryHtml = this.renderRunHistory(state.seed);
@@ -2431,6 +2472,7 @@ export class BrowserDisplay3D implements IGameDisplay {
           <div class="gameover-stat"><span class="stat-label">Deductions:</span> <span class="stat-value ${deductionsCorrect === deductions.length ? 'good' : deductionsCorrect > 0 ? 'warn' : 'bad'}">${deductionsCorrect}/${deductions.length} correct</span></div>
           ${choicesHtml}
         </div>
+        ${autopsyHtml}
         ${runHistoryHtml}
         <div class="gameover-restart">Press [R] to restart</div>
       </div>`;
