@@ -2794,21 +2794,24 @@ export class BrowserDisplay3D implements IGameDisplay {
         [SensorType.Atmospheric]: "ATMOSPHERIC",
       };
       const sensorTag = this.sensorMode
-        ? ` <span style="color:#f44;font-weight:bold">[${sensorNames[this.sensorMode] ?? this.sensorMode.toUpperCase()}]</span>`
+        ? ` <span style="color:#f44;font-weight:bold;font-size:11px;letter-spacing:1px">[${sensorNames[this.sensorMode] ?? this.sensorMode.toUpperCase()}]</span>`
         : "";
 
       const room = this.getPlayerRoom(state);
       const roomLabel = room
-        ? `<span class="hud-value">${this.escapeHtml(room.name)}</span>`
+        ? `<span class="hud-value" style="font-size:12px">${this.escapeHtml(room.name)}</span>`
         : "";
 
       const hpPercent = Math.round((state.player.hp / state.player.maxHp) * 100);
       const hpColor = hpPercent > 60 ? "#0f0" : hpPercent > 30 ? "#fa0" : "#f00";
-      const hpBarWidth = 10;
-      const filledBlocks = Math.round((state.player.hp / state.player.maxHp) * hpBarWidth);
-      const emptyBlocks = hpBarWidth - filledBlocks;
-      const hpBar = "\u2588".repeat(filledBlocks) + "\u2591".repeat(emptyBlocks);
       const hpCriticalClass = hpPercent <= 25 ? " hp-critical" : "";
+      // CSS bar instead of block characters
+      const hpBarHtml = `<span class="hud-hp${hpCriticalClass}" style="display:inline-flex;align-items:center;gap:4px">` +
+        `<span style="display:inline-block;width:60px;height:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:1px;overflow:hidden;vertical-align:middle">` +
+        `<span style="display:block;width:${hpPercent}%;height:100%;background:${hpColor};box-shadow:0 0 4px ${hpColor};transition:width 0.3s ease"></span>` +
+        `</span>` +
+        `<span style="color:${hpColor};font-size:11px;font-weight:bold">${state.player.hp}</span>` +
+        `</span>`;
 
       const stunTag = state.player.stunTurns > 0
         ? ` <span style="color:#44f;font-weight:bold">\u26a1 STUNNED (${state.player.stunTurns})</span>`
@@ -2819,14 +2822,14 @@ export class BrowserDisplay3D implements IGameDisplay {
       const remaining = maxTurns - state.turn;
       const warnThreshold = Math.floor(maxTurns * 0.70);
       const turnWarning = state.turn >= warnThreshold
-        ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold">[${remaining} left]</span>`
+        ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold;font-size:11px">[${remaining}]</span>`
         : "";
 
       this._hudStatus.innerHTML =
-        `<span class="hud-hp${hpCriticalClass}" style="color:${hpColor}">${hpBar} ${state.player.hp}/${state.player.maxHp}</span>` +
+        hpBarHtml +
         ` <span class="hud-label">T:</span><span class="hud-value">${state.turn}</span>${turnWarning}` +
         sensorTag + stunTag +
-        (roomLabel ? ` | ${roomLabel}` : "");
+        (roomLabel ? ` <span style="color:#445">|</span> ${roomLabel}` : "");
     }
 
     // ── Interact hint ───────────────────────────────────────────

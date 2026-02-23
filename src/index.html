@@ -56,7 +56,7 @@
       perspective: none;
     }
     /* Hub-open dimming: HUD + minimap fade when Investigation Hub is open */
-    .hub-open #hud-objective, .hub-open #hud-status, .hub-open #hud-scanner { opacity: 0.2; transition: opacity 0.3s ease; }
+    .hub-open #hud-objective, .hub-open #hud-bar { opacity: 0.2; transition: opacity 0.3s ease; }
     .hub-open #minimap-canvas { opacity: 0.3; transition: opacity 0.3s ease; }
     /* 3D minimap overlay */
     .mode-3d #minimap-canvas {
@@ -270,8 +270,8 @@
       line-height: 1.5;
     }
 
-    /* ── HUD overlays (3D mode) ─────────────────────────── */
-    #hud-objective, #hud-status, #hud-scanner, #hud-interact {
+    /* ── HUD objective (top-left, unchanged) ─────────────── */
+    #hud-objective {
       position: fixed;
       pointer-events: none;
       z-index: 10;
@@ -285,8 +285,6 @@
       border-radius: 4px;
       padding: 6px 10px;
       transition: opacity 0.3s ease;
-    }
-    #hud-objective {
       top: 12px;
       left: 12px;
       max-width: 360px;
@@ -310,51 +308,143 @@
       font-size: 11px;
       letter-spacing: 0.5px;
     }
-    #hud-status {
-      bottom: 12px;
-      left: 12px;
-      max-width: 420px;
-      line-height: 1.5;
+
+    /* ── Bottom HUD bar (unified sci-fi terminal) ──────── */
+    #hud-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      pointer-events: none;
+      font-family: monospace;
+      transition: opacity 0.3s ease;
     }
-    #hud-status .hud-label { color: #5a7a6a; }
-    #hud-status .hud-value { color: #44ff88; text-shadow: 0 0 6px rgba(68, 255, 136, 0.3); }
-    #hud-status .hud-hp { font-weight: bold; }
-    #hud-scanner {
-      bottom: 72px;
+    .hud-bar-edge {
+      position: absolute;
+      top: 0;
+      left: 40px;
+      right: 40px;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(68, 255, 136, 0.06) 5%,
+        rgba(68, 255, 136, 0.25) 20%,
+        rgba(68, 255, 136, 0.4) 50%,
+        rgba(68, 255, 136, 0.25) 80%,
+        rgba(68, 255, 136, 0.06) 95%,
+        transparent 100%
+      );
+      box-shadow: 0 0 8px rgba(68, 255, 136, 0.15), 0 -2px 12px rgba(68, 255, 136, 0.06);
+    }
+    .hud-bar-content {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 6px 16px 8px 16px;
+      background: linear-gradient(180deg,
+        rgba(8, 10, 16, 0.65) 0%,
+        rgba(6, 8, 14, 0.85) 40%,
+        rgba(4, 6, 12, 0.92) 100%
+      );
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      min-height: 36px;
+    }
+    .hud-bar-content::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(68, 255, 136, 0.008) 2px,
+        rgba(68, 255, 136, 0.008) 4px
+      );
+      pointer-events: none;
+    }
+    .hud-bar-divider {
+      width: 1px;
+      align-self: stretch;
+      margin: 2px 12px;
+      background: linear-gradient(180deg,
+        rgba(68, 255, 136, 0.3) 0%,
+        rgba(68, 255, 136, 0.08) 100%
+      );
+    }
+    .hud-bar-corner {
+      position: absolute;
+      top: -4px;
+      width: 20px;
+      height: 5px;
+      border-top: 1px solid rgba(68, 255, 136, 0.3);
+    }
+    .hud-bar-corner-l {
       left: 12px;
-      max-width: 420px;
+      border-left: 1px solid rgba(68, 255, 136, 0.3);
+    }
+    .hud-bar-corner-r {
+      right: 12px;
+      border-right: 1px solid rgba(68, 255, 136, 0.3);
+    }
+
+    /* ── HUD bar sections ──────────────────────────────── */
+    #hud-status {
+      font-size: 13px;
+      color: #ccc;
+      line-height: 1.4;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #hud-status .hud-label { color: #5a7a6a; font-size: 11px; }
+    #hud-status .hud-value { color: #44ff88; text-shadow: 0 0 6px rgba(68, 255, 136, 0.3); }
+    #hud-status .hud-hp { font-weight: bold; letter-spacing: -0.5px; }
+    #hud-status .hp-critical { animation: hp-pulse 0.8s ease-in-out infinite; }
+    @keyframes hp-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    #hud-scanner {
       font-size: 12px;
-      line-height: 1.5;
+      color: #ccc;
+      line-height: 1.4;
+      flex: 1;
+      min-width: 0;
     }
     #hud-scanner .hud-legend-item {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      margin-right: 8px;
+      gap: 3px;
+      margin-right: 6px;
       white-space: nowrap;
     }
     #hud-scanner .hud-legend-glyph {
-      font-size: 14px;
+      font-size: 13px;
+      text-shadow: 0 0 4px currentColor;
     }
     #hud-scanner .hud-legend-label {
-      font-size: 11px;
+      font-size: 10px;
+      color: #777;
     }
     #hud-scanner .hud-scanner-hint {
       font-size: 11px;
       color: #8ac;
-      border-top: 1px solid rgba(68, 255, 136, 0.1);
-      margin-top: 4px;
-      padding-top: 3px;
+      border-top: 1px solid rgba(68, 255, 136, 0.08);
+      margin-top: 3px;
+      padding-top: 2px;
     }
     #hud-scanner:empty { display: none; }
+    .hud-bar-divider:has(+ #hud-scanner:empty) { display: none; }
     #hud-interact {
-      bottom: 100px;
-      right: 16px;
-      font-size: 15px;
+      font-size: 13px;
       font-weight: bold;
       color: #fa0;
-      background: rgba(8, 10, 16, 0.8);
-      border-color: rgba(255, 170, 0, 0.2);
+      text-shadow: 0 0 8px rgba(255, 170, 0, 0.3);
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-left: auto;
+      padding-left: 12px;
       opacity: 0;
       transition: opacity 0.2s ease;
     }
@@ -1329,9 +1419,17 @@
   <div id="journal-overlay"></div>
   <div id="crawl-overlay"></div>
   <div id="hud-objective"></div>
-  <div id="hud-status"></div>
-  <div id="hud-scanner"></div>
-  <div id="hud-interact"></div>
+  <div id="hud-bar">
+    <div class="hud-bar-edge"></div>
+    <div class="hud-bar-content">
+      <div id="hud-status"></div>
+      <div class="hud-bar-divider"></div>
+      <div id="hud-scanner"></div>
+      <div id="hud-interact"></div>
+    </div>
+    <div class="hud-bar-corner hud-bar-corner-l"></div>
+    <div class="hud-bar-corner hud-bar-corner-r"></div>
+  </div>
   <div id="game-container">
     <div id="map-column">
       <div id="rot-display"><canvas id="minimap-canvas" width="200" height="200" style="display:none"></canvas><canvas id="compass-canvas" width="60" height="60" style="display:none"></canvas></div>
