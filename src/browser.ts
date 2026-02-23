@@ -6488,19 +6488,33 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
   if (clueTypes.has("access_log")) { suggestedActivities.add(SceneActivity.RoutineWork); }
   if (clueTypes.has("terminal_log")) { suggestedActivities.add(SceneActivity.Investigation); suggestedActivities.add(SceneActivity.DataAccess); suggestedActivities.add(SceneActivity.Communication); }
 
+  // Additional activity suggestions from text keywords
+  if (clueTextsLower.includes("repair") || clueTextsLower.includes("wrench") || clueTextsLower.includes("welding")) {
+    suggestedActivities.add(SceneActivity.EquipmentRepair);
+  }
+  if (clueTextsLower.includes("transmit") || clueTextsLower.includes("signal") || clueTextsLower.includes("radio") || clueTextsLower.includes("frequency")) {
+    suggestedActivities.add(SceneActivity.Communication);
+  }
+  if (clueTextsLower.includes("confront") || clueTextsLower.includes("argument") || clueTextsLower.includes("fight") || clueTextsLower.includes("struggle")) {
+    suggestedActivities.add(SceneActivity.Confrontation);
+  }
+
   // Text-based outcome hints from clue descriptions
   const suggestedOutcomes = new Set<SceneOutcome>();
-  if (clueTextsLower.includes("blood") || clueTextsLower.includes("body") || clueTextsLower.includes("died") || clueTextsLower.includes("deceased") || clueTextsLower.includes("fatal")) {
+  if (clueTextsLower.includes("blood") || clueTextsLower.includes("body") || clueTextsLower.includes("died") || clueTextsLower.includes("deceased") || clueTextsLower.includes("fatal") || clueTextsLower.includes("lifeless")) {
     suggestedOutcomes.add(SceneOutcome.DiedHere);
   }
-  if (clueTextsLower.includes("hurry") || clueTextsLower.includes("rush") || clueTextsLower.includes("fled") || clueTextsLower.includes("abandoned") || clueTextsLower.includes("dropped")) {
+  if (clueTextsLower.includes("hurry") || clueTextsLower.includes("rush") || clueTextsLower.includes("fled") || clueTextsLower.includes("abandoned") || clueTextsLower.includes("dropped") || clueTextsLower.includes("panic")) {
     suggestedOutcomes.add(SceneOutcome.LeftInHurry);
   }
-  if (clueTextsLower.includes("barricade") || clueTextsLower.includes("sealed") || clueTextsLower.includes("locked from inside")) {
+  if (clueTextsLower.includes("barricade") || clueTextsLower.includes("sealed") || clueTextsLower.includes("locked from inside") || clueTextsLower.includes("welded shut")) {
     suggestedOutcomes.add(SceneOutcome.SealedInside); suggestedOutcomes.add(SceneOutcome.StillHere);
   }
-  if (clueTextsLower.includes("injur") || clueTextsLower.includes("wound") || clueTextsLower.includes("bandage") || clueTextsLower.includes("medical")) {
+  if (clueTextsLower.includes("injur") || clueTextsLower.includes("wound") || clueTextsLower.includes("bandage") || clueTextsLower.includes("medical") || clueTextsLower.includes("limp") || clueTextsLower.includes("bleeding")) {
     suggestedOutcomes.add(SceneOutcome.Injured);
+  }
+  if (clueTextsLower.includes("orderly") || clueTextsLower.includes("normal") || clueTextsLower.includes("routine") || clueTextsLower.includes("nothing unusual")) {
+    suggestedOutcomes.add(SceneOutcome.LeftNormally);
   }
 
   // WHO hints: clues with crewLinked
@@ -6603,8 +6617,15 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     }
   }
 
+  // Crew count hint based on clue analysis
+  const groundTruthCount = scene.groundTruth.who.length;
+  const countHint = groundTruthCount === 1 ? "1 person" : `${groundTruthCount} people`;
+
   html += `<div style="flex:1;border:1px solid ${whoActive ? "#4cf" : "#333"};padding:8px;max-height:300px;overflow-y:auto">`;
   html += `<div style="color:${whoActive ? "#4cf" : "#889"};font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px">WHO WAS HERE?</div>`;
+  if (examinedClues.length > 0) {
+    html += `<div style="color:#6cf;font-size:9px;margin-bottom:3px">Physical evidence indicates ${countHint} present</div>`;
+  }
   if (suggestedCrewIds.size > 0) {
     html += `<div style="color:#4cf;font-size:9px;margin-bottom:4px;font-style:italic">Evidence points to marked crew</div>`;
   }
@@ -6735,7 +6756,11 @@ function renderHubSceneConfirm(scene: RoomScene, crew: import("./shared/types.js
   html += `WHAT: <span style="color:#fa0">${esc(activities[hubSceneWhatIdx]?.label ?? "?")}</span><br>`;
   html += `OUTCOME: <span style="color:#f80">${esc(outcomes[hubSceneOutcomeIdx]?.label ?? "?")}</span>`;
   html += `</div>`;
-  html += `<div style="color:#ca8;font-size:12px;margin:12px 0">This will cost ${turnCost} turns. Wrong answers cost 2 HP each.</div>`;
+  const costColor = turnCost >= 8 ? "#f44" : turnCost >= 5 ? "#fa0" : "#ca8";
+  html += `<div style="color:${costColor};font-size:12px;margin:12px 0">This will cost <span style="font-weight:bold">${turnCost} turns</span>. Wrong answers cost 2 HP each.</div>`;
+  if (scene.processAttempts >= 2) {
+    html += `<div style="color:#f88;font-size:10px;margin-bottom:8px">High turn cost — review your evidence carefully before confirming.</div>`;
+  }
   html += `<div style="color:#aaa;font-size:14px">[Y] Confirm  [N] Go back</div>`;
   html += `</div>`;
   return html;

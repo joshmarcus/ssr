@@ -5506,8 +5506,45 @@ export function step(state: GameState, action: Action): GameState {
         }
       }
 
+      // Log per-clue discovery with type-specific labels
+      const clueTypeDescriptions: Record<string, string> = {
+        badge: "Crew badge found",
+        personal_effect: "Personal item discovered",
+        damage_pattern: "Damage pattern analyzed",
+        access_log: "Access log retrieved",
+        terminal_log: "Terminal data recovered",
+        tool: "Equipment found",
+        residue: "Chemical residue detected",
+        barricade: "Barricade remnants noted",
+        modified_equipment: "Modified equipment documented",
+        memory_echo: "Memory echo registered",
+      };
+
       // Log summary
       if (newlyExamined.length > 0) {
+        // Individual clue logs for first 3 clues (avoid log spam)
+        for (const clue of newlyExamined.slice(0, 3)) {
+          const desc = clueTypeDescriptions[clue.type] ?? "Evidence found";
+          const linked = clue.crewLinked
+            ? ` [${next.mystery!.crew.find(c => c.id === clue.crewLinked)?.lastName ?? "crew"}]`
+            : "";
+          next.logs = [...next.logs, {
+            id: `log_clue_detail_${clue.id}_${next.turn}`,
+            timestamp: next.turn,
+            source: "narrative",
+            text: `${desc}${linked}: ${clue.text.slice(0, 80)}${clue.text.length > 80 ? "..." : ""}`,
+            read: false,
+          }];
+        }
+        if (newlyExamined.length > 3) {
+          next.logs = [...next.logs, {
+            id: `log_examine_more_${next.turn}`,
+            timestamp: next.turn,
+            source: "narrative",
+            text: `...and ${newlyExamined.length - 3} more clue${newlyExamined.length - 3 > 1 ? "s" : ""} examined.`,
+            read: false,
+          }];
+        }
         next.logs = [...next.logs, {
           id: `log_examine_clues_${next.turn}`,
           timestamp: next.turn,
@@ -5530,11 +5567,17 @@ export function step(state: GameState, action: Action): GameState {
       } else {
         const sensorGated = scene.physicalClues.filter(c => !c.examined && c.sensorRequired);
         if (sensorGated.length > 0) {
+          const sensorTypes = [...new Set(sensorGated.map(c => c.sensorRequired))];
+          const sensorNames = sensorTypes.map(s => {
+            if (s === SensorType.Thermal) return "Thermal";
+            if (s === SensorType.Atmospheric) return "Atmospheric";
+            return String(s);
+          });
           next.logs = [...next.logs, {
             id: `log_examine_sensor_${next.turn}`,
             timestamp: next.turn,
             source: "system",
-            text: `${sensorGated.length} clue${sensorGated.length > 1 ? "s" : ""} require sensor upgrades to examine.`,
+            text: `${sensorGated.length} clue${sensorGated.length > 1 ? "s" : ""} require ${sensorNames.join("/")} sensor to examine.`,
             read: false,
           }];
         } else {
@@ -5692,6 +5735,32 @@ export function step(state: GameState, action: Action): GameState {
         text: `${scoreText} [${parts.join(", ")}]`,
         read: false,
       }];
+
+      // After 3+ failed attempts, reveal hints about correct answers for wrong categories
+      const attemptNum = targetScene.processAttempts + 1;
+      if (result.score < 2 && attemptNum >= 3) {
+        const gt = targetScene.groundTruth;
+        const hints: string[] = [];
+        if (!result.whoCorrect) {
+          const crewHint = gt.who.map(id => next.mystery!.crew.find(c => c.id === id)?.lastName).filter(Boolean);
+          if (crewHint.length > 0) hints.push(`WHO: Look for evidence linking ${crewHint.join("/")} to this room`);
+        }
+        if (!result.whatCorrect) {
+          hints.push(`WHAT: Re-examine the clue types — they suggest the activity`);
+        }
+        if (!result.outcomeCorrect) {
+          hints.push(`OUTCOME: The clue descriptions contain keywords about what happened after`);
+        }
+        if (hints.length > 0) {
+          next.logs = [...next.logs, {
+            id: `log_process_hint_${processRoomId}_${next.turn}`,
+            timestamp: next.turn,
+            source: "system",
+            text: `CORVUS-7: Analysis calibration — ${hints.join(". ")}.`,
+            read: false,
+          }];
+        }
+      }
 
       // CORVUS-7 commentary for perfect scene analysis
       if (result.score === 3) {
