@@ -352,9 +352,31 @@ function addJournalEntry(
     }
   }
 
+  // CORVUS-7 investigation prompts at evidence milestones
+  let milestoneLogs = threadLogs;
+  const prevCount = state.mystery.journal.length;
+  const newCount = newJournal.length;
+  const evidenceMilestones: { count: number; key: string; text: string }[] = [
+    { count: 5, key: "corvus_evidence_5", text: "CORVUS-7: Five evidence entries logged. Patterns may be emerging — review the Investigation Hub for connections." },
+    { count: 8, key: "corvus_evidence_8", text: "CORVUS-7: Eight evidence entries collected. Consider processing room scenes — enough data to start forming hypotheses." },
+    { count: 12, key: "corvus_evidence_12", text: "CORVUS-7: Twelve evidence entries on file. The picture is becoming clearer. Check Connections for deductions ready to answer." },
+  ];
+  for (const em of evidenceMilestones) {
+    if (prevCount < em.count && newCount >= em.count && !newMilestones.has(em.key)) {
+      newMilestones.add(em.key);
+      milestoneLogs = [...milestoneLogs, {
+        id: `log_${em.key}_${state.turn}`,
+        timestamp: state.turn,
+        source: "milestone" as const,
+        text: em.text,
+        read: false,
+      }];
+    }
+  }
+
   return {
     ...state,
-    logs: threadLogs,
+    logs: milestoneLogs,
     milestones: newMilestones,
     mystery: {
       ...state.mystery,

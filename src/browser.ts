@@ -6388,6 +6388,19 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
 
   // WHO column — highlight crew linked to clues
   const whoActive = focusCol === 0;
+
+  // Build cross-reference: crew → other processed scenes they appeared in
+  const allScenes = state.mystery?.roomScenes ?? [];
+  const crewSceneXref = new Map<string, { roomName: string; activity: string }[]>();
+  for (const s of allScenes) {
+    if (!s.processed || s.roomId === scene.roomId) continue;
+    for (const whoId of s.groundTruth.who) {
+      if (!crewSceneXref.has(whoId)) crewSceneXref.set(whoId, []);
+      const actLabel = activities.find(a => a.key === s.groundTruth.what)?.label ?? s.groundTruth.what;
+      crewSceneXref.get(whoId)!.push({ roomName: s.roomName, activity: actLabel });
+    }
+  }
+
   html += `<div style="flex:1;border:1px solid ${whoActive ? "#4cf" : "#333"};padding:8px;max-height:300px;overflow-y:auto">`;
   html += `<div style="color:${whoActive ? "#4cf" : "#889"};font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px">WHO WAS HERE?</div>`;
   if (suggestedCrewIds.size > 0) {
@@ -6403,7 +6416,18 @@ function renderHubSceneProcess(scene: RoomScene, crew: import("./shared/types.js
     const nameText = identified ? `${c.firstName} ${c.lastName}` : `Crew #${i + 1} (${c.role})`;
     const prefix = selected ? "\u25b6 " : suggested ? "\u25c7 " : "  ";
     const hint = suggested ? ` <span style="color:#4cf;font-size:9px">\u2190 evidence</span>` : "";
-    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#bce" : "#889"}">${prefix}${esc(nameText)}${hint}</div>`;
+    html += `<div style="padding:3px 6px;font-size:11px;${bg};color:${selected ? "#eef" : suggested ? "#bce" : "#889"}">${prefix}${esc(nameText)}${hint}`;
+    // Cross-reference: show where this crew member was confirmed in other scenes
+    const xrefs = crewSceneXref.get(c.id);
+    if (xrefs && xrefs.length > 0 && (selected || suggested)) {
+      for (const xr of xrefs.slice(0, 2)) {
+        html += `<div style="font-size:9px;color:#6a8;padding-left:12px;margin-top:1px">Seen in ${esc(xr.roomName)}: ${esc(xr.activity)}</div>`;
+      }
+      if (xrefs.length > 2) {
+        html += `<div style="font-size:9px;color:#567;padding-left:12px">+${xrefs.length - 2} more</div>`;
+      }
+    }
+    html += `</div>`;
   }
   html += `</div>`;
 
