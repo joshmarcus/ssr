@@ -277,6 +277,31 @@ function createToonGradient(): THREE.DataTexture {
   return tex;
 }
 
+/** Manually pose a crew model's skeleton from T-pose to a natural arms-at-sides standing pose.
+ *  Works with Synty SciFi Worlds SpaceSuit models (Unity bone naming convention). */
+function poseCrewStanding(model: THREE.Object3D): void {
+  model.traverse((child) => {
+    if (child instanceof THREE.Bone) {
+      const name = child.name;
+      // Rotate shoulders/arms down from T-pose (~70 degrees)
+      // Synty SciFi Worlds uses: Clavicle_L → Shoulder_L → Elbow_L → Hand_L
+      if (name === "Shoulder_L") {
+        child.rotation.z = -1.2; // ~70 degrees down
+        child.rotation.x = 0.15; // slight forward
+      } else if (name === "Shoulder_R") {
+        child.rotation.z = 1.2;
+        child.rotation.x = 0.15;
+      }
+      // Slight bend in elbows
+      else if (name === "Elbow_L") {
+        child.rotation.z = -0.2;
+      } else if (name === "Elbow_R") {
+        child.rotation.z = 0.2;
+      }
+    }
+  });
+}
+
 /** Create a material with optional emissive glow.
  *  Currently uses MeshStandardMaterial for proper texture display.
  *  Switch to MeshToonMaterial + gradientMap for cel-shaded look. */
@@ -10354,21 +10379,16 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Set up AnimationMixer for models with animation clips
       const clips = this.gltfAnimations.get(cacheKey);
       if (clips && clips.length > 0) {
-        const mixer = new THREE.AnimationMixer(clone);
         const idleClip = clips.find(c => c.name === "Idle");
         if (idleClip) {
           // Named idle animation — loop it
+          const mixer = new THREE.AnimationMixer(clone);
           mixer.clipAction(idleClip).play();
+          this.entityMixers.set(entity.id, mixer);
         } else {
-          // No explicit idle — freeze at last frame (standing rest pose)
-          const clip = clips[0];
-          const action = mixer.clipAction(clip);
-          action.clampWhenFinished = true;
-          action.setLoop(THREE.LoopOnce, 1);
-          action.play();
-          mixer.setTime(clip.duration);
+          // No explicit idle — manually pose skeleton from T-pose to arms-at-sides
+          poseCrewStanding(clone);
         }
-        this.entityMixers.set(entity.id, mixer);
       }
 
       // Entity base height: flying entities hover, ground entities sit on floor
@@ -11685,20 +11705,15 @@ export class BrowserDisplay3D implements IGameDisplay {
           this.entityMixers.get(id)!.stopAllAction();
           this.entityMixers.delete(id);
         }
-        const mixer = new THREE.AnimationMixer(clone);
         const rebuildIdleClip = clips.find(c => c.name === "Idle");
         if (rebuildIdleClip) {
+          const mixer = new THREE.AnimationMixer(clone);
           mixer.clipAction(rebuildIdleClip).play();
+          this.entityMixers.set(id, mixer);
         } else {
-          // No explicit idle — freeze at last frame (standing rest pose)
-          const clip = clips[0];
-          const action = mixer.clipAction(clip);
-          action.clampWhenFinished = true;
-          action.setLoop(THREE.LoopOnce, 1);
-          action.play();
-          mixer.setTime(clip.duration);
+          // No explicit idle — manually pose skeleton from T-pose to arms-at-sides
+          poseCrewStanding(clone);
         }
-        this.entityMixers.set(id, mixer);
       }
 
       // Use per-type baseY lookup (match the one in entity creation)
