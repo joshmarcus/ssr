@@ -289,14 +289,14 @@ function poseCrewStanding(model: THREE.Object3D): void {
         child.rotation.z = -1.2; // ~70 degrees down
         child.rotation.x = 0.15; // slight forward
       } else if (name === "Shoulder_R") {
-        child.rotation.z = 1.2;
-        child.rotation.x = 0.15;
+        child.rotation.z = -1.2; // same sign — mirrored bone axes
+        child.rotation.x = -0.15;
       }
       // Slight bend in elbows
       else if (name === "Elbow_L") {
         child.rotation.z = -0.2;
       } else if (name === "Elbow_R") {
-        child.rotation.z = 0.2;
+        child.rotation.z = -0.2;
       }
     }
   });
@@ -11431,21 +11431,18 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Convert materials to toon-shaded, applying Synty atlas where models have UVs but no embedded texture
     const tintColor = key === "player" ? COLORS_3D.player : ENTITY_COLORS_3D[lookupKey];
     const isSyntyModel = isCrewVariant || MODEL_PATHS[key]?.includes("synty-space-gltf");
-    // Crew variants from SciFi Worlds pack use a different atlas
-    const crewAtlas = isCrewVariant ? this.syntyWorldsAtlas : null;
     model.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         const oldMat = mats[0] as THREE.MeshStandardMaterial;
         const hasUVs = !!(child.geometry?.attributes?.uv);
-        // Use embedded texture if available, otherwise apply appropriate Synty atlas
+        // Use embedded texture if available, otherwise apply Synty Space atlas
+        // Note: crew variants (SciFi Worlds pack) use solid colors — their GLB UVs
+        // don't match the atlas due to FBX2glTF conversion artifacts
         let tex = hasUVs && oldMat?.map ? oldMat.map : null;
-        if (!tex && hasUVs && crewAtlas) {
-          tex = crewAtlas;
-        } else if (!tex && hasUVs && isSyntyModel && this.syntyAtlas) {
+        if (!tex && hasUVs && !isCrewVariant && isSyntyModel && this.syntyAtlas) {
           tex = this.syntyAtlas;
         }
-
         child.material = makeToonMaterial({
           color: tex ? 0xffffff : (tintColor ?? oldMat?.color?.getHex() ?? 0xaaaaaa),
           gradientMap: this.toonGradient,
@@ -11495,7 +11492,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     );
 
     // Synty SciFi Worlds atlas (crew SpaceSuit characters)
-    // flipY=true matches FBX UV convention (same as Space atlas — both converted via FBX2glTF)
+    // Note: currently unused — crew GLB UVs don't match atlas due to FBX2glTF conversion
     const worldsAtlasUrl = import.meta.env.BASE_URL + "models/synty-scifiworlds/PolygonScifiWorlds_Texture_01_A.png";
     loader.load(
       worldsAtlasUrl,

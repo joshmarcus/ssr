@@ -11,20 +11,17 @@ A procedural roguelike where you remotely pilot maintenance bots through a low-b
 
 ## Tech Stack
 
-- **Language**: TypeScript (strict mode)
-- **Rendering**: ROT.js (ASCII/glyph roguelike display)
-- **Testing**: Vitest
-- **Runtime**: Node.js (via fnm), tsx for dev
-- **Time model**: Turn-based (one action = one time step)
-- **Input**: Controller-first (Steam Deck "Playable" tier target, 1280x800)
-- **Platform**: PC + Steam Deck (browser-based via ROT.js)
+- **Language**: TypeScript (strict mode), ESM modules (`.js` extensions in imports)
+- **Rendering**: Three.js (3D chase cam, cel-shaded), ROT.js (map generation)
+- **Testing**: Vitest | **Runtime**: Node.js (via fnm), tsx for dev
+- **Time model**: Turn-based | **Input**: Controller-first (Steam Deck target, 1280x800)
 
 ## Architecture
 
 ```
 src/
   sim/       — Authoritative game rules (rendering-agnostic)
-  render/    — ROT.js terminal rendering (glyphs + panels)
+  render/    — 3D renderer (display3d.ts ~5500 lines) + HUD overlays
   harness/   — Headless runner + observation/action API (agent/AI playtesting)
   shared/    — Shared types, constants, utilities
   data/      — Lore data, golden seed room definitions
@@ -38,370 +35,148 @@ tests/       — Golden seed + unit tests (Vitest)
 - `npm test` — Run tests (vitest)
 - `npm run harness` — Headless CLI runner
 - `npm run lint` — Type-check without emit
+- `npm run screenshot` — Playwright headless capture (`--seed`, `--turns`, `--overlay`, `--out`)
 
 ## Key Gameplay Systems
 
-- **Player bot** (Janitor Rover): 3 attachment slots (Tool, Sensor, Utility), base cleanliness sensor
+- **Player bot** (Sweepo): 3 attachment slots (Tool, Sensor, Utility), tank controls, chase cam
 - **Sensor ladder**: Cleanliness → Thermal → Atmospheric → Radiation → Structural → EM/Signal
 - **Puzzle types**: Power routing, pressure/leak management, access control, robotics salvage, signal relay
 - **Mystery/narrative**: Procedurally generated crew (8-20), incident archetypes, evidence via logs/traces/still frames
-
-## MVP Target
-
-10-15 minute vertical slice: 10 rooms, 1 locked door (power-gated), 1 robotics bay, 1 data core objective, thermal sensor upgrade, heat/smoke hazard. Deterministic with seed. Golden seed test: seed 184201, 31-turn walkthrough.
-
-## Documentation Reference
-
-All design docs live in `space_station_roguelike_docs_v10/`:
-
-### Design (core specs)
-- `design/00_high_concept.md` — Vision, pillars, one-liner
-- `design/01_game_loop.md` — State machine, progression phases
-- `design/02_player_bot_and_upgrades.md` — Bot systems, attachments, sensor ladder
-- `design/03_terminal_ui_and_sensors.md` — UI/UX, controller mapping, action bar
-- `design/04_procgen_station_layout.md` — Generation pipeline (macro graph → rooms → doors → hazards → loot)
-- `design/05_mystery_narrative_system.md` — Crew gen, evidence types, incident archetypes
-- `design/06_puzzles_and_interactions.md` — Puzzle categories and mechanics
-- `design/07_content_pipeline_and_data_formats.md` — Content pipeline and data format specs
-- `design/08_technical_architecture.md` — System architecture, module boundaries (TypeScript + ROT.js)
-- `design/09_input_and_controller.md` — Input mapping and controller support
-- `design/10_meta_progression.md` — Meta-progression design
-- `design/11_sensor_ladder_and_variants.md` — Sensor types and variants
-- `design/12_minimal_combat.md` — Optional combat-lite design
-- `design/13_realtime_simulation.md` — Future real-time mode (post-MVP)
-- `design/14_platform_pc_steam_deck.md` — Platform targets and Steam Deck constraints
-- `design/15_visual_style_no_art.md` — Visual style: representational, no art pipeline
-- `design/16_agent_harness.md` — AI testing framework, observation/action format
-- `design/17_terminal_v0_prototype.md` — V0 prototype specs (ROT.js Display, full visibility)
-- `design/18_tech_stack_rotjs_typescript.md` — Technology choices and rationale (active)
-- `design/golden_seed_puzzle_design.md` — Thermal-gated power routing puzzle design
-- `design/18_tech_stack_python_tcod.md` — (superseded) Original Python tech stack doc
-
-### Tasks (implementation roadmap)
-- `tasks/00_repo_scaffold_typescript.md` — Repository structure (TypeScript, active)
-- `tasks/01_ci_plan_typescript.md` — CI/testing plan (GitHub Actions + Vitest)
-- `tasks/mvp_spec.md` — MVP requirements and scope
-- `tasks/golden_seed_run_184201.md` — Integration test spec (seed 184201, ROT.js Digger map)
-- `tasks/backlog.md` — Milestone roadmap (V0.0 → V0.1 → M0 → M1 → M2 → M3)
-- `tasks/v0_terminal_roadmap.md` — V0 terminal-first development roadmap
-- `tasks/00_repo_scaffold_python.md` — (superseded) Original Python scaffold doc
-- `tasks/01_ci_plan_python.md` — (superseded) Original Python CI plan
-
-### Status
-- `STATUS.md` — Current project status, what works, known issues, next steps
-
-### Schemas (data formats)
-- `schemas/` — Specs for bots, systems, puzzles, incidents, attachments, log templates
-
-### Agent Prompts (AI-assisted dev)
-- `agents/agent_core_engineering.md` — Core sim implementation (TypeScript)
-- `agents/agent_ui_terminal.md` — UI/terminal rendering (ROT.js)
-- `agents/agent_procgen.md` — Procedural generation
-- `agents/agent_narrative_puzzle.md` — Narrative and puzzle design
-- `agents/agent_input_controller.md` — Input and controller mapping
-- `agents/agent_hazards_realtime.md` — Hazards and real-time systems
-- `agents/agent_playtest_balance.md` — Playtesting and balance
-- `agents/agent_packaging_steam_deck.md` — Packaging and Steam Deck deployment
+- **Golden seed test**: seed 184201, 31-turn walkthrough
 
 ## Important Project Files
 
-- `CLAUDE.md` — This file. Project instructions and architecture reference
-- `TEAM.md` — Sprint team roles, file ownership, workflow rules
-- `STATUS.md` — Living project status (update after each sprint)
-- `FUTURE_FEATURES.md` — Deferred features and design ideas
-- `space_station_roguelike_docs_v10/tasks/backlog.md` — Milestone roadmap and backlog
+| File | Purpose |
+|------|---------|
+| `CLAUDE.md` | This file — project instructions and architecture |
+| `STATUS.md` | Living project status (update after each sprint) |
+| `TEAM.md` | Sprint team roles, file ownership, workflow |
+| `FUTURE_FEATURES.md` | Deferred features and design ideas |
+| `MYSTERY_GAMEPLAY.md` | Mystery/investigation system design |
+| `RENDERER_ARCHITECTURE.md` | 3D renderer internals (scene, lights, camera, effects) |
+| `SPRINT_LEARNINGS.md` | Accumulated dev patterns and gotchas (V34-V221) |
+| `space_station_roguelike_docs_v10/` | All design docs, task specs, schemas, agent prompts |
+| `space_station_roguelike_docs_v10/tasks/backlog.md` | Milestone roadmap and living task queue |
+| `public/model-list.json` | Full 3D model manifest (300+ models) |
+
+## Documentation Reference
+
+All design docs live in `space_station_roguelike_docs_v10/`: design specs (`design/00-18`), task roadmaps (`tasks/`), data schemas (`schemas/`), and agent prompts (`agents/`). See individual files for details.
 
 ## Sprint Workflow
 
-1. Review `STATUS.md` for current state (what works, what's broken)
+1. Review `STATUS.md` for current state
 2. Check `backlog.md` and `FUTURE_FEATURES.md` for priorities
 3. Plan sprint: 3-5 deliverables, prioritized by game design lead
 4. Execute in parallel by role (see `TEAM.md`)
-5. QA: run `npx tsc --noEmit` + `npx vitest run` to verify
-6. **Always commit and push** after changes are verified
-7. Update `STATUS.md` after each sprint with changes and new findings
-8. **After major sprints**: Update critical docs, run a full playtest (harness or manual), share a playtest report before the next planning cycle. The whole team can propose priorities.
-9. **Auto-continue**: When a sprint is completed, automatically begin the next sprint — review state, identify priorities, plan, and execute without waiting for user prompt.
-10. **Design priority**: The game should be fun, interesting, and innovative — technical elegance is secondary
+5. QA: `npx tsc --noEmit` + `npx vitest run`
+6. **Visual QA** (MANDATORY — see Visual QA Checklist below)
+7. **Always commit and push** after changes are verified
+8. Update `STATUS.md` after each sprint
+9. **Auto-continue**: Automatically begin the next sprint without waiting for user prompt
+10. **Design priority**: Fun, interesting, and innovative > technical elegance
+
+## Visual QA Checklist (MANDATORY after every sprint)
+
+Code compilation and unit tests are NOT SUFFICIENT. The game must be visually playable. After every sprint that touches rendering, UI, or gameplay, run visual QA using Playwright:
+
+### Step 1: Take screenshots at key game states
+```bash
+# Basic 3D gameplay after 10 turns (checks: models loaded, HUD correct, no crashes)
+npx tsx screenshot.ts --3d --turns 10 --out qa_gameplay.png
+
+# Investigation hub (checks: scene list, evidence, crew panels)
+npx tsx screenshot.ts --3d --turns 20 --overlay hub --out qa_hub.png
+
+# Scene processing (checks: WHO/WHAT/OUTCOME columns, clue display)
+npx tsx screenshot.ts --3d --turns 20 --overlay hub-scenes --out qa_scenes.png
+
+# Map overlay (checks: minimap, room layout, player position)
+npx tsx screenshot.ts --3d --turns 5 --overlay map --out qa_map.png
+```
+
+### Step 2: Review each screenshot with the Read tool
+Open each screenshot and check for:
+- **3D models loading**: Sweepo visible? Crew NPCs visible? Props/furniture rendered?
+- **HUD elements**: Minimap present? Action bar? Health/turn counter? Objective banner?
+- **Text overlays**: Readable? No overlapping? No empty strings? No "Unknown" or "undefined"?
+- **Spatial correctness**: Doors aligned with frames? No models clipping through walls? Camera angle reasonable?
+- **Scene processing**: Clues showing text? WHO/WHAT/OUTCOME columns populated? No "Unknown" as answer option?
+
+### Step 3: DOM state checks via Playwright
+For deeper checks, extend `screenshot.ts` or use `page.evaluate()` to query:
+- `document.querySelectorAll('.mode-3d canvas').length > 0` — 3D renderer active
+- `document.getElementById('hud-objective')` — HUD present
+- Console errors/warnings (already captured by screenshot.ts)
+- Game state via `window.__gameState` if exposed
+
+### When to run visual QA
+- **Every sprint** that changes: browser.ts, display3d.ts, index.html, roomScenes.ts, procgen.ts
+- **Before marking any UI/rendering task complete**
+- **After fixing reported visual bugs** — verify the fix visually, not just by code review
+
+### What to do with failures
+- Fix the issue before committing
+- If a visual issue is beyond current scope, log it in backlog.md with a screenshot reference
+- NEVER ship changes that produce broken visuals just because tests pass
+
+## Playwright MCP (Live Browser Control)
+
+The Playwright MCP server allows Claude to directly control Chrome for interactive visual QA — navigating the game, pressing keys, taking screenshots, and inspecting DOM/JS state in real time. This is **preferred over the screenshot.ts script** for visual QA.
+
+### Setup
+The MCP server is configured via `claude mcp add`. If it needs to be re-added:
+```bash
+claude mcp add playwright -- cmd /c .claude\playwright-mcp.cmd
+```
+The wrapper script `.claude/playwright-mcp.cmd` sets the correct PATH for fnm-managed Node.js before launching `@playwright/mcp`.
+
+### Usage
+Once configured, Playwright MCP tools are available directly:
+
+1. **Start dev server**: `npm run dev` (runs on localhost, typically port 5173+)
+2. **Navigate**: `browser_navigate` to `http://localhost:<port>/ssr/`
+3. **Interact**: `browser_click` to skip opening crawl, `browser_press_key` for game controls:
+   - `ArrowUp/Down/Left/Right` — tank movement
+   - `c` — clean room, `q` — scan, `m` — map overlay, `3` — 3D mode, `Enter` — interact
+4. **Screenshot**: `browser_take_screenshot` to capture current viewport
+5. **Inspect state**: `browser_evaluate` to run JS in the page context
+6. **Snapshot**: `browser_snapshot` for accessibility tree (better than screenshot for DOM state)
+
+### Tips
+- **fnm PATH issue**: On Windows with fnm, spawned processes can't find `node`/`npx`. The `.claude/playwright-mcp.cmd` wrapper solves this by setting PATH explicitly.
+- **Game state access**: Add `Object.defineProperty(window, '__gameState', { get: () => state, configurable: true })` in `browser.ts` (after `let state = ...`) to expose game state for JS inspection. Use a getter (not assignment) so it always returns the current state after reassignments.
+- **Batch navigation**: Use `browser_run_code` with async loops for multi-step navigation (cleaning rooms, moving through corridors).
+- **Entity positions**: Query `window.__gameState.entities` (a Map) to find entity positions by type (e.g., `crew_npc`, `relay`, `evidence_trace`).
 
 ## Autonomous Development
 
-- **Keep going**: Continue developing, sprinting, and iterating without asking the user for input unless absolutely critical (e.g., destructive action, ambiguous architectural direction). Make design decisions independently.
-- **Continuous sprints**: After completing a sprint, immediately launch the next one. Never stop and wait — always pick up the next highest-priority work from the backlog. The development loop is: finish sprint → update STATUS.md → update backlog → consult design leads → start next sprint.
-- **Backlog maintenance**: Keep `space_station_roguelike_docs_v10/tasks/backlog.md` up to date as the living task queue. After each sprint, add new tasks discovered during development, reprioritize existing items, and remove completed work. The backlog should always reflect what's next.
-- **Sprint retrospective**: At the end of each sprint, consult the **game design lead** and the **visual design lead** (per `TEAM.md` roles) to set priorities for the next sprint. They should weigh in on what will most improve the game — whether that's visual polish, new mechanics, performance, model integration, or atmosphere. Their priorities drive the next sprint's scope.
-- **Sprint focus**: Autonomous sprints should now prioritize **mystery gameplay mechanics and discovery flow**. The mystery/investigation system is the major gap — it needs to feel specific, meaningful, and not generic. Inspiration: Return of the Obra Dinn, Alan Wake 2, Her Story, Disco Elysium. Visual polish is secondary until the core mystery loop is compelling. See `MYSTERY_GAMEPLAY.md` for the design document.
-- **STATUS.md updates**: Always update `STATUS.md` after every sprint with what changed, what's new, and any issues found. This is the living record of project progress — keep it current.
-- **Playtesting**: Use `npx tsx playtest_bot.ts [seed]` for automated playtesting. The harness CLI is `npm run harness`. The Claude API driver is at `src/harness/claudeDriver.ts` (requires ANTHROPIC_API_KEY in .env).
-- **Snapshots**: There is a tool/workflow for taking screenshots of the running application (saved as `review_v*.png` in the project root). Use these snapshots to review visual progress between sprints.
-- **Commit and push always**: After each feature or fix that passes tests, commit and push immediately. Never leave work uncommitted — every passing change should be pushed to the remote so progress is never lost.
-- **Sprint reflections**: Every 10 sprints, pause and reflect — add important learnings, patterns, and gotchas to CLAUDE.md so future sessions benefit from accumulated knowledge.
+- **Keep going**: Continue developing without asking for input unless absolutely critical. Make design decisions independently.
+- **Continuous sprints**: Finish sprint → update STATUS.md → update backlog → consult design leads → start next sprint. Never stop and wait.
+- **Sprint focus**: Prioritize **mystery gameplay mechanics and discovery flow**. Inspiration: Return of the Obra Dinn, Alan Wake 2, Her Story, Disco Elysium. See `MYSTERY_GAMEPLAY.md`.
+- **Backlog maintenance**: Keep `backlog.md` current as the living task queue.
+- **Sprint retrospective**: Consult game design lead and visual design lead per `TEAM.md` to set next priorities.
+- **Playtesting**: `npx tsx playtest_bot.ts [seed]` for automated playtesting. Claude API driver at `src/harness/claudeDriver.ts`.
+- **Snapshots**: Screenshots saved as `review_v*.png`. Use to review visual progress between sprints.
+- **Commit and push always**: Every passing change should be pushed immediately.
+- **Sprint reflections**: Every 10 sprints, add learnings to `SPRINT_LEARNINGS.md`.
 
 ## 3D Model Assets
 
-There is a significant collection of 3D models in `public/models/` (~300+ models) that should be progressively integrated into the 3D view. A full manifest is in `public/model-list.json`. Key collections:
+300+ models in `public/models/` (manifest: `public/model-list.json`). Key collections: `synty-space-gltf/` (station pieces), `synty-gltf/` (industrial props), `kenney-space/` (modular corridors/rooms), `Characters/`, `Vehicles/`, `Items/`. Priority: station architecture → props → characters → vehicles. Use `inspect-glb.cjs` to inspect model structure. Only ~40 models actively used — selective integration, not comprehensive.
 
-- **synty-space-gltf/**: Sci-fi space station pieces — walls, floors, ceilings, corridors, doorframes, props, consoles, beds, desks, characters, robots (`.glb`)
-- **synty-gltf/**: Industrial/sci-fi props — barrels, pipes, conveyors, panels, chairs, tables, machinery (`.glb`)
-- **kenney-space/**: Modular corridor/room pieces — corridors, corners, junctions, intersections, gates, rooms (`.glb`)
-- **kenney-chars/**: Character models
-- **kenney-blaster/**: Weapon models
-- **quaternius-robot/**: Robot character model
-- **Characters/**: Astronaut and mech character models (`.gltf`)
-- **Vehicles/**: Rovers and spaceships (`.gltf`)
-- **Items/**: Pickups — keycards, crates, health, etc. (`.gltf`)
+## Critical Dev Patterns (from SPRINT_LEARNINGS.md)
 
-Priority for integration: station architecture (walls, floors, ceilings, corridors) → props and furniture → characters/robots → vehicles and items. Use `inspect-glb.cjs` to inspect model structure when needed.
-
-## 3D Renderer Architecture
-
-The 3D renderer lives in `src/render/display3d.ts` (~5500 lines). Key architecture notes:
-
-### Scene Structure
-- **Instanced meshes** for tiles: separate InstancedMesh for floor, corridor floor, walls, wall corners, doors, ceilings
-- **Procedural textures**: floor grid, wall panels, corridor grates, caution stripes — all generated via canvas
-- **Distance culling**: 12-tile Manhattan distance, corridor spatial buckets (6 tiles each), updated every 5 frames
-- **Room groups**: `roomTrimGroups`, `roomDecoGroups`, `roomCeilGroups` for per-room visibility control
-
-### Lighting Stack
-- **Global**: AmbientLight + 3 DirectionalLights (key/fill/rim) + HemisphereLight
-- **Player**: Green PointLight (follows player) + white fill light
-- **Room lights**: PointLights at room centers, colored by room type, red/amber for hazards (with emergency flicker)
-- **Corridor lights**: Dim blue every 5th tile along explored corridors
-- **Door lights**: Red (locked, pulsing) or green (open)
-- **Entity glow lights**: Per-entity PointLights with configured color/intensity/distance
-
-### Camera System
-- **Chase cam** (default, F2 toggle): Perspective, 2.5 units behind, 1.8 height, look-ahead 2.0, wall avoidance via walkability map, head-bob, FOV breathing (base 60 + 3 during movement)
-- **Ortho cam**: Top-down/isometric, adjustable frustum (wheel) and elevation
-
-### Visual Effects
-- **Fog**: THREE.Fog adjusting near/far per camera mode
-- **Fog-of-war**: Overlay planes — dark navy (unexplored, 0.92 opacity) vs blue-grey (memory, 0.45 opacity)
-- **Hazard sprites**: Smoke wisps (grey, upward drift), heat glow (orange pulse), vacuum frost (blue sparkle)
-- **Particles**: 400-star nebula backdrop with shader gradient, 120 ambient dust motes, 12-point movement trail
-- **Entity animations**: Per-type rotation, bob, pulse, hover, wobble
-- **Cel shading**: Toon gradient (4-step), OutlineEffect (F4 toggle), MeshStandardMaterial with roughness 0.7
-
-### Room Decoration Pipeline
-- `ROOM_DECORATIONS` lookup → GLTF models from Synty Space library
-- `placeRoomTrim()`: baseboard, edge glow, top rail, door frames
-- `placeRoomCeiling()`: cross-bracing beams every 3 tiles
-- `placeCorridorArches/Pipes/StripLights/WallProps()`: corridor architecture
-
-### Key Constants
-- `COLORS_3D`: floor 0xcccccc, wall 0xddeeee, door 0xeeaa55, corridor 0xbbbbbb, background 0x060610
-- Room wall tints: per-room-type vibrant colors (Power Relay = 0xffee88, Life Support = 0x99ddff, etc.)
-- Entity glow: DataCore 0xff44ff, Breach 0xff2200, EscapePod 0x44ffaa, Relay 0xffcc00, etc.
-
-### Screenshot Tool
-- `npm run screenshot` — Playwright-based headless Chromium capture
-- Flags: `--seed`, `--turns`, `--overlay`, `--out`
-- Saves to project root as `review_v*.png`
-
-## Sprint Learnings (V34-V43 Reflection)
-
-Key patterns and gotchas discovered during visual sprints:
-
-- **Ground-level camera changes everything**: Lowering the chase cam from 1.8 to 0.7-1.2 transformed the game feel. All subsequent visual work (wall fixtures, floor detail, door gaps) is driven by what's visible at ground level.
-- **Headlight is the hero light**: Adding a SpotLight to Sweepo and reducing corridor ambient lighting creates dramatic exploration atmosphere. Shadows from the headlight are the primary visual interest.
-- **Context-aware parameters**: Camera FOV, height, distance, and fog should all adapt to room vs corridor context. Smooth lerp transitions between parameters prevent jarring cuts.
-- **InstancedMesh for everything**: Floor strips, trim, emergency lights — always use InstancedMesh for repeated small elements. Draw call count is the main performance bottleneck.
-- **CSS post-processing is free**: Vignette, scanlines, hazard borders — all CSS overlays with zero GPU cost. Layer via z-index.
-- **Hazard sprites need userData type unions**: When adding new hazard types (spark, drip, scorch), expand the userData type assertion or it won't compile.
-- **Shadow maps**: Only enable castShadow on the headlight SpotLight (512x512). Directional light shadows would require covering the whole map and are too expensive.
-- **display3d.ts is 5500+ lines**: Consider splitting into modules if it grows further. The file has clear sections (textures, lights, camera, entities, corridors, rooms) that could be extracted.
-- **Grep tool sometimes fails on large files**: Use bash grep as fallback when the Grep tool returns no results on display3d.ts.
-- **Always check tile bounds**: Any code accessing `state.tiles[y][x]` must bounds-check first. Off-by-one errors crash the renderer silently.
-
-## Sprint Learnings (V44-V61 Reflection)
-
-Room-focused rendering paradigm shift and atmosphere refinement:
-
-- **Room-focused rendering is transformative**: Showing only the current room + nearby corridors makes every room feel like a distinct discovery. The infrastructure (room sub-groups, distance culling, room transition detection) was already there — just needed tighter parameters.
-- **Corridor darkness sells the atmosphere**: Reducing ambient to 35% in corridors with a brighter headlight creates genuine tension. The contrast between dark corridors and lit rooms is the game's strongest visual element.
-- **Fog is the most powerful atmosphere tool**: Dynamic fog parameters (near/far) varying by room vs corridor create more visual impact than adding geometry. Chase cam fog near=2/far=10 in corridors is claustrophobic perfection.
-- **Hazard-reactive everything**: Room center glow, headlight color, fog color, screen border, dust particles — everything should react to the current hazard state. Creates visceral danger feedback.
-- **Player animation adds life**: Forward tilt, turn lean, and movement bob on Sweepo are tiny changes (~20 lines) but make the character feel alive and weighty.
-- **Idle camera sway prevents deadness**: Even 0.04-unit lateral drift at 0.5Hz makes a static scene feel like it's "breathing". Never have a truly static camera.
-- **Property declarations before use**: Always add class property declarations before writing code that references them. Missing `_doorSlideState` declaration caused a TypeScript error.
-- **Performance budget per-room**: Room-focused rendering means you can increase decoration density (7→9), wall props (3→5), corridor props (12%→20%) since only one room renders at a time.
-- **Transition effects need CSS overlay**: The room transition fade uses a simple fixed-position div with opacity animation. Simpler and faster than a Three.js post-processing pass.
-- **Map state to visual, don't store visual state**: Room haze meshes store hazard color but should derive it from game state each frame. Storing visual state leads to stale data when game state changes.
-
-## Sprint Learnings (V65-V74 Reflection)
-
-Entity personality and environmental storytelling through animation:
-
-- **Entity awareness sells the world**: CrewNPC facing the player, Drone eye tracking, RepairBot extending its arm — these tiny reactions (3-5 lines each) make entities feel conscious rather than static props. Use `atan2` for smooth face-player rotation with shortest-path lerp.
-- **Heartbeat/beacon rhythms > sine waves**: MedKit's double-beat pulse (`pow(sin,8) + pow(sin+offset,12)`) and EscapePod's beacon flash (modulo timing with narrow window) feel more organic than simple sine oscillations.
-- **Screen glow projection transforms rooms**: Adding a PointLight to Console/LogTerminal that casts colored light onto the floor creates the sci-fi control room look for free. Sync light intensity with material flicker for coherence.
-- **Volumetric light cones are cheap drama**: A semi-transparent ConeGeometry with additive blending on Sweepo's headlight costs one mesh but adds massive corridor atmosphere. Opacity 0.03-0.045 is the sweet spot.
-- **Room signatures = room identity**: A brief tinted CSS overlay on room entry (300-400ms fade) makes each room type feel distinct. Purple for Data Core, white for Med Bay — simple but effective.
-- **Damage state on the player model**: Antenna droop, ground glow color shift, body sparks — these visual cues communicate HP without UI. The stun jitter (random rotation) is immediately readable.
-- **Evacuation needs visual escalation**: Red ceiling emissive, klaxon ambient pulse, persistent hazard border — the endgame should feel dramatically different from exploration. Phase-reactive effects stack.
-- **Room exit transitions matter**: Going from room to corridor should feel like "leaving safety". Brief darkness pulse + FOV tighten creates the contrast needed.
-- **Corridor steam vents = atmospheric filler**: Occasional sprite puffs near the player fill the visual silence of corridor traversal. Pool and dispose to avoid memory leaks.
-- **Scan grid ripple gives feedback**: Floor grid squares that flash as the scan wave passes make scanning feel satisfying and tech-forward. Use additive blending for the glow-through-floor effect.
-
-## Sprint Learnings (V75-V84 Reflection)
-
-Layered atmospheric effects and ground-level visual feedback:
-
-- **Corridor light shafts make dark corridors readable**: Volumetric cylinders (CylinderGeometry, additive blend) descending from ceiling lights with floor pool discs create visible "islands of light" in corridors. Distance-based fade + hazard-reactive flicker keeps performance tight.
-- **Floor-level effects ground the player**: Footstep dust kicks, headlight ground spots, and breath puffs all operate near y=0. These tiny effects (0.04-0.15 opacity) are surprisingly impactful because the chase cam is low-angle and they fill the foreground.
-- **Discovery sparkles reward exploration**: First-time room entry triggers 12 room-tinted twinkle sprites. The 15Hz twinkle (`sin(life*15)`) reads as magical/rewarding without being overwhelming. Track visited rooms in a session Set.
-- **Wall LEDs sell "active station"**: 4 tiny blinking sprites per room wall with position-based phase offsets create the illusion of computer panel status indicators. Each blink cycle needs both a primary and secondary flash for visual interest.
-- **Sweepo personality through the eye**: A single emissive sphere (0.04 radius) on the bot's front with HP-reactive color (green→amber→orange→red) adds character. Combined with antenna droop and ground glow, the bot tells its story visually.
-- **Breath puffs in corridors**: Small white puffs from Sweepo's front in corridors (every 2-3s) sell the "cold damaged station" atmosphere. Must drift in facing direction, not just upward.
-- **Entity shadow discs vs shadow maps**: A simple dark circle (0.15 opacity) under each entity is cheaper than shadow casting and always visible. Works alongside the existing ground ring for a grounded look.
-- **Puzzle feedback with energy dots**: Sprites traveling along bezier curves between activated relays give satisfying visual confirmation that "power is flowing". Store the curve reference alongside the line for animation.
-- **Child index stability**: When adding meshes to Sweepo's group, always append (don't insert) to avoid breaking existing damage visualization that references specific child indices.
-- **Compass HUD below minimap**: Canvas-rendered compass works better than Three.js overlay because it stays pixel-sharp. Cardinal labels rotating with `playerFacing` gives instant directional awareness.
-
-## Sprint Learnings (V91-V100 Reflection)
-
-Screen-space overlays, Sweepo detail, and minimap utility:
-
-- **Antenna as gameplay signal**: Converting Sweepo's antenna tip to MeshBasicMaterial enables real-time proximity detection feedback. Pulse rate 2-8Hz scales with distance to nearest unexhausted entity — players learn to "follow the signal" intuitively.
-- **CSS overlays are cheap state indicators**: Stun static (randomized gradient noise), HP vignette (inset box-shadow), sensor visor tint (mix-blend-mode:multiply) — all use DOM elements with z-index layering. Create/show/hide pattern avoids DOM churn.
-- **Multiple damage indicators compound**: Headlight flicker (multi-frequency sine), HP vignette (pulsing red edges), body sparks, eye color shift, antenna droop — each individually subtle, together they create escalating dread as HP drops. The headlight flicker is most impactful because it affects what the player can see.
-- **Pipe leaks from known positions**: Reusing `corridorPipeTiles` Set to spawn drip particles at actual pipe locations ensures visual coherence. "Find nearest pipe tile" search is O(n) on the Set but runs infrequently (every 3-8s).
-- **Minimap information density**: Room names (abbreviated first word), entity shape icons, room checkmarks, and facing arrows all fit on a small canvas without clutter. Each uses a different visual channel (text, shape, symbol, line) to avoid collision.
-- **Cleaning brushes sell identity**: Two small counter-rotating cylinders under Sweepo (children 6-7) that spin fast when moving and slow when idle. Tiny detail that reinforces "this is a cleaning bot" every time the player moves.
-- **Sensor visor tint is barely visible but important**: 6% opacity color wash with mix-blend-mode:multiply is almost subliminal, but players notice when it's removed. The breathing animation (1.5Hz) prevents it from feeling static.
-- **Append-only child strategy proven**: Through V91-V100, Sweepo group grew to 8+ children (body, head, antenna, tip, glow, eye, brushL, brushR) with zero index breakage. Always add new meshes at the end.
-
-## Sprint Learnings (V101-V110 Reflection)
-
-Minimap utility, environmental warnings, and interaction feedback polish:
-
-- **Minimap as planning tool**: Hazard icons (V101), room checkmarks (V98), exploration % (V107), and room names (V94) collectively turn the minimap from a simple map into a strategic planning overlay. Players can identify which rooms need attention, where dangers are, and how much they've explored without moving.
-- **Idle animations sell character**: Antenna sway (dual-frequency 1.2Hz + 0.7Hz, V102) makes Sweepo feel alive when stationary. The layered frequencies avoid mechanical repetition — a single sine wave looks robotic, two create organic motion.
-- **Entity-specific interaction colors**: Using ENTITY_COLORS_3D lookup in flashTile (V103) means each entity type has a distinct interaction feel. Brightening particles +60 per channel ensures visibility against the entity's base color.
-- **Flicker ratio as shared state**: Storing `_headlightFlickerRatio` (V104) as a class property lets cone mesh and ground spot sync without recalculating. Single source of truth for multi-element visual effects.
-- **Door proximity as spatial storytelling**: Unlocked doors brightening on approach (V105) creates a "motion sensor" feel. The contrast with locked doors' red pulse tells players at a glance which doors they can enter. Simple distance-based lerp, big navigation payoff.
-- **Following crew glow as social signal**: Green emissive on following NPCs (V106) provides constant reassurance that rescued crew are still with you. Pulsing prevents it from blending into static scene lighting.
-- **Breach danger rings scale to threat**: Additive-blend red rings (V108) with expanding pulse draw the eye to active hazards without blocking gameplay. The cleanup-on-seal pattern (remove from scene when userData._sealed flips) prevents visual artifacts.
-- **Sparkle pool reuse for different effects**: Relay activation sparks (V109) reuse `_discoverySparkles` pool with high `_driftY` values for upward burst. Same lifecycle management (spawn, drift, fade, cleanup) serves both ambient sparkles and event bursts. Pool reuse > new particle system.
-
-## Sprint Learnings (V111-V120 Reflection)
-
-Entity animation completeness, particle systems as feedback, and Sweepo personality:
-
-- **Complete animation coverage matters**: Animating all 4 remaining static entity types (V110: PressureValve, RepairCradle, ClosedDoor, Airlock) eliminated visual deadness. Even tiny motion (0.01 radian door tremor, 0.15 radian arm oscillation) prevents entities from feeling like props.
-- **One-shot spawn flags for periodic particles**: PowerCell sparks (V111), DataCore arcs (V119) use `_sparkSpawned`/`_arcSpawned` boolean on userData to prevent spawning every frame during the brief spark window. Pattern: set true on spawn, reset false when window passes.
-- **Separate animation for distinct behavior**: Splitting SecurityTerminal from LogTerminal (V112) enables lens tracking, awareness pulsing, and idle sweep. Shared code with minor differences is worse than separate blocks when behaviors diverge significantly.
-- **Eye emotion sells personality**: Blink (Y-scale squish), squint (scale 0.7 at low HP), widen (scale 1.3 on interaction) — three simple scale changes give Sweepo expressiveness (V113). The widen timer triggered from flashTile creates cause-and-effect: interact → Sweepo reacts.
-- **Lazily-created lights avoid upfront cost**: MedKit heartbeat light (V114), drone propwash rings (V115) create geometry on first animation frame, not during entity construction. Entities that never enter view never allocate their animated elements.
-- **Visual feedback for core loop is critical**: Cleaning sparkles (V116) are the single most important particle effect because they reward the primary gameplay action. Dirt threshold (>30) ensures sparkles only appear when cleaning is meaningful.
-- **Damage feedback layers**: Emissive body flash + actual sprite sparks (V117) + headlight flicker + HP vignette + eye color + antenna droop = 6 simultaneous damage indicators. Each addresses a different perception channel (body, particles, light, screen edges, eye, posture).
-- **Minimap attention drawing**: Pulsing rings on key entities (V120) use globalAlpha for clean fade without creating permanent canvas state. Ring radius oscillation (±1.5px) is subtle enough to not obscure underlying map data.
-
-## Sprint Learnings (V121-V130 Reflection)
-
-Interaction feedback, atmospheric layers, and animation lifecycle management:
-
-- **Single reusable indicator sprite**: The floating interact indicator (V121) creates one sprite, reuses it across frames by updating position/visibility. Avoids per-frame allocation for constantly-updating UI elements. Pattern: create lazily, hide when no target, show when target found.
-- **CSS overlays complement 3D rendering**: Room atmosphere tint (V123) uses a fixed div with `mix-blend-mode: soft-light` at 4% opacity — imperceptible individually but creates subconscious color association. CSS post-processing is nearly free compared to shader-based alternatives.
-- **Scout light for spatial awareness**: Forward blue PointLight (V124) uses 5% lerp to smoothly follow player facing direction 3 tiles ahead. Hidden in rooms (ceiling lights suffice), only active in corridors where visibility is the challenge.
-- **World-to-local conversion for eye tracking**: Sweepo eye look direction (V126) converts world-space entity direction to local space using player rotation matrix. Simple 2D rotation: `localX = cos(rot)*dx + sin(rot)*dz`. Prevents eye from "snapping" when player turns.
-- **One-shot discovery burst pattern**: EvidenceTrace golden burst (V125) uses `_discoveryBurst` flag on entity userData — fires once when player is within 3 tiles, never again. Prevents repeated triggering as player moves in and out of range.
-- **Minimap trail aging**: Player trail (V128) records positions at 1+ tile intervals, ages each dot every frame (age 0→1), removes when expired. Linear alpha decay creates natural fade. Cap at 40 entries prevents unbounded growth.
-- **Relay pulse wave as chain reaction visual**: Pulse waves (V129) spawn from activated relay position, travel along all connected curves at 4.5x normal dot speed. Pending pulse queue bridges the gap between activation detection and curve rebuilding.
-- **Collection fly-to-player animation**: Instead of instant entity removal (V130), pickup entities arc toward player with ease-in acceleration, spin, shrink, and opacity fade. Reparent from entityGroup to scene so they stay visible during animation. Traverse children for opacity since GLTF models have nested meshes.
-
-## Sprint Learnings (V131-V140 Reflection)
-
-Particle physics, 2D-3D parity, and cinematic polish:
-
-- **Breach vacuum suction on particles**: Inverse-square gravitational pull (V131) applied to sparkles, dust kicks, and breath puffs toward unsealed breaches. Range-limited (4 tiles) with `pull = delta * 2.0 / (dist² + 0.5)` prevents division-by-zero. Reuse `_breachPositions` array across all particle loops to avoid recomputing.
-- **Sparkle pool drift extensions**: Adding `_driftX`/`_driftZ` (V132) to the existing sparkle pool lets radial airlock wind streaks reuse the same particle system. Check with `if ((sp as any)._driftX)` avoids adding properties to all sprites — only wind streak sprites carry drift.
-- **HP-reactive lighting as body language**: Headlight color shift (V133) tells the player about bot health without UI reading. Four tiers map cleanly to color temperature: cool white → warm → amber → red-orange. Room hazard tints override to prevent conflicting signals.
-- **Damped spring for appendage physics**: Antenna wobble (V134) uses `sin(t * freq) * amp * exp(-decay)` for natural bounce during movement. Two frequencies (14Hz Z, 11Hz X) prevent symmetry. Idle uses slower sinusoidal sway with 0.9 exponential decay on cross-axis.
-- **Minimap as information canvas**: Fog border (V135), turn counter (V136), and player trail (V128) transform the minimap from passive map to active dashboard. Each feature uses minimal canvas operations — the fog border is just one `fillRect` per frontier tile.
-- **Game over orbit camera**: Simple `sin/cos * radius` orbit (V138) creates cinematic end-of-game feel. Initial angle from player facing prevents jarring camera jump. Only 4 lines of math in the animate loop.
-- **2D-3D parity via Explore agent**: When feature novelty runs dry, systematic gap analysis between display.ts and display3d.ts (V139-V140) identifies high-value ports. Scanner compass and turn warning are gameplay-impactful, not just visual polish.
-- **Avoiding duplicate indicators**: Always search existing code for similar functionality before adding new indicators. V140 initially added a deduction-ready indicator that duplicated existing `[NEW]` tag — caught by code review before commit.
-
-## Sprint Learnings (V141-V150 Reflection)
-
-Screen-space effects, camera expressiveness, and environmental storytelling:
-
-- **Directional sprites for sensor visualization**: Air flow arrows (V141) use a pool of sprites repositioned each frame based on tile pressure gradients. Canvas-drawn arrow texture, sprite `.material.rotation` for direction. Pool pattern: lazily grow, hide unused, avoid per-frame allocation.
-- **Signal glitch as damage feedback**: RGB block corruption (V144) on a tiny 64x48 canvas with `image-rendering: pixelated` creates authentic low-res digital interference. Double-pulse on stun (second lighter pulse 50ms after primary) adds depth. Canvas is nearly free to render.
-- **CRT scanlines via CSS gradient**: `repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)` creates period-perfect scanlines (V145). Scrolling via `backgroundPositionY` at 8px/s. Almost zero performance cost.
-- **Room ambient particles via sparkle pool**: Reuse existing `_discoverySparkles` array (V146) with `_isAmbient` flag for counter tracking. 10 room types get unique configs (color, drift speed, lifetime). Per-room-type personality through particle behavior.
-- **Floor trail decals as breadcrumbs**: Oriented sprites at y=0.011 (V147) — just above floor to avoid z-fighting. FIFO cap at 50 with quadratic opacity decay (0.12 * (1 - t²)) gives natural fade-away. Rotation matches player facing direction.
-- **Camera tilt for hazard awareness**: Roll (Z-rotation) toward breaches (V148) converts world-space threat direction to screen-space via player rotation matrix. Max ±0.06 rad is barely perceptible but creates subconscious unease. Heat tiles get sin-wave wobble instead.
-- **Time-stretch for milestone emphasis**: Relay activation (V149) slows camera lerp to 30% for 0.4s — not actual time slowdown but perceived pause. Combined with zoom-in punch + golden sparks for layered celebration.
-- **Minimap as sensor status indicator**: Colored border + 3-letter label (V150) communicates sensor state without reading the sidebar. Same minimap canvas, just 3 additional draw calls (strokeRect + fillText).
-
-## Sprint Learnings (V151-V160 Reflection)
-
-Room enclosure, fundamental visual fixes, and screenshot-driven development:
-
-- **Screenshot-driven development is essential**: The user's feedback "are you reviewing screenshots?" triggered a paradigm shift. V156-V160 fixed fundamental spatial issues (ceiling gaps, starfield bleed) that 100+ sprints of micro-effects had never addressed because they weren't visible in code review. Always take and carefully analyze screenshots between sprints.
-- **Ceiling above ALL tile types, not just walkable**: The original ceiling only covered Floor and Door tiles. Wall tiles had no ceiling, creating gaps where the starfield was visible. The fix: place ceiling BEFORE the internal-wall skip check so every wall tile gets a ceiling panel too.
-- **scene.background vs scene objects**: Changing `scene.background` from starfield texture to solid color didn't hide the 400-star THREE.Points object or the nebula shader mesh — those are separate scene children. Must track and `.visible = false` each one independently.
-- **Void-fill geometry prevents edge-of-world gaps**: Large PlaneGeometry ground/ceiling (80x80) following the player plus a ring of dark floor/ceiling/wall instances beyond the view range prevents any peek at the void. The void planes at renderOrder -10 sit behind everything.
-- **InstancedMesh maxTiles needs headroom**: Void-fill geometry ring adds many instances beyond the normal tile count. Bumping capacity to `width * height * 1.5` prevents overflow when filling unexplored areas around the player.
-- **Mid-wall accent strips sell wall depth**: Adding a 4th trim level at y=0.85 (eye level from chase cam at 1.0 height) breaks up flat wall surfaces. The existing baseboard/glow/rail at floor/ceiling were invisible from low-angle chase cam. Eye-level detail matters most.
-- **Ceiling beam subtlety**: Cross-braces should be structural scaffolding, not decoration. Darkened (base 0x18 vs 0x40), thinned (0.04 vs 0.06 height), and spaced wider (every 4 vs 3 tiles). Faint emissive (0.08) catches ambient light naturally.
-- **Entity glow is the primary visual identifier**: From the chase cam, entities are identified by their glow color + ground ring, not by model detail. Boosting emissive from 0.3→0.5 and ground ring opacity 0.25→0.35 had more impact than model improvements would.
-- **Fundamental before decorative**: 155 sprints of particle effects, camera tricks, and micro-animations couldn't compensate for rooms that didn't look enclosed. Always fix spatial/structural issues before adding polish effects.
-- **Screenshot tool reliability**: The tool frequently times out (exit code 124) but saves the PNG before timeout. The `timeout 90` prefix + `|| true` suffix handles this gracefully. Always check if the PNG exists even after apparent failure.
-
-## Sprint Learnings (V161-V170 Reflection)
-
-Dramatic lighting, material properties, and atmospheric room identity:
-
-- **Reducing global lights is more impactful than adding local ones**: V161's reduction of ambient/fill/rim by ~50% while boosting headlight and room center glow created more visual drama than 50 sprints of adding new light sources. The headlight becomes the hero when everything else is dim.
-- **Material roughness/metalness matter for floor readability**: Lowering floor roughness from 0.7→0.55 and raising metalness 0.1→0.15 creates visible specular highlights from the headlight. The floor looks "alive" instead of flat matte. Corridor metal grate at 0.45/0.2 is shinier — correct for metal.
-- **Subtle emissive on tile materials aids shadow readability**: Floor emissive 0x222222 at 0.08 and wall emissive 0x181818 at 0.06 mean procedural texture details (grid lines, panel grooves) remain visible even in shadowed areas. The self-illumination is barely perceptible but prevents "pure black" dead zones.
-- **Room-type ambient tinting is subliminal but important**: Blending 30% of the room's light color into the ambient creates a "feel" difference between rooms — Power rooms warm, Data Core purple — without being obvious. The smooth lerp (0.06 rate) prevents jarring color pops on room transitions.
-- **Door light spill needs corridor adjacency check**: Light spill planes should only extend toward corridor tiles, not into other rooms. Simple N/S/E/W check against TileType.Corridor + orientation-aware placement. Additive blending at 8% is the right subtlety level.
-- **Enhanced textures need darker grooves, not more detail**: V162 wall panel texture improvement was about deepening existing grooves (#ccc→#999) and adding beveled highlights beside them, not adding new geometry. Bigger contrast = more visible from the low chase cam.
-- **Film color grade adds cinematic cohesion**: A single CSS div with mix-blend-mode:color and a cool-blue gradient unifies the color palette. Active only in chase cam. The 6% edge darkening creates vignette-like color framing at zero GPU cost.
-- **Lower camera is always better (to a point)**: Every camera lowering (V157→V166→current) has improved screenshots. Rooms 1.0→0.85, corridors 0.65→0.50. The floor, wall base trim, and entity ground rings dominate the frame, which is the right composition.
-- **Screenshot consistency masks incremental changes**: V167-V170 screenshots look nearly identical because the same room from the same seed produces similar results. Need to use different seeds or more turns for variety. Corridor screenshots are hard to capture because auto-explore prioritizes rooms.
-- **Toon gradient shadow level affects overall mood**: Raising toon shadow from 60→80 brightened shadow areas slightly, reducing the harshest shadows while keeping the cel-shaded look. This was more impactful than any single light adjustment.
-
-## Sprint Learnings (V171-V200 Reflection)
-
-3D-only commitment, HUD overlays, and rendering architecture evolution:
-
-- **Committing to 3D-only was liberating**: V196's removal of the 2D renderer toggle eliminated the need to maintain parity between two display systems. Every visual feature since then has been designed purely for the 3D chase cam, which is the game's identity.
-- **HUD overlays replace sidebar panels**: V200's move from sidebar text panels to 3D-space HUD overlays (HP bar, sensor status, action bar) integrates information into the game world rather than framing it. CSS-based overlays with transparency keep information visible without obscuring the 3D scene.
-- **Tank controls feel right for a bot**: Forward/backward relative to facing direction (V199) matches the "piloting a remote bot" fantasy. Combined with the chase cam, it creates a natural "driving" feel that WASD cardinal movement never achieved.
-- **GitHub Pages model deployment simplifies asset pipeline**: V200's move to host models externally means the game bundle stays small while still accessing 300+ GLTF models. Cache-friendly CDN delivery vs bundling megabytes of binary assets.
-- **Holographic overlays as visual language**: V197-V198's holographic Investigation Hub and Case Board established the visual vocabulary — translucent panels, scan-line effects, color-coded sections. This style carries through all subsequent UI work.
-- **Model integration is selective, not comprehensive**: Of 300+ available models, only ~40 are actively used. The right density is "enough to sell the room type" not "fill every surface." Corridor props at 12-20% coverage feel right.
-
-## Sprint Learnings (V201-V221 Reflection)
-
-Mystery mechanics rework, corridor atmosphere, and environmental storytelling:
-
-- **Tags as invisible plumbing works**: V201's "Read & Deduce" rework kept tags for procgen/narrative threading but completely hid them from players. The result: players read evidence text and think about the story instead of collecting abstract tokens. Evidence-count thresholds (2/4/6/8/10/12) create natural pacing without exposing the machinery.
-- **Wrong-answer consequences create tension**: 3 HP + 10 turns per wrong answer, with 2-attempt lockout, means players actually read before guessing. The playtest bot still solves 5/5 using keyword overlap from journal text, proving the system is fair.
-- **Dead code detection via empty arrays**: V219 discovered that 4 corridor light arrays (`corridorLightList`, `corridorFixtureLights`, `_lightShaftMeshes`, `_floorPoolMeshes`) were declared but never populated — V215's entire corridor light animation was iterating over zero elements. Lesson: always verify that initialization code actually runs, not just that animation code references the arrays.
-- **Volumetric light shafts transform corridors**: CylinderGeometry (0.15→0.25 radius, 1.8 height) with additive blending at 3-4% opacity, placed every 5th corridor tile, creates visible "islands of light" in dark corridors. Combined with floor pool discs (CircleGeometry 0.35) for ground illumination. This was the single biggest corridor visual improvement.
-- **Station stress as unified visual parameter**: `_stationStress` (0.0-1.0 from hazard tile ratio) drives fog density, dust count, light shaft color, junction beacon tint, and ambient warmth. One value controlling many effects creates coherent atmosphere escalation.
-- **Evidence discovery as reward moment**: Multi-layered feedback (8 golden sparkles + camera zoom-in + radial CSS golden flash) makes finding evidence feel significant. The camera zoom pulse (`cameraZoomPulse = -0.6`) is the most impactful element.
-- **Room-proximity corridor tinting as navigation aid**: Light shafts within 3 tiles of a room blend 50% toward that room's wall tint color. Players unconsciously learn "warm light means Power room ahead" without any explicit UI. Manhattan distance to nearest room edge is the right metric.
-- **Wall damage decals for environmental storytelling**: Scorch marks (heat>50), frost patterns (pressure<40), and smoke stains (smoke>40) on wall surfaces near hazards tell the story of station damage without requiring sensor activation. Room-aware grouping ensures proper culling.
-- **Smooth entity proximity over binary thresholds**: Quadratic falloff `(1 - dist/6)^2 * 0.6` over 6 tiles replaces binary threshold system (dist<2 → 0.5, dist<4 → 0.2). The smooth ramp feels more natural and avoids visible "pop-in" edges.
-- **Junction beacons as corridor landmarks**: Glowing floor sprites at T-junctions and crossroads (3+ corridor connections) provide wayfinding in otherwise uniform corridors. Stress-reactive color shift (blue→amber) maintains atmosphere coherence.
-- **Minimap exploration percentage as motivation**: Simple walkable-explored ratio in the corner, color-coded (green ≥80%, yellow ≥50%, grey <50%), gives players a clear sense of progress. Three canvas draw calls for massive gameplay feedback.
-- **Interaction camera micro-zoom**: Brief FOV punch (`cameraZoomPulse = -0.3`) on flashTile creates a subtle "focus" effect during entity interaction. Small detail, but makes every interaction feel responsive.
-- **Floor trail enhancement**: Additive blending on trail sprites (was standard alpha) creates a luminous breadcrumb effect. Extended lifetime (15-20 frames vs 12-16) and fresh glow boost (1.5x for first 10% of life) make recent steps stand out.
-
-## Development Conventions
-
-- **Deterministic**: All simulation seeded and reproducible (ROT.RNG.setSeed)
-- **Testable**: Golden seed integration test is the north star (seed 184201)
-- **No fog-of-war** initially (for debugging and agent play)
-- **Sim/render separation**: Game logic must never depend on rendering
-- **Controller-first**: No typing required; action bar covers all interactions
-- **Pure functions**: step(state, action) → state' pattern for simulation
-- **ESM modules**: `"type": "module"` in package.json, `.js` extensions in imports
+- **InstancedMesh for all repeated geometry** — draw calls are the main bottleneck
+- **CSS overlays for screen-space effects** — vignette, scanlines, hazard borders at zero GPU cost
+- **Always check tile bounds** — `state.tiles[y][x]` must bounds-check, off-by-one crashes silently
+- **Screenshot-driven development** — always take and review screenshots; code review misses spatial issues
+- **Fundamental before decorative** — fix structural issues before adding polish effects
+- **Append-only children on Sweepo's group** — never insert, always append to avoid index breakage
+- **Lazily create lights/geometry** — on first animation frame, not during construction
+- **Derive visual state from game state** — don't store visual state that can go stale
+- **Sim/render separation** — game logic must never depend on rendering
+- **Deterministic** — all simulation seeded and reproducible (ROT.RNG.setSeed)
+- **Pure functions** — `step(state, action) → state'` pattern for simulation
+- **Controller-first** — no typing required; action bar covers all interactions
