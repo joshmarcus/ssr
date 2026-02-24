@@ -11436,11 +11436,11 @@ export class BrowserDisplay3D implements IGameDisplay {
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         const oldMat = mats[0] as THREE.MeshStandardMaterial;
         const hasUVs = !!(child.geometry?.attributes?.uv);
-        // Use embedded texture if available, otherwise apply Synty Space atlas
-        // Note: crew variants (SciFi Worlds pack) use solid colors — their GLB UVs
-        // don't match the atlas due to FBX2glTF conversion artifacts
+        // Use embedded texture if available, otherwise apply appropriate Synty atlas
         let tex = hasUVs && oldMat?.map ? oldMat.map : null;
-        if (!tex && hasUVs && !isCrewVariant && isSyntyModel && this.syntyAtlas) {
+        if (!tex && hasUVs && isCrewVariant && this.syntyWorldsAtlas) {
+          tex = this.syntyWorldsAtlas;
+        } else if (!tex && hasUVs && !isCrewVariant && isSyntyModel && this.syntyAtlas) {
           tex = this.syntyAtlas;
         }
         child.material = makeToonMaterial({
@@ -11492,7 +11492,6 @@ export class BrowserDisplay3D implements IGameDisplay {
     );
 
     // Synty SciFi Worlds atlas (crew SpaceSuit characters)
-    // Note: currently unused — crew GLB UVs don't match atlas due to FBX2glTF conversion
     const worldsAtlasUrl = import.meta.env.BASE_URL + "models/synty-scifiworlds/PolygonScifiWorlds_Texture_01_A.png";
     loader.load(
       worldsAtlasUrl,
