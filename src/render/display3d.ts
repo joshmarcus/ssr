@@ -10351,13 +10351,12 @@ export class BrowserDisplay3D implements IGameDisplay {
         : gltfModel.clone();
       group.add(clone);
 
-      // Set up AnimationMixer for models with clips — prefer "Idle" animation
+      // Set up AnimationMixer for models with a named "Idle" clip
       const clips = this.gltfAnimations.get(cacheKey);
-      if (clips && clips.length > 0) {
+      const idleClip = clips?.find(c => c.name === "Idle");
+      if (idleClip) {
         const mixer = new THREE.AnimationMixer(clone);
-        const idleClip = clips.find(c => c.name === "Idle") ?? clips[0];
-        const action = mixer.clipAction(idleClip);
-        action.play();
+        mixer.clipAction(idleClip).play();
         this.entityMixers.set(entity.id, mixer);
       }
 
@@ -11463,6 +11462,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     );
 
     // Synty SciFi Worlds atlas (crew SpaceSuit characters)
+    // flipY=true matches FBX UV convention (same as Space atlas — both converted via FBX2glTF)
     const worldsAtlasUrl = import.meta.env.BASE_URL + "models/synty-scifiworlds/PolygonScifiWorlds_Texture_01_A.png";
     loader.load(
       worldsAtlasUrl,
@@ -11663,17 +11663,17 @@ export class BrowserDisplay3D implements IGameDisplay {
         : gltfModel.clone();
 
       // Set up AnimationMixer for models with clips
+      // Set up AnimationMixer for models with a named "Idle" clip
       const clips = this.gltfAnimations.get(rebuildCacheKey);
-      if (clips && clips.length > 0) {
+      const rebuildIdleClip = clips?.find(c => c.name === "Idle");
+      if (rebuildIdleClip) {
         // Clean up old mixer if exists
         if (this.entityMixers.has(id)) {
           this.entityMixers.get(id)!.stopAllAction();
           this.entityMixers.delete(id);
         }
         const mixer = new THREE.AnimationMixer(clone);
-        const idleClip = clips.find(c => c.name === "Idle") ?? clips[0];
-        const action = mixer.clipAction(idleClip);
-        action.play();
+        mixer.clipAction(rebuildIdleClip).play();
         this.entityMixers.set(id, mixer);
       }
 
