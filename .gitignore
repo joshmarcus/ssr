@@ -23,6 +23,7 @@ public/models/*
 !public/models/kenney-space/
 !public/models/Items/
 !public/models/Characters/
+!public/models/synty-scifiworlds/
 # Note: only files actually referenced by src/render/display3d.ts should be committed.
 # Unused models in these directories are fine to add — total is ~198MB across 5 dirs.
 space_station_roguelike_docs_v10.zip

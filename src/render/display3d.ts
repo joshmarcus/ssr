@@ -499,12 +499,12 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   // EvidenceTrace uses procedural ? mesh (no GLTF — more distinctive)
 };
 
-// Crew NPC model variants — Astronaut characters with 18 animations (Idle, Walk, Wave, etc.)
+// Crew NPC model variants — SciFi Worlds SpaceSuit characters with idle animation
 const CREW_MODEL_VARIANTS = [
-  "models/Characters/GLTF/Astronaut_BarbaraTheBee.gltf",
-  "models/Characters/GLTF/Astronaut_FernandoTheFlamingo.gltf",
-  "models/Characters/GLTF/Astronaut_FinnTheFrog.gltf",
-  "models/Characters/GLTF/Astronaut_RaeTheRedPanda.gltf",
+  "models/synty-scifiworlds/SK_Chr_ScifiWorlds_SpaceSuit_Male_01.glb",
+  "models/synty-scifiworlds/SK_Chr_ScifiWorlds_SpaceSuit_Male_02.glb",
+  "models/synty-scifiworlds/SK_Chr_ScifiWorlds_SpaceSuit_Female_01.glb",
+  "models/synty-scifiworlds/SK_Chr_ScifiWorlds_SpaceSuit_Female_02.glb",
 ];
 
 // ── BrowserDisplay3D ─────────────────────────────────────────────
@@ -694,8 +694,9 @@ export class BrowserDisplay3D implements IGameDisplay {
   private waypointTargetZ: number = 0;
   private waypointVisible: boolean = false;
 
-  // Synty texture atlas (loaded at startup, applied to models that lack embedded textures)
+  // Synty texture atlases (loaded at startup, applied to models that lack embedded textures)
   private syntyAtlas: THREE.Texture | null = null;
+  private syntyWorldsAtlas: THREE.Texture | null = null;
 
   // Particle systems
   private dustParticles: THREE.Points | null = null;
@@ -11400,14 +11401,18 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Convert materials to toon-shaded, applying Synty atlas where models have UVs but no embedded texture
     const tintColor = key === "player" ? COLORS_3D.player : ENTITY_COLORS_3D[lookupKey];
     const isSyntyModel = isCrewVariant || MODEL_PATHS[key]?.includes("synty-space-gltf");
+    // Crew variants from SciFi Worlds pack use a different atlas
+    const crewAtlas = isCrewVariant ? this.syntyWorldsAtlas : null;
     model.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         const oldMat = mats[0] as THREE.MeshStandardMaterial;
         const hasUVs = !!(child.geometry?.attributes?.uv);
-        // Use embedded texture if available, otherwise apply Synty atlas for Synty models with UVs
+        // Use embedded texture if available, otherwise apply appropriate Synty atlas
         let tex = hasUVs && oldMat?.map ? oldMat.map : null;
-        if (!tex && hasUVs && isSyntyModel && this.syntyAtlas) {
+        if (!tex && hasUVs && crewAtlas) {
+          tex = crewAtlas;
+        } else if (!tex && hasUVs && isSyntyModel && this.syntyAtlas) {
           tex = this.syntyAtlas;
         }
 
@@ -11427,24 +11432,51 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.gltfCache.set(key, model);
   }
 
-  /** Load texture atlas first, then kick off both tile and entity model loading */
+  /** Load texture atlases first, then kick off both tile and entity model loading */
   private loadAtlasThenModels(): void {
-    const atlasUrl = import.meta.env.BASE_URL + "models/synty-space-gltf/PolygonSciFiSpace_Texture_01_A.png";
-    new THREE.TextureLoader().load(
-      atlasUrl,
+    const loader = new THREE.TextureLoader();
+    let atlasesLoaded = 0;
+    const onAtlasDone = () => {
+      atlasesLoaded++;
+      if (atlasesLoaded >= 2) {
+        this.loadTileModels();
+        this.loadModels();
+      }
+    };
+
+    // Synty SciFi Space atlas (station architecture, props)
+    const spaceAtlasUrl = import.meta.env.BASE_URL + "models/synty-space-gltf/PolygonSciFiSpace_Texture_01_A.png";
+    loader.load(
+      spaceAtlasUrl,
       (tex) => {
         tex.flipY = true; // FBX2glTF preserves FBX UV space which expects flipY=true
         tex.colorSpace = THREE.SRGBColorSpace;
         this.syntyAtlas = tex;
-        console.log("Synty texture atlas loaded.");
-        this.loadTileModels();
-        this.loadModels();
+        console.log("Synty Space texture atlas loaded.");
+        onAtlasDone();
       },
       undefined,
       () => {
-        console.warn("Failed to load Synty texture atlas — models will use flat colors.");
-        this.loadTileModels();
-        this.loadModels();
+        console.warn("Failed to load Synty Space texture atlas — models will use flat colors.");
+        onAtlasDone();
+      }
+    );
+
+    // Synty SciFi Worlds atlas (crew SpaceSuit characters)
+    const worldsAtlasUrl = import.meta.env.BASE_URL + "models/synty-scifiworlds/PolygonScifiWorlds_Texture_01_A.png";
+    loader.load(
+      worldsAtlasUrl,
+      (tex) => {
+        tex.flipY = true;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        this.syntyWorldsAtlas = tex;
+        console.log("Synty Worlds texture atlas loaded.");
+        onAtlasDone();
+      },
+      undefined,
+      () => {
+        console.warn("Failed to load Synty Worlds texture atlas — crew will use flat colors.");
+        onAtlasDone();
       }
     );
   }
