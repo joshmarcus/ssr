@@ -5761,6 +5761,14 @@ function handlePauseInput(e: KeyboardEvent): void {
           closePauseMenu();
           state = loaded;
           seed = state.seed;
+          // Sync evidence tracking to loaded state so old entries aren't treated as "new"
+          lastJournalLength = state.mystery?.journal.length ?? 0;
+          previouslyUnlockedDeductions.clear();
+          if (state.mystery) {
+            for (const d of getUnlockedDeductions(state.mystery.deductions, state.mystery.journal)) {
+              previouslyUnlockedDeductions.add(d.id);
+            }
+          }
           initGame();
           hasPlayerActed = true; deferredInitMessages = []; // skip intro messages for loaded saves
           display.addLog("[Save loaded — resuming session]", "milestone");
@@ -9087,6 +9095,14 @@ function showTitleScreen(): void {
           if (loaded) {
             state = loaded;
             seed = state.seed;
+            // Sync evidence tracking to loaded state so old entries aren't treated as "new"
+            lastJournalLength = state.mystery?.journal.length ?? 0;
+            previouslyUnlockedDeductions.clear();
+            if (state.mystery) {
+              for (const d of getUnlockedDeductions(state.mystery.deductions, state.mystery.journal)) {
+                previouslyUnlockedDeductions.add(d.id);
+              }
+            }
             gameStarted = true;
             crawlOverlay.style.display = "none";
             initGame();

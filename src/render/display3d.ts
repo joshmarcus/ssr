@@ -10351,12 +10351,23 @@ export class BrowserDisplay3D implements IGameDisplay {
         : gltfModel.clone();
       group.add(clone);
 
-      // Set up AnimationMixer for models with a named "Idle" clip
+      // Set up AnimationMixer for models with animation clips
       const clips = this.gltfAnimations.get(cacheKey);
-      const idleClip = clips?.find(c => c.name === "Idle");
-      if (idleClip) {
+      if (clips && clips.length > 0) {
         const mixer = new THREE.AnimationMixer(clone);
-        mixer.clipAction(idleClip).play();
+        const idleClip = clips.find(c => c.name === "Idle");
+        if (idleClip) {
+          // Named idle animation — loop it
+          mixer.clipAction(idleClip).play();
+        } else {
+          // No explicit idle — freeze at last frame (standing rest pose)
+          const clip = clips[0];
+          const action = mixer.clipAction(clip);
+          action.clampWhenFinished = true;
+          action.setLoop(THREE.LoopOnce, 1);
+          action.play();
+          mixer.setTime(clip.duration);
+        }
         this.entityMixers.set(entity.id, mixer);
       }
 
@@ -11450,6 +11461,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       (tex) => {
         tex.flipY = true; // FBX2glTF preserves FBX UV space which expects flipY=true
         tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
         this.syntyAtlas = tex;
         console.log("Synty Space texture atlas loaded.");
         onAtlasDone();
@@ -11469,6 +11482,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       (tex) => {
         tex.flipY = true;
         tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
         this.syntyWorldsAtlas = tex;
         console.log("Synty Worlds texture atlas loaded.");
         onAtlasDone();
@@ -11662,18 +11677,27 @@ export class BrowserDisplay3D implements IGameDisplay {
         ? SkeletonUtils.clone(gltfModel)
         : gltfModel.clone();
 
-      // Set up AnimationMixer for models with clips
-      // Set up AnimationMixer for models with a named "Idle" clip
+      // Set up AnimationMixer for models with animation clips
       const clips = this.gltfAnimations.get(rebuildCacheKey);
-      const rebuildIdleClip = clips?.find(c => c.name === "Idle");
-      if (rebuildIdleClip) {
+      if (clips && clips.length > 0) {
         // Clean up old mixer if exists
         if (this.entityMixers.has(id)) {
           this.entityMixers.get(id)!.stopAllAction();
           this.entityMixers.delete(id);
         }
         const mixer = new THREE.AnimationMixer(clone);
-        mixer.clipAction(rebuildIdleClip).play();
+        const rebuildIdleClip = clips.find(c => c.name === "Idle");
+        if (rebuildIdleClip) {
+          mixer.clipAction(rebuildIdleClip).play();
+        } else {
+          // No explicit idle — freeze at last frame (standing rest pose)
+          const clip = clips[0];
+          const action = mixer.clipAction(clip);
+          action.clampWhenFinished = true;
+          action.setLoop(THREE.LoopOnce, 1);
+          action.play();
+          mixer.setTime(clip.duration);
+        }
         this.entityMixers.set(id, mixer);
       }
 
