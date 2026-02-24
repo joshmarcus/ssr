@@ -571,6 +571,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private gltfCache: Map<string, THREE.Object3D> = new Map();
   private gltfLoader: GLTFLoader;
   private modelsLoaded = false;
+  private _loadingOverlay: HTMLElement | null = null;
 
   // Wall/floor model meshes (loaded from GLB, used for instanced rendering)
   private wallModelGeo: THREE.BufferGeometry | null = null;
@@ -1244,6 +1245,20 @@ export class BrowserDisplay3D implements IGameDisplay {
     };
     window.addEventListener("keydown", this.boundKeyHandler);
 
+    // ── Loading overlay (hides placeholder geometry until models are ready) ──
+    this._loadingOverlay = document.createElement("div");
+    this._loadingOverlay.id = "model-loading-overlay";
+    this._loadingOverlay.style.cssText =
+      "position:fixed;inset:0;z-index:95;display:flex;flex-direction:column;" +
+      "align-items:center;justify-content:center;background:#020408;" +
+      "font-family:'Courier New',monospace;color:#4af;transition:opacity 0.5s;";
+    this._loadingOverlay.innerHTML =
+      '<div style="font-size:12px;letter-spacing:4px;opacity:0.7">LOADING STATION DATA</div>' +
+      '<div id="model-load-bar" style="width:200px;height:2px;background:#112;margin-top:12px;border-radius:1px;overflow:hidden">' +
+      '<div id="model-load-fill" style="width:0%;height:100%;background:#4af;transition:width 0.2s"></div></div>' +
+      '<div id="model-load-pct" style="font-size:10px;margin-top:6px;opacity:0.5">0%</div>';
+    document.body.appendChild(this._loadingOverlay);
+
     // ── Start animation loop ──
     this.animate();
 
@@ -1404,23 +1419,39 @@ export class BrowserDisplay3D implements IGameDisplay {
         : type === "sensor" ? "SENSOR"
         : type === "system" ? "SYSTEM"
         : undefined;
-      // Priority: sensor/milestone/critical messages go to front of queue
-      const priority = type === "sensor" || type === "milestone" || type === "critical";
-      this.queueSubtitle(msg, source, priority);
+      const priority = type === "milestone" || type === "critical";
+      // Auto-dismiss for non-critical messages
+      const duration = (type === "system") ? 3000
+        : (type === "sensor" || type === "warning") ? 4000
+        : (type === "narrative") ? 4000
+        : undefined; // milestone/critical require manual dismiss
+      this.queueSubtitle(msg, source, priority, duration);
     }
   }
 
   private _subtitleTimer: ReturnType<typeof setTimeout> | null = null;
   private _subtitleDismissHandler: ((e: KeyboardEvent) => void) | null = null;
-  private _subtitleQueue: { text: string; source?: string }[] = [];
+  private _subtitleQueue: { text: string; source?: string; duration?: number }[] = [];
   private _subtitleActive: boolean = false;
 
-  /** Queue a subtitle message — priority messages go to the front */
-  private queueSubtitle(text: string, source?: string, priority: boolean = false): void {
+  /** Queue a subtitle message — priority messages go to the front, with queue limit */
+  private queueSubtitle(text: string, source?: string, priority: boolean = false, duration?: number): void {
+    // Queue limit: drop non-priority messages if queue is too long
+    if (this._subtitleQueue.length >= 5) {
+      if (!priority) return;
+      // If priority, remove the last non-priority item to make room
+      for (let i = this._subtitleQueue.length - 1; i >= 0; i--) {
+        const s = this._subtitleQueue[i].source;
+        if (!s || s === "SYSTEM" || s === "SENSOR") {
+          this._subtitleQueue.splice(i, 1);
+          break;
+        }
+      }
+    }
     if (priority) {
-      this._subtitleQueue.unshift({ text, source });
+      this._subtitleQueue.unshift({ text, source, duration });
     } else {
-      this._subtitleQueue.push({ text, source });
+      this._subtitleQueue.push({ text, source, duration });
     }
     // If no subtitle is currently showing, show the next one
     if (!this._subtitleActive) {
@@ -1436,39 +1467,57 @@ export class BrowserDisplay3D implements IGameDisplay {
       return;
     }
     this._subtitleActive = true;
-    this.showSubtitle(next.text, next.source);
+    this.showSubtitle(next.text, next.source, next.duration);
   }
 
-  /** Show a cinematic subtitle at the bottom of the 3D viewport — requires keypress to dismiss */
-  private showSubtitle(text: string, source?: string): void {
+  /** Show a cinematic subtitle at the bottom of the 3D viewport */
+  private showSubtitle(text: string, source?: string, duration?: number): void {
     const el = document.getElementById("subtitle-bar");
     if (!el) return;
     // Strip HTML tags and [ECHO] prefix for cleaner display
     const cleanText = text.replace(/<[^>]*>/g, "").replace(/^\[ECHO\]\s*/, "");
     const sourceHtml = source ? `<span class="sub-source">${source}</span>` : "";
-    el.innerHTML = sourceHtml + cleanText + `<span class="sub-dismiss">[Space/Esc]</span>`;
+    const dismissHint = duration ? "" : `<span class="sub-dismiss">[Esc]</span>`;
+    el.innerHTML = sourceHtml + cleanText + dismissHint;
     el.className = "visible";
     if (this._subtitleTimer) clearTimeout(this._subtitleTimer);
     // Remove any previous dismiss handler
     if (this._subtitleDismissHandler) {
       window.removeEventListener("keydown", this._subtitleDismissHandler);
     }
-    // Wait for spacebar or escape to dismiss, then show next queued subtitle
+
+    const dismiss = (): void => {
+      el.className = "fade-out";
+      if (this._subtitleTimer) {
+        clearTimeout(this._subtitleTimer);
+      }
+      this._subtitleTimer = setTimeout(() => {
+        el.className = "";
+        el.innerHTML = "";
+        this._subtitleTimer = null;
+        this.showNextSubtitle();
+      }, 400);
+      if (this._subtitleDismissHandler) {
+        window.removeEventListener("keydown", this._subtitleDismissHandler);
+        this._subtitleDismissHandler = null;
+      }
+    };
+
+    // Auto-dismiss timer for non-critical messages
+    if (duration) {
+      this._subtitleTimer = setTimeout(dismiss, duration);
+    }
+
+    // Keyboard dismiss — Escape prevents default, Space passes through to game input
     this._subtitleDismissHandler = (e: KeyboardEvent) => {
-      if (e.key === " " || e.key === "Escape") {
-        e.preventDefault();
-        el.className = "fade-out";
-        this._subtitleTimer = setTimeout(() => {
-          el.className = "";
-          el.innerHTML = "";
+      if (e.key === "Escape" || e.key === " ") {
+        if (e.key === "Escape") e.preventDefault();
+        // Clear auto-dismiss timer if present
+        if (this._subtitleTimer) {
+          clearTimeout(this._subtitleTimer);
           this._subtitleTimer = null;
-          // Show next queued subtitle after fade
-          this.showNextSubtitle();
-        }, 400);
-        if (this._subtitleDismissHandler) {
-          window.removeEventListener("keydown", this._subtitleDismissHandler);
-          this._subtitleDismissHandler = null;
         }
+        dismiss();
       }
     };
     window.addEventListener("keydown", this._subtitleDismissHandler);
@@ -2008,6 +2057,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.roomLightBoost = 1.5;
       // Room transition fade — brief darken then brighten
       this._roomTransitionFade = 0.6;
+      setTimeout(() => { const el = document.getElementById("room-transition-fade"); if (el && parseFloat(el.style.opacity) > 0.1) el.style.opacity = "0"; }, 600);
 
       // Room-type visual signature: brief tinted flash on entry
       this.triggerRoomSignature(room!.name);
@@ -2074,6 +2124,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     } else if (!roomId && this.lastRoomId) {
       // Room → corridor exit: brief darkness pulse as "lights left behind"
       this._roomTransitionFade = 0.35;
+      setTimeout(() => { const el = document.getElementById("room-transition-fade"); if (el && parseFloat(el.style.opacity) > 0.1) el.style.opacity = "0"; }, 500);
       // Quick corridor FOV tighten — zoom pulse inward
       this.cameraZoomPulse = -0.5; // negative = zoom in slightly
     }
@@ -2948,6 +2999,11 @@ export class BrowserDisplay3D implements IGameDisplay {
   }
 
   destroy(): void {
+    // Remove loading overlay if still present
+    if (this._loadingOverlay) {
+      this._loadingOverlay.remove();
+      this._loadingOverlay = null;
+    }
     cancelAnimationFrame(this.animFrameId);
     window.removeEventListener("resize", this.resizeHandler);
     window.removeEventListener("keydown", this.boundKeyHandler);
@@ -2985,6 +3041,11 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (this.renderer.domElement.parentElement) {
       this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);
     }
+    // Clear hazard border and fade overlay on destroy
+    const hazBorder = document.getElementById("hazard-border");
+    if (hazBorder) { hazBorder.className = ""; hazBorder.style.opacity = ""; }
+    const fadeOvl = document.getElementById("room-transition-fade");
+    if (fadeOvl) { fadeOvl.style.opacity = "0"; }
   }
 
   // ── Render game state into 3D scene ─────────────────────────────
@@ -3096,7 +3157,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (!fadeOverlay) {
       fadeOverlay = document.createElement("div");
       fadeOverlay.id = "room-transition-fade";
-      fadeOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:#000;pointer-events:none;z-index:90;transition:none;";
+      fadeOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:#000;pointer-events:none;z-index:90;transition:opacity 0.5s ease-out;";
       document.body.appendChild(fadeOverlay);
     }
     fadeOverlay.style.opacity = String(this._roomTransitionFade);
@@ -11319,6 +11380,13 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     const onDone = () => {
       loaded++;
+      // Update loading progress bar
+      const pct = Math.round((loaded / allEntries.length) * 100);
+      const fill = document.getElementById("model-load-fill");
+      const pctEl = document.getElementById("model-load-pct");
+      if (fill) fill.style.width = pct + "%";
+      if (pctEl) pctEl.textContent = pct + "%";
+
       if (loaded >= allEntries.length) {
         this.modelsLoaded = true;
         this.addLog(`Loaded ${this.gltfCache.size}/${allEntries.length} 3D models.`, "system");
@@ -11326,6 +11394,14 @@ export class BrowserDisplay3D implements IGameDisplay {
         this.rebuildEntityMeshes();
         // Preload decoration models in the background to prevent frame hitches
         this.preloadDecorationModels();
+        // Remove loading overlay with fade
+        if (this._loadingOverlay) {
+          this._loadingOverlay.style.opacity = "0";
+          setTimeout(() => {
+            this._loadingOverlay?.remove();
+            this._loadingOverlay = null;
+          }, 500);
+        }
       }
     };
 

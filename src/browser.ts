@@ -4230,6 +4230,8 @@ function updateTutorialObjective(): void {
   // Check completion of current objective
   if (tutorialObjective === 0) {
     // Objective 0: Clean this room to 60%
+    // Don't complete cleaning objective before player has acted
+    if (state.turn < 1) return;
     if (tutorialFirstRoomName) {
       const cleanliness = getRoomCleanliness(state, tutorialFirstRoomName);
       if (cleanliness >= (state.mystery?.roomCleanlinessGoal ?? 60)) {
@@ -8949,6 +8951,11 @@ function showSeedInput(onConfirm: (seed: number) => void): void {
 
 function showTitleScreen(): void {
   crawlOverlay.style.display = "flex";
+  // Clear hazard border and fade overlay from previous game
+  const hazBorder = document.getElementById("hazard-border");
+  if (hazBorder) { hazBorder.className = ""; hazBorder.style.opacity = ""; }
+  const fadeOvl = document.getElementById("room-transition-fade");
+  if (fadeOvl) { fadeOvl.style.opacity = "0"; }
   let titleIdx = 0; // 0 = Continue, 1 = New Game
   const items = ["Continue", "New Game"];
 
