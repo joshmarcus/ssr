@@ -183,7 +183,7 @@ export function generate(seed: number, difficulty: Difficulty = Difficulty.Norma
     investigationTrigger: 1, // clean 1 room before yellow alert triggers investigation
     evidenceThreshold,
     cleaningDirective: true,
-    roomCleanlinessGoal: 60,
+    roomCleanlinessGoal: 40,
     triggeredEchoes: new Set<string>(),
     sceneEchoes: [],
     connections: [],
@@ -1004,9 +1004,7 @@ function generateDirtTrails(state: GameState, rooms: DiggerRoom[]): void {
       for (let x = startRoom.getLeft(); x <= startRoom.getRight(); x++) {
         if (x < 0 || x >= state.width || y < 0 || y >= state.height) continue;
         if (!state.tiles[y][x].walkable) continue;
-        if (state.tiles[y][x].dirt < 30) {
-          state.tiles[y][x].dirt = 30 + Math.floor(ROT.RNG.getUniform() * 21); // 30-50
-        }
+        state.tiles[y][x].dirt = 55 + Math.floor(ROT.RNG.getUniform() * 21); // 55-75
       }
     }
   }

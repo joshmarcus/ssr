@@ -563,6 +563,8 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Interaction indicator — floating diamond above nearby interactable
   private interactionIndicator: THREE.Mesh | null = null;
   private interactionTargetId: string = "";
+  private interactionCycleIndex: number = 0;
+  private interactionCandidateIds: string[] = [];
 
   // Player mesh
   private playerMesh: THREE.Group;
@@ -1303,7 +1305,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     const ringGeo = new THREE.RingGeometry(0.1, 0.3, 32);
     ringGeo.rotateX(-Math.PI / 2);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: waveColor, transparent: true, opacity: 0.6,
+      color: waveColor, transparent: true, opacity: 0.4,
       side: THREE.DoubleSide, depthWrite: false,
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -1314,7 +1316,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     const ring2Geo = new THREE.RingGeometry(0.05, 0.15, 32);
     ring2Geo.rotateX(-Math.PI / 2);
     const ring2Mat = new THREE.MeshBasicMaterial({
-      color: waveColor, transparent: true, opacity: 0.4,
+      color: waveColor, transparent: true, opacity: 0.3,
       side: THREE.DoubleSide, depthWrite: false,
     });
     const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
@@ -1333,7 +1335,7 @@ export class BrowserDisplay3D implements IGameDisplay {
 
     // Scan grid ripple — glowing grid squares appear in scan wave's wake
     const gridSquares: THREE.Mesh[] = [];
-    const scanRadius = 6;
+    const scanRadius = 3;
     for (let gx = -scanRadius; gx <= scanRadius; gx++) {
       for (let gz = -scanRadius; gz <= scanRadius; gz++) {
         const dist = Math.abs(gx) + Math.abs(gz);
@@ -1355,7 +1357,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
 
     const startTime = this.clock.getElapsedTime();
-    const duration = 1.0;
+    const duration = 0.6;
     const animateWave = () => {
       const t = (this.clock.getElapsedTime() - startTime) / duration;
       if (t >= 1) {
@@ -1373,15 +1375,15 @@ export class BrowserDisplay3D implements IGameDisplay {
         return;
       }
       // Primary ring expands fast
-      const scale1 = 1 + t * 8;
+      const scale1 = 1 + t * 3;
       ring.scale.set(scale1, 1, scale1);
-      ringMat.opacity = 0.6 * (1 - t * t);
+      ringMat.opacity = 0.4 * (1 - t);
 
       // Secondary ring trails behind (delayed by 0.15)
       const t2 = Math.max(0, t - 0.15);
-      const scale2 = 1 + t2 * 6;
+      const scale2 = 1 + t2 * 2;
       ring2.scale.set(scale2, 1, scale2);
-      ring2Mat.opacity = 0.4 * (1 - t2 * t2);
+      ring2Mat.opacity = 0.3 * (1 - t2);
 
       // Column fades out quickly
       colMat.opacity = 0.3 * Math.max(0, 1 - t * 3);
@@ -2006,6 +2008,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       `</div>`;
 
     // Animate in
+    el.style.display = "block";
     el.style.opacity = "0";
     el.style.top = "-10px";
     requestAnimationFrame(() => {
@@ -2018,8 +2021,23 @@ export class BrowserDisplay3D implements IGameDisplay {
     this._hudNotifTimer = setTimeout(() => {
       el!.style.opacity = "0";
       el!.style.top = "-10px";
+      setTimeout(() => { el!.style.display = "none"; }, 500);
     }, opts.duration ?? 6000);
+
+    // Keypress dismiss
+    const dismissNotif = () => {
+      if (this._hudNotifTimer) clearTimeout(this._hudNotifTimer);
+      this._hudNotifTimer = null;
+      el!.style.opacity = "0";
+      el!.style.top = "-10px";
+      setTimeout(() => { el!.style.display = "none"; }, 500);
+      window.removeEventListener("keydown", dismissNotif);
+    };
+    window.addEventListener("keydown", dismissNotif);
   }
+
+  /** Cycle to the next interaction target when multiple entities are adjacent. */
+  cycleInteractionTarget(): void { this.interactionCycleIndex++; }
 
   /** Update which rooms have collected evidence for investigation aura effects. */
   setInvestigationRooms(rooms: Map<string, { evidenceCount: number; fullyInvestigated: boolean }>): void {
@@ -3376,18 +3394,22 @@ export class BrowserDisplay3D implements IGameDisplay {
         const actionHints: string[] = [];
         const stateHints: string[] = []; // grey hints for exhausted nearby entities
 
-        // [Enter] interact with adjacent entity
+        // [Enter] interact with adjacent entity (shows currently selected target + cycle hint)
         const nearby = this.getAdjacentInteractables(state);
-        let hasAvailable = false;
+        const availableNearby = nearby.filter(e => !isEntityExhausted(e));
+        if (availableNearby.length > 0) {
+          // Show the entity matching interactionTargetId, or first available
+          const selectedEnt = this.interactionTargetId
+            ? availableNearby.find(e => e.id === this.interactionTargetId) ?? availableNearby[0]
+            : availableNearby[0];
+          const name = entityDisplayName(selectedEnt);
+          const cycleHint = availableNearby.length > 1
+            ? ` <span style="color:#556;font-size:10px">[Tab] ${(this.interactionCycleIndex % availableNearby.length) + 1}/${availableNearby.length}</span>`
+            : "";
+          actionHints.push(`<span style="color:#fa0">\u25b8 [Enter] ${this.escapeHtml(name)}</span>${cycleHint}`);
+        }
         for (const ent of nearby) {
-          if (!isEntityExhausted(ent)) {
-            if (!hasAvailable) {
-              const name = entityDisplayName(ent);
-              actionHints.push(`<span style="color:#fa0">\u25b8 [Enter] ${this.escapeHtml(name)}</span>`);
-              hasAvailable = true;
-            }
-          } else {
-            // Show exhausted entity with state description
+          if (isEntityExhausted(ent)) {
             const desc = this.getEntityStateDesc(ent);
             if (desc) stateHints.push(desc);
           }
@@ -9957,12 +9979,11 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
 
-    // Update interaction indicator — show above nearest interactable entity
+    // Update interaction indicator — show above selected interactable entity (supports cycling)
     if (this.interactionIndicator) {
       const px = state.player.entity.pos.x;
       const py = state.player.entity.pos.y;
-      let bestId = "";
-      let bestDist = Infinity;
+      const candidates: { id: string; dist: number }[] = [];
       for (const [id, entity] of state.entities) {
         if (id === "player") continue;
         const dx = Math.abs(entity.pos.x - px);
@@ -9970,18 +9991,25 @@ export class BrowserDisplay3D implements IGameDisplay {
         if (dx > 1 || dy > 1 || dx + dy > 1) continue; // cardinal adjacency + same tile
         const tile = state.tiles[entity.pos.y]?.[entity.pos.x];
         if (!tile?.visible) continue;
-        const dist = dx + dy;
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestId = id;
-        }
+        candidates.push({ id, dist: dx + dy });
       }
-      if (bestId) {
-        const mesh = this.entityMeshes.get(bestId);
+      // Sort by distance then id for stable ordering
+      candidates.sort((a, b) => a.dist - b.dist || a.id.localeCompare(b.id));
+      const candidateIds = candidates.map(c => c.id);
+
+      // Reset cycle index when candidate list changes
+      if (candidateIds.length === 0 || candidateIds.join(",") !== this.interactionCandidateIds.join(",")) {
+        this.interactionCycleIndex = 0;
+      }
+      this.interactionCandidateIds = candidateIds;
+
+      if (candidateIds.length > 0) {
+        const selectedId = candidateIds[this.interactionCycleIndex % candidateIds.length];
+        const mesh = this.entityMeshes.get(selectedId);
         if (mesh && mesh.visible) {
           this.interactionIndicator.visible = true;
           this.interactionIndicator.position.set(mesh.position.x, 1.8, mesh.position.z);
-          this.interactionTargetId = bestId;
+          this.interactionTargetId = selectedId;
         } else {
           this.interactionIndicator.visible = false;
           this.interactionTargetId = "";
@@ -11318,6 +11346,22 @@ export class BrowserDisplay3D implements IGameDisplay {
     model.position.z -= center.z;
     model.position.y -= scaledBox.min.y; // sit on y=0
 
+    // Convert SkinnedMesh to regular Mesh (skeletal animation not needed; clone() breaks skeleton bindings)
+    const skinnedMeshes: THREE.SkinnedMesh[] = [];
+    model.traverse((child) => {
+      if ((child as any).isSkinnedMesh) skinnedMeshes.push(child as THREE.SkinnedMesh);
+    });
+    for (const skinned of skinnedMeshes) {
+      if (!skinned.parent) continue;
+      const staticMesh = new THREE.Mesh(skinned.geometry, skinned.material);
+      staticMesh.name = skinned.name;
+      staticMesh.position.copy(skinned.position);
+      staticMesh.rotation.copy(skinned.rotation);
+      staticMesh.scale.copy(skinned.scale);
+      skinned.parent.add(staticMesh);
+      skinned.parent.remove(skinned);
+    }
+
     // Convert materials to toon-shaded, applying Synty atlas where models have UVs but no embedded texture
     const tintColor = key === "player" ? COLORS_3D.player : ENTITY_COLORS_3D[lookupKey];
     const isSyntyModel = isCrewVariant || MODEL_PATHS[key]?.includes("synty-space-gltf");
@@ -11413,7 +11457,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         url,
         (gltf) => {
           try {
-            this.prepareModel(key, gltf.scene.clone());
+            this.prepareModel(key, gltf.scene);
           } catch (e) {
             console.warn(`Failed to prepare model ${path}:`, e);
           }

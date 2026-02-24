@@ -2072,6 +2072,15 @@ function initGame(): void {
       showJournal();
       return;
     }
+    // Tab to cycle interaction target (when no overlays open)
+    if (e.key === "Tab" && !journalOpen && !investigationHubOpen && !mapOpen && !helpOpen && !logReviewOpen && !goalPanelOpen) {
+      e.preventDefault();
+      if ('cycleInteractionTarget' in display) {
+        (display as any).cycleInteractionTarget();
+        renderAll();
+      }
+      return;
+    }
     // Enter to attempt deduction when on deductions tab
     if (journalOpen && journalTab === "deductions" && e.key === "Enter") {
       e.preventDefault();
@@ -2305,7 +2314,7 @@ function handleRestartKey(e: KeyboardEvent): void {
     resetGameState(seed);
     display.addLog("RESTARTING LINK...", "system");
     display.addLog("Sweepo rebooted. All systems reset.", "milestone");
-    display.addLog("MAINTENANCE SUBROUTINE: Clean rooms to 80% standard. Use [c] to clean.", "system");
+    display.addLog("MAINTENANCE SUBROUTINE: Clean rooms to standard. Use [c] to clean.", "system");
     lastObjectivePhase = ObjectivePhase.Clean;
     // Start ambient for same archetype
     if (state.mystery?.timeline?.archetype) {
@@ -3794,12 +3803,12 @@ function handleAction(action: Action): void {
     return;
   }
 
-  // Show interaction preview for adjacent entities after move
-  if (action.type === ActionType.Move && !autoExploring) {
-    showInteractionPreview();
-  }
+  // (BUG-010: removed showInteractionPreview call — action bar already shows nearby entities)
 
   renderAll();
+
+  // Refresh map overlay if open so player marker updates live
+  if (mapOpen) showStationMap();
 
   // Update camera-relative input mode from 3D renderer
   if (display && 'getPlayerFacing' in display) {
@@ -3840,9 +3849,7 @@ function showInteractionPreview(): void {
     if (hint) hints.push(hint);
   }
 
-  if (hints.length > 0) {
-    display.addLog(`Nearby: ${hints.join(" | ")}`, "sensor");
-  }
+  // (BUG-010: removed addLog subtitle — action bar already shows nearby entities)
 }
 
 /** Get a short hint for an adjacent interactable entity (null = skip). */
@@ -4045,7 +4052,7 @@ function showHelp(): void {
 
       <div style="margin-top:16px;border-top:1px solid #333;padding-top:12px;max-width:700px;margin-left:auto;margin-right:auto">
         <div style="color:#4af;font-weight:bold;margin-bottom:6px">── Game Phases ──</div>
-        <div><span style="color:#4a4">MAINTENANCE</span>  Clean rooms to 80% to progress</div>
+        <div><span style="color:#4a4">MAINTENANCE</span>  Clean rooms to progress</div>
         <div><span style="color:#fa0">INVESTIGATION</span>  Read terminals, collect evidence, solve deductions</div>
         <div><span style="color:#f44">RECOVERY</span>  Reroute relays, transmit data from Data Core</div>
         <div><span style="color:#f0f">EVACUATION</span>  Lead crew survivors to powered Escape Pods</div>
@@ -4251,8 +4258,6 @@ function updateTutorialObjective(): void {
   // Check completion of current objective
   if (tutorialObjective === 0) {
     // Objective 0: Clean this room to 60%
-    // Don't complete cleaning objective before player has acted
-    if (state.turn < 1) return;
     if (tutorialFirstRoomName) {
       const cleanliness = getRoomCleanliness(state, tutorialFirstRoomName);
       if (cleanliness >= (state.mystery?.roomCleanlinessGoal ?? 60)) {
@@ -4438,7 +4443,7 @@ function showStationMap(): void {
           ${legendHtml}
         </div>
       </div>
-      <div class="journal-controls">[Esc/M] Close | [+/-] Zoom (${mapZoom.toFixed(1)}x) | [WASD/Arrows] Move</div>
+      <div class="journal-controls" style="color:#8fa;font-size:13px"><span style="color:#fff">[Esc/M]</span> Close | <span style="color:#fff">[+/-]</span> Zoom (${mapZoom.toFixed(1)}x) | <span style="color:#fff">[WASD/Arrows]</span> Move</div>
     </div>`;
   overlay.classList.add("active");
 

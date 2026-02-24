@@ -33,8 +33,8 @@ export function isValidAction(state: GameState, action: Action): boolean {
       if (!state.tiles[py][nx].walkable || !state.tiles[ny][px].walkable) return false;
     }
 
-    // Cleaning directive: can't leave a dirty room until clean enough (expires at turn 75)
-    if (state.mystery?.cleaningDirective && state.turn < 75) {
+    // Cleaning directive: can't leave a dirty room until clean enough (expires after tutorial)
+    if (state.mystery?.cleaningDirective && state.turn < 25) {
       const currentRoom = getRoomAt(state, { x: px, y: py });
       if (currentRoom) {
         const destRoom = getRoomAt(state, { x: nx, y: ny });
