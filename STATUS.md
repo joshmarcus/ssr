@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 174 (V348 completed — bugfix sprint: subtitle queue overhaul, loading gate, fade/hazard cleanup, tutorial fix)
+- **Phase**: Sprint 175 (V352 completed — polish & balance: cleaning requires 2-3 actions, scan wave reduced, message pacing improved, all 8 QA bugs addressed)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable

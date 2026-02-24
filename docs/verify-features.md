@@ -38,8 +38,20 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **Expected:** Clean title screen with no gameplay overlays.
 - **Status:** PENDING
 
-### BUG-007: Sensor pickup blue sphere (UNRESOLVED)
-- **What to check:** Whether picking up the sensor in Arrival Bay still creates an enormous blue sphere/dome obscuring the view.
-- **How to reach it:** Start new game, navigate to sensor pickup (green diamond), press Enter.
-- **Expected:** Brief visual effect, no giant blue sphere.
-- **Status:** PENDING — could not identify source in code, needs visual verification
+### BUG-007: Sensor pickup blue sphere (MITIGATED)
+- **What to check:** Whether picking up the sensor in Arrival Bay still creates an enormous blue sphere/dome obscuring the view. Scan wave ring expansion was reduced from 16x to 9x.
+- **How to reach it:** Start new game, navigate to sensor pickup (green diamond), press Enter. Also toggle sensor mode with [T] key.
+- **Expected:** Brief visual effect (expanding ring), no giant blue sphere.
+- **Status:** PENDING — scan wave reduced in Sprint 175, needs visual verification
+
+### Cleaning requires multiple actions (BUG-003 fix)
+- **What to check:** Cleaning the starting room now requires 2-3 C presses, not 1.
+- **How to reach it:** Start new game, press C to clean. Check the cleanliness % in the tutorial progress bar.
+- **Expected:** Each clean increases cleanliness by ~15-25%, requiring 2-3 cleans to hit 60% goal.
+- **Status:** PENDING
+
+### New game message pacing
+- **What to check:** Only "LINK ACTIVE" intro message appears at game start. CORVUS-7 lore messages don't appear until player takes first action.
+- **How to reach it:** Start a new game. Do NOT press anything for 5 seconds. Observe subtitle bar.
+- **Expected:** One intro message, no flood of 10+ messages. After first move, deferred messages appear with auto-dismiss.
+- **Status:** PENDING
