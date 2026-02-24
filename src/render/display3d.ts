@@ -11347,6 +11347,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     model.position.y -= scaledBox.min.y; // sit on y=0
 
     // Convert SkinnedMesh to regular Mesh (skeletal animation not needed; clone() breaks skeleton bindings)
+    // Note: characters will appear in T-pose (bind pose) — animation baking would require GLTF clip data
     const skinnedMeshes: THREE.SkinnedMesh[] = [];
     model.traverse((child) => {
       if ((child as any).isSkinnedMesh) skinnedMeshes.push(child as THREE.SkinnedMesh);
