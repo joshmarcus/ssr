@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { OutlineEffect } from "three/addons/effects/OutlineEffect.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -498,13 +499,9 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   // EvidenceTrace uses procedural ? mesh (no GLTF — more distinctive)
 };
 
-// Crew NPC model variants — different models for visual variety
+// Crew NPC model variants — EVA suit with built-in idle animation
 const CREW_MODEL_VARIANTS = [
-  "models/synty-space-gltf/SK_Chr_Crew_Male_01.glb",
-  "models/synty-space-gltf/SK_Chr_Crew_Female_01.glb",
-  "models/synty-space-gltf/SK_Chr_CrewCaptain_Male_01.glb",
-  "models/synty-space-gltf/SK_Chr_CrewCaptain_Female_01.glb",
-  "models/synty-space-gltf/SK_Chr_Medic_Male_01.glb",
+  "models/synty-space-gltf/SK_Chr_BR_EVA_Suit_01.glb",
 ];
 
 // ── BrowserDisplay3D ─────────────────────────────────────────────
@@ -571,6 +568,8 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // Model cache (key = entityType or "player")
   private gltfCache: Map<string, THREE.Object3D> = new Map();
+  private gltfAnimations: Map<string, THREE.AnimationClip[]> = new Map();
+  private entityMixers: Map<string, THREE.AnimationMixer> = new Map();
   private gltfLoader: GLTFLoader;
   private modelsLoaded = false;
   private _loadingOverlay: HTMLElement | null = null;
@@ -5024,6 +5023,11 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         });
       }
+    }
+
+    // Update skeletal animation mixers (e.g. crew EVA suit idle)
+    for (const [, mixer] of this.entityMixers) {
+      mixer.update(delta);
     }
 
     // Proximity entity highlight: smooth emissive ramp + pulse ground ring (throttled: every 4th frame)
@@ -9946,6 +9950,11 @@ export class BrowserDisplay3D implements IGameDisplay {
     ]);
     for (const [id, mesh] of this.entityMeshes) {
       if (!activeIds.has(id)) {
+        // Clean up animation mixer if this entity had one
+        if (this.entityMixers.has(id)) {
+          this.entityMixers.get(id)!.stopAllAction();
+          this.entityMixers.delete(id);
+        }
         const entType = mesh.userData.entityType as EntityType | undefined;
         if (entType && pickupTypes.has(entType) && this.chaseCamActive) {
           // Fly-to-player animation: reparent to scene so it stays visible
@@ -10319,16 +10328,34 @@ export class BrowserDisplay3D implements IGameDisplay {
     // Try to use a loaded GLTF model first
     // For CrewNPC, pick a variant based on position hash for visual variety
     let gltfModel = this.gltfCache.get(entity.type);
+    let cacheKey: string = entity.type;
     if (entity.type === EntityType.CrewNPC) {
       const hash = Math.abs(entity.pos.x * 31 + entity.pos.y * 17) % CREW_MODEL_VARIANTS.length;
-      const variantModel = this.gltfCache.get(`CrewNPC_${hash}`);
-      if (variantModel) gltfModel = variantModel;
+      const variantKey = `CrewNPC_${hash}`;
+      const variantModel = this.gltfCache.get(variantKey);
+      if (variantModel) {
+        gltfModel = variantModel;
+        cacheKey = variantKey;
+      }
     }
     if (gltfModel) {
       // Wrap in a Group so the model's internal centering offsets are preserved
       const group = new THREE.Group();
-      const clone = gltfModel.clone();
+      // Use SkeletonUtils.clone for animated models (preserves skeleton bindings)
+      const clone = this.gltfAnimations.has(cacheKey)
+        ? SkeletonUtils.clone(gltfModel)
+        : gltfModel.clone();
       group.add(clone);
+
+      // Set up AnimationMixer for models with clips
+      const clips = this.gltfAnimations.get(cacheKey);
+      if (clips && clips.length > 0) {
+        const mixer = new THREE.AnimationMixer(clone);
+        const action = mixer.clipAction(clips[0]);
+        action.play();
+        this.entityMixers.set(entity.id, mixer);
+      }
+
       // Entity base height: flying entities hover, ground entities sit on floor
       const ENTITY_BASE_Y: Partial<Record<string, number>> = {
         [EntityType.Drone]: 0.6,
@@ -10341,7 +10368,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         [EntityType.FuseBox]: 0.15,
       };
       const baseY = ENTITY_BASE_Y[entity.type] ?? 0; // default: sit on floor
-      group.userData = { entityType: entity.type, baseY, isGltf: true };
+      group.userData = { entityType: entity.type, baseY, isGltf: true, _cacheKey: cacheKey };
       group.position.set(entity.pos.x, baseY, entity.pos.y);
 
       // Entity glow: emissive material only (PointLights disabled for performance)
@@ -11346,21 +11373,24 @@ export class BrowserDisplay3D implements IGameDisplay {
     model.position.z -= center.z;
     model.position.y -= scaledBox.min.y; // sit on y=0
 
-    // Convert SkinnedMesh to regular Mesh (skeletal animation not needed; clone() breaks skeleton bindings)
-    // Note: characters will appear in T-pose (bind pose) — animation baking would require GLTF clip data
-    const skinnedMeshes: THREE.SkinnedMesh[] = [];
-    model.traverse((child) => {
-      if ((child as any).isSkinnedMesh) skinnedMeshes.push(child as THREE.SkinnedMesh);
-    });
-    for (const skinned of skinnedMeshes) {
-      if (!skinned.parent) continue;
-      const staticMesh = new THREE.Mesh(skinned.geometry, skinned.material);
-      staticMesh.name = skinned.name;
-      staticMesh.position.copy(skinned.position);
-      staticMesh.rotation.copy(skinned.rotation);
-      staticMesh.scale.copy(skinned.scale);
-      skinned.parent.add(staticMesh);
-      skinned.parent.remove(skinned);
+    // Convert SkinnedMesh to regular Mesh unless the model has animations
+    // (animated models need their skeleton intact for AnimationMixer)
+    const hasAnimations = this.gltfAnimations.has(key);
+    if (!hasAnimations) {
+      const skinnedMeshes: THREE.SkinnedMesh[] = [];
+      model.traverse((child) => {
+        if ((child as any).isSkinnedMesh) skinnedMeshes.push(child as THREE.SkinnedMesh);
+      });
+      for (const skinned of skinnedMeshes) {
+        if (!skinned.parent) continue;
+        const staticMesh = new THREE.Mesh(skinned.geometry, skinned.material);
+        staticMesh.name = skinned.name;
+        staticMesh.position.copy(skinned.position);
+        staticMesh.rotation.copy(skinned.rotation);
+        staticMesh.scale.copy(skinned.scale);
+        skinned.parent.add(staticMesh);
+        skinned.parent.remove(skinned);
+      }
     }
 
     // Convert materials to toon-shaded, applying Synty atlas where models have UVs but no embedded texture
@@ -11458,6 +11488,9 @@ export class BrowserDisplay3D implements IGameDisplay {
         url,
         (gltf) => {
           try {
+            if (gltf.animations && gltf.animations.length > 0) {
+              this.gltfAnimations.set(key, gltf.animations);
+            }
             this.prepareModel(key, gltf.scene);
           } catch (e) {
             console.warn(`Failed to prepare model ${path}:`, e);
@@ -11578,12 +11611,35 @@ export class BrowserDisplay3D implements IGameDisplay {
 
       // Create new from GLTF — use crew variant if available
       let gltfModel = this.gltfCache.get(entityType)!;
+      let rebuildCacheKey = entityType;
       if (entityType === EntityType.CrewNPC) {
         const hash = Math.abs(Math.round(pos.x) * 31 + Math.round(pos.z) * 17) % CREW_MODEL_VARIANTS.length;
-        const variant = this.gltfCache.get(`CrewNPC_${hash}`);
-        if (variant) gltfModel = variant;
+        const variantKey = `CrewNPC_${hash}`;
+        const variant = this.gltfCache.get(variantKey);
+        if (variant) {
+          gltfModel = variant;
+          rebuildCacheKey = variantKey;
+        }
       }
-      const clone = gltfModel.clone();
+      // Use SkeletonUtils.clone for animated models (preserves skeleton bindings)
+      const clone = this.gltfAnimations.has(rebuildCacheKey)
+        ? SkeletonUtils.clone(gltfModel)
+        : gltfModel.clone();
+
+      // Set up AnimationMixer for models with clips
+      const clips = this.gltfAnimations.get(rebuildCacheKey);
+      if (clips && clips.length > 0) {
+        // Clean up old mixer if exists
+        if (this.entityMixers.has(id)) {
+          this.entityMixers.get(id)!.stopAllAction();
+          this.entityMixers.delete(id);
+        }
+        const mixer = new THREE.AnimationMixer(clone);
+        const action = mixer.clipAction(clips[0]);
+        action.play();
+        this.entityMixers.set(id, mixer);
+      }
+
       // Use per-type baseY lookup (match the one in entity creation)
       const REBUILD_BASE_Y: Partial<Record<string, number>> = {
         [EntityType.Drone]: 0.6,
@@ -11596,7 +11652,7 @@ export class BrowserDisplay3D implements IGameDisplay {
         [EntityType.FuseBox]: 0.15,
       };
       const baseY = REBUILD_BASE_Y[entityType] ?? 0;
-      clone.userData = { entityType, baseY };
+      clone.userData = { entityType, baseY, _cacheKey: rebuildCacheKey };
       clone.position.copy(pos);
       clone.position.y = baseY;
       clone.visible = visible;
