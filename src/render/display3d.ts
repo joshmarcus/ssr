@@ -499,9 +499,12 @@ const MODEL_PATHS: Partial<Record<string, string>> = {
   // EvidenceTrace uses procedural ? mesh (no GLTF — more distinctive)
 };
 
-// Crew NPC model variants — EVA suit with built-in idle animation
+// Crew NPC model variants — Astronaut characters with 18 animations (Idle, Walk, Wave, etc.)
 const CREW_MODEL_VARIANTS = [
-  "models/synty-space-gltf/SK_Chr_BR_EVA_Suit_01.glb",
+  "models/Characters/GLTF/Astronaut_BarbaraTheBee.gltf",
+  "models/Characters/GLTF/Astronaut_FernandoTheFlamingo.gltf",
+  "models/Characters/GLTF/Astronaut_FinnTheFrog.gltf",
+  "models/Characters/GLTF/Astronaut_RaeTheRedPanda.gltf",
 ];
 
 // ── BrowserDisplay3D ─────────────────────────────────────────────
@@ -10347,11 +10350,12 @@ export class BrowserDisplay3D implements IGameDisplay {
         : gltfModel.clone();
       group.add(clone);
 
-      // Set up AnimationMixer for models with clips
+      // Set up AnimationMixer for models with clips — prefer "Idle" animation
       const clips = this.gltfAnimations.get(cacheKey);
       if (clips && clips.length > 0) {
         const mixer = new THREE.AnimationMixer(clone);
-        const action = mixer.clipAction(clips[0]);
+        const idleClip = clips.find(c => c.name === "Idle") ?? clips[0];
+        const action = mixer.clipAction(idleClip);
         action.play();
         this.entityMixers.set(entity.id, mixer);
       }
@@ -11635,7 +11639,8 @@ export class BrowserDisplay3D implements IGameDisplay {
           this.entityMixers.delete(id);
         }
         const mixer = new THREE.AnimationMixer(clone);
-        const action = mixer.clipAction(clips[0]);
+        const idleClip = clips.find(c => c.name === "Idle") ?? clips[0];
+        const action = mixer.clipAction(idleClip);
         action.play();
         this.entityMixers.set(id, mixer);
       }
