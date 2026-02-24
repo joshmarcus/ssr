@@ -5137,8 +5137,8 @@ export function step(state: GameState, action: Action): GameState {
           // Reduce dirt: full strength on player tile, slightly less on surrounding
           const isCenter = d.x === 0 && d.y === 0;
           const dirtAmt = isCenter
-            ? 25 + ((px * 7 + py * 13 + next.turn * 3) % 11) // 25-35
-            : 15 + ((tx * 3 + ty * 11 + next.turn) % 6); // 15-20
+            ? 12 + ((px * 7 + py * 13 + next.turn * 3) % 6) // 12-17
+            : 6 + ((tx * 3 + ty * 11 + next.turn) % 4); // 6-9
           newTiles[ty][tx].dirt = Math.max(0, newTiles[ty][tx].dirt - dirtAmt);
         }
 

@@ -1355,7 +1355,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
 
     const startTime = this.clock.getElapsedTime();
-    const duration = 1.5;
+    const duration = 1.0;
     const animateWave = () => {
       const t = (this.clock.getElapsedTime() - startTime) / duration;
       if (t >= 1) {
@@ -1373,13 +1373,13 @@ export class BrowserDisplay3D implements IGameDisplay {
         return;
       }
       // Primary ring expands fast
-      const scale1 = 1 + t * 15;
+      const scale1 = 1 + t * 8;
       ring.scale.set(scale1, 1, scale1);
       ringMat.opacity = 0.6 * (1 - t * t);
 
       // Secondary ring trails behind (delayed by 0.15)
       const t2 = Math.max(0, t - 0.15);
-      const scale2 = 1 + t2 * 12;
+      const scale2 = 1 + t2 * 6;
       ring2.scale.set(scale2, 1, scale2);
       ring2Mat.opacity = 0.4 * (1 - t2 * t2);
 

@@ -319,6 +319,8 @@ let lastProgressTurn = 0; // last turn where player made meaningful progress
 let lastNudgeTurn = 0; // prevent nudge spam
 let lastPuzzleGuidanceTurn = 0; // cooldown for contextual puzzle hints
 let devModeEnabled = new URLSearchParams(window.location.search).get("dev") === "1";
+let deferredInitMessages: Array<{ text: string; type: string }> = []; // messages deferred until first player action
+let hasPlayerActed = false; // flipped on first handleAction call
 
 // ── Wait message variety ────────────────────────────────────────
 const WAIT_MESSAGES_COOL = [
@@ -1686,15 +1688,15 @@ function initGame(): void {
 
   // ── Dramatic link establishment sequence (compact) ──────────────
   display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. Sweepo online.", "milestone");
-  display.addLog(MOOD_FLAVOR[stationMood], "narrative");
-  display.addLog(CORVUS_GREETING[corvusPersonality], "narrative");
+  deferredInitMessages.push({ text: MOOD_FLAVOR[stationMood], type: "narrative" });
+  deferredInitMessages.push({ text: CORVUS_GREETING[corvusPersonality], type: "narrative" });
 
   // Station context briefing — crew count, station status, mission objective
   if (state.mystery) {
     const crewCount = state.mystery.crew.length;
     const roomCount = state.rooms.length;
     const stationId = `PROVIDENCE-${seed % 1000}`;
-    display.addLog(`CORVUS-7: Station ${stationId} — ${crewCount} crew on manifest, ${roomCount} sections mapped. Last contact: 72 hours ago.`, "narrative");
+    deferredInitMessages.push({ text: `CORVUS-7: Station ${stationId} — ${crewCount} crew on manifest, ${roomCount} sections mapped. Last contact: 72 hours ago.`, type: "narrative" });
     // Archetype-specific alert status
     const archAlerts: Record<string, string> = {
       coolant_cascade: "Alert status: COOLANT FAILURE. Temperature readings critical in multiple sections.",
@@ -1705,21 +1707,21 @@ function initGame(): void {
       mutiny: "Alert status: INTERNAL CONFLICT. Command structure compromised. Multiple faction signals.",
     };
     const alertText = archAlerts[state.mystery.timeline.archetype] ?? "Alert status: UNKNOWN. Investigating.";
-    display.addLog(`CORVUS-7: ${alertText}`, "warning");
+    deferredInitMessages.push({ text: `CORVUS-7: ${alertText}`, type: "warning" });
   }
 
   // Archetype-specific mission briefing (3 lines setting stakes)
   const briefingArchetype = state.mystery?.timeline?.archetype;
   if (briefingArchetype && CORVUS_MISSION_BRIEFING[briefingArchetype]) {
     for (const line of CORVUS_MISSION_BRIEFING[briefingArchetype]) {
-      display.addLog(line, "narrative");
+      deferredInitMessages.push({ text: line, type: "narrative" });
     }
   }
 
   // Signal interference static burst (SignalAnomaly opening)
   if (state.milestones.has("signal_interference_active")) {
-    display.addLog("▓▓▓ ELECTROMAGNETIC INTERFERENCE DETECTED ▓▓▓", "critical");
-    display.addLog("Station communications array is broadcasting at high power. Sensor systems degraded. Expect instrument disruption.", "system");
+    deferredInitMessages.push({ text: "▓▓▓ ELECTROMAGNETIC INTERFERENCE DETECTED ▓▓▓", type: "critical" });
+    deferredInitMessages.push({ text: "Station communications array is broadcasting at high power. Sensor systems degraded. Expect instrument disruption.", type: "system" });
   }
 
   display.addLog("Use arrow keys or h/j/k/l to move. Approach objects and press [i] to interact.", "system");
@@ -1734,7 +1736,7 @@ function initGame(): void {
     tutorialObjective = 0;
     tutorialObjectiveDismissed = false;
     tutorialObjectiveCompleteTime = 0;
-    display.addLog(`CORVUS-7: Maintenance protocol active. Clean ${startRoom.name} first — press [C] to sweep debris.`, "system");
+    deferredInitMessages.push({ text: `CORVUS-7: Maintenance protocol active. Clean ${startRoom.name} first — press [C] to sweep debris.`, type: "system" });
   }
 
   // Start archetype-specific ambient soundscape
@@ -1742,7 +1744,16 @@ function initGame(): void {
     audio.startAmbient(state.mystery.timeline.archetype);
   }
 
-  checkRoomEntry();
+  // Register starting room as visited without emitting messages (deferred to first action)
+  {
+    const px0r = state.player.entity.pos.x;
+    const py0r = state.player.entity.pos.y;
+    const initRoom = state.rooms.find(r => px0r >= r.x && px0r < r.x + r.width && py0r >= r.y && py0r < r.y + r.height);
+    if (initRoom) {
+      lastPlayerRoomId = initRoom.id;
+      visitedRoomIds.add(initRoom.id);
+    }
+  }
   renderAll();
 
   inputHandler = new InputHandler(handleAction, handleScan);
@@ -2273,6 +2284,8 @@ function resetGameState(newSeed: number): void {
   lastProgressTurn = 0;
   lastNudgeTurn = 0;
   lastPuzzleGuidanceTurn = 0;
+  hasPlayerActed = false;
+  deferredInitMessages = [];
   pendingCrewDoor = null;
   journalTab = "evidence";
   choiceSelectedIdx = 0;
@@ -2323,6 +2336,14 @@ function handleRestartKey(e: KeyboardEvent): void {
 function handleAction(action: Action): void {
   if (state.gameOver) return;
 
+  // Flush deferred init messages on first player action
+  if (!hasPlayerActed) {
+    hasPlayerActed = true;
+    for (const msg of deferredInitMessages) {
+      display.addLog(msg.text, msg.type as any);
+    }
+    deferredInitMessages = [];
+  }
   // Any non-auto-explore action stops auto-explore
   if (autoExploring && action.type !== ActionType.AutoExplore && action.type !== ActionType.Move) {
     stopAutoExplore();
@@ -5736,6 +5757,7 @@ function handlePauseInput(e: KeyboardEvent): void {
           state = loaded;
           seed = state.seed;
           initGame();
+          hasPlayerActed = true; deferredInitMessages = []; // skip intro messages for loaded saves
           display.addLog("[Save loaded — resuming session]", "milestone");
           // Restore crack moment tint if applicable
           if (state.mystery?.evidenceAccumulation?.crack_moment_fired) {
@@ -9063,6 +9085,7 @@ function showTitleScreen(): void {
             gameStarted = true;
             crawlOverlay.style.display = "none";
             initGame();
+            hasPlayerActed = true; deferredInitMessages = []; // skip intro messages for loaded saves
             display.addLog("[Save loaded — resuming session]", "milestone");
             renderAll();
           } else {
