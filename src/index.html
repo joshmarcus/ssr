@@ -1210,6 +1210,7 @@
       width: 85%;
       background: linear-gradient(165deg, rgba(8, 14, 22, 0.95) 0%, rgba(4, 8, 16, 0.98) 100%);
       border: 1px solid rgba(68, 204, 255, 0.2);
+      border-left: 3px solid rgba(68, 204, 255, 0.3);
       border-radius: 4px;
       padding: 0;
       font-family: monospace;
@@ -1217,6 +1218,17 @@
       position: relative;
       overflow: hidden;
     }
+    /* Category-specific accent colors */
+    #evidence-card .card-inner.cat-trace { border-left-color: #fa0; }
+    #evidence-card .card-inner.cat-trace .card-category { color: #fa0; }
+    #evidence-card .card-inner.cat-log { border-left-color: #4cf; }
+    #evidence-card .card-inner.cat-log .card-category { color: #4cf; }
+    #evidence-card .card-inner.cat-crew_item { border-left-color: #f8a; }
+    #evidence-card .card-inner.cat-crew_item .card-category { color: #f8a; }
+    #evidence-card .card-inner.cat-testimony { border-left-color: #ff4; }
+    #evidence-card .card-inner.cat-testimony .card-category { color: #ff4; }
+    #evidence-card .card-inner.cat-crew { border-left-color: #4f8; }
+    #evidence-card .card-inner.cat-crew .card-category { color: #4f8; }
     #evidence-card .card-inner::before {
       content: '';
       position: absolute;

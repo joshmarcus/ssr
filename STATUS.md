@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 182 (V388 completed — pause menu settings panel, investigation tips in help screen, room-entry/clean/pickup SFX, BUGS.md cleanup)
+- **Phase**: Sprint 183 (V393 completed — evidence card category colors, boot sequence glitch flavor; crew dialog/map legend/minimap hazards already existed)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable

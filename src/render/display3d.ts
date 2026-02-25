@@ -1928,7 +1928,8 @@ export class BrowserDisplay3D implements IGameDisplay {
       metaHtml += `<div class="card-meta-item">MENTIONS <span>${next.crew.join(", ")}</span></div>`;
     }
 
-    el.innerHTML = `<div class="card-inner">
+    const catClass = `cat-${next.category.replace(/\s+/g, "_")}`;
+    el.innerHTML = `<div class="card-inner ${catClass}">
       <div class="card-header">
         <div class="card-category">${categoryLabel}</div>
         <div class="card-new">NEW EVIDENCE</div>

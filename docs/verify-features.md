@@ -227,3 +227,19 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Walk between rooms. Press C to clean. Collect evidence.
 - **Expected:** Subtle procedural sounds for door transitions, cleaning, and pickups.
 - **Status:** PENDING — needs audio verification (Playwright can't test audio)
+
+---
+
+## Sprint 183 — V389-V393 (2026-02-25)
+
+### Evidence card category color accents
+- **What to check:** Evidence cards show a colored left-border accent based on category: trace=orange, log=cyan, crew_item=pink, testimony=yellow, crew=green. Category label text color matches.
+- **How to reach it:** Play game, collect evidence. Evidence cards pop up when finding new evidence.
+- **Expected:** Each card has a distinctive colored left border matching its category. Default cards (no category match) show subtle cyan border.
+- **Status:** PENDING
+
+### Boot sequence glitch messages
+- **What to check:** Boot sequence (after skipping opening crawl) includes 1-2 atmospheric glitch/retry messages interspersed with standard system messages. Messages vary by seed.
+- **How to reach it:** Start a new game. Skip the opening crawl text. Watch the boot sequence messages.
+- **Expected:** Messages like "ERR: PACKET LOSS — RETRYING..." / "RETRY OK", "CRC MISMATCH — RESYNC...", "WARNING: SIGNAL DEGRADATION X%", etc. Different seeds produce different glitches.
+- **Status:** PENDING

@@ -169,15 +169,41 @@ function showOpeningCrawl(): void {
 
     const sensorStr = (state.player.sensors ?? []).length > 1 ? "MULTI-BAND" : "CLEANLINESS";
     const roomCount = state.rooms.length;
-    const bootMessages = [
+
+    // Seed-driven glitch flavor: pick 1-2 atmospheric interference messages
+    const glitchPool = [
+      { text: "ERR: PACKET LOSS — RETRYING...", followUp: "RETRY OK" },
+      { text: `RELAY BUFFER: ${11 + (seed % 19)}% — COMPENSATING...`, followUp: null },
+      { text: "CRC MISMATCH — RESYNC...", followUp: "STREAM REALIGNED" },
+      { text: `WARNING: SIGNAL DEGRADATION ${20 + (seed % 31)}%`, followUp: null },
+      { text: `FIRMWARE: v2.${seed % 9}.${seed % 100}-patch`, followUp: null },
+      { text: "HANDSHAKE TIMEOUT — RENEGOTIATING...", followUp: "CHANNEL OPEN" },
+    ];
+    const g1 = glitchPool[seed % glitchPool.length];
+    const g2 = glitchPool[(seed * 7 + 3) % glitchPool.length];
+    // Use 1 glitch if seed is even, 2 if odd (never the same one twice)
+    const glitches = g1 === g2 ? [g1] : (seed & 1) ? [g1, g2] : [g1];
+
+    const bootMessages: { text: string; delay: number }[] = [
       { text: "SIGNAL ACQUIRED...", delay: 0 },
       { text: "TERMINAL SYNC — LOW-BITRATE RELAY", delay: 400 },
-      { text: `UNIT ID: SWEEPO-${seed % 10000}  [MAINTENANCE ROVER]`, delay: 800 },
-      { text: `SENSOR ARRAY: ${sensorStr}`, delay: 1100 },
-      { text: `STATION MAP: ${roomCount} SECTIONS DETECTED`, delay: 1400 },
-      { text: "CORVUS-7 HANDSHAKE — OK", delay: 1700 },
-      { text: "LINK ESTABLISHED — AWAITING INPUT", delay: 2100 },
     ];
+    let t = 800;
+    // Insert first glitch after sync
+    if (glitches[0]) {
+      bootMessages.push({ text: glitches[0].text, delay: t }); t += 350;
+      if (glitches[0].followUp) { bootMessages.push({ text: glitches[0].followUp, delay: t }); t += 300; }
+    }
+    bootMessages.push({ text: `UNIT ID: SWEEPO-${seed % 10000}  [MAINTENANCE ROVER]`, delay: t }); t += 300;
+    bootMessages.push({ text: `SENSOR ARRAY: ${sensorStr}`, delay: t }); t += 300;
+    // Insert second glitch before station map (if present)
+    if (glitches[1]) {
+      bootMessages.push({ text: glitches[1].text, delay: t }); t += 350;
+      if (glitches[1].followUp) { bootMessages.push({ text: glitches[1].followUp, delay: t }); t += 300; }
+    }
+    bootMessages.push({ text: `STATION MAP: ${roomCount} SECTIONS DETECTED`, delay: t }); t += 300;
+    bootMessages.push({ text: "CORVUS-7 HANDSHAKE — OK", delay: t }); t += 400;
+    bootMessages.push({ text: "LINK ESTABLISHED — AWAITING INPUT", delay: t }); t += 500;
 
     for (const msg of bootMessages) {
       setTimeout(() => {
@@ -191,7 +217,7 @@ function showOpeningCrawl(): void {
       crawlOverlay.style.display = "none";
       gameStarted = true;
       initGame();
-    }, 2600);
+    }, t);
   };
 
   window.addEventListener("keydown", startGame);
