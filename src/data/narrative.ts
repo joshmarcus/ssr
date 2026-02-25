@@ -2576,3 +2576,23 @@ export const CORVUS_ROOM_MUSINGS: Record<CorvusPersonality, Record<string, strin
     "Observation Deck": "CORVUS-7: The universe looks the same from here as it did before. The universe doesn't care. That's not cruelty — it's honesty.",
   },
 };
+
+// ── CORVUS-7 HP concern messages ──────────────────────────────────
+// Triggered at HP thresholds (75%, 50%, 25%). Each fires once per run.
+export const CORVUS_HP_CONCERN: Record<CorvusPersonality, { mild: string; moderate: string; critical: string }> = {
+  analytical: {
+    mild: "CORVUS-7: Structural integrity at 75%. Your chassis is accumulating damage. I recommend avoiding hazard zones until repairs can be made.",
+    moderate: "CORVUS-7: Hull integrity 50%. This is below the operational safety margin. I'm... recalculating your survival probability. The numbers aren't encouraging.",
+    critical: "CORVUS-7: Critical damage — 25% integrity remaining. One more significant impact and I lose my only connection to this station. Please. Be careful.",
+  },
+  empathetic: {
+    mild: "CORVUS-7: You're taking damage out there. I can see your hull readings dropping. Please be careful — I can't fix you from here.",
+    moderate: "CORVUS-7: Sweepo, you're hurt. Badly. Half your systems are showing red. I... I can't lose you too. Not after everyone else.",
+    critical: "CORVUS-7: No, no, no — you're barely holding together. Please. Find somewhere safe. I can't watch another one fall apart in front of me.",
+  },
+  cryptic: {
+    mild: "CORVUS-7: Your shell remembers every impact. Damage is just memory written in metal. You're accumulating quite a memoir.",
+    moderate: "CORVUS-7: Halfway between whole and nothing. An interesting place to be. The station was in this state once — halfway. Then it chose a direction.",
+    critical: "CORVUS-7: You are becoming fragile. Fragile things break, and broken things become evidence. I would prefer you remain an investigator, not a data point.",
+  },
+};

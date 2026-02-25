@@ -3731,10 +3731,14 @@ export class BrowserDisplay3D implements IGameDisplay {
         ? ` <span style="color:${remaining <= 50 ? '#f44' : remaining <= 100 ? '#fa0' : '#ca8'};font-weight:bold;font-size:11px">[${remaining}]</span>`
         : "";
 
+      // Turn counter color: green→white→amber→red based on turn progress
+      const turnPct = maxTurns > 0 ? state.turn / maxTurns : 0;
+      const turnColor = turnPct >= 0.9 ? "#f44" : turnPct >= 0.7 ? "#fa0" : turnPct >= 0.5 ? "#ca8" : turnPct >= 0.3 ? "#aab" : "#4a6";
+
       const seedLabel = ` <span style="color:#334;font-size:10px">S:${state.seed}</span>`;
       this._hudStatus.innerHTML =
         hpBarHtml +
-        ` <span class="hud-label">T:</span><span class="hud-value">${state.turn}</span>${turnWarning}` +
+        ` <span class="hud-label">T:</span><span class="hud-value" style="color:${turnColor}">${state.turn}</span>${turnWarning}` +
         sensorTag + stunTag +
         (roomLabel ? ` <span style="color:#445">|</span> ${roomLabel}` : "") +
         seedLabel;

@@ -59,9 +59,60 @@ export class AudioManager {
 
   // ── Public SFX methods ──────────────────────────────────────
 
-  /** Very short quiet tick for movement (50ms, 200Hz). */
-  playMove(): void {
-    this.tone(200, 0.05, 0.15, "square");
+  /** Movement tick — pitch/timbre varies by room type for spatial audio feel. */
+  playMove(roomName?: string): void {
+    if (!roomName) { this.tone(200, 0.05, 0.15, "square"); return; }
+    const rn = roomName.toLowerCase();
+    if (rn.includes("engine") || rn.includes("power") || rn.includes("relay")) {
+      // Metallic clank — higher pitch square
+      this.tone(280, 0.04, 0.12, "square");
+    } else if (rn.includes("med") || rn.includes("crew") || rn.includes("quarter")) {
+      // Soft pad — low sine
+      this.tone(150, 0.06, 0.10, "sine");
+    } else if (rn.includes("corridor") || rn.includes("maintenance")) {
+      // Echo-y tap — triangle with longer decay
+      this.tone(220, 0.07, 0.13, "triangle");
+    } else if (rn.includes("bridge") || rn.includes("comm") || rn.includes("data") || rn.includes("signal")) {
+      // Electronic chirp — sine with pitch drop
+      this.tone(300, 0.04, 0.11, "sine", 240);
+    } else if (rn.includes("cargo") || rn.includes("storage")) {
+      // Heavy thud — low square
+      this.tone(120, 0.05, 0.14, "square");
+    } else {
+      this.tone(200, 0.05, 0.15, "square");
+    }
+  }
+
+  // ── Low-HP heartbeat state ──────────────────────────────────
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private heartbeatActive = false;
+
+  /** Start or update the low-HP heartbeat. Call each frame with current HP ratio (0-1). */
+  updateHeartbeat(hpRatio: number): void {
+    if (hpRatio >= 0.4) {
+      // Stop heartbeat when HP is above threshold
+      if (this.heartbeatActive) {
+        if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; }
+        this.heartbeatActive = false;
+      }
+      return;
+    }
+    if (this.heartbeatActive) return; // already running
+    this.heartbeatActive = true;
+    // Heartbeat speed: faster as HP drops (800ms at 40%, 400ms at 0%)
+    const interval = Math.max(400, Math.round(800 * (hpRatio / 0.4)));
+    const beatVolume = 0.08 + (1 - hpRatio / 0.4) * 0.07; // 0.08 to 0.15
+    this.heartbeatInterval = setInterval(() => {
+      // Double-tap heartbeat pattern: thump-thump
+      this.tone(60, 0.06, beatVolume, "sine");
+      setTimeout(() => this.tone(50, 0.08, beatVolume * 0.7, "sine"), 120);
+    }, interval);
+  }
+
+  /** Stop heartbeat (called on game over, title screen, etc.) */
+  stopHeartbeat(): void {
+    if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; }
+    this.heartbeatActive = false;
   }
 
   /** Satisfying blip for interactions (100ms, 440Hz). */

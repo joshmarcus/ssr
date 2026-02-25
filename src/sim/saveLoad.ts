@@ -132,6 +132,54 @@ export function hasSave(): boolean {
   return localStorage.getItem(SAVE_KEY) !== null;
 }
 
+/** Lightweight save preview — extracts metadata without full deserialization. */
+export function peekSave(): { turn: number; seed: number; roomName: string; roomsExplored: number; roomsTotal: number; phase: string } | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const wrapper = JSON.parse(raw);
+    // Save format: { _version: 1, state: { ...gameState } }
+    const data = (wrapper && wrapper.state) ? wrapper.state : wrapper;
+    const turn: number = data.turn ?? 0;
+    const seed: number = data.seed ?? 0;
+    const rooms: unknown[] = Array.isArray(data.rooms) ? data.rooms : [];
+    const roomsTotal = rooms.length;
+    const tiles: unknown[][] = Array.isArray(data.tiles) ? data.tiles : [];
+    // Count rooms with at least one explored tile (tiles[y][x].explored)
+    const roomsExplored = rooms.filter((r: any) => {
+      if (!r || typeof r.x !== "number" || typeof r.y !== "number") return false;
+      const w = r.width ?? r.w ?? 0;
+      const h = r.height ?? r.h ?? 0;
+      for (let y = r.y; y < r.y + h; y++) {
+        const row = tiles[y];
+        if (!Array.isArray(row)) continue;
+        for (let x = r.x; x < r.x + w; x++) {
+          const t = row[x] as any;
+          if (t && t.explored) return true;
+        }
+      }
+      return false;
+    }).length;
+    // Find current room name
+    const px = data.player?.entity?.pos?.x ?? 0;
+    const py = data.player?.entity?.pos?.y ?? 0;
+    const currentRoom = rooms.find((r: any) => {
+      if (!r) return false;
+      const w = r.width ?? r.w ?? 0;
+      const h = r.height ?? r.h ?? 0;
+      return px >= r.x && px < r.x + w && py >= r.y && py < r.y + h;
+    }) as any;
+    const roomName: string = currentRoom?.name ?? "Unknown";
+    // Determine phase from mystery.objectivePhase
+    const objPhase: string = data.mystery?.objectivePhase ?? "clean";
+    const phaseLabels: Record<string, string> = { clean: "Explore", investigate: "Investigate", recover: "Recover", evacuate: "Evacuate" };
+    const phase = phaseLabels[objPhase] ?? "Explore";
+    return { turn, seed, roomName, roomsExplored, roomsTotal, phase };
+  } catch {
+    return null;
+  }
+}
+
 /** Delete the save */
 export function deleteSave(): void {
   localStorage.removeItem(SAVE_KEY);

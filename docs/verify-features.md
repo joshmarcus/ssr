@@ -243,3 +243,37 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Start a new game. Skip the opening crawl text. Watch the boot sequence messages.
 - **Expected:** Messages like "ERR: PACKET LOSS — RETRYING..." / "RETRY OK", "CRC MISMATCH — RESYNC...", "WARNING: SIGNAL DEGRADATION X%", etc. Different seeds produce different glitches.
 - **Status:** PENDING
+
+---
+
+## Sprint 184 — V394-V398 (2026-02-25)
+
+### Title screen save preview
+- **What to check:** When Continue is highlighted on the title screen, a sub-line shows saved game info: turn count, current room name, game phase, and exploration percentage.
+- **How to reach it:** Launch game with a saved game. Title screen shows Continue option.
+- **Expected:** Below "Continue": something like "T:678 · Cargo Hold · Evacuate · 38% explored". Disappears when New Game is highlighted.
+- **Status:** VERIFIED — Playwright QA confirmed correct display (T:678 · Cargo Hold · Evacuate · 38%)
+
+### CORVUS-7 HP concern messages
+- **What to check:** When taking damage that drops HP below 75%, 50%, or 25%, CORVUS-7 speaks a personality-driven concern message in the relay feed. Each threshold fires once per run.
+- **How to reach it:** Play until taking environmental damage (hazards, stun). Check relay feed for teal CORVUS-7 messages about your damage.
+- **Expected:** Personality-flavored concern (analytical=statistical, empathetic=emotional, cryptic=poetic). Three escalating severity levels.
+- **Status:** PENDING — needs damage playthrough
+
+### Room-type movement audio variation
+- **What to check:** Movement sounds differ by room type: metallic in engineering/power rooms, soft in crew quarters/medical, echo-y in corridors, electronic in bridge/comms, heavy in cargo.
+- **How to reach it:** Move through different room types and listen to the movement tick sound.
+- **Expected:** Subtle but noticeable pitch/timbre differences between room types. Default square wave in unnamed rooms.
+- **Status:** PENDING — needs audio verification
+
+### Turn pacing color indicator
+- **What to check:** The T:{turn} counter in the HUD gradually changes color: green early game → white mid-game → amber at 50%+ → orange at 70%+ → red at 90%+.
+- **How to reach it:** Play through a game and observe the turn counter color at different stages.
+- **Expected:** Smooth color progression creating subtle urgency awareness without being intrusive.
+- **Status:** VERIFIED — visual QA confirmed amber color at T:678/1000 (67.8%)
+
+### Low-HP heartbeat audio
+- **What to check:** Below 40% HP, a persistent double-tap heartbeat sound plays. Heartbeat gets faster as HP drops lower. Stops on game over or title screen.
+- **How to reach it:** Take damage until below 40% HP. Listen for subtle low-frequency heartbeat.
+- **Expected:** Quiet but perceptible double-tap (thump-thump) at ~60bpm scaling to ~150bpm at near-death.
+- **Status:** PENDING — needs audio verification

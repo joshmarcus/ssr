@@ -49,13 +49,14 @@ import {
   CORVUS_IDLE_MUSINGS,
   CORVUS_ROOM_MUSINGS,
   CORVUS_MECHANIC_TIPS,
+  CORVUS_HP_CONCERN,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember, Entity, CrewDossier, RoomScene } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType, SceneActivity, SceneOutcome, TimelinePhase } from "./shared/types.js";
 import { computeChoiceEndings, computeBranchedEpilogue, isMoralChoiceUnlocked } from "./sim/mysteryChoices.js";
 import { getUnlockedDeductions, getTagCoverage, solveDeduction } from "./sim/deduction.js";
 import { getRoomAt, getRoomCleanliness } from "./sim/rooms.js";
-import { saveGame, loadGame, hasSave, deleteSave, recordRun, getRunHistory, checkAchievements, getAchievements } from "./sim/saveLoad.js";
+import { saveGame, loadGame, hasSave, deleteSave, recordRun, getRunHistory, checkAchievements, getAchievements, peekSave } from "./sim/saveLoad.js";
 import { isEntityExhausted } from "./shared/ui.js";
 import { computeGoals, computeGoalDiscoveries, type Goal, type Subgoal } from "./shared/goals.js";
 import { formatRelationship, formatCrewMemberDetail, getDeductionsForEntry, generateWhatWeKnow } from "./sim/whatWeKnow.js";
@@ -254,6 +255,7 @@ let lastCorridorAmbientTurn = 0; // cooldown: don't fire corridor ambient more t
 let lastStationEventTurn = 0; // cooldown for station-wide ambient events
 let lastJournalLength = 0; // track journal size for insight notifications
 const previouslyUnlockedDeductions = new Set<string>(); // track deduction IDs that were already unlocked
+const firedHpConcernThresholds = new Set<string>(); // track which HP concern thresholds have fired
 const foreshadowedRooms = new Map<string, string>(); // room name → log excerpt (for manuscript echo)
 const echoedRooms = new Set<string>(); // rooms where we've already shown the echo
 let journalOpen = false;
@@ -2271,6 +2273,7 @@ function resetGameState(newSeed: number): void {
   lastCorridorAmbientTurn = 0;
   lastJournalLength = 0;
   previouslyUnlockedDeductions.clear();
+  firedHpConcernThresholds.clear();
   goalPanelOpen = false;
   goalPanelIdx = 0;
   focusedGoalId = null;
@@ -2327,6 +2330,7 @@ function resetGameState(newSeed: number): void {
   choiceSelectedIdx = 0;
 
   // Clear overlays and display, rebuild
+  audio.stopHeartbeat();
   const gameoverEl = document.getElementById("gameover-overlay");
   if (gameoverEl) { gameoverEl.classList.remove("active"); gameoverEl.innerHTML = ""; }
   display.destroy();
@@ -2731,13 +2735,15 @@ function handleAction(action: Action): void {
         }
       }
     } else if (resolvedAction.type === ActionType.Move) {
-      audio.playMove();
+      const moveRoom = getRoomAt(state, state.player.entity.pos);
+      audio.playMove(moveRoom?.name);
     }
   } else if (state.turn !== prevTurn) {
     // Fallback messages for actions without sim logs
     switch (resolvedAction.type) {
       case ActionType.Move: {
-        audio.playMove();
+        const moveRoom = getRoomAt(state, state.player.entity.pos);
+        audio.playMove(moveRoom?.name);
         // Contextual feedback based on tile conditions
         const px = state.player.entity.pos.x;
         const py = state.player.entity.pos.y;
@@ -3678,11 +3684,32 @@ function handleAction(action: Action): void {
 
   // Mystery choices no longer auto-trigger — player presses [r] to broadcast
 
+  // Update heartbeat audio based on HP
+  if (!state.gameOver) {
+    audio.updateHeartbeat(state.player.hp / state.player.maxHp);
+  }
+
   // Detect damage taken this turn for screen flash
   if (state.turn !== prevTurn && !state.gameOver) {
     const hpDelta = state.player.hp - prevHp;
     if (hpDelta < 0) {
       display.triggerScreenFlash("damage");
+
+      // CORVUS-7 HP concern messages at thresholds
+      const hpRatio = state.player.hp / state.player.maxHp;
+      const concerns = CORVUS_HP_CONCERN[corvusPersonality];
+      if (concerns) {
+        if (hpRatio <= 0.25 && !firedHpConcernThresholds.has("critical")) {
+          firedHpConcernThresholds.add("critical");
+          display.addLog(concerns.critical, "narrative");
+        } else if (hpRatio <= 0.50 && !firedHpConcernThresholds.has("moderate")) {
+          firedHpConcernThresholds.add("moderate");
+          display.addLog(concerns.moderate, "narrative");
+        } else if (hpRatio <= 0.75 && !firedHpConcernThresholds.has("mild")) {
+          firedHpConcernThresholds.add("mild");
+          display.addLog(concerns.mild, "narrative");
+        }
+      }
     }
     if (state.player.stunTurns > 0 && prevStun === 0) {
       display.triggerScreenFlash("stun");
@@ -3710,6 +3737,7 @@ function handleAction(action: Action): void {
   if (state.gameOver) {
     deleteSave(); // Clear save on game end
     audio.stopAmbient(); // Silence the ambient drone
+    audio.stopHeartbeat(); // Stop low-HP heartbeat
     // audio.stopBgMusic(); // Stop background music — temporarily disabled
 
     // Record run in history
@@ -9343,6 +9371,9 @@ function showTitleScreen(): void {
     `;
   }
 
+  // Pre-compute save preview for Continue option
+  const savePreview = hasSaveGame ? peekSave() : null;
+
   function renderTitle(): void {
     let menuHtml = "";
     for (let i = 0; i < items.length; i++) {
@@ -9351,7 +9382,14 @@ function showTitleScreen(): void {
       const bg = sel ? "rgba(0,255,180,0.08)" : "transparent";
       const border = sel ? "1px solid rgba(0,255,180,0.25)" : "1px solid transparent";
       const arrow = sel ? `<span style="color:#0fa;margin-right:8px">▸</span>` : `<span style="margin-right:8px;opacity:0">▸</span>`;
-      menuHtml += `<div style="padding:10px 24px;background:${bg};border:${border};border-radius:4px;color:${color};font-size:16px;cursor:pointer;transition:all 0.15s;letter-spacing:1px">${arrow}${items[i]}</div>`;
+      let itemLine = `<div style="padding:10px 24px;background:${bg};border:${border};border-radius:4px;color:${color};font-size:16px;cursor:pointer;transition:all 0.15s;letter-spacing:1px">${arrow}${items[i]}`;
+      // Save preview info below Continue when selected
+      if (items[i] === "Continue" && sel && savePreview) {
+        const explorePct = savePreview.roomsTotal > 0 ? Math.round(savePreview.roomsExplored / savePreview.roomsTotal * 100) : 0;
+        itemLine += `<div style="font-size:10px;color:#445;margin-top:4px;margin-left:20px;letter-spacing:1px">T:${savePreview.turn} · ${savePreview.roomName} · ${savePreview.phase} · ${explorePct}% explored</div>`;
+      }
+      itemLine += `</div>`;
+      menuHtml += itemLine;
     }
 
     // Difficulty selector
