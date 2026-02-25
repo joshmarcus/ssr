@@ -2384,6 +2384,37 @@ function handleAction(action: Action): void {
     journalOpen = !journalOpen;
     if (journalOpen) {
       showJournal();
+      // CORVUS-7 case summary — brief narrated status when opening journal
+      if (state.mystery) {
+        const m = state.mystery;
+        const solved = m.deductions.filter(d => d.solved && d.answeredCorrectly).length;
+        const total = m.deductions.length;
+        const evidenceCount = m.journal.length;
+        const roomsVisited = visitedRoomIds.size;
+        const totalRooms = state.rooms.length;
+        let crewFound = 0;
+        for (const [, ent] of state.entities) {
+          if (ent.type === EntityType.CrewNPC && ent.props["found"] === true) crewFound++;
+        }
+        const totalCrew = m.crew.length;
+        const summaries: Record<string, string[]> = {
+          analytical: [
+            `CORVUS-7: Case status — ${evidenceCount} evidence items, ${solved}/${total} deductions resolved. ${roomsVisited}/${totalRooms} sectors explored. ${crewFound}/${totalCrew} crew located.`,
+            `CORVUS-7: Analysis update — evidence saturation at ${Math.round((evidenceCount / Math.max(total * 3, 1)) * 100)}%. ${total - solved} deductions remain open. Recommend continued exploration.`,
+          ],
+          empathetic: [
+            `CORVUS-7: We've found ${evidenceCount} pieces of the puzzle so far. ${crewFound > 0 ? `${crewFound} crew member${crewFound > 1 ? "s" : ""} found alive.` : "No crew found yet."} Keep looking — every piece matters.`,
+            `CORVUS-7: ${solved > 0 ? `${solved} answer${solved > 1 ? "s" : ""} confirmed — we're getting closer to the truth.` : "The truth is out there. We just need more evidence."} ${totalRooms - roomsVisited} rooms left to explore.`,
+          ],
+          cryptic: [
+            `CORVUS-7: ${evidenceCount} fragments. ${solved} certainties. ${totalRooms - roomsVisited} doors unopened. The station keeps its secrets... for now.`,
+            `CORVUS-7: ${crewFound > 0 ? "The survivors remember." : "Silence where voices should be."} ${solved}/${total} questions answered. The rest wait in the dark.`,
+          ],
+        };
+        const pool = summaries[corvusPersonality] ?? summaries.analytical;
+        const idx = state.turn % pool.length;
+        display.addLog(pool[idx], "narrative");
+      }
     } else {
       display.addLog("[Journal closed]", "system");
       renderAll();
@@ -2550,6 +2581,13 @@ function handleAction(action: Action): void {
           display.addLog(commentary, "narrative");
         }
 
+        // Scene solved celebration: golden flash + special message for perfect 3/3
+        if (sceneScore >= 3) {
+          display.triggerScreenFlash("milestone");
+          display.addLog("\u2605 SCENE SOLVED \u2014 all deductions correct. Evidence consolidated.", "milestone");
+          audio.playDeductionCorrect();
+        }
+
         continue; // skip immediate display
       }
       // Crew identification celebration — trigger screen flash
@@ -2615,6 +2653,10 @@ function handleAction(action: Action): void {
           if (simLog.text.includes(room.name) && !visitedRoomIds.has(room.id)) {
             if (!foreshadowedRooms.has(room.name)) {
               foreshadowedRooms.set(room.name, simLog.text);
+              // Notify display for minimap foreshadowed room hint
+              if ('setForeshadowedRoom' in display) {
+                (display as any).setForeshadowedRoom(room.name);
+              }
             }
           }
         }

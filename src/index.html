@@ -984,6 +984,10 @@
     .ct-node-icon { font-size: 12px; }
     .ct-node-label { font-size: 7px; letter-spacing: 0.5px; display: block; margin-top: 1px; }
     .ct-line { width: 8px; height: 1px; margin-top: -4px; }
+    .ct-near .ct-node-icon { animation: ct-pulse 2s ease-in-out infinite; }
+    .ct-ready .ct-node-icon { animation: ct-pulse-fast 1s ease-in-out infinite; text-shadow: 0 0 6px currentColor; }
+    @keyframes ct-pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+    @keyframes ct-pulse-fast { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.3); } }
 
     /* ── Narrative side panel (Disco Elysium-style relay feed) ── */
     #narrative-panel {

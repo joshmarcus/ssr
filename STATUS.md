@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 179 (V373 completed — environmental storytelling: echo rendering, evidence linking, room mood, look action)
+- **Phase**: Sprint 180 (V378 completed — investigation polish: deduction readiness, case narration, scene VFX, crew minimap icons)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable

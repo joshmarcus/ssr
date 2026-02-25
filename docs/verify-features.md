@@ -151,3 +151,23 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Collect multiple pieces of evidence from different rooms that share tag categories (e.g., both tagged "timeline" or "crew").
 - **Expected:** Brief sensor-type message: "─ EVIDENCE LINKED — connects to prior findings [tag1, tag2]"
 - **Status:** PENDING
+
+## Sprint 180 — V374-V378 (2026-02-25)
+
+### Deduction readiness pulse on case tracker
+- **What to check:** Case tracker nodes pulse slowly when evidence is 75%+ of threshold, pulse fast with glow when ready to solve.
+- **How to reach it:** Collect evidence until near a deduction's threshold. Watch case tracker on right side of screen.
+- **Expected:** Near-ready nodes: slow breathing animation. Ready nodes: fast pulse with text-shadow glow and scale animation.
+- **Status:** PENDING
+
+### Crew status icons on minimap
+- **What to check:** Crew NPC icons on minimap are color-coded by status: green (found alive), blue with pulse ring (following), gold (evacuated), red X (dead).
+- **How to reach it:** Find crew NPCs, rescue them, escort to pods. Check minimap at each stage.
+- **Expected:** Distinct colors per status. Following crew have animated blue ring. Dead crew show red X instead of triangle.
+- **Status:** PENDING
+
+### Foreshadowed room hints on minimap
+- **What to check:** Unexplored rooms mentioned in terminal logs show a pulsing orange "?" icon on the minimap.
+- **How to reach it:** Read a terminal that mentions another room by name. Check minimap for that room.
+- **Expected:** Orange pulsing "?" with glow ring at center of the hinted room. Disappears once the room is explored.
+- **Status:** PENDING

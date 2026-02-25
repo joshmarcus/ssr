@@ -1472,6 +1472,13 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _narrativeMsgCount: number = 0;
   private _lastNarrativeTurn: number = -1;
   private static readonly MAX_NARRATIVE_MSGS = 50;
+  /** Room names mentioned in terminal logs — for minimap exploration hints */
+  private _foreshadowedRoomNames: Set<string> = new Set();
+
+  /** Mark a room name as foreshadowed (mentioned in a log the player read) */
+  setForeshadowedRoom(roomName: string): void {
+    this._foreshadowedRoomNames.add(roomName);
+  }
 
   // ── Narrative side panel methods ──────────────────────────────────
 
@@ -1483,13 +1490,19 @@ export class BrowserDisplay3D implements IGameDisplay {
     tracker.classList.add("active");
     const labels = ["WHAT", "WHERE", "WHY", "WHO", "BLAME", "HIDDEN"];
     const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
+    const journalLen = state.mystery.journal.length;
     let html = "";
     for (let i = 0; i < deductions.length; i++) {
       const d = deductions[i];
       const isUnlocked = !d.solved && (!d.unlockAfter || solvedIds.has(d.unlockAfter));
-      const nodeColor = d.solved ? (d.answeredCorrectly ? "#4f8" : "#f44") : isUnlocked ? "#fa0" : "#444";
-      const nodeChar = d.solved ? (d.answeredCorrectly ? "\u25C9" : "\u2717") : isUnlocked ? "\u25C7" : "\u25CB";
-      html += `<div class="ct-node"><span class="ct-node-icon" style="color:${nodeColor}">${nodeChar}</span><span class="ct-node-label" style="color:${nodeColor}">${labels[i] ?? ""}</span></div>`;
+      // Check if near evidence threshold (75%+ of required evidence collected)
+      const threshold = d.evidenceThreshold ?? 1;
+      const nearReady = !d.solved && isUnlocked && journalLen >= threshold * 0.75 && journalLen < threshold;
+      const isReady = !d.solved && isUnlocked && journalLen >= threshold;
+      const nodeColor = d.solved ? (d.answeredCorrectly ? "#4f8" : "#f44") : isReady ? "#0f0" : isUnlocked ? "#fa0" : "#444";
+      const nodeChar = d.solved ? (d.answeredCorrectly ? "\u25C9" : "\u2717") : isReady ? "\u25C7" : isUnlocked ? "\u25C7" : "\u25CB";
+      const pulseClass = isReady ? " ct-ready" : nearReady ? " ct-near" : "";
+      html += `<div class="ct-node${pulseClass}"><span class="ct-node-icon" style="color:${nodeColor}">${nodeChar}</span><span class="ct-node-label" style="color:${nodeColor}">${labels[i] ?? ""}</span></div>`;
       if (i < deductions.length - 1) {
         const lineColor = d.solved && d.answeredCorrectly ? "#4f8" : "#333";
         html += `<div class="ct-line" style="background:${lineColor}"></div>`;
@@ -12555,13 +12568,48 @@ export class BrowserDisplay3D implements IGameDisplay {
         ctx.arc(px, py, 3, 0, Math.PI * 2);
         ctx.fill();
       } else if (entity.type === EntityType.CrewNPC) {
-        // Triangle (person)
-        ctx.beginPath();
-        ctx.moveTo(px, py - 3);
-        ctx.lineTo(px + 2.5, py + 2);
-        ctx.lineTo(px - 2.5, py + 2);
-        ctx.closePath();
-        ctx.fill();
+        // Status-colored crew icon
+        const isFollowing = entity.props["following"] === true;
+        const isEvacuated = entity.props["evacuated"] === true;
+        const isDead = entity.props["dead"] === true || entity.props["hp"] === 0;
+        const isFound = entity.props["found"] === true;
+        const crewColor = isEvacuated ? "#fd0" : isDead ? "#f44" : isFollowing ? "#4cf" : isFound ? "#4f8" : "#fe6";
+        ctx.fillStyle = crewColor;
+        if (isDead) {
+          // Red X for dead crew
+          ctx.strokeStyle = "#f44";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(px - 2, py - 2); ctx.lineTo(px + 2, py + 2);
+          ctx.moveTo(px + 2, py - 2); ctx.lineTo(px - 2, py + 2);
+          ctx.stroke();
+        } else {
+          // Triangle (person) with status color
+          ctx.beginPath();
+          ctx.moveTo(px, py - 3);
+          ctx.lineTo(px + 2.5, py + 2);
+          ctx.lineTo(px - 2.5, py + 2);
+          ctx.closePath();
+          ctx.fill();
+          // Following crew: pulsing blue ring
+          if (isFollowing) {
+            const fPulse = 0.4 + Math.sin(now * 3 + entity.pos.x * 2) * 0.4;
+            ctx.globalAlpha = fPulse;
+            ctx.strokeStyle = "#4cf";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(px, py, 4, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+          // Evacuated crew: gold dot
+          if (isEvacuated) {
+            ctx.fillStyle = "#fd0";
+            ctx.beginPath();
+            ctx.arc(px, py, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
       } else if (entity.type === EntityType.Relay) {
         // Plus sign
         ctx.fillRect(px - 1, py - 3, 2, 6);
@@ -12670,6 +12718,34 @@ export class BrowserDisplay3D implements IGameDisplay {
         }
         ctx.strokeRect(rx, ry, rw, rh);
         ctx.shadowBlur = 0;
+      }
+    }
+
+    // Foreshadowed room hints: pulsing ? icon at center of unexplored-but-mentioned rooms
+    for (const room of state.rooms) {
+      if (!this._foreshadowedRoomNames.has(room.name)) continue;
+      const rcx = room.x + Math.floor(room.width / 2);
+      const rcy = room.y + Math.floor(room.height / 2);
+      // Only show hint for rooms that haven't been fully explored yet
+      if (rcy >= 0 && rcy < state.height && rcx >= 0 && rcx < state.width) {
+        const explored = state.tiles[rcy]?.[rcx]?.explored;
+        if (explored) continue; // already visited, no hint needed
+        const hx = Math.floor(rcx * scale);
+        const hy = Math.floor(rcy * scale);
+        const pulse = 0.4 + Math.sin(now * 2 + room.x * 0.5) * 0.35;
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = "#fa0";
+        ctx.font = "bold 8px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("?", hx, hy);
+        // Pulsing glow ring
+        ctx.strokeStyle = "rgba(255, 170, 0, 0.3)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 4 + Math.sin(now * 2.5) * 1.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
       }
     }
 
