@@ -4463,6 +4463,40 @@ export class BrowserDisplay3D implements IGameDisplay {
           }
         }
 
+        // Hazard-based mood tint: layer danger colors when in hazardous rooms
+        if (inRoom && this._lastState && this._currentRoom) {
+          const room = this._currentRoom;
+          let maxHeat = 0, minPressure = 100, maxSmoke = 0;
+          for (let ry = room.y; ry < room.y + room.height; ry++) {
+            for (let rx = room.x; rx < room.x + room.width; rx++) {
+              if (ry < 0 || ry >= this._lastState.height || rx < 0 || rx >= this._lastState.width) continue;
+              const t = this._lastState.tiles[ry][rx];
+              maxHeat = Math.max(maxHeat, t.heat);
+              minPressure = Math.min(minPressure, t.pressure);
+              maxSmoke = Math.max(maxSmoke, t.smoke);
+            }
+          }
+          // Apply hazard color shift with smooth blending
+          if (maxHeat > 25) {
+            // Fire/heat: warm orange-red shift
+            const heatFactor = Math.min(0.35, (maxHeat - 25) / 200);
+            this._tempColor.setHex(0xff6622);
+            this.ambientLight.color.lerp(this._tempColor, heatFactor);
+          }
+          if (minPressure < 60) {
+            // Breach/vacuum: cold blue shift
+            const coldFactor = Math.min(0.3, (60 - minPressure) / 150);
+            this._tempColor.setHex(0x2244aa);
+            this.ambientLight.color.lerp(this._tempColor, coldFactor);
+          }
+          if (maxSmoke > 30) {
+            // Smoke: desaturated grey-yellow
+            const smokeFactor = Math.min(0.2, (maxSmoke - 30) / 200);
+            this._tempColor.setHex(0x998866);
+            this.ambientLight.color.lerp(this._tempColor, smokeFactor);
+          }
+        }
+
         // Dynamic bloom: stronger in corridors for dramatic headlight, subtle in rooms
         if (this.bloomPass && this.bloomEnabled) {
           const targetStrength = inRoom ? 0.12 : 0.28;
@@ -10286,6 +10320,12 @@ export class BrowserDisplay3D implements IGameDisplay {
       } else if (echo.echoType === SceneEchoType.SystemTrace) {
         // System trace: flickering small cube
         mesh = this.createSystemTrace(echo);
+      } else if (echo.echoType === SceneEchoType.DisturbedFurniture) {
+        // Disturbed furniture: overturned chair/spilled items
+        mesh = this.createDisturbedFurniture(echo);
+      } else if (echo.echoType === SceneEchoType.PersonalItem) {
+        // Personal item: crew personal effect left behind
+        mesh = this.createPersonalItem(echo);
       } else {
         continue;
       }
@@ -10397,6 +10437,106 @@ export class BrowserDisplay3D implements IGameDisplay {
     return mesh;
   }
 
+  /** Create a disturbed furniture mesh (overturned chair shape) */
+  private createDisturbedFurniture(echo: SceneEcho): THREE.Object3D {
+    const group = new THREE.Group();
+    const color = BrowserDisplay3D.PHASE_COLORS[echo.phase] ?? 0xff8844;
+    const mat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false,
+    });
+
+    // Tilted box (overturned chair seat)
+    const seatGeo = new THREE.BoxGeometry(0.3, 0.04, 0.3);
+    const seat = new THREE.Mesh(seatGeo, mat);
+    seat.position.set(0, 0.12, 0);
+    seat.rotation.z = 1.2; // tilted over
+    seat.rotation.y = echo.pos.x * 0.7; // varied rotation per position
+    group.add(seat);
+
+    // Chair leg sticking up
+    const legGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.25, 4);
+    const leg = new THREE.Mesh(legGeo, mat);
+    leg.position.set(0.08, 0.22, 0);
+    leg.rotation.z = 0.8;
+    group.add(leg);
+
+    // Small scattered debris (spilled items)
+    const debrisGeo = new THREE.BoxGeometry(0.06, 0.03, 0.08);
+    for (let i = 0; i < 3; i++) {
+      const debris = new THREE.Mesh(debrisGeo, mat);
+      const angle = (i / 3) * Math.PI * 2 + echo.pos.y;
+      debris.position.set(Math.cos(angle) * 0.2, 0.015, Math.sin(angle) * 0.2);
+      debris.rotation.y = angle;
+      group.add(debris);
+    }
+
+    // Ground shadow disc
+    const glowGeo = new THREE.CircleGeometry(0.35, 12);
+    glowGeo.rotateX(-Math.PI / 2);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.1,
+      depthWrite: false,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.y = 0.005;
+    group.add(glow);
+
+    group.position.set(echo.pos.x, 0, echo.pos.y);
+    return group;
+  }
+
+  /** Create a personal item mesh (small glowing object on floor) */
+  private createPersonalItem(echo: SceneEcho): THREE.Object3D {
+    const group = new THREE.Group();
+    const color = BrowserDisplay3D.PHASE_COLORS[echo.phase] ?? 0xaa44ff;
+
+    // Small rectangular item (card/photo/badge shape)
+    const itemGeo = new THREE.BoxGeometry(0.12, 0.015, 0.08);
+    const itemMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+    });
+    const item = new THREE.Mesh(itemGeo, itemMat);
+    item.position.y = 0.01;
+    item.rotation.y = echo.pos.x + echo.pos.y * 1.3; // varied angle
+    group.add(item);
+
+    // Soft ground glow (emotional significance indicator)
+    const glowGeo = new THREE.CircleGeometry(0.18, 12);
+    glowGeo.rotateX(-Math.PI / 2);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.2,
+      depthWrite: false,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.y = 0.005;
+    group.add(glow);
+
+    // Faint upward particle hint (small sphere above)
+    const sparkGeo = new THREE.SphereGeometry(0.02, 6, 6);
+    const sparkMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false,
+    });
+    const spark = new THREE.Mesh(sparkGeo, sparkMat);
+    spark.position.y = 0.15;
+    group.add(spark);
+
+    group.position.set(echo.pos.x, 0, echo.pos.y);
+    return group;
+  }
+
   // Track echo discovery state for revelation effects
   private _echoDiscoveryTimes: Map<string, number> = new Map();
   private _echoRevealedIds: Set<string> = new Set();
@@ -10495,6 +10635,33 @@ export class BrowserDisplay3D implements IGameDisplay {
         mesh.rotation.y = elapsed * 2;
         // Vertical bob
         mesh.position.y = 0.5 + Math.sin(elapsed * 1.5 + echo.pos.y * 3) * 0.08;
+      } else if (echo.echoType === SceneEchoType.DisturbedFurniture) {
+        // Subtle rocking motion (as if recently disturbed)
+        const rock = Math.sin(elapsed * 0.3 + echo.pos.x * 2) * 0.02;
+        mesh.rotation.z = rock;
+        // Revelation flash
+        if (isRevealing) {
+          const revealT = elapsed - discoveryTime!;
+          mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
+              child.material.opacity = 0.3 + Math.sin(revealT * 3) * 0.3;
+            }
+          });
+        }
+      } else if (echo.echoType === SceneEchoType.PersonalItem) {
+        // Gentle pulsing glow for emotional weight
+        const glowPulse = 0.4 + Math.sin(elapsed * 1.0 + echo.pos.y * 2) * 0.15;
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
+            child.material.opacity = isRevealing
+              ? 0.5 + Math.sin((elapsed - discoveryTime!) * 4) * 0.4
+              : glowPulse;
+          }
+        });
+        // Small floating spark bobs up and down
+        if (mesh instanceof THREE.Group && mesh.children.length >= 3) {
+          mesh.children[2].position.y = 0.15 + Math.sin(elapsed * 1.5 + echo.pos.x) * 0.05;
+        }
       }
     }
 
@@ -12450,6 +12617,24 @@ export class BrowserDisplay3D implements IGameDisplay {
           ctx.moveTo(ex + 2, ey - 2);
           ctx.lineTo(ex - 2, ey + 2);
           ctx.stroke();
+        } else if (echo.echoType === SceneEchoType.DisturbedFurniture) {
+          // Small square (furniture icon)
+          ctx.globalAlpha = echo.discovered ? 0.6 : 0.3;
+          ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+          ctx.fillRect(ex - 2, ey - 1, 4, 3);
+          ctx.globalAlpha = 1;
+        } else if (echo.echoType === SceneEchoType.PersonalItem) {
+          // Small diamond (personal effect)
+          ctx.globalAlpha = echo.discovered ? 0.7 : 0.35;
+          ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+          ctx.beginPath();
+          ctx.moveTo(ex, ey - 2);
+          ctx.lineTo(ex + 2, ey);
+          ctx.lineTo(ex, ey + 2);
+          ctx.lineTo(ex - 2, ey);
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 1;
         }
       }
     }

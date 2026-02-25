@@ -1996,8 +1996,8 @@ function initGame(): void {
           return;
         }
       }
-      display.addLog("No scene to examine here.", "system");
-      renderAll();
+      // No scene clues — fall through to Look action for atmospheric room description
+      handleAction({ type: ActionType.Look });
       return;
     }
     // ? key toggles help
@@ -2487,6 +2487,20 @@ function handleAction(action: Action): void {
         display.triggerScreenFlash?.("damage");
         audio.playDeductionWrong();
       }
+      // Evidence resonance: when new evidence shares tags with existing evidence, show link
+      if (entry.tags && entry.tags.length > 0 && prevJournalCount > 0) {
+        const priorEntries = state.mystery!.journal.slice(0, prevJournalCount);
+        const sharedTags = new Set<string>();
+        for (const prior of priorEntries) {
+          for (const tag of entry.tags) {
+            if (prior.tags?.includes(tag)) sharedTags.add(tag);
+          }
+        }
+        if (sharedTags.size > 0) {
+          const tagList = [...sharedTags].slice(0, 3).join(", ");
+          display.addLog(`\u2500 EVIDENCE LINKED \u2014 connects to prior findings [${tagList}]`, "sensor");
+        }
+      }
     }
   }
 
@@ -2605,6 +2619,12 @@ function handleAction(action: Action): void {
           }
         }
       }
+    }
+
+    // Terminal read VFX: show "DOWNLOADING..." + brief screen tint when reading log terminals
+    const newTerminalLogs = state.logs.slice(prevLogs).filter(l => l.id.startsWith("log_terminal_") && !l.id.includes("reread"));
+    if (newTerminalLogs.length > 0) {
+      display.addLog("\u2588\u2588 TERMINAL ACCESS \u2014 downloading crew records...", "system");
     }
 
     // Interaction produced logs -- play interact sound + colored tile flash
@@ -4056,7 +4076,7 @@ function showHelp(): void {
           <div><span style="color:#fff">[c]</span>  Clean current tile</div>
           <div><span style="color:#fff">[q]</span>  Scan room (all sensors)</div>
           <div><span style="color:#fff">[t]</span>  Toggle sensor overlay</div>
-          <div><span style="color:#fff">[x]</span>  Examine scene clues in current room</div>
+          <div><span style="color:#fff">[x]</span>  Examine scene / look around room</div>
           <div><span style="color:#fff">[.] [5]</span>  Wait one turn</div>
           <div><span style="color:#fff">[Tab]</span>  Auto-explore (any key to stop)</div>
         </div>

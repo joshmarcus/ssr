@@ -131,3 +131,23 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Navigate between rooms in 3D mode.
 - **Expected:** Cyan uppercase text with bottom border showing room name, animated in with the same slide effect as messages.
 - **Status:** VERIFIED — room names appearing on transitions
+
+## Sprint 179 — V369-V373 (2026-02-25)
+
+### DisturbedFurniture + PersonalItem echo rendering
+- **What to check:** New scene echo types render in 3D: overturned furniture (tilted box + scattered debris) and personal items (small glowing rectangle with floating spark). Both appear on minimap as distinct icons.
+- **How to reach it:** Navigate to rooms with scene echoes. Echoes appear when explored tiles are within view range.
+- **Expected:** DisturbedFurniture: tilted chair shape with debris, subtle rocking. PersonalItem: small glowing card on floor with pulsing spark above. Both phase-colored.
+- **Status:** PENDING
+
+### Dynamic room mood lighting
+- **What to check:** Room ambient light tints based on hazard conditions — warm orange in hot rooms, cold blue in low-pressure rooms, grey-yellow in smoky rooms.
+- **How to reach it:** Enter rooms with active hazards (heat in Power Relay Junction, breach in hull rooms).
+- **Expected:** Visible color shift in room lighting compared to neutral rooms. Blends smoothly with existing room-type tints.
+- **Status:** PENDING
+
+### Evidence resonance link messages
+- **What to check:** When new evidence shares tags with existing evidence, a "EVIDENCE LINKED" message appears in the narrative panel showing matching tag categories.
+- **How to reach it:** Collect multiple pieces of evidence from different rooms that share tag categories (e.g., both tagged "timeline" or "crew").
+- **Expected:** Brief sensor-type message: "─ EVIDENCE LINKED — connects to prior findings [tag1, tag2]"
+- **Status:** PENDING

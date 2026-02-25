@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 178 (V368 completed — crew discovery dialog, case tracker HUD, investigation nudges, evidence VFX, room headers)
+- **Phase**: Sprint 179 (V373 completed — environmental storytelling: echo rendering, evidence linking, room mood, look action)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
