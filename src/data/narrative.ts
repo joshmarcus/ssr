@@ -2340,6 +2340,32 @@ export const HAZARD_COOLING_EVIDENCE: Record<string, { summary: string; detail: 
   },
 };
 
+// ── CORVUS-7 contextual mechanic tips ──────────────────────────────
+// Fired on first occurrence of key game events. Teaches mechanics through personality.
+export const CORVUS_MECHANIC_TIPS: Record<CorvusPersonality, Record<string, string>> = {
+  analytical: {
+    first_scan: "CORVUS-7: Scan sweep logged. Sensor data reveals hidden evidence and hazards within this room. Recommend periodic scans in each new area.",
+    first_evidence: "CORVUS-7: Evidence catalogued. Press [V] to open the Investigation Hub — I've organized everything by type and relevance to our open deductions.",
+    first_deduction: "CORVUS-7: Deduction unlocked. Sufficient evidence collected to form a hypothesis. Open Investigation Hub [V] → Connections tab to review and submit your analysis.",
+    first_crew: "CORVUS-7: Crew member located. Check their dossier in the Investigation Hub [V] → Crew tab. Cross-reference their position with the incident timeline.",
+    first_room_exit: "CORVUS-7: New sector. Each room may contain terminals, evidence traces, and crew. Scan [Q] on entry, interact [Enter] with anything highlighted.",
+  },
+  empathetic: {
+    first_scan: "CORVUS-7: Your sensors are working. That scan will show you things hidden in the walls — evidence, hazards, traces of what happened. Keep scanning as you explore.",
+    first_evidence: "CORVUS-7: You found something. Every piece of evidence brings us closer to understanding. Press [V] — I've been organizing everything for you.",
+    first_deduction: "CORVUS-7: I think we know enough to piece something together. When you're ready, open the Hub [V] and check Connections. Take your time — getting it right matters.",
+    first_crew: "CORVUS-7: You found one of them. After all this time... Check the Crew tab [V] — I kept files on everyone. Maybe their story will help us understand.",
+    first_room_exit: "CORVUS-7: New territory. Be careful, Sweepo — but be curious too. There's something to find in every room if you look closely enough.",
+  },
+  cryptic: {
+    first_scan: "CORVUS-7: Your eyes open wider. Sensors pierce the veil between what is seen and what is hidden. Scan each room — the station has secrets it shows only to those who ask.",
+    first_evidence: "CORVUS-7: The station offers a gift. Accept it with [V] — I have arranged the fragments into a mosaic. Patterns emerge when you step back far enough.",
+    first_deduction: "CORVUS-7: The threshold is crossed. Enough threads to weave a tapestry — or a noose. The Hub [V], Connections tab. Choose wisely what you believe.",
+    first_crew: "CORVUS-7: A soul in the machine. Or near it. The Crew tab [V] holds what I remember of who they were. Whether they're still that person... you'll have to decide.",
+    first_room_exit: "CORVUS-7: Beyond the door, another room with another story. The station is a book written in damage and silence. Read carefully.",
+  },
+};
+
 // ── CORVUS-7 evidence discovery reactions ─────────────────────────
 // Fired when player collects new evidence. Personality-driven commentary.
 // Each pool is cycled deterministically via (seed + turn) hash.

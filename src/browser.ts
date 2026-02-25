@@ -48,6 +48,7 @@ import {
   CORVUS_EVIDENCE_REACTIONS,
   CORVUS_IDLE_MUSINGS,
   CORVUS_ROOM_MUSINGS,
+  CORVUS_MECHANIC_TIPS,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember, Entity, CrewDossier, RoomScene } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType, SceneActivity, SceneOutcome, TimelinePhase } from "./shared/types.js";
@@ -1244,6 +1245,13 @@ function checkRoomEntry(): void {
     if (!visitedRoomIds.has(currentRoom.id)) {
       visitedRoomIds.add(currentRoom.id);
 
+      // CORVUS-7 tip on first room exit (entering second room)
+      if (visitedRoomIds.size === 2 && !triggeredTutorialHints.has("first_room_exit")) {
+        triggeredTutorialHints.add("first_room_exit");
+        const roomTip = CORVUS_MECHANIC_TIPS[corvusPersonality]?.first_room_exit;
+        if (roomTip) display.addLog(roomTip, "narrative");
+      }
+
       // Exploration reward: small HP recovery on first room visit
       const EXPLORE_HEAL = 5;
       if (state.player.hp < state.player.maxHp && !state.gameOver) {
@@ -1729,7 +1737,7 @@ function initGame(): void {
   }
   renderAll();
 
-  inputHandler = new InputHandler(handleAction, handleScan);
+  inputHandler = new InputHandler(handleAction, handleScanOverlayToggle);
 
   // Create auto-explore badge (floating indicator on map)
   if (!document.getElementById("auto-explore-badge")) {
@@ -2043,6 +2051,20 @@ function initGame(): void {
       e.preventDefault();
       journalTab = journalTab === "evidence" ? "deductions" : "evidence";
       showJournal();
+      return;
+    }
+    // L key: toggle narrative relay feed panel
+    if ((e.key === "l" || e.key === "L") && !journalOpen && !investigationHubOpen && !mapOpen && !helpOpen && !logReviewOpen && !goalPanelOpen) {
+      e.preventDefault();
+      if ('toggleNarrativePanel' in display) {
+        (display as any).toggleNarrativePanel();
+      }
+      return;
+    }
+    // T key: toggle sensor overlays on/off (free, no turn cost)
+    if ((e.key === "t" || e.key === "T") && !journalOpen && !investigationHubOpen && !mapOpen && !helpOpen && !logReviewOpen && !goalPanelOpen) {
+      e.preventDefault();
+      handleScanOverlayToggle();
       return;
     }
     // Tab to cycle interaction target (when no overlays open)
@@ -2414,6 +2436,14 @@ function handleAction(action: Action): void {
     if (action.type === ActionType.Scan && !triggeredTutorialHints.has("first_scan")) {
       triggeredTutorialHints.add("first_scan");
       display.addLog(TUTORIAL_HINT_FIRST_SCAN, "system");
+      const tip = CORVUS_MECHANIC_TIPS[corvusPersonality]?.first_scan;
+      if (tip) display.addLog(tip, "narrative");
+    }
+    // Auto-activate best sensor overlay when scanning (unified scan)
+    if (action.type === ActionType.Scan && display.activeSensorMode === null) {
+      const sensors = state.player.sensors ?? [SensorType.Cleanliness];
+      const best = sensors[sensors.length - 1];
+      if (best) display.toggleSensor(best);
     }
     if (action.type === ActionType.Clean && !triggeredTutorialHints.has("first_clean")) {
       triggeredTutorialHints.add("first_clean");
@@ -2433,6 +2463,12 @@ function handleAction(action: Action): void {
   const newJournalCount = state.mystery?.journal.length ?? 0;
   if (newJournalCount > prevJournalCount && state.mystery) {
     const newEntries = state.mystery.journal.slice(prevJournalCount);
+    // CORVUS-7 tip on first crew discovery
+    if (!triggeredTutorialHints.has("first_crew") && newEntries.some(e => e.category === "crew")) {
+      triggeredTutorialHints.add("first_crew");
+      const crewTip = CORVUS_MECHANIC_TIPS[corvusPersonality]?.first_crew;
+      if (crewTip) display.addLog(crewTip, "narrative");
+    }
     for (const entry of newEntries) {
       const catLabel = entry.category.toUpperCase();
       // Check if this entry matches a contradiction pair
@@ -2641,24 +2677,6 @@ function handleAction(action: Action): void {
       }
     }
   } else {
-    // Check if blocked by cleaning directive
-    if (action.type === ActionType.Move && state.mystery?.cleaningDirective) {
-      const playerPos = state.player.entity.pos;
-      const currentRoom = getRoomAt(state, playerPos);
-      if (currentRoom) {
-        const cleanliness = getRoomCleanliness(state, currentRoom.name);
-        const goal = state.mystery.roomCleanlinessGoal;
-        if (cleanliness < goal) {
-          display.addLog(
-            `Maintenance subroutine override — primary directive requires ${currentRoom.name} at ${goal}% cleanliness before departure (currently ${cleanliness}%). Press [c] to clean. Press [t] to toggle cleanliness overlay.`,
-            "warning"
-          );
-          audio.playError();
-          renderAll();
-          return;
-        }
-      }
-    }
     display.addLog("Path blocked -- bulkhead or sealed door. Find another route.", "system");
     audio.playError();
   }
@@ -3247,6 +3265,8 @@ function handleAction(action: Action): void {
     if (state.mystery.journal.length > 0 && !triggeredTutorialHints.has("first_evidence")) {
       triggeredTutorialHints.add("first_evidence");
       display.addLog(TUTORIAL_HINT_FIRST_EVIDENCE, "system");
+      const mechTip = CORVUS_MECHANIC_TIPS[corvusPersonality]?.first_evidence;
+      if (mechTip) display.addLog(mechTip, "narrative");
       // Archetype-personality first evidence line
       const arch = state.mystery.timeline?.archetype;
       if (arch) {
@@ -3259,6 +3279,8 @@ function handleAction(action: Action): void {
     if (unlocked.length > 0 && !triggeredTutorialHints.has("first_deduction")) {
       triggeredTutorialHints.add("first_deduction");
       display.addLog(TUTORIAL_HINT_FIRST_DEDUCTION, "system");
+      const dedTip = CORVUS_MECHANIC_TIPS[corvusPersonality]?.first_deduction;
+      if (dedTip) display.addLog(dedTip, "narrative");
       audio.playDeductionReady();
     }
     // CORVUS-7 investigation progress milestones (evidence count)
@@ -3949,42 +3971,27 @@ function getTotalDiscoverables(): number {
   return count;
 }
 
-// ── Scan callback (cycles through all collected sensor overlays) ──
-function handleScan(): void {
+// ── Sensor overlay toggle (T key — free, no turn cost, all on/off) ──
+function handleScanOverlayToggle(): void {
   const sensors = state.player.sensors ?? [SensorType.Cleanliness];
   const currentMode = display.activeSensorMode;
 
-  // Cycle: off -> sensors[0] -> sensors[1] -> ... -> off
-  let nextMode: SensorType | null;
-  if (currentMode === null) {
-    nextMode = sensors[0] ?? null;
-  } else {
-    const idx = sensors.indexOf(currentMode);
-    if (idx >= 0 && idx < sensors.length - 1) {
-      nextMode = sensors[idx + 1];
-    } else {
-      nextMode = null;
-    }
-  }
-
-  // Apply the mode change via toggleSensor
   if (currentMode !== null) {
-    display.toggleSensor(currentMode); // turn off current
-  }
-  if (nextMode !== null) {
-    display.toggleSensor(nextMode); // turn on next
-  }
-
-  const sensorLabels: Record<string, string> = {
-    [SensorType.Cleanliness]: "[CLEANLINESS OVERLAY ON] — Dirt trails reveal crew movement patterns.",
-    [SensorType.Thermal]: "[THERMAL OVERLAY ON]",
-    [SensorType.Atmospheric]: "[ATMOSPHERIC OVERLAY ON] — Pressure differentials visible. Breaches glow red.",
-  };
-
-  if (nextMode === null) {
+    // Turn off current overlay
+    display.toggleSensor(currentMode);
     display.addLog("[SENSOR OVERLAY OFF]", "sensor");
   } else {
-    display.addLog(sensorLabels[nextMode] || `[${nextMode.toUpperCase()} OVERLAY ON]`, "sensor");
+    // Activate the most useful sensor (last collected = most advanced)
+    const best = sensors[sensors.length - 1];
+    if (best) {
+      display.toggleSensor(best);
+      const sensorLabels: Record<string, string> = {
+        [SensorType.Cleanliness]: "[CLEANLINESS OVERLAY ON] — Dirt trails reveal crew movement patterns.",
+        [SensorType.Thermal]: "[THERMAL OVERLAY ON] — Heat signatures and energy sources visible.",
+        [SensorType.Atmospheric]: "[ATMOSPHERIC OVERLAY ON] — Pressure differentials visible. Breaches glow red.",
+      };
+      display.addLog(sensorLabels[best] || `[${best.toUpperCase()} OVERLAY ON]`, "sensor");
+    }
   }
 
   audio.playScan();
@@ -4018,7 +4025,8 @@ function showHelp(): void {
           <div style="color:#888;margin-left:20px">Terminals, doors, airlocks, relays,</div>
           <div style="color:#888;margin-left:20px">repair cradles, crew NPCs, escape pods</div>
           <div><span style="color:#fff">[c]</span>  Clean current tile</div>
-          <div><span style="color:#fff">[q] / [t]</span>  Scan room (cycles sensor mode)</div>
+          <div><span style="color:#fff">[q]</span>  Scan room (all sensors)</div>
+          <div><span style="color:#fff">[t]</span>  Toggle sensor overlay</div>
           <div><span style="color:#fff">[x]</span>  Examine scene clues in current room</div>
           <div><span style="color:#fff">[.] [5]</span>  Wait one turn</div>
           <div><span style="color:#fff">[Tab]</span>  Auto-explore (any key to stop)</div>
@@ -4032,6 +4040,7 @@ function showHelp(): void {
           <div><span style="color:#fff">[\`]</span>  Message log review</div>
           <div><span style="color:#fff">[g]</span>  Mission Goals (track/focus)</div>
           <div><span style="color:#fff">[m]</span>  Station map overlay</div>
+          <div><span style="color:#fff">[l]</span>  Toggle relay feed panel</div>
           <div><span style="color:#fff">[?]</span>  This help screen</div>
         </div>
 

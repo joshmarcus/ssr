@@ -109,6 +109,8 @@ The following subtitle types **MUST be removed** because they already have alter
 
 ## BUG-014: Mandatory room cleaning gates exploration — interrupts investigation flow
 - **Severity**: MEDIUM (not fun)
+- **Status**: FIXED (Sprint 177, V359-V363)
+- **Fix**: Removed movement block from actions.ts and UI warning from browser.ts. Cleaning is now advisory-only (periodic warnings but no gate). Cleaning directive still auto-expires at turn 75.
 - **Location**: Room exit check (MAINTENANCE objective)
 - **Steps**: Enter a new room and try to leave to continue exploring
 - **Expected**: Can freely explore the station to collect evidence and solve the mystery
@@ -118,6 +120,8 @@ The following subtitle types **MUST be removed** because they already have alter
 
 ## BUG-015: Scanner cycling through individual sensor types is confusing — should be one unified SCAN
 - **Severity**: MEDIUM (UX design — confusing)
+- **Status**: FIXED (Sprint 177, V359-V363)
+- **Fix**: Q performs scan action + auto-activates best sensor overlay. T toggles overlay on/off (free, no turn cost). Tab only cycles interaction targets. Removed confusing sensor mode cycling.
 - **Location**: Scanner system / sensor overlay cycling (Q/T key, Tab key)
 - **Current behavior**: Pressing Q/T cycles through individual sensor modes: CLEANLINESS, THERMAL, ATMOSPHERIC, RADIATION, STRUCTURAL, EM/SIGNAL. Each mode shows different overlay data. The player must manually cycle to the "right" sensor to see relevant information. Tab also cycles sensor overlays.
 - **Problem**:
@@ -131,6 +135,7 @@ The following subtitle types **MUST be removed** because they already have alter
 
 ## BUG-016: Interaction prompt "[Enter] X" shown for non-adjacent entities — false affordance
 - **Severity**: HIGH (UX — misleading)
+- **Status**: VERIFIED FIXED (Sprint 177) — display and sim ranges already match (cardinal adjacency + same tile). Both use dx+dy<=1 check. Bug may have been from an earlier version.
 - **Location**: `display3d.ts` interaction target detection vs `step.ts:84-103` `getInteractableEntities()`
 - **Steps**: Enter a room with a Security Terminal. Walk within ~3 tiles. The HUD shows `▸ [Enter] Security Terminal`. Press Enter/i/e.
 - **Expected**: Interaction opens the terminal (since the HUD says you can)

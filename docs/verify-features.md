@@ -71,3 +71,31 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Enter a room with multiple entities. Check that subtitle bar doesn't show "You detect:" messages.
 - **Expected:** Clean relay feed without redundant sensor readouts. Action bar still shows interactable entities.
 - **Status:** VERIFIED — confirmed suppressed in visual QA
+
+---
+
+## Sprint 177 — V359-V363 (2026-02-25)
+
+### Unified scan action (BUG-015)
+- **What to check:** Q key performs scan AND auto-activates sensor overlay. T key toggles overlay on/off (free, no turn cost). Tab only cycles interaction targets, not sensors.
+- **How to reach it:** Start game, press Q to scan, check overlay activates. Press T to toggle overlay off. Press Tab near multiple entities to cycle targets.
+- **Expected:** Q = scan + overlay auto-on. T = overlay toggle. Tab = interaction target cycle. No confusing sensor mode cycling.
+- **Status:** VERIFIED — all three keys function correctly
+
+### Optional room cleaning (BUG-014)
+- **What to check:** Player can leave rooms freely without being forced to clean first. Cleaning is still available but not mandatory.
+- **How to reach it:** Enter a room with low cleanliness and try to leave without cleaning.
+- **Expected:** Player moves freely. No "Maintenance subroutine override" blocking message. Advisory warnings may still appear periodically.
+- **Status:** VERIFIED — player moved between rooms freely
+
+### Narrative panel polish
+- **What to check:** Panel scrollable via mousewheel, turn timestamps (T##) on each message, [L] key toggles panel visibility, themed thin scrollbar.
+- **How to reach it:** Play the game, accumulate messages in relay feed. Try scrolling up. Press L to hide/show panel.
+- **Expected:** Smooth scroll, timestamps visible, L toggles panel with fade animation.
+- **Status:** VERIFIED — all features working
+
+### CORVUS-7 contextual mechanic tips
+- **What to check:** CORVUS-7 personality-driven tips appear on first scan, first evidence, first deduction, first crew discovery, and first room exit. Three personality variants.
+- **How to reach it:** Start new game, perform first scan (Q), find evidence, trigger deduction.
+- **Expected:** Teal CORVUS-7 messages in relay feed providing personality-colored gameplay guidance.
+- **Status:** VERIFIED — tips appearing correctly for all events

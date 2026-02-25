@@ -33,22 +33,6 @@ export function isValidAction(state: GameState, action: Action): boolean {
       if (!state.tiles[py][nx].walkable || !state.tiles[ny][px].walkable) return false;
     }
 
-    // Cleaning directive: can't leave a dirty room until clean enough (expires after tutorial)
-    if (state.mystery?.cleaningDirective && state.turn < 25) {
-      const currentRoom = getRoomAt(state, { x: px, y: py });
-      if (currentRoom) {
-        const destRoom = getRoomAt(state, { x: nx, y: ny });
-        // Only block if moving OUT of the current room (into corridor or different room)
-        if (!destRoom || destRoom.id !== currentRoom.id) {
-          const cleanliness = getRoomCleanliness(state, currentRoom.name);
-          const goal = state.mystery.roomCleanlinessGoal;
-          if (cleanliness < goal) {
-            return false;
-          }
-        }
-      }
-    }
-
     return true;
   }
 

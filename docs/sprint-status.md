@@ -1,18 +1,20 @@
-# Sprint 176 — V353-V358
+# Sprint 177 — V359-V363
 **Status:** COMPLETE
-**Theme:** Critical UX bug fixes + CORVUS-7 narrative personality for the relay feed panel
+**Theme:** Critical interaction UX fixes — false affordance, cleaning pacing, unified scan
 
 ## Tasks
-- [x] 1. BUG-010: Suppress low-value sensor/nearby messages that duplicate action bar — `src/browser.ts` — medium
-- [x] 2. BUG-009: Auto-dismiss NEW GOAL DISCOVERED notification after 5s — `src/render/display3d.ts` — small (already had 5s auto-dismiss)
-- [x] 3. BUG-012: Replace scan wave sphere with brief expanding ring — `src/render/display3d.ts` — small (already ring from Sprint 175)
-- [x] 4. CORVUS-7 personality: contextual relay feed commentary (room-entry observations, evidence reactions, idle musings) — `src/data/narrative.ts`, `src/browser.ts` — large
-- [x] 5. BUG-013: Tab key cycles interaction target — `src/render/display3d.ts` — medium (already implemented)
+- [x] 1. BUG-016: Verified already fixed — display and sim interaction ranges match (cardinal adjacency)
+- [x] 2. BUG-014: Make room cleaning optional — removed mandatory clean-before-exit gate from actions.ts and browser.ts
+- [x] 3. BUG-015: Unified scanner — Q performs scan + auto-activates overlay, T toggles overlay (free), Tab cycles targets only
+- [x] 4. Narrative panel polish: scrollable (mousewheel), turn timestamps (T##), [L] key toggle, themed scrollbar
+- [x] 5. CORVUS-7 contextual mechanic tips: first_scan, first_evidence, first_deduction, first_crew, first_room_exit (3 personalities × 5 tips)
 
 ## Progress Log
-- 2026-02-25: Sprint planned
-- 2026-02-25: Task 1 complete — suppressed "You detect:" and "X objects to investigate" messages in browser.ts
-- 2026-02-25: Tasks 2,3,5 verified already implemented in prior sprints
-- 2026-02-25: Task 4 complete — added CORVUS_EVIDENCE_REACTIONS, CORVUS_IDLE_MUSINGS, CORVUS_ROOM_MUSINGS (3 personality variants, ~160 lines of dialog) with hooks in browser.ts
-- 2026-02-25: Visual QA passed — CORVUS-7 personality dialog rendering correctly in narrative panel
+- 2026-02-25: Sprint planned, executing immediately
+- 2026-02-25: Task 1 verified — BUG-016 already fixed in current code
+- 2026-02-25: Task 2 complete — removed cleaning gate from actions.ts and browser.ts
+- 2026-02-25: Task 3 complete — unified scan (Q=action+overlay, T=toggle, removed T from scan action)
+- 2026-02-25: Task 4 complete — scrollable panel, turn timestamps, L key toggle, themed scrollbar
+- 2026-02-25: Task 5 complete — 15 mechanic tips (3 personalities × 5 events) in narrative.ts + hooks in browser.ts
+- 2026-02-25: Visual QA passed — all features verified via Playwright MCP
 - 2026-02-25: All 408 tests passing, tsc clean. Sprint complete.

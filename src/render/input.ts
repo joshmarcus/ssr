@@ -173,13 +173,8 @@ export class InputHandler {
       }
     }
 
-    // Tab key: cycle sensor overlay (free, no turn cost)
-    // Skip if already handled by an overlay (e.g. journal, hub)
-    if (e.key === "Tab" && !e.defaultPrevented) {
-      e.preventDefault();
-      this.scanCallback();
-      return;
-    }
+    // Tab key: cycle interaction target (handled by browser.ts)
+    // No longer used for sensor overlay cycling (unified scan via Q key)
 
     const action = this.mapKeyToAction(e.key);
     if (action) {
@@ -250,9 +245,7 @@ export class InputHandler {
       case "I":
       case "Enter":
         return { type: ActionType.Interact };
-      // Scan (sensor cycle)
-      case "t":
-      case "T":
+      // Scan (unified — uses all sensors at once)
       case "q":
       case "Q":
         return { type: ActionType.Scan };

@@ -974,6 +974,7 @@
       transition: opacity 0.5s ease;
     }
     #narrative-panel.active { opacity: 1; }
+    #narrative-panel.narr-hidden { opacity: 0 !important; pointer-events: none !important; }
     .hub-open #narrative-panel { opacity: 0.15; transition: opacity 0.3s ease; }
 
     .narr-header {
@@ -988,12 +989,18 @@
 
     .narr-scroll {
       flex: 1;
-      overflow-y: hidden;
+      overflow-y: auto;
+      pointer-events: auto;
       padding: 6px 10px 8px 12px;
       background: linear-gradient(180deg, rgba(4,6,12,0.75) 0%, rgba(4,6,12,0.6) 50%, rgba(4,6,12,0.4) 100%);
       mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 85%, transparent 100%);
       -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 85%, transparent 100%);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(68,204,255,0.15) transparent;
     }
+    .narr-scroll::-webkit-scrollbar { width: 4px; }
+    .narr-scroll::-webkit-scrollbar-track { background: transparent; }
+    .narr-scroll::-webkit-scrollbar-thumb { background: rgba(68,204,255,0.2); border-radius: 2px; }
 
     /* Individual messages */
     .narr-msg {
@@ -1016,6 +1023,7 @@
 
     /* Source labels (speaker tags) */
     .narr-source { display: block; font-size: 9px; font-weight: bold; letter-spacing: 1.5px; margin-bottom: 1px; }
+    .narr-turn { float: right; font-size: 8px; color: #334; letter-spacing: 1px; margin-top: 1px; }
 
     /* Per-type styling (colored left borders + text, like DE's skill voices) */
     .narr-msg.narr-narrative { color: #0ff; border-left-color: #088; }

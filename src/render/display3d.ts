@@ -1475,6 +1475,13 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // ── Narrative side panel methods ──────────────────────────────────
 
+  toggleNarrativePanel(): void {
+    if (!this._narrativePanel) this.initNarrativePanel();
+    if (this._narrativePanel) {
+      this._narrativePanel.classList.toggle("narr-hidden");
+    }
+  }
+
   private initNarrativePanel(): void {
     this._narrativePanel = document.getElementById("narrative-panel");
     if (!this._narrativePanel) return;
@@ -1552,8 +1559,9 @@ export class BrowserDisplay3D implements IGameDisplay {
     const typeClass = isCorvus ? "narr-corvus" : `narr-${type}`;
     msgEl.className = `narr-msg ${typeClass} narr-newest`;
 
+    const turnLabel = `<span class="narr-turn">T${currentTurn}</span>`;
     const sourceHtml = source ? `<span class="narr-source">${this.escapeHtml(source)}</span>` : "";
-    msgEl.innerHTML = sourceHtml + this.escapeHtml(cleanText);
+    msgEl.innerHTML = turnLabel + sourceHtml + this.escapeHtml(cleanText);
     this._narrativeScroll.appendChild(msgEl);
     this._lastNarrativeEl = msgEl;
     this._narrativeMsgCount++;
@@ -3599,13 +3607,8 @@ export class BrowserDisplay3D implements IGameDisplay {
         // [Q] Scan — show when player has sensors
         const sensors = state.player.sensors ?? [];
         if (sensors.length > 0) {
-          const sensorNames: Record<string, string> = {
-            [SensorType.Thermal]: "Thermal",
-            [SensorType.Cleanliness]: "Clean",
-            [SensorType.Atmospheric]: "Atmo",
-          };
-          const currentLabel = this.sensorMode ? sensorNames[this.sensorMode] ?? this.sensorMode : "Off";
-          actionHints.push(`<span style="color:#0cf">[Q] Scan <span style="color:#556;font-size:10px">(${currentLabel})</span></span>`);
+          const overlayLabel = this.sensorMode ? "On" : "Off";
+          actionHints.push(`<span style="color:#0cf">[Q] Scan <span style="color:#556;font-size:10px">(${overlayLabel})</span></span>`);
         }
 
         // [X] Examine — show when in a room with scene clues
