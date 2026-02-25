@@ -1242,6 +1242,10 @@ function checkRoomEntry(): void {
 
   if (currentRoom && currentRoom.id !== lastPlayerRoomId) {
     lastPlayerRoomId = currentRoom.id;
+    // Room location header in narrative panel (like DE chapter markers)
+    if ('appendNarrativeLocationHeader' in display) {
+      (display as any).appendNarrativeLocationHeader(currentRoom.name);
+    }
     if (!visitedRoomIds.has(currentRoom.id)) {
       visitedRoomIds.add(currentRoom.id);
 
@@ -2463,6 +2467,8 @@ function handleAction(action: Action): void {
   const newJournalCount = state.mystery?.journal.length ?? 0;
   if (newJournalCount > prevJournalCount && state.mystery) {
     const newEntries = state.mystery.journal.slice(prevJournalCount);
+    // Evidence discovery screen flash
+    display.triggerScreenFlash?.("evidence");
     // CORVUS-7 tip on first crew discovery
     if (!triggeredTutorialHints.has("first_crew") && newEntries.some(e => e.category === "crew")) {
       triggeredTutorialHints.add("first_crew");
@@ -3099,6 +3105,29 @@ function handleAction(action: Action): void {
       else nudgePool = PACING_NUDGE_CLEAN;
       const nudgeIdx = (state.turn * 7 + state.seed) % nudgePool.length;
       display.addLog(nudgePool[nudgeIdx], "system");
+      // CORVUS-7 personality-colored investigation nudge
+      if (phase === ObjectivePhase.Investigate || phase === ObjectivePhase.Recover) {
+        const investNudges: Record<CorvusPersonality, string[]> = {
+          analytical: [
+            "CORVUS-7: Idle time accumulating. Unvisited rooms contain unseen evidence. Recommend exploring.",
+            "CORVUS-7: Investigation stalling. Try scanning [Q] or interacting with nearby objects [Enter].",
+            "CORVUS-7: Data collection rate below optimal. More evidence needed for pending deductions.",
+          ],
+          empathetic: [
+            "CORVUS-7: Take your time, but... the crew needs answers. There might be something important nearby.",
+            "CORVUS-7: I know it's a lot to take in. But every room you haven't visited could hold the key.",
+            "CORVUS-7: Still here? That's okay. But there are terminals and traces waiting to be found.",
+          ],
+          cryptic: [
+            "CORVUS-7: The station grows quieter the longer you stand still. But it hasn't finished speaking.",
+            "CORVUS-7: Answers don't find themselves. The evidence is patient. You should be less so.",
+            "CORVUS-7: Somewhere nearby, a clue gathers dust. It was meant for you.",
+          ],
+        };
+        const pool = investNudges[corvusPersonality] ?? investNudges.analytical;
+        const idx = ((state.seed ?? 0) + state.turn) % pool.length;
+        display.addLog(pool[idx], "narrative");
+      }
       lastNudgeTurn = state.turn;
     }
 

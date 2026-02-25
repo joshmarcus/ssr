@@ -203,6 +203,7 @@
     #damage-flash.damage { background: radial-gradient(ellipse at center, transparent 40%, rgba(255,0,0,0.3) 100%); }
     #damage-flash.milestone { background: radial-gradient(ellipse at center, rgba(0,255,0,0.15) 0%, transparent 70%); }
     #damage-flash.stun { background: radial-gradient(ellipse at center, rgba(0,100,255,0.2) 0%, transparent 70%); }
+    #damage-flash.evidence { background: radial-gradient(ellipse at center, transparent 50%, rgba(0,204,180,0.2) 100%); }
 
     /* Hazard warning screen border — persistent red/amber edge glow in dangerous areas */
     #hazard-border {
@@ -958,6 +959,32 @@
       font-size: 10px;
       margin-left: 12px;
     }
+    /* ── Case tracker (persistent deduction chain progress) ── */
+    #case-tracker {
+      position: fixed;
+      right: 8px;
+      top: 100px;
+      z-index: 10;
+      pointer-events: none;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      color: #556;
+      display: none;
+      gap: 0;
+      align-items: center;
+      background: rgba(4,6,12,0.6);
+      padding: 4px 8px;
+      border-radius: 3px;
+      border: 1px solid rgba(68,204,255,0.08);
+      letter-spacing: 1px;
+    }
+    #case-tracker.active { display: flex; }
+    .hub-open #case-tracker { opacity: 0.15; }
+    .ct-node { text-align: center; padding: 0 3px; line-height: 1; }
+    .ct-node-icon { font-size: 12px; }
+    .ct-node-label { font-size: 7px; letter-spacing: 0.5px; display: block; margin-top: 1px; }
+    .ct-line { width: 8px; height: 1px; margin-top: -4px; }
+
     /* ── Narrative side panel (Disco Elysium-style relay feed) ── */
     #narrative-panel {
       position: fixed;
@@ -1070,6 +1097,20 @@
 
     /* Turn separator */
     .narr-turn-sep { height: 1px; margin: 6px 20px 6px 8px; background: linear-gradient(90deg, rgba(68,204,255,0.15) 0%, transparent 80%); }
+
+    /* Room location header (Disco Elysium chapter marker) */
+    .narr-location {
+      padding: 6px 8px 4px;
+      margin: 8px 0 4px;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      color: #4cf;
+      border-bottom: 1px solid rgba(68,204,255,0.12);
+      text-transform: uppercase;
+      opacity: 0;
+      animation: narr-msg-in 0.4s ease forwards;
+    }
 
     /* ── Evidence card overlay ──────────────────────────────── */
     #evidence-card {
@@ -1572,6 +1613,7 @@
     </div>
     <div class="narr-scroll"></div>
   </div>
+  <div id="case-tracker"></div>
   <div id="evidence-card"></div>
   <div id="deduction-result"></div>
   <div id="case-closed"></div>

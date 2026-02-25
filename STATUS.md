@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 177 (V363 completed — unified scan, optional cleaning, narrative panel polish, CORVUS-7 mechanic tips)
+- **Phase**: Sprint 178 (V368 completed — crew discovery dialog, case tracker HUD, investigation nudges, evidence VFX, room headers)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable

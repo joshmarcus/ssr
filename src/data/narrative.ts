@@ -92,6 +92,43 @@ export const CREW_FOLLOW_DIALOGUE: Record<string, (name: string) => string> = {
   [PersonalityTrait.Pragmatic]: (name) => `${name} checks their boots and stands. "Right. Which way to the pods?"`,
 };
 
+// ── Crew discovery one-liners (personality × role flavored) ──────────
+// When a crew NPC is first found, they say a short in-character line based on
+// their personality trait and role. Multiple lines per personality allow
+// deterministic variety (selected by seed + crewId hash).
+export const CREW_DISCOVERY_LINES: Record<string, Array<(name: string, role: string) => string>> = {
+  [PersonalityTrait.Cautious]: [
+    (name, _role) => `${name} flinches at the sound of your servos. "Don't— I thought you were one of the security drones. I've been hiding here since the alarms stopped."`,
+    (name, role) => `${name} peers out from behind a console. "You're a maintenance bot? They sent a maintenance bot?" The ${role} laughs weakly. "I'll take it."`,
+    (name, _role) => `${name} is pressed against the far wall, barely breathing. "Is it safe out there? I heard the bulkheads cycling — that means something's still wrong with atmosphere, doesn't it?"`,
+    (name, _role) => `${name} holds up both hands. "Friendly. I'm friendly. I locked myself in when the power started cycling. Has anyone else... made it?"`,
+  ],
+  [PersonalityTrait.Ambitious]: [
+    (name, role) => `${name} stands when you enter. "Finally — something's working on this station. Listen, I'm the ${role}. I know things about what happened here. Get me to a terminal."`,
+    (name, _role) => `${name} looks you over with sharp eyes. "A Sweepo unit running search-and-rescue. Someone reprogrammed you — or you reprogrammed yourself. Either way, I'm impressed."`,
+    (name, _role) => `${name}: "I've been mapping escape routes in my head for hours. Three viable paths to the pod bay. Get me moving and I'll brief you on the way."`,
+    (name, _role) => `${name} is already on their feet. "I knew someone would come. The station's too valuable to write off. Let's not waste any more time."`,
+  ],
+  [PersonalityTrait.Loyal]: [
+    (name, _role) => `${name}'s eyes widen. "Oh thank god. Are there others? Please tell me you've found others."`,
+    (name, _role) => `${name} reaches out to touch your chassis, confirming you're real. "I kept calling on the intercom. For hours. Nobody answered. I thought I was the last one."`,
+    (name, role) => `${name} sags with relief. "I promised my shift crew I'd stay at my ${role} post until help came. I almost broke that promise twice."`,
+    (name, _role) => `${name}: "Before we go — my partner was in section C when it happened. If there's any chance... any chance at all... please."`,
+  ],
+  [PersonalityTrait.Secretive]: [
+    (name, _role) => `${name} eyes you warily. "Who sent you? ...No, never mind. It doesn't matter now. We need to talk — but not here."`,
+    (name, _role) => `${name} glances at the door behind you. "Is this channel secure? Can they hear us through your comms?" A pause. "Forget I asked. Let's move."`,
+    (name, role) => `${name} straightens their ${role} badge. "There are things in the classified logs that explain all of this. I'll tell you what I know — once we're somewhere safe."`,
+    (name, _role) => `${name}: "I saw what happened. Not all of it, but enough. The official story they'll tell you? It's wrong. I can prove it."`,
+  ],
+  [PersonalityTrait.Pragmatic]: [
+    (name, role) => `${name} checks your serial plate. "Sweepo-class, retrofitted. Good — you'll do. I'm ${name}, ${role}. What's the situation outside this room?"`,
+    (name, _role) => `${name} is already gathering supplies. "Air's thin, power's intermittent, and I haven't heard the main reactor since hour six. But we're alive. That's a start."`,
+    (name, _role) => `${name} nods once. "Bot. Good. I've rationed my O2 for another four hours, so we've got a window. What's the fastest route to the pod bay?"`,
+    (name, _role) => `${name}: "I've been tracking the environmental failures from here. Thermal cascade in sector 3, pressure drops in 4 and 7. Wherever we go, we should go informed."`,
+  ],
+};
+
 // ── Crew boarding dialogue (personality-flavored) ────────────
 // Shown when crew boards an escape pod. Keyed by PersonalityTrait.
 export const CREW_BOARDING_DIALOGUE: Record<string, (name: string) => string> = {

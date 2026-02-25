@@ -1475,6 +1475,43 @@ export class BrowserDisplay3D implements IGameDisplay {
 
   // ── Narrative side panel methods ──────────────────────────────────
 
+  updateCaseTracker(state: GameState): void {
+    const tracker = document.getElementById("case-tracker");
+    if (!tracker || !state.mystery) return;
+    const deductions = state.mystery.deductions;
+    if (!deductions || deductions.length === 0) { tracker.classList.remove("active"); return; }
+    tracker.classList.add("active");
+    const labels = ["WHAT", "WHERE", "WHY", "WHO", "BLAME", "HIDDEN"];
+    const solvedIds = new Set(deductions.filter(d => d.solved).map(d => d.id));
+    let html = "";
+    for (let i = 0; i < deductions.length; i++) {
+      const d = deductions[i];
+      const isUnlocked = !d.solved && (!d.unlockAfter || solvedIds.has(d.unlockAfter));
+      const nodeColor = d.solved ? (d.answeredCorrectly ? "#4f8" : "#f44") : isUnlocked ? "#fa0" : "#444";
+      const nodeChar = d.solved ? (d.answeredCorrectly ? "\u25C9" : "\u2717") : isUnlocked ? "\u25C7" : "\u25CB";
+      html += `<div class="ct-node"><span class="ct-node-icon" style="color:${nodeColor}">${nodeChar}</span><span class="ct-node-label" style="color:${nodeColor}">${labels[i] ?? ""}</span></div>`;
+      if (i < deductions.length - 1) {
+        const lineColor = d.solved && d.answeredCorrectly ? "#4f8" : "#333";
+        html += `<div class="ct-line" style="background:${lineColor}"></div>`;
+      }
+    }
+    tracker.innerHTML = html;
+  }
+
+  appendNarrativeLocationHeader(roomName: string): void {
+    if (!this._narrativePanel) this.initNarrativePanel();
+    if (!this._narrativeScroll) return;
+    const header = document.createElement("div");
+    header.className = "narr-location";
+    header.textContent = `— ${roomName} —`;
+    this._narrativeScroll.appendChild(header);
+    requestAnimationFrame(() => {
+      if (this._narrativeScroll) {
+        this._narrativeScroll.scrollTo({ top: this._narrativeScroll.scrollHeight, behavior: "smooth" });
+      }
+    });
+  }
+
   toggleNarrativePanel(): void {
     if (!this._narrativePanel) this.initNarrativePanel();
     if (this._narrativePanel) {
@@ -2435,7 +2472,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   private cameraShakeDecay: number = 0;
   private _shakePhase: number = 0;
 
-  triggerScreenFlash(type: "damage" | "milestone" | "stun"): void {
+  triggerScreenFlash(type: "damage" | "milestone" | "stun" | "evidence"): void {
     const flash = document.getElementById("damage-flash");
     if (!flash) return;
     flash.className = `active ${type}`;
@@ -3283,6 +3320,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateAirFlowArrows(state);
     this.updateEntities(state);
     this.updateClueMarkers(state);
+    this.updateCaseTracker(state);
 
     // Phase-reactive global lighting
     const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;

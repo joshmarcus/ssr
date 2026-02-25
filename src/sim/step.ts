@@ -18,7 +18,7 @@ import { updateSlotUnlocks, confirmCard, rejectCard, generateProposal, generateR
 import { isMoralChoiceUnlocked } from "./mysteryChoices.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
-  CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
+  CREW_DISCOVERY_LINES, CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
   CREW_POST_BREACH_TESTIMONY, CREW_POST_BREACH_GENERIC,
   HAZARD_BREACH_EVIDENCE, HAZARD_RELAY_EVIDENCE, HAZARD_COOLING_EVIDENCE,
   CREW_RESCUE_GRATITUDE,
@@ -2591,16 +2591,27 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
             },
           ];
         } else {
-          // No seal — immediate discovery
-          const personalityDescriptors: Record<string, string> = {
-            cautious: "shaken",
-            ambitious: "determined but frightened",
-            loyal: "relieved to see you",
-            secretive: "guarded",
-            pragmatic: "injured but alert",
-          };
+          // No seal — immediate discovery with personality one-liner
           const personality = target.props["personality"] as string || "cautious";
-          const descriptor = personalityDescriptors[personality] || "shaken";
+          const role = target.props["role"] as string || "crew";
+
+          let discoveryText: string;
+          if (isUnconscious) {
+            discoveryText = `Found ${crewName} in cryo-stasis. Need to interact again to revive.`;
+          } else {
+            // Pick a procedural one-liner based on personality + deterministic hash
+            const lines = CREW_DISCOVERY_LINES[personality];
+            if (lines && lines.length > 0) {
+              // Deterministic selection from seed + crewId hash
+              const crewId = target.props["crewId"] as string || targetId;
+              let hash = state.seed ?? 0;
+              for (let i = 0; i < crewId.length; i++) hash = ((hash << 5) - hash + crewId.charCodeAt(i)) | 0;
+              const idx = Math.abs(hash) % lines.length;
+              discoveryText = lines[idx](crewName, role);
+            } else {
+              discoveryText = `${crewName} found in ${getPlayerRoomName(state)}!`;
+            }
+          }
 
           next.logs = [
             ...state.logs,
@@ -2608,9 +2619,7 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
               id: `log_crew_found_${targetId}_${next.turn}`,
               timestamp: next.turn,
               source: "narrative",
-              text: isUnconscious
-                ? `Found ${crewName} in cryo-stasis. Need to interact again to revive.`
-                : `${crewName} found in ${getPlayerRoomName(state)}! They look ${descriptor}.`,
+              text: discoveryText,
               read: false,
             },
           ];

@@ -26,7 +26,7 @@ export interface IGameDisplay {
   readonly isCleanlinessActive: boolean;
   readonly activeSensorMode: SensorType | null;
   getLogHistory(): DisplayLogEntry[];
-  triggerScreenFlash(type: "damage" | "milestone" | "stun"): void;
+  triggerScreenFlash(type: "damage" | "milestone" | "stun" | "evidence"): void;
   flashTile(x: number, y: number, color?: string): void;
   showGameOverOverlay(state: GameState): void;
   copyRunSummary(): Promise<boolean>;

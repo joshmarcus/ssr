@@ -99,3 +99,35 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Start new game, perform first scan (Q), find evidence, trigger deduction.
 - **Expected:** Teal CORVUS-7 messages in relay feed providing personality-colored gameplay guidance.
 - **Status:** VERIFIED — tips appearing correctly for all events
+
+## Sprint 178 — V364-V368 (2026-02-25)
+
+### Crew NPC personality discovery one-liners
+- **What to check:** When first discovering a crew NPC, they speak an in-character line based on their personality trait and role (not just "They look shaken"). 20 unique lines across 5 personalities.
+- **How to reach it:** Play until finding a crew NPC (typically Recover phase). Interact to discover them.
+- **Expected:** Rich, character-driven first contact line with personality flavor (cautious = fearful, ambitious = commanding, loyal = worried about others, secretive = paranoid, pragmatic = practical).
+- **Status:** PENDING
+
+### Investigation case tracker HUD widget
+- **What to check:** Small persistent tracker on right side showing WHAT→WHERE→WHY→WHO→BLAME deduction chain with colored symbols (green check, red X, orange diamond for unlocked, gray circle for locked).
+- **How to reach it:** Start game, navigate to a room with evidence. The tracker should appear once deductions exist.
+- **Expected:** Vertical/horizontal chain of labeled nodes with connecting lines. Colors update as deductions are solved.
+- **Status:** VERIFIED — tracker visible with correct chain nodes
+
+### CORVUS-7 investigation nudges
+- **What to check:** When player lingers in investigation/recovery phase, CORVUS-7 provides contextual nudges ("Have you tried scanning nearby compartments?" etc.). 3 personalities × 3 messages.
+- **How to reach it:** Play through investigation phase, wait several turns without progress.
+- **Expected:** Personality-flavored hints appear in narrative panel as teal CORVUS-7 messages.
+- **Status:** PENDING
+
+### Evidence discovery screen flash VFX
+- **What to check:** Brief teal screen-edge glow when picking up new evidence (distinct from red damage flash and green milestone flash).
+- **How to reach it:** Find evidence during gameplay (scan rooms, interact with terminals/crew).
+- **Expected:** Subtle teal radial glow from screen edges that fades quickly.
+- **Status:** PENDING
+
+### Room location headers in relay feed
+- **What to check:** When entering a new room, a styled location header appears in the narrative panel (like Disco Elysium's location chapter markers).
+- **How to reach it:** Navigate between rooms in 3D mode.
+- **Expected:** Cyan uppercase text with bottom border showing room name, animated in with the same slide effect as messages.
+- **Status:** VERIFIED — room names appearing on transitions
