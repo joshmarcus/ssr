@@ -500,7 +500,7 @@ export function tickPA(state: GameState): GameState {
 export function applyHazardDamage(inputState: GameState): GameState {
   let state = inputState;
   const { x, y } = state.player.entity.pos;
-  const tile = state.tiles[y][x];
+  let tile = state.tiles[y][x];
 
   if (!state.player.alive) return state;
 
@@ -511,6 +511,18 @@ export function applyHazardDamage(inputState: GameState): GameState {
 
   // Passive buff checks
   const buffs = state.player.passiveBuffs ?? {};
+
+  // Heat Sink buff: passively cool the tile the player stands on (before damage calc)
+  if (buffs["heat_sink"] && tile.heat > 0) {
+    const coolAmount = buffs["heat_sink"] ?? 5;
+    const newTiles = state.tiles === inputState.tiles
+      ? state.tiles.map(row => row.map(t => ({ ...t })))
+      : state.tiles;
+    newTiles[y][x].heat = Math.max(0, newTiles[y][x].heat - coolAmount);
+    state = { ...state, tiles: newTiles };
+    // Re-read tile with reduced heat for damage calculations below
+    tile = state.tiles[y][x];
+  }
 
   // Pressure suit buff: immune to low-pressure damage
   // Pressure damage: low-pressure tiles damage the bot
@@ -627,16 +639,6 @@ export function applyHazardDamage(inputState: GameState): GameState {
       logs: smokeLogs,
     };
     if (smokeHp <= 0) return state;
-  }
-
-  // Heat Sink buff: passively cool the tile the player stands on
-  if (buffs["heat_sink"] && tile.heat > 0) {
-    const coolAmount = buffs["heat_sink"] ?? 5;
-    const newTiles = state.tiles === inputState.tiles
-      ? state.tiles.map(row => row.map(t => ({ ...t })))
-      : state.tiles;
-    newTiles[y][x].heat = Math.max(0, newTiles[y][x].heat - coolAmount);
-    state = { ...state, tiles: newTiles };
   }
 
   // Emergency Repair buff: auto-heal when dropping below 20% HP (once per room)
