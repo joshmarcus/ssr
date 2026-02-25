@@ -1441,21 +1441,22 @@ export class BrowserDisplay3D implements IGameDisplay {
     if (this.logHistory.length > BrowserDisplay3D.MAX_LOG_ENTRIES) {
       this.logHistory.shift();
     }
-    // Show all messages as subtitles (sidebar removed — subtitles are the primary message display)
     if (this.chaseCamActive) {
       const source = type === "milestone" ? "CORVUS-7 CENTRAL"
         : type === "critical" ? "ALERT"
         : type === "warning" ? "WARNING"
         : type === "sensor" ? "SENSOR"
+        : type === "narrative" ? "OBSERVATION"
         : type === "system" ? "SYSTEM"
         : undefined;
-      const priority = type === "milestone" || type === "critical";
-      // Auto-dismiss for non-critical messages
-      const duration = (type === "system") ? 3000
-        : (type === "sensor" || type === "warning") ? 4000
-        : (type === "narrative") ? 4000
-        : undefined; // milestone/critical require manual dismiss
-      this.queueSubtitle(msg, source, priority, duration);
+
+      // Always add to narrative side panel
+      this.appendNarrativeMessage(msg, type, source);
+
+      // Only flash subtitle bar for critical/milestone (center-screen alerts)
+      if (type === "critical" || type === "milestone") {
+        this.queueSubtitle(msg, source, true, undefined);
+      }
     }
   }
 
@@ -1463,6 +1464,145 @@ export class BrowserDisplay3D implements IGameDisplay {
   private _subtitleDismissHandler: ((e: KeyboardEvent) => void) | null = null;
   private _subtitleQueue: { text: string; source?: string; duration?: number }[] = [];
   private _subtitleActive: boolean = false;
+
+  // Narrative side panel (Disco Elysium-style relay feed)
+  private _narrativePanel: HTMLElement | null = null;
+  private _narrativeScroll: HTMLElement | null = null;
+  private _narrativeStatus: HTMLElement | null = null;
+  private _narrativeMsgCount: number = 0;
+  private _lastNarrativeTurn: number = -1;
+  private static readonly MAX_NARRATIVE_MSGS = 50;
+
+  // ── Narrative side panel methods ──────────────────────────────────
+
+  private initNarrativePanel(): void {
+    this._narrativePanel = document.getElementById("narrative-panel");
+    if (!this._narrativePanel) return;
+    this._narrativeScroll = this._narrativePanel.querySelector(".narr-scroll");
+    this._narrativeStatus = this._narrativePanel.querySelector(".narr-header-status");
+    this._narrativePanel.classList.add("active");
+  }
+
+  private _lastNarrativeText: string = "";
+  private _lastNarrativeDupCount: number = 0;
+  private _lastNarrativeEl: HTMLElement | null = null;
+
+  private appendNarrativeMessage(text: string, type: LogType, source?: string): void {
+    // Lazy-init the panel on first message
+    if (!this._narrativePanel) this.initNarrativePanel();
+    if (!this._narrativeScroll) return;
+
+    // Clean text: strip HTML tags and [ECHO] prefix
+    let cleanText = text.replace(/<[^>]*>/g, "").replace(/^\[ECHO\]\s*/, "").trim();
+
+    // Skip empty messages
+    if (!cleanText) return;
+
+    // Detect CORVUS-7 messages for special styling
+    let isCorvus = false;
+    if (cleanText.startsWith("CORVUS-7:")) {
+      isCorvus = true;
+      source = "CORVUS-7";
+      cleanText = cleanText.replace(/^CORVUS-7:\s*/, "");
+    } else if (cleanText.startsWith("CORVUS-7 CENTRAL:")) {
+      isCorvus = true;
+      source = "CORVUS-7";
+      cleanText = cleanText.replace(/^CORVUS-7 CENTRAL:\s*/, "");
+    } else if (type === "milestone" && source === "CORVUS-7 CENTRAL") {
+      // Milestone messages from CORVUS-7 get corvus voice — unless they're alerts
+      const isAlert = /ALERT|═══/.test(cleanText);
+      if (!isAlert) {
+        isCorvus = true;
+      }
+    }
+
+    // Deduplicate consecutive identical messages (e.g. "Path blocked" spam)
+    if (cleanText === this._lastNarrativeText && this._lastNarrativeEl) {
+      this._lastNarrativeDupCount++;
+      // Update the existing message with a repeat count
+      const countBadge = this._lastNarrativeEl.querySelector(".narr-dup");
+      if (countBadge) {
+        countBadge.textContent = `×${this._lastNarrativeDupCount + 1}`;
+      } else {
+        const badge = document.createElement("span");
+        badge.className = "narr-dup";
+        badge.textContent = `×${this._lastNarrativeDupCount + 1}`;
+        this._lastNarrativeEl.appendChild(badge);
+      }
+      return; // Don't create a new element
+    }
+    this._lastNarrativeText = cleanText;
+    this._lastNarrativeDupCount = 0;
+
+    // Insert turn separator if the turn changed
+    const currentTurn = this._lastState?.turn ?? 0;
+    if (currentTurn > this._lastNarrativeTurn && this._lastNarrativeTurn >= 0) {
+      const sep = document.createElement("div");
+      sep.className = "narr-turn-sep";
+      this._narrativeScroll.appendChild(sep);
+    }
+    this._lastNarrativeTurn = currentTurn;
+
+    // Remove "newest" glow from previous message
+    const prevNewest = this._narrativeScroll.querySelector(".narr-newest");
+    if (prevNewest) prevNewest.classList.remove("narr-newest");
+
+    // Create message element
+    const msgEl = document.createElement("div");
+    const typeClass = isCorvus ? "narr-corvus" : `narr-${type}`;
+    msgEl.className = `narr-msg ${typeClass} narr-newest`;
+
+    const sourceHtml = source ? `<span class="narr-source">${this.escapeHtml(source)}</span>` : "";
+    msgEl.innerHTML = sourceHtml + this.escapeHtml(cleanText);
+    this._narrativeScroll.appendChild(msgEl);
+    this._lastNarrativeEl = msgEl;
+    this._narrativeMsgCount++;
+
+    // Prune oldest messages if over limit
+    while (this._narrativeMsgCount > BrowserDisplay3D.MAX_NARRATIVE_MSGS) {
+      const first = this._narrativeScroll.firstElementChild;
+      if (first) {
+        this._narrativeScroll.removeChild(first);
+        if (!first.classList.contains("narr-turn-sep")) {
+          this._narrativeMsgCount--;
+        }
+      } else {
+        break;
+      }
+    }
+
+    // Age older messages
+    this.ageNarrativeMessages();
+
+    // Update status indicator
+    if (this._narrativeStatus) {
+      this._narrativeStatus.textContent = `T${currentTurn}`;
+    }
+
+    // Smooth auto-scroll to bottom
+    requestAnimationFrame(() => {
+      if (this._narrativeScroll) {
+        this._narrativeScroll.scrollTo({
+          top: this._narrativeScroll.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    });
+  }
+
+  private ageNarrativeMessages(): void {
+    if (!this._narrativeScroll) return;
+    const msgs = this._narrativeScroll.querySelectorAll(".narr-msg");
+    const total = msgs.length;
+    for (let i = 0; i < total; i++) {
+      const el = msgs[i];
+      el.classList.remove("aged-1", "aged-2", "aged-3");
+      const distFromEnd = total - 1 - i;
+      if (distFromEnd >= 12) el.classList.add("aged-3");
+      else if (distFromEnd >= 8) el.classList.add("aged-2");
+      else if (distFromEnd >= 4) el.classList.add("aged-1");
+    }
+  }
 
   /** Queue a subtitle message — priority messages go to the front, with queue limit */
   private queueSubtitle(text: string, source?: string, priority: boolean = false, duration?: number): void {
@@ -3060,6 +3200,19 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._subtitleDismissHandler = null;
     }
     if (this._subtitleTimer) clearTimeout(this._subtitleTimer);
+    // Clean up narrative panel
+    if (this._narrativePanel) {
+      this._narrativePanel.classList.remove("active");
+      if (this._narrativeScroll) this._narrativeScroll.innerHTML = "";
+      this._narrativePanel = null;
+      this._narrativeScroll = null;
+      this._narrativeStatus = null;
+      this._narrativeMsgCount = 0;
+      this._lastNarrativeTurn = -1;
+      this._lastNarrativeText = "";
+      this._lastNarrativeDupCount = 0;
+      this._lastNarrativeEl = null;
+    }
     // Clean up overlays
     const overlay = document.getElementById("gameover-overlay");
     if (overlay) overlay.classList.remove("active");

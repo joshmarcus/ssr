@@ -292,7 +292,7 @@
       transition: opacity 0.3s ease;
       top: 0;
       left: 0;
-      max-width: 380px;
+      max-width: 320px;
       line-height: 1.4;
     }
     #hud-objective::before {
@@ -958,6 +958,111 @@
       font-size: 10px;
       margin-left: 12px;
     }
+    /* ── Narrative side panel (Disco Elysium-style relay feed) ── */
+    #narrative-panel {
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 48px;
+      width: 320px;
+      z-index: 9;
+      pointer-events: none;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    #narrative-panel.active { opacity: 1; }
+    .hub-open #narrative-panel { opacity: 0.15; transition: opacity 0.3s ease; }
+
+    .narr-header {
+      flex-shrink: 0;
+      padding: 6px 12px 4px;
+      padding-top: 90px;
+      background: linear-gradient(180deg, rgba(4,6,12,0.0) 0%, rgba(4,6,12,0.6) 60%, rgba(6,8,14,0.7) 100%);
+      border-bottom: 1px solid rgba(68,204,255,0.12);
+    }
+    .narr-header-label { color: #4cf; font-size: 9px; font-weight: bold; letter-spacing: 2px; }
+    .narr-header-status { color: #333; font-size: 9px; float: right; letter-spacing: 1px; }
+
+    .narr-scroll {
+      flex: 1;
+      overflow-y: hidden;
+      padding: 6px 10px 8px 12px;
+      background: linear-gradient(180deg, rgba(4,6,12,0.75) 0%, rgba(4,6,12,0.6) 50%, rgba(4,6,12,0.4) 100%);
+      mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 85%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 85%, transparent 100%);
+    }
+
+    /* Individual messages */
+    .narr-msg {
+      padding: 4px 0 4px 8px;
+      margin-bottom: 3px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #aab;
+      border-left: 2px solid transparent;
+      opacity: 0;
+      transform: translateY(6px);
+      animation: narr-msg-in 0.4s ease forwards;
+    }
+    @keyframes narr-msg-in { to { opacity: 1; transform: translateY(0); } }
+
+    /* Age-based dimming */
+    .narr-msg.aged-1 { opacity: 0.7; }
+    .narr-msg.aged-2 { opacity: 0.5; }
+    .narr-msg.aged-3 { opacity: 0.35; }
+
+    /* Source labels (speaker tags) */
+    .narr-source { display: block; font-size: 9px; font-weight: bold; letter-spacing: 1.5px; margin-bottom: 1px; }
+
+    /* Per-type styling (colored left borders + text, like DE's skill voices) */
+    .narr-msg.narr-narrative { color: #0ff; border-left-color: #088; }
+    .narr-msg.narr-narrative .narr-source { color: #0aa; }
+
+    .narr-msg.narr-system { color: #778; border-left-color: rgba(68,255,136,0.15); font-size: 11px; }
+    .narr-msg.narr-system .narr-source { color: #4a6; }
+
+    .narr-msg.narr-warning { color: #fa0; border-left-color: #a70; }
+    .narr-msg.narr-warning .narr-source { color: #c80; }
+
+    .narr-msg.narr-critical { color: #f44; border-left-color: #f22; font-weight: bold; }
+    .narr-msg.narr-critical .narr-source { color: #f66; }
+
+    .narr-msg.narr-milestone { color: #0f0; border-left-color: #0a0; font-weight: bold; text-shadow: 0 0 6px rgba(0,255,0,0.2); }
+    .narr-msg.narr-milestone .narr-source { color: #0c0; }
+
+    .narr-msg.narr-sensor { color: #6cf; border-left-color: rgba(102,204,255,0.3); font-size: 11px; }
+    .narr-msg.narr-sensor .narr-source { color: #4af; }
+
+    /* CORVUS-7 special voice (like DE's Inland Empire — distinct teal with background tint) */
+    .narr-msg.narr-corvus { color: #4ec9b0; border-left-color: #2a7a6a; background: rgba(42,122,106,0.06); padding: 5px 8px 5px 10px; border-radius: 0 2px 2px 0; }
+    .narr-msg.narr-corvus .narr-source { color: #2a9a7a; }
+
+    /* Newest message subtle glow */
+    .narr-msg.narr-newest { animation: narr-msg-in 0.4s ease forwards, narr-glow 1.5s ease-out forwards; }
+    @keyframes narr-glow {
+      0% { box-shadow: inset 0 0 8px rgba(68,204,255,0.15); }
+      100% { box-shadow: none; }
+    }
+
+    /* Duplicate message count badge */
+    .narr-dup {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 0 4px;
+      font-size: 9px;
+      font-weight: bold;
+      color: #556;
+      background: rgba(255,255,255,0.06);
+      border-radius: 3px;
+      vertical-align: middle;
+    }
+
+    /* Turn separator */
+    .narr-turn-sep { height: 1px; margin: 6px 20px 6px 8px; background: linear-gradient(90deg, rgba(68,204,255,0.15) 0%, transparent 80%); }
+
     /* ── Evidence card overlay ──────────────────────────────── */
     #evidence-card {
       position: fixed;
@@ -1452,6 +1557,13 @@
   <div id="minimap-fullscreen"></div>
   <div id="autoplay-badge">AUTOPLAY</div>
   <div id="subtitle-bar"></div>
+  <div id="narrative-panel">
+    <div class="narr-header">
+      <span class="narr-header-label">RELAY FEED</span>
+      <span class="narr-header-status"></span>
+    </div>
+    <div class="narr-scroll"></div>
+  </div>
   <div id="evidence-card"></div>
   <div id="deduction-result"></div>
   <div id="case-closed"></div>
