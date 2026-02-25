@@ -277,3 +277,25 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Take damage until below 40% HP. Listen for subtle low-frequency heartbeat.
 - **Expected:** Quiet but perceptible double-tap (thump-thump) at ~60bpm scaling to ~150bpm at near-death.
 - **Status:** PENDING — needs audio verification
+
+---
+
+## Sprint 185 — V399-V403 (2026-02-25)
+
+### Crew NPC role-based suit colors
+- **What to check:** Crew NPCs display per-role emissive color tinting: captain=gold, engineer=orange, medic=green, security=blue, scientist=purple, robotics=cyan, comms=teal, life_support=white. Ground ring under each NPC also uses role color.
+- **How to reach it:** Navigate to rooms containing crew NPCs. Look for humanoid models with colored glow/emissive tint.
+- **Expected:** Distinct colors per crew role, making it easy to identify crew function at a glance.
+- **Status:** PENDING — needs navigation to crew NPC locations
+
+### Difficulty-specific CORVUS-7 opening greeting
+- **What to check:** Starting a game on Easy shows an encouraging CORVUS-7 greeting; Hard shows an ominous one; Normal shows no extra greeting. Each greeting varies by CORVUS personality (analytical/empathetic/cryptic).
+- **How to reach it:** Start a new game on Easy difficulty, then on Hard difficulty. Observe the opening messages in the narrative panel.
+- **Expected:** Easy: warm/reassuring tone. Hard: dire/foreboding tone. Visible in the RELAY FEED panel.
+- **Status:** PENDING
+
+### Seed display on title screen
+- **What to check:** The title screen shows "SEED: {number}" below the difficulty selector.
+- **How to reach it:** Return to title screen or start the game fresh.
+- **Expected:** Small text showing the current seed number, useful for sharing runs.
+- **Status:** VERIFIED — visible as "SEED: 184202" in Playwright QA

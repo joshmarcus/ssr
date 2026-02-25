@@ -657,6 +657,20 @@ export const CORVUS_GREETING: Record<CorvusPersonality, string> = {
   cryptic: "CORVUS-7 CENTRAL: Signal received. Acknowledged. The station remembers you, even if you've never been here before.",
 };
 
+// Difficulty-specific additional greeting (appended after personality greeting)
+export const CORVUS_DIFFICULTY_GREETING: Record<string, Record<CorvusPersonality, string>> = {
+  easy: {
+    analytical: "CORVUS-7: Environmental conditions within tolerance. Systems degradation: minimal. Sufficient time for a thorough investigation.",
+    empathetic: "CORVUS-7: The station is quiet today. Take your time, little one. There's no rush — just... find out what happened here.",
+    cryptic: "CORVUS-7: The lights are still on. The doors still open. The station is being patient with you. Enjoy that while it lasts.",
+  },
+  hard: {
+    analytical: "CORVUS-7: WARNING — Critical system failures across multiple compartments. Environmental hazards exceeding safe thresholds. Time is a diminishing resource.",
+    empathetic: "CORVUS-7: I won't sugarcoat this — the station is falling apart. Hazards everywhere. You need to work fast or... well. Please work fast.",
+    cryptic: "CORVUS-7: The station is dying. It knows. You can feel it in the way the walls groan. Every turn you waste, something else fails. Move with purpose.",
+  },
+};
+
 // Personality-variant milestone reactions — override the default for key milestones
 export const CORVUS_PERSONALITY_REACTIONS: Record<CorvusPersonality, Record<string, string>> = {
   analytical: {

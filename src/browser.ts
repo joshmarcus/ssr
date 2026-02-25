@@ -50,6 +50,7 @@ import {
   CORVUS_ROOM_MUSINGS,
   CORVUS_MECHANIC_TIPS,
   CORVUS_HP_CONCERN,
+  CORVUS_DIFFICULTY_GREETING,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember, Entity, CrewDossier, RoomScene } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType, SceneActivity, SceneOutcome, TimelinePhase } from "./shared/types.js";
@@ -1705,6 +1706,11 @@ function initGame(): void {
   display.addLog("LINK ACTIVE — Low-bandwidth terminal feed. Sweepo online.", "milestone");
   deferredInitMessages.push({ text: MOOD_FLAVOR[stationMood], type: "narrative" });
   deferredInitMessages.push({ text: CORVUS_GREETING[corvusPersonality], type: "narrative" });
+  // Difficulty-specific CORVUS-7 flavor (Easy=encouraging, Hard=ominous, Normal=none)
+  const diffGreeting = CORVUS_DIFFICULTY_GREETING[difficulty]?.[corvusPersonality];
+  if (diffGreeting) {
+    deferredInitMessages.push({ text: diffGreeting, type: "narrative" });
+  }
 
   // Station context briefing — crew count, station status, mission objective
   if (state.mystery) {
@@ -9418,6 +9424,7 @@ function showTitleScreen(): void {
         <div style="display:flex;flex-direction:column;gap:6px;min-width:200px;align-items:center">
           ${menuHtml}
           ${diffHtml}
+          <div style="font-size:9px;color:#223;letter-spacing:1px;margin-top:2px">SEED: ${seed}</div>
         </div>
         ${statsHtml}
         <div style="font-size:10px;color:#223">[↑/↓] Navigate · [←/→] Difficulty · [Enter] Select</div>

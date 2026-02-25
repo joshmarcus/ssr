@@ -25,7 +25,7 @@ All bugs from QA Sessions 1-3 are resolved. This file tracks the history for ref
 |-----|----------|--------|-----|
 | **BUG-009** "NEW GOAL DISCOVERED" never auto-dismisses | HIGH | VERIFIED FIXED (Sprint 177) | 5s auto-dismiss timer + keypress dismiss handler |
 | **BUG-010** Sensor "Nearby" subtitles spam and block gameplay | P0 | VERIFIED FIXED (Sprint 176) | "You detect:" and "Nearby" messages suppressed entirely |
-| **BUG-011** Crew NPC models are placeholder blue shapes | MEDIUM | PARTIALLY FIXED (Sprint 173-174) | GLTF models with Worlds texture atlas; could use per-role variation |
+| **BUG-011** Crew NPC models are placeholder blue shapes | MEDIUM | VERIFIED FIXED (Sprint 185) | GLTF models with Worlds texture atlas + per-role emissive suit colors (captain=gold, engineer=orange, medic=green, security=blue, scientist=purple, robotics=cyan, comms=teal, life_support=white) |
 | **BUG-012** Scan wave still too large (BUG-007 follow-up) | HIGH | VERIFIED FIXED (Sprint 181) | See BUG-007 — 4x/0.6s ring, no sphere |
 | **BUG-013** No way to cycle interaction targets | MEDIUM | VERIFIED FIXED (Sprint 177) | Tab cycles adjacent interactables, action bar shows counter |
 | **BUG-014** Mandatory room cleaning gates exploration | MEDIUM | FIXED (Sprint 177) | Cleaning now advisory-only, no movement block |
@@ -36,9 +36,7 @@ All bugs from QA Sessions 1-3 are resolved. This file tracks the history for ref
 
 ## Open Issues
 
-| Bug | Severity | Description |
-|-----|----------|-------------|
-| **BUG-011** (partial) | LOW | Crew NPCs could benefit from per-role color/uniform variation and status-based poses |
+All bugs resolved. No open issues.
 
 ---
 

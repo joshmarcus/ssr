@@ -10904,6 +10904,14 @@ export class BrowserDisplay3D implements IGameDisplay {
       group.userData = { entityType: entity.type, baseY, isGltf: true, _cacheKey: cacheKey };
       group.position.set(entity.pos.x, baseY, entity.pos.y);
 
+      // Crew NPC role-based suit colors
+      const CREW_ROLE_COLORS: Record<string, number> = {
+        captain: 0xffd700, engineer: 0xff8c00, medic: 0x44cc66, security: 0x4488ff,
+        scientist: 0xaa66ff, robotics: 0x00cccc, life_support: 0xcccccc, comms: 0x44ccaa,
+      };
+      const crewRole = entity.type === EntityType.CrewNPC ? (entity.props["role"] as string) : undefined;
+      const roleColor = crewRole ? CREW_ROLE_COLORS[crewRole] : undefined;
+
       // Entity glow: emissive material only (PointLights disabled for performance)
       const glowDef = BrowserDisplay3D.ENTITY_GLOW_LIGHTS[entity.type];
       if (glowDef) {
@@ -10914,8 +10922,16 @@ export class BrowserDisplay3D implements IGameDisplay {
             child.material.emissiveIntensity = 0.45;
           }
         });
+      } else if (roleColor !== undefined) {
+        // Crew NPCs get role-based suit tinting
+        clone.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.emissive = new THREE.Color(roleColor);
+            child.material.emissiveIntensity = 0.25;
+          }
+        });
       } else {
-        // Non-glow entities still get a visible emissive tint from their entity color
+        // Non-glow, non-crew entities: generic entity color tint
         const entityColor = ENTITY_COLORS_3D[entity.type];
         if (entityColor) {
           clone.traverse((child) => {
@@ -10937,7 +10953,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       group.add(shadowDisc);
 
       // Ground ring — glowing circle on the floor beneath the entity (additive for bloom)
-      const ringColor = ENTITY_COLORS_3D[entity.type] ?? 0xffffff;
+      const ringColor = roleColor ?? ENTITY_COLORS_3D[entity.type] ?? 0xffffff;
       const groundRing = new THREE.Mesh(
         new THREE.RingGeometry(0.28, 0.42, 20),
         new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })

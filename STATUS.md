@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 184 (V398 completed — title screen save preview, CORVUS-7 HP concern dialog, room-type movement audio, turn pacing color, low-HP heartbeat)
+- **Phase**: Sprint 185 (V403 completed — crew role suit colors, difficulty-specific CORVUS-7 greeting, seed display on title screen, BUG-011 closed)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
