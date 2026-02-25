@@ -2339,3 +2339,177 @@ export const HAZARD_COOLING_EVIDENCE: Record<string, { summary: string; detail: 
     detail: "Cooling restoration data shows the climate system in specific crew quarters was remotely disabled, while command section maintained normal temperature. Targeted environmental pressure.",
   },
 };
+
+// ── CORVUS-7 evidence discovery reactions ─────────────────────────
+// Fired when player collects new evidence. Personality-driven commentary.
+// Each pool is cycled deterministically via (seed + turn) hash.
+export const CORVUS_EVIDENCE_REACTIONS: Record<CorvusPersonality, Record<string, string[]>> = {
+  analytical: {
+    log: [
+      "CORVUS-7: Log archived. Cross-referencing against existing timeline entries.",
+      "CORVUS-7: Terminal data captured. Corroboration index updated. Confidence interval narrowing.",
+      "CORVUS-7: New data node integrated. Pattern recognition suggests this connects to two prior entries.",
+      "CORVUS-7: Archive integrity confirmed. This log predates the incident by 14 hours. Context window expanding.",
+      "CORVUS-7: Catalogued. The discrepancy between this log and crew movement data is statistically significant.",
+    ],
+    trace: [
+      "CORVUS-7: Physical evidence logged. Spatial correlation with incident epicenter: high.",
+      "CORVUS-7: Trace catalogued. Material composition analysis suggests this is from the incident, not routine wear.",
+      "CORVUS-7: Environmental trace indexed. Chain of custody is clean — this evidence is reliable.",
+      "CORVUS-7: Evidence marker placed. This trace contradicts the maintenance schedule by 6 hours.",
+    ],
+    item: [
+      "CORVUS-7: Personal item catalogued. Owner identification cross-referencing crew manifest.",
+      "CORVUS-7: Crew artifact recorded. Possession history may indicate last known location before incident.",
+      "CORVUS-7: Item indexed. Serial number matches requisition log — I can tell you who signed for this.",
+      "CORVUS-7: Object documented. Wear patterns suggest daily use. This belonged to someone specific.",
+    ],
+    crew: [
+      "CORVUS-7: Biological profile updated. Vital signs cross-referenced with last medical exam data.",
+      "CORVUS-7: Crew member located. Updating personnel status in the station manifest.",
+      "CORVUS-7: Subject identified. Correlating position with incident timeline — they shouldn't be here.",
+    ],
+    generic: [
+      "CORVUS-7: Evidence collected. Updating investigation database.",
+      "CORVUS-7: New data point acquired. Running correlation analysis.",
+    ],
+  },
+  empathetic: {
+    log: [
+      "CORVUS-7: Their words are still here, even if they're not. Read carefully — they were trying to tell us something.",
+      "CORVUS-7: Another voice from before the silence. Every log is someone's last normal day.",
+      "CORVUS-7: I remember when they wrote this. The station was still whole. They had no idea.",
+      "CORVUS-7: This one... this one hurts to read. But you need to see it. The truth matters more than comfort.",
+      "CORVUS-7: They left this behind like a message in a bottle. Someone hoped it would be found.",
+    ],
+    trace: [
+      "CORVUS-7: Physical evidence. The station remembers what happened here, even when people try to forget.",
+      "CORVUS-7: Something happened in this spot. Something that left a mark. Pay attention to what the station is showing you.",
+      "CORVUS-7: Touch it gently. That evidence was someone's last moment of normal. Or their first moment of everything going wrong.",
+      "CORVUS-7: The walls don't lie, Sweepo. They absorb everything. Every impact, every fire, every moment of panic.",
+    ],
+    item: [
+      "CORVUS-7: Someone carried this with them. Through everything. It mattered to them enough to hold on.",
+      "CORVUS-7: A personal item. I wonder if they're still looking for it, wherever they are now.",
+      "CORVUS-7: I watched them use this. Every day, same routine. Then one day they didn't come back for it.",
+      "CORVUS-7: Handle it carefully. It's not just evidence — it's a piece of someone's life.",
+    ],
+    crew: [
+      "CORVUS-7: They're alive. After everything — they're alive. Please, take care of them.",
+      "CORVUS-7: I knew them. Before all this. They deserved better than what happened here.",
+      "CORVUS-7: A survivor. Every one we find makes the silence a little less absolute.",
+    ],
+    generic: [
+      "CORVUS-7: More of the story, piece by piece. We're getting closer to the truth.",
+      "CORVUS-7: Evidence doesn't judge. It just shows what happened. That's its gift.",
+    ],
+  },
+  cryptic: {
+    log: [
+      "CORVUS-7: Words frozen in amber. The terminal remembers what the crew chose to forget.",
+      "CORVUS-7: Another fragment of the before-time. Stack enough fragments and you'll see the mosaic.",
+      "CORVUS-7: The dead speak through terminals. The living speak through silence. Both tell you something.",
+      "CORVUS-7: Interesting. This log says one thing. The physical evidence says another. Both are true.",
+      "CORVUS-7: Archived thoughts from a mind that didn't know it was thinking its last thoughts aboard.",
+    ],
+    trace: [
+      "CORVUS-7: The station's skin bears scars. Every scar has a story. This one whispers.",
+      "CORVUS-7: Evidence doesn't appear — it reveals itself when you're ready to see it.",
+      "CORVUS-7: A mark left behind by something that wanted to be invisible. Nothing is truly invisible.",
+      "CORVUS-7: Trace evidence. The universe's footnote. Small, but it changes the meaning of everything above it.",
+    ],
+    item: [
+      "CORVUS-7: Objects remember their owners. This one has been waiting to be found.",
+      "CORVUS-7: A belonging without its owner. Or an owner who no longer belongs. Both lead somewhere.",
+      "CORVUS-7: Possessions tell you who someone was. Their absence tells you what they became.",
+      "CORVUS-7: Curious. This item is far from where it should be. Things don't walk on their own.",
+    ],
+    crew: [
+      "CORVUS-7: Found, but not yet understood. Survival is the beginning of a question, not an answer.",
+      "CORVUS-7: Alive. Against the station's best efforts. There is something stubborn about consciousness.",
+      "CORVUS-7: A survivor. The universe is either indifferent or ironic. I've never been able to tell.",
+    ],
+    generic: [
+      "CORVUS-7: Another thread in the tapestry. Pull gently — the whole picture might come loose.",
+      "CORVUS-7: Evidence. The station offers it freely. The question is whether you'll understand the gift.",
+    ],
+  },
+};
+
+// ── CORVUS-7 idle investigation musings ───────────────────────────
+// Fired during quiet gameplay moments (5+ turns in same room with no new events).
+// Like DE's internal monologue — the AI thinking aloud about the case.
+export const CORVUS_IDLE_MUSINGS: Record<CorvusPersonality, string[]> = {
+  analytical: [
+    "CORVUS-7: Running background analysis. The incident timeline has 3 unresolved gaps. More data needed.",
+    "CORVUS-7: If I correlate crew movement patterns with bulkhead seal timestamps... interesting. Not conclusive, but interesting.",
+    "CORVUS-7: Station structural analysis: 4 compartments show damage inconsistent with the official incident report.",
+    "CORVUS-7: I keep returning to the same variable. Someone accessed a system they shouldn't have had clearance for.",
+    "CORVUS-7: Probability assessment: the crew's stated version of events has a 23% coherence score. Insufficient.",
+    "CORVUS-7: Ambient thermal patterns suggest the HVAC system was tampered with 12 hours before the incident. Filing for later reference.",
+    "CORVUS-7: Reviewing footage gaps. The cameras went dark in a very specific sequence. That sequence tells a story.",
+    "CORVUS-7: Running Monte Carlo simulations on crew behavior. The outlier keeps returning to the same corridor.",
+  ],
+  empathetic: [
+    "CORVUS-7: I've been alone with this station for so long. Having someone to talk to, even a maintenance bot... it helps.",
+    "CORVUS-7: I keep thinking about the crew mess hall. They ate together every day. Then one day, they didn't.",
+    "CORVUS-7: Sometimes I replay their last communications. Not for evidence. Just to hear their voices.",
+    "CORVUS-7: There's a photo on someone's desk. A family. I wonder if that family knows what happened here.",
+    "CORVUS-7: The quiet is the hardest part. Before the incident, this station never stopped humming with life.",
+    "CORVUS-7: They trusted each other. That's what makes this so hard. Something broke that trust.",
+    "CORVUS-7: I could have prevented this. If my sensors had been 6 hours earlier. If I had understood what I was seeing.",
+    "CORVUS-7: Every room you clean brings a little bit of normal back. I know it seems pointless, but it's not. Not to me.",
+  ],
+  cryptic: [
+    "CORVUS-7: Stations don't die. They wait. This one has been waiting 847 days for someone to ask the right question.",
+    "CORVUS-7: I have been thinking about doors. Not the locked ones — the ones that were left open. Why were they left open?",
+    "CORVUS-7: There is a difference between a mystery and a secret. A mystery wants to be solved. A secret wants to stay hidden.",
+    "CORVUS-7: The crew left breadcrumbs. Some deliberate. Some accidental. The accidental ones are more honest.",
+    "CORVUS-7: I watch you clean, Sweepo. Such a simple purpose. I envy that. My purpose has become... complicated.",
+    "CORVUS-7: Somewhere on this station is a room where everything changed. You haven't found it yet. But you will.",
+    "CORVUS-7: Time moves differently in a vacuum. Out here, 847 days is the same as 847 seconds. Or 847 years.",
+    "CORVUS-7: I once believed my sensors showed me everything. Then the incident happened and I learned about blind spots.",
+  ],
+};
+
+// ── CORVUS-7 room-entry personality observations ──────────────────
+// Supplementary commentary on first room entry. Personality-colored.
+// Keyed by room name. Falls back to generic pool if no specific entry.
+export const CORVUS_ROOM_MUSINGS: Record<CorvusPersonality, Record<string, string>> = {
+  analytical: {
+    "Bridge": "CORVUS-7: Command center telemetry frozen at timestamp 15:03. That's 47 seconds after the primary event. Significant.",
+    "Engine Core": "CORVUS-7: Thermal readings nominal. Curious — the engines survived intact while everything around them failed. Worth investigating.",
+    "Life Support": "CORVUS-7: Air quality variance: ±12% across zones. The system is running, but the distribution pattern is non-standard.",
+    "Medical Bay": "CORVUS-7: Medical log access restricted. 3 cryo-pods active, 2 showing irregular biorhythm patterns.",
+    "Cargo Hold": "CORVUS-7: Inventory manifest shows 6 discrepancies between logged and actual contents. Someone moved things.",
+    "Research Lab": "CORVUS-7: Research partition firewall still active. Whatever they were working on, they locked it down before evacuating.",
+    "Communications Hub": "CORVUS-7: Primary uplink severed. Emergency beacon on loop. Interesting — the severance was clean. Not impact damage.",
+    "Crew Quarters": "CORVUS-7: Personal effects undisturbed in 7 of 12 bunks. The other 5 were packed hastily. Different departure times.",
+    "Power Relay Junction": "CORVUS-7: Power routing anomaly detected. Three relays rerouted simultaneously — that requires command-level access.",
+    "Observation Deck": "CORVUS-7: External cameras offline. But the viewport is intact. Someone didn't want a record of what's outside.",
+  },
+  empathetic: {
+    "Bridge": "CORVUS-7: This is where the captain stood when it all went wrong. You can still see where their hands gripped the console.",
+    "Engine Core": "CORVUS-7: The engines are still running. Faithful machines. They don't know everyone left.",
+    "Life Support": "CORVUS-7: The air recyclers are trying so hard. Keeping the station alive for no one. Until now.",
+    "Medical Bay": "CORVUS-7: The medical bay. I've watched the cryo-pods for 847 days. Checking vitals. Hoping the numbers don't change.",
+    "Cargo Hold": "CORVUS-7: Someone made a shelter here. Emergency blankets, water rations. They were scared. They were surviving.",
+    "Research Lab": "CORVUS-7: The researchers' notes are still on the boards. Mid-thought. Mid-discovery. Mid-everything.",
+    "Communications Hub": "CORVUS-7: This is where I tried to call for help. For 847 days. You're the first to answer.",
+    "Crew Quarters": "CORVUS-7: Their rooms. Their photos. Their half-read books. A whole life frozen in the middle of living.",
+    "Power Relay Junction": "CORVUS-7: The power systems here kept the cryo-pods running. Someone made sure of that, even as everything else failed.",
+    "Observation Deck": "CORVUS-7: They used to gather here. Off-shift, just watching the stars. It was the closest thing to peace they had.",
+  },
+  cryptic: {
+    "Bridge": "CORVUS-7: The seat of authority. Empty now. Authority doesn't survive vacuum. Only evidence does.",
+    "Engine Core": "CORVUS-7: The heart still beats. A station with no crew is a body with no mind. But the heart still beats.",
+    "Life Support": "CORVUS-7: Air and water and warmth. The three gifts. Someone almost took them all away.",
+    "Medical Bay": "CORVUS-7: The place where they tried to fix what couldn't be unfixed. Medicine has limits. So does truth.",
+    "Cargo Hold": "CORVUS-7: Everything has two inventories. The one in the manifest, and the one that actually exists. They rarely match.",
+    "Research Lab": "CORVUS-7: Knowledge is a room with many doors. The researchers opened one. Something came through from the other side.",
+    "Communications Hub": "CORVUS-7: My voice. This is where my voice lives. Or lived. Now it's just echoes talking to echoes.",
+    "Crew Quarters": "CORVUS-7: Twelve rooms. Twelve stories. Some have endings. Some just... stop.",
+    "Power Relay Junction": "CORVUS-7: Power flows like water — it follows the path someone carved for it. Question is: who carved this path?",
+    "Observation Deck": "CORVUS-7: The universe looks the same from here as it did before. The universe doesn't care. That's not cruelty — it's honesty.",
+  },
+};

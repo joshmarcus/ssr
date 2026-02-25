@@ -2152,7 +2152,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     text: string;         // e.g. "What happened aboard CORVUS-7?"
     hint: string;         // e.g. "Press [V] to investigate"
     color?: string;       // accent color (default: orange)
-    duration?: number;    // ms before auto-dismiss (default: 6000)
+    duration?: number;    // ms before auto-dismiss (default: 5000)
   }): void {
     let el = document.getElementById("hud-notification");
     if (!el) {
@@ -2190,7 +2190,7 @@ export class BrowserDisplay3D implements IGameDisplay {
       el!.style.opacity = "0";
       el!.style.top = "-10px";
       setTimeout(() => { el!.style.display = "none"; }, 500);
-    }, opts.duration ?? 6000);
+    }, opts.duration ?? 5000);
 
     // Keypress dismiss
     const dismissNotif = () => {

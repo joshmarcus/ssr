@@ -55,3 +55,19 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Start a new game. Do NOT press anything for 5 seconds. Observe subtitle bar.
 - **Expected:** One intro message, no flood of 10+ messages. After first move, deferred messages appear with auto-dismiss.
 - **Status:** PENDING
+
+---
+
+## Sprint 176 — V353-V358 (2026-02-25)
+
+### CORVUS-7 personality relay feed commentary
+- **What to check:** CORVUS-7 personality-driven messages appear in the left narrative panel during gameplay: room-entry observations when entering named rooms, evidence discovery reactions when finding clues, idle musings every ~11 turns of inactivity. Three personality variants (analytical, empathetic, cryptic) selected by seed.
+- **How to reach it:** Start a new game, explore rooms and collect evidence. Check the RELAY FEED panel on the left.
+- **Expected:** Teal-colored CORVUS-7 messages interspersed with system messages. Room observations on first entry to named rooms (Command Center, Engineering, etc.). Evidence reactions when picking up logs/traces/items.
+- **Status:** VERIFIED — visual QA confirmed CORVUS-7 messages in relay feed panel
+
+### BUG-010: Suppressed low-value sensor/nearby messages
+- **What to check:** "You detect:" sensor readouts and "X objects to investigate" messages no longer spam the subtitle bar or narrative panel. Scanner bar at bottom still shows nearby entities.
+- **How to reach it:** Enter a room with multiple entities. Check that subtitle bar doesn't show "You detect:" messages.
+- **Expected:** Clean relay feed without redundant sensor readouts. Action bar still shows interactable entities.
+- **Status:** VERIFIED — confirmed suppressed in visual QA

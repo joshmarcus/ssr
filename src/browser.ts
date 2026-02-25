@@ -45,6 +45,9 @@ import {
   CORVUS_MISSION_BRIEFING,
   PACING_NUDGE_CLEAN, PACING_NUDGE_INVESTIGATE, PACING_NUDGE_RECOVER, PACING_NUDGE_EVACUATE,
   CORVUS_WITNESS_COMMENTARY,
+  CORVUS_EVIDENCE_REACTIONS,
+  CORVUS_IDLE_MUSINGS,
+  CORVUS_ROOM_MUSINGS,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember, Entity, CrewDossier, RoomScene } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType, SceneActivity, SceneOutcome, TimelinePhase } from "./shared/types.js";
@@ -1308,6 +1311,12 @@ function checkRoomEntry(): void {
         display.addLog(desc, "narrative");
       }
 
+      // CORVUS-7 personality room observation (first visit only)
+      const roomMusing = CORVUS_ROOM_MUSINGS[corvusPersonality]?.[currentRoom.name];
+      if (roomMusing) {
+        display.addLog(roomMusing, "narrative");
+      }
+
       // Manuscript echo: if this room was foreshadowed in a log the player already read
       if (foreshadowedRooms.has(currentRoom.name) && !echoedRooms.has(currentRoom.name)) {
         echoedRooms.add(currentRoom.name);
@@ -1449,46 +1458,10 @@ function checkRoomEntry(): void {
         }
       }
 
-      // List notable entities in the room
-      const roomEntities: string[] = [];
-      for (const [id, ent] of state.entities) {
-        if (id === "player") continue;
-        if (ent.pos.x >= currentRoom.x && ent.pos.x < currentRoom.x + currentRoom.width &&
-            ent.pos.y >= currentRoom.y && ent.pos.y < currentRoom.y + currentRoom.height) {
-          const name = entityLabel(ent);
-          if (name) roomEntities.push(name);
-        }
-      }
-      if (roomEntities.length > 0) {
-        const unique = [...new Set(roomEntities)];
-        display.addLog(`You detect: ${unique.join(", ")}`, "sensor");
-      }
+      // (BUG-010: suppressed "You detect:" messages — duplicates action bar scanner readout)
     }
 
-    // Room investigation progress — fires on every room change
-    {
-      let totalInteractable = 0;
-      let freshCount = 0;
-      for (const [id, ent] of state.entities) {
-        if (id === "player") continue;
-        if (ent.pos.x < currentRoom.x || ent.pos.x >= currentRoom.x + currentRoom.width) continue;
-        if (ent.pos.y < currentRoom.y || ent.pos.y >= currentRoom.y + currentRoom.height) continue;
-        // Skip non-interactable types (drones, repair bots, etc.)
-        if (ent.type === EntityType.PatrolDrone || ent.type === EntityType.Drone ||
-            ent.type === EntityType.RepairBot) continue;
-        // Skip hidden/evacuated/dead entities
-        if (ent.props["hidden"] === true || ent.props["evacuated"] === true ||
-            ent.props["dead"] === true) continue;
-        totalInteractable++;
-        if (!isEntityExhausted(ent)) freshCount++;
-      }
-      if (totalInteractable > 0 && freshCount === 0) {
-        display.addLog("Room fully investigated.", "system");
-      } else if (freshCount > 0 && visitedRoomIds.has(currentRoom.id)) {
-        // Only show count on revisits (first visit already shows entity list)
-        display.addLog(`${freshCount} object${freshCount === 1 ? "" : "s"} to investigate.`, "sensor");
-      }
-    }
+    // (BUG-010: suppressed "X objects to investigate" / "Room fully investigated" messages — duplicates action bar)
 
     // Scene notification — tell the player about physical clues in the room
     if (state.mystery?.roomScenes) {
@@ -2775,6 +2748,14 @@ function handleAction(action: Action): void {
         const ambIdx = (state.turn * 3 + roomId.length * 7) % pool.length;
         display.addLog(pool[ambIdx], "narrative");
       }
+      // CORVUS-7 idle investigation musings — fires every 11 turns of lingering
+      if (currentRoomTurns > 0 && currentRoomTurns % 11 === 0) {
+        const musingPool = CORVUS_IDLE_MUSINGS[corvusPersonality] ?? [];
+        if (musingPool.length > 0) {
+          const mIdx = ((state.turn * 7 + (state.seed ?? 0)) % musingPool.length);
+          display.addLog(musingPool[mIdx], "narrative");
+        }
+      }
     } else {
       currentRoomTurns = 0;
       lastRoomIdForAmbient = roomId;
@@ -3330,6 +3311,22 @@ function handleAction(action: Action): void {
             entry.roomFound,
             crewNames,
           );
+        }
+      }
+
+      // CORVUS-7 personality-driven evidence discovery reaction
+      if (newEntries.length > 0) {
+        const lastEntry = newEntries[newEntries.length - 1];
+        const catKey = lastEntry.category === "log" ? "log"
+          : lastEntry.category === "trace" ? "trace"
+          : lastEntry.category === "item" ? "item"
+          : lastEntry.category === "crew" ? "crew"
+          : "generic";
+        const pool = CORVUS_EVIDENCE_REACTIONS[corvusPersonality]?.[catKey]
+          ?? CORVUS_EVIDENCE_REACTIONS[corvusPersonality]?.generic ?? [];
+        if (pool.length > 0) {
+          const idx = ((state.seed ?? 0) + state.turn) % pool.length;
+          display.addLog(pool[idx], "narrative");
         }
       }
 
