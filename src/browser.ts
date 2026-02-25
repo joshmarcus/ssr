@@ -2344,6 +2344,8 @@ function handleRestartKey(e: KeyboardEvent): void {
 // ── Action handler ──────────────────────────────────────────────
 function handleAction(action: Action): void {
   if (state.gameOver) return;
+  // Block input while reward selection overlay is active
+  if (display && 'rewardSelectionActive' in display && (display as any).rewardSelectionActive) return;
 
   // Flush deferred init messages on first player action
   if (!hasPlayerActed) {
@@ -3804,6 +3806,29 @@ function handleAction(action: Action): void {
   }
 
   // (BUG-010: removed showInteractionPreview call — action bar already shows nearby entities)
+
+  // Cleaning animation trigger (only when there was actual dirt/smoke cleaned)
+  if (action.type === ActionType.Clean && state.turn !== prevTurn && prevDirt > 0) {
+    if (display && 'triggerCleanAnimation' in display) {
+      (display as any).triggerCleanAnimation();
+    }
+  }
+
+  // Reward card selection — show overlay if a reward is pending
+  if (state.pendingReward && state.pendingReward.cards.length > 0) {
+    if (display && 'showRewardSelection' in display) {
+      const reward = state.pendingReward;
+      (display as any).showRewardSelection(
+        reward.cards.map(c => ({ id: c.id, title: c.title, description: c.description, rarity: c.rarity })),
+        reward.source,
+        (cardId: string) => {
+          // Dispatch the reward selection action
+          state = step(state, { type: ActionType.SelectReward, rewardCardId: cardId });
+          renderAll();
+        },
+      );
+    }
+  }
 
   renderAll();
 

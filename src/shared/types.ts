@@ -71,6 +71,28 @@ export enum DoorKeyType {
   Environmental = "environmental", // blocked by hazard — clear the hazard to pass
 }
 
+// ── Reward Cards (Hades-style power selection) ──────────────
+export enum RewardCardRarity {
+  Common = "common",
+  Rare = "rare",
+  Epic = "epic",
+}
+
+export interface RewardCard {
+  id: string;
+  title: string;
+  description: string;
+  rarity: RewardCardRarity;
+  mechanicId: string;       // unique key for the passive buff
+  modifierValue?: number;   // numeric modifier (e.g. damage reduction %)
+}
+
+export interface RewardSelection {
+  turn: number;
+  cards: RewardCard[];
+  source: string;           // what triggered this reward (e.g. "relay_fix", "room_clean", "deduction")
+}
+
 // ── Attachments ──────────────────────────────────────────────
 export enum AttachmentSlot {
   Tool = "tool",
@@ -100,6 +122,7 @@ export interface PlayerBot {
   maxHp: number;
   stunTurns: number; // turns remaining where player cannot act
   clearanceLevel: number; // security clearance from solving deductions
+  passiveBuffs: Record<string, number>; // mechanicId → modifier value (from reward cards)
 }
 
 // ── Actions ──────────────────────────────────────────────────
@@ -118,6 +141,7 @@ export enum ActionType {
   ProcessScene = "processScene",
   ConfirmTimeline = "confirmTimeline",
   RejectTimeline = "rejectTimeline",
+  SelectReward = "selectReward",
 }
 
 export enum Direction {
@@ -146,6 +170,8 @@ export interface Action {
   // Timeline reconstruction
   timelinePhase?: string;      // TimelinePhase string for ConfirmTimeline/RejectTimeline
   cardCorrect?: boolean;       // true = confirm correct card, false = confirm wrong card
+  // Reward card selection
+  rewardCardId?: string;        // card ID for SelectReward action
 }
 
 // ── Room metadata ────────────────────────────────────────────
@@ -184,6 +210,8 @@ export interface GameState {
   mystery?: MysteryState;
   deteriorationInterval?: number; // Archetype-specific override (default: DETERIORATION_INTERVAL)
   milestones: Set<string>; // One-time event flags (e.g. "first_terminal", "first_relay")
+  pendingReward?: RewardSelection; // 3-card reward selection awaiting player choice
+  collectedRewards: string[];      // mechanicIds of all rewards collected this run
 }
 
 // ── Logs / evidence ──────────────────────────────────────────

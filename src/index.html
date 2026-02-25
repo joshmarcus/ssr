@@ -1389,6 +1389,133 @@
       animation: dr-fade-in-up 0.5s ease forwards;
     }
 
+    /* ── Reward Card Selection overlay ─────────────────────── */
+    #reward-selection {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      background: rgba(0, 2, 6, 0.88);
+      backdrop-filter: blur(6px);
+      z-index: 10055;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    #reward-selection.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #reward-selection.fade-out {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+    .reward-header {
+      font-size: 16px;
+      letter-spacing: 6px;
+      color: #4f8;
+      text-shadow: 0 0 12px rgba(68, 255, 136, 0.3);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .reward-subheader {
+      font-size: 11px;
+      color: #686;
+      margin-bottom: 24px;
+      letter-spacing: 2px;
+    }
+    .reward-cards {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      align-items: stretch;
+    }
+    .reward-card {
+      width: 200px;
+      padding: 20px 16px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: rgba(10, 16, 12, 0.95);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    .reward-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: #444;
+      transition: background 0.2s ease;
+    }
+    .reward-card.rarity-common::before { background: #4a4; }
+    .reward-card.rarity-rare::before { background: #48f; }
+    .reward-card.rarity-epic::before { background: #fa2; }
+    .reward-card.selected {
+      border-color: #4f8;
+      box-shadow: 0 0 20px rgba(68, 255, 136, 0.15), inset 0 0 30px rgba(68, 255, 136, 0.05);
+      transform: translateY(-4px);
+    }
+    .reward-card:not(.selected):hover {
+      border-color: #555;
+      transform: translateY(-2px);
+    }
+    .reward-card .rc-rarity {
+      font-size: 9px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .reward-card.rarity-common .rc-rarity { color: #4a4; }
+    .reward-card.rarity-rare .rc-rarity { color: #48f; }
+    .reward-card.rarity-epic .rc-rarity { color: #fa2; }
+    .reward-card .rc-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #cec;
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
+    .reward-card.selected .rc-title { color: #fff; }
+    .reward-card .rc-desc {
+      font-size: 11px;
+      color: #889;
+      line-height: 1.5;
+      flex: 1;
+    }
+    .reward-card .rc-select-hint {
+      font-size: 9px;
+      color: #444;
+      text-align: center;
+      margin-top: 12px;
+      letter-spacing: 2px;
+      transition: color 0.2s;
+    }
+    .reward-card.selected .rc-select-hint {
+      color: #4f8;
+    }
+    .reward-footer {
+      margin-top: 20px;
+      font-size: 10px;
+      color: #454;
+      letter-spacing: 2px;
+    }
+    @keyframes reward-card-enter {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .reward-card {
+      animation: reward-card-enter 0.4s ease forwards;
+    }
+    .reward-card:nth-child(2) { animation-delay: 0.1s; }
+    .reward-card:nth-child(3) { animation-delay: 0.2s; }
+
     /* ── Case Closed overlay ──────────────────────────────── */
     #case-closed {
       position: fixed;
@@ -1566,6 +1693,7 @@
   </div>
   <div id="evidence-card"></div>
   <div id="deduction-result"></div>
+  <div id="reward-selection"></div>
   <div id="case-closed"></div>
   <div id="gameover-overlay"></div>
   <div id="broadcast-overlay"></div>

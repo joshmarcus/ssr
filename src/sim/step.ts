@@ -16,6 +16,7 @@ import { confirmIdentity, confirmFate, updateTheoriesFromScene, linkEvidence, ge
 import { recordEvidence, shouldFireCrackMoment, fireCrackMoment, markEvidenceFound, checkPendingContradictions, revealContradiction, getRevealedContradictionCount } from "./twoStory.js";
 import { updateSlotUnlocks, confirmCard, rejectCard, generateProposal, generateRedHerring, buildNarrativeState, isBoardComplete } from "./incidentBoard.js";
 import { isMoralChoiceUnlocked } from "./mysteryChoices.js";
+import { generateRewardCards, applyRewardCard, hasBuff, getBuffValue, REWARD_CARD_POOL } from "./rewards.js";
 import {
   PA_MILESTONE_FIRST_DEDUCTION, PA_MILESTONE_HALF_DEDUCTIONS, PA_MILESTONE_ALL_DEDUCTIONS,
   CREW_FOLLOW_DIALOGUE, CREW_BOARDING_DIALOGUE, CREW_QUESTIONING_TESTIMONY, CREW_SELF_TESTIMONY,
@@ -1032,6 +1033,16 @@ function handleInteract(state: GameState, targetId: string | undefined): GameSta
       ];
       next = fireMilestone(next, "first_relay");
       if (allActivated) next = fireMilestone(next, "all_relays");
+
+      // Reward card offering for relay fix (once per relay)
+      if (!next.pendingReward) {
+        const rewardMilestone = `reward_relay_${targetId}`;
+        if (!next.milestones.has(rewardMilestone) && next.collectedRewards.length < REWARD_CARD_POOL.length) {
+          const newMs = new Set(next.milestones);
+          newMs.add(rewardMilestone);
+          next = { ...next, milestones: newMs, pendingReward: generateRewardCards(next, "relay_fix") };
+        }
+      }
 
       // Hazard-evidence: relay activation reveals system log evidence
       const relayArchetype = next.mystery?.timeline.archetype;
@@ -5071,6 +5082,17 @@ export function step(state: GameState, action: Action): GameState {
       break;
     case ActionType.Scan:
       next = { ...handleScan(next), turn: next.turn };
+      // Quick Scan buff: scanning also cleans the current tile
+      if (hasBuff(next, "quick_scan")) {
+        const sx = next.player.entity.pos.x;
+        const sy = next.player.entity.pos.y;
+        if (sy >= 0 && sy < next.height && sx >= 0 && sx < next.width) {
+          const scanTiles = next.tiles.map(row => row.map(t => ({ ...t })));
+          scanTiles[sy][sx].dirt = Math.max(0, scanTiles[sy][sx].dirt - 15);
+          scanTiles[sy][sx].smoke = 0;
+          next = { ...next, tiles: scanTiles };
+        }
+      }
       break;
     case ActionType.Clean:
       // Clean action: fully clear smoke, reduce dirt, reduce adjacent heat near relays
@@ -5115,12 +5137,17 @@ export function step(state: GameState, action: Action): GameState {
 
         const newTiles = state.tiles.map((row) => row.map((t) => ({ ...t })));
 
-        // All 8 surrounding squares + player's tile
-        const surroundingDeltas = [
-          { x: 0, y: 0 },
-          { x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
-          { x: 1, y: -1 }, { x: 1, y: 1 }, { x: -1, y: -1 }, { x: -1, y: 1 },
-        ];
+        // Efficient Brushes buff: expand cleaning radius from 1 to 2
+        const cleanRadius = hasBuff(next, "efficient_brushes") ? 2 : 1;
+        const surroundingDeltas: { x: number; y: number }[] = [];
+        for (let dy = -cleanRadius; dy <= cleanRadius; dy++) {
+          for (let dx = -cleanRadius; dx <= cleanRadius; dx++) {
+            surroundingDeltas.push({ x: dx, y: dy });
+          }
+        }
+
+        // Deep Clean buff: cleaning also removes heat and smoke
+        const deepClean = hasBuff(next, "deep_clean");
 
         // Clean smoke and dirt on player's tile and all surrounding tiles
         for (const d of surroundingDeltas) {
@@ -5132,6 +5159,11 @@ export function step(state: GameState, action: Action): GameState {
           // Clear smoke fully
           if (newTiles[ty][tx].smoke > 0) {
             newTiles[ty][tx].smoke = 0;
+          }
+
+          // Deep Clean: also reduce heat
+          if (deepClean && newTiles[ty][tx].heat > 0) {
+            newTiles[ty][tx].heat = Math.max(0, newTiles[ty][tx].heat - 15);
           }
 
           // Reduce dirt: full strength on player tile, slightly less on surrounding
@@ -5289,6 +5321,16 @@ export function step(state: GameState, action: Action): GameState {
               read: false,
             });
 
+            // Reward card offering for room clean (once per room)
+            if (!next.pendingReward) {
+              const rewardMilestone = `reward_clean_${roomName}`;
+              if (!next.milestones.has(rewardMilestone) && next.collectedRewards.length < REWARD_CARD_POOL.length) {
+                const newMs = new Set(next.milestones);
+                newMs.add(rewardMilestone);
+                next = { ...next, milestones: newMs, pendingReward: generateRewardCards(next, "room_clean") };
+              }
+            }
+
             // Check if cleaning enough rooms triggers investigation subgoal
             if (next.mystery!.objectivePhase === ObjectivePhase.Clean &&
                 newCleanedCount >= next.mystery!.investigationTrigger) {
@@ -5420,6 +5462,16 @@ export function step(state: GameState, action: Action): GameState {
       // Apply reward
       next = applyDeductionReward(next, solved);
       if (correct) next = fireMilestone(next, "first_deduction_correct");
+
+      // Reward card offering for correct deduction
+      if (correct && !next.pendingReward) {
+        const rewardMilestone = `reward_deduction_${deduction.id}`;
+        if (!next.milestones.has(rewardMilestone) && next.collectedRewards.length < REWARD_CARD_POOL.length) {
+          const newMs = new Set(next.milestones);
+          newMs.add(rewardMilestone);
+          next = { ...next, milestones: newMs, pendingReward: generateRewardCards(next, "deduction") };
+        }
+      }
 
       // Investigation milestone PA announcements
       if (next.mystery) {
@@ -5557,6 +5609,41 @@ export function step(state: GameState, action: Action): GameState {
       // Apply mechanical consequence based on choice
       next = applyChoiceConsequence(next, choice.consequence, action.answerKey!);
 
+      // Free action — no turn advance
+      return next;
+    }
+    case ActionType.SelectReward: {
+      // Player picks one of 3 offered reward cards
+      if (!next.pendingReward || !action.rewardCardId) {
+        next.logs = [...next.logs, {
+          id: `log_reward_invalid_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "No reward selection pending.",
+          read: false,
+        }];
+        break;
+      }
+      const chosenCard = next.pendingReward.cards.find(c => c.id === action.rewardCardId);
+      if (!chosenCard) {
+        next.logs = [...next.logs, {
+          id: `log_reward_invalid_card_${next.turn}`,
+          timestamp: next.turn,
+          source: "system",
+          text: "Invalid reward card selection.",
+          read: false,
+        }];
+        break;
+      }
+      // Apply the reward
+      next = applyRewardCard(next, chosenCard);
+      next.logs = [...next.logs, {
+        id: `log_reward_selected_${chosenCard.id}_${next.turn}`,
+        timestamp: next.turn,
+        source: "system",
+        text: `UPGRADE INSTALLED: ${chosenCard.title} — ${chosenCard.description}`,
+        read: false,
+      }];
       // Free action — no turn advance
       return next;
     }

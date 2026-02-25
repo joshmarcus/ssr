@@ -98,6 +98,9 @@ function ensureMysteryDefaults(state: GameState): GameState {
   if (!(state.milestones instanceof Set)) {
     (state as any).milestones = new Set(Array.isArray(state.milestones) ? state.milestones : []);
   }
+  // Ensure reward card fields exist (added in card selection update)
+  if (!state.collectedRewards) (state as any).collectedRewards = [];
+  if (!state.player.passiveBuffs) (state.player as any).passiveBuffs = {};
   return state;
 }
 

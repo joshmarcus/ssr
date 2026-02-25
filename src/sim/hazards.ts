@@ -509,10 +509,14 @@ export function applyHazardDamage(inputState: GameState): GameState {
   const hasThermal = sensors.includes(SensorType.Thermal);
   const hasAtmospheric = sensors.includes(SensorType.Atmospheric);
 
+  // Passive buff checks
+  const buffs = state.player.passiveBuffs ?? {};
+
+  // Pressure suit buff: immune to low-pressure damage
   // Pressure damage: low-pressure tiles damage the bot
   // Atmospheric sensor halves pressure damage (better seals awareness)
   const dmgMul = getDamageMultiplier(state);
-  if (tile.pressure < PRESSURE_DAMAGE_THRESHOLD && tile.pressure >= 0) {
+  if (tile.pressure < PRESSURE_DAMAGE_THRESHOLD && tile.pressure >= 0 && !buffs["pressure_suit"]) {
     const pressureDamage = Math.ceil((hasAtmospheric ? Math.ceil(PRESSURE_DAMAGE_PER_TURN / 2) : PRESSURE_DAMAGE_PER_TURN) * dmgMul);
     const pressureHp = Math.max(0, state.player.hp - pressureDamage);
     const pressureLogs = [...state.logs];
@@ -548,7 +552,9 @@ export function applyHazardDamage(inputState: GameState): GameState {
   if (tile.heat >= HEAT_PAIN_THRESHOLD) {
     const intensity = Math.min(1, (tile.heat - HEAT_PAIN_THRESHOLD) / 60);
     const baseDamage = Math.ceil(HEAT_DAMAGE_PER_TURN * (0.5 + intensity * 1.5) * dmgMul);
-    const damage = hasThermal ? Math.ceil(baseDamage * 0.6) : baseDamage;
+    let damage = hasThermal ? Math.ceil(baseDamage * 0.6) : baseDamage;
+    // Thermal Plating buff: reduce heat damage by its modifier value (e.g. 30%)
+    if (buffs["thermal_plating"]) damage = Math.ceil(damage * (1 - buffs["thermal_plating"]));
     const newHp = Math.max(0, state.player.hp - damage);
 
     const newLogs = [...state.logs];
@@ -601,7 +607,9 @@ export function applyHazardDamage(inputState: GameState): GameState {
 
   // Smoke damage: dense smoke causes minor toxic fume damage
   if (tile.smoke >= SMOKE_DAMAGE_THRESHOLD && tile.heat < HEAT_PAIN_THRESHOLD) {
-    const smokeDmg = Math.ceil(SMOKE_DAMAGE_PER_TURN * dmgMul);
+    let smokeDmg = Math.ceil(SMOKE_DAMAGE_PER_TURN * dmgMul);
+    // Air Filters buff: reduce smoke damage by its modifier value (e.g. 30%)
+    if (buffs["air_filters"]) smokeDmg = Math.ceil(smokeDmg * (1 - buffs["air_filters"]));
     const smokeHp = Math.max(0, state.player.hp - smokeDmg);
     const smokeLogs = [...state.logs];
     if (state.turn % 3 === 0) {
@@ -619,6 +627,42 @@ export function applyHazardDamage(inputState: GameState): GameState {
       logs: smokeLogs,
     };
     if (smokeHp <= 0) return state;
+  }
+
+  // Heat Sink buff: passively cool the tile the player stands on
+  if (buffs["heat_sink"] && tile.heat > 0) {
+    const coolAmount = buffs["heat_sink"] ?? 5;
+    const newTiles = state.tiles === inputState.tiles
+      ? state.tiles.map(row => row.map(t => ({ ...t })))
+      : state.tiles;
+    newTiles[y][x].heat = Math.max(0, newTiles[y][x].heat - coolAmount);
+    state = { ...state, tiles: newTiles };
+  }
+
+  // Emergency Repair buff: auto-heal when dropping below 20% HP (once per room)
+  if (buffs["emergency_repair"] && state.player.hp > 0) {
+    const threshold = state.player.maxHp * 0.2;
+    if (state.player.hp <= threshold) {
+      const roomKey = `emergency_repair_${x}_${y}`;
+      if (!state.milestones.has(roomKey)) {
+        const healAmount = buffs["emergency_repair"] ?? 100;
+        const newHp = Math.min(state.player.maxHp, state.player.hp + healAmount);
+        const newMs = new Set(state.milestones);
+        newMs.add(roomKey);
+        state = {
+          ...state,
+          milestones: newMs,
+          player: { ...state.player, hp: newHp },
+          logs: [...state.logs, {
+            id: `log_emergency_repair_${state.turn}`,
+            timestamp: state.turn,
+            source: "system",
+            text: `EMERGENCY REPAIR: Auto-repair activated. +${healAmount} HP (${newHp}/${state.player.maxHp})`,
+            read: false,
+          }],
+        };
+      }
+    }
   }
 
   // Recovery: slow heal on cool tiles only

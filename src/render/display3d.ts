@@ -2010,6 +2010,192 @@ export class BrowserDisplay3D implements IGameDisplay {
     window.addEventListener("keydown", this._deductionResultDismissHandler);
   }
 
+  // ── Reward Card Selection overlay ────────────────────────────
+  private _rewardSelectionActive: boolean = false;
+  private _rewardSelectionHandler: ((e: KeyboardEvent) => void) | null = null;
+  private _rewardSelectedIndex: number = 0;
+  private _rewardOnSelect: ((cardId: string) => void) | null = null;
+
+  /** True while the reward selection overlay is visible — blocks other input */
+  get rewardSelectionActive(): boolean { return this._rewardSelectionActive; }
+
+  /**
+   * Show the 3-card reward selection overlay.
+   * onSelect is called with the chosen card ID when the player confirms.
+   */
+  showRewardSelection(cards: { id: string; title: string; description: string; rarity: string }[], source: string, onSelect: (cardId: string) => void): void {
+    if (this._rewardSelectionActive) return;
+    this._rewardSelectionActive = true;
+    this._rewardSelectedIndex = 0;
+    this._rewardOnSelect = onSelect;
+
+    const el = document.getElementById("reward-selection");
+    if (!el) { this._rewardSelectionActive = false; return; }
+
+    const sourceLabel = source === "relay_fix" ? "RELAY STABILIZED"
+      : source === "room_clean" ? "ROOM CLEANED"
+      : source === "deduction" ? "DEDUCTION CONFIRMED"
+      : "MILESTONE REACHED";
+
+    let cardsHtml = "";
+    for (let i = 0; i < cards.length; i++) {
+      const c = cards[i];
+      const sel = i === 0 ? " selected" : "";
+      cardsHtml += `<div class="reward-card rarity-${c.rarity}${sel}" data-index="${i}" data-card-id="${c.id}">
+        <div class="rc-rarity">${c.rarity}</div>
+        <div class="rc-title">${c.title}</div>
+        <div class="rc-desc">${c.description}</div>
+        <div class="rc-select-hint">${i === 0 ? "[ENTER] INSTALL" : ""}</div>
+      </div>`;
+    }
+
+    el.innerHTML = `
+      <div class="reward-header">${sourceLabel}</div>
+      <div class="reward-subheader">CHOOSE AN UPGRADE</div>
+      <div class="reward-cards">${cardsHtml}</div>
+      <div class="reward-footer">[LEFT/RIGHT] SELECT  [ENTER] CONFIRM</div>
+    `;
+    el.className = "visible";
+
+    // Update visual selection
+    const updateSelection = (idx: number) => {
+      const cardEls = el.querySelectorAll(".reward-card");
+      cardEls.forEach((ce, i) => {
+        if (i === idx) {
+          ce.classList.add("selected");
+          ce.querySelector(".rc-select-hint")!.textContent = "[ENTER] INSTALL";
+        } else {
+          ce.classList.remove("selected");
+          ce.querySelector(".rc-select-hint")!.textContent = "";
+        }
+      });
+    };
+
+    // Remove previous handler
+    if (this._rewardSelectionHandler) {
+      window.removeEventListener("keydown", this._rewardSelectionHandler);
+    }
+
+    this._rewardSelectionHandler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" || e.key === "a") {
+        e.preventDefault();
+        this._rewardSelectedIndex = (this._rewardSelectedIndex - 1 + cards.length) % cards.length;
+        updateSelection(this._rewardSelectedIndex);
+      } else if (e.key === "ArrowRight" || e.key === "d") {
+        e.preventDefault();
+        this._rewardSelectedIndex = (this._rewardSelectedIndex + 1) % cards.length;
+        updateSelection(this._rewardSelectedIndex);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        const chosenId = cards[this._rewardSelectedIndex].id;
+
+        // Animate selection: chosen card glows, others fade
+        const cardEls = el.querySelectorAll(".reward-card");
+        cardEls.forEach((ce, i) => {
+          if (i === this._rewardSelectedIndex) {
+            (ce as HTMLElement).style.borderColor = "#4f8";
+            (ce as HTMLElement).style.boxShadow = "0 0 30px rgba(68,255,136,0.3)";
+            (ce as HTMLElement).style.transform = "scale(1.05)";
+          } else {
+            (ce as HTMLElement).style.opacity = "0.2";
+            (ce as HTMLElement).style.transform = "scale(0.95)";
+          }
+        });
+
+        // Dismiss after a brief moment
+        setTimeout(() => {
+          el.className = "fade-out";
+          setTimeout(() => {
+            el.className = "";
+            el.innerHTML = "";
+            this._rewardSelectionActive = false;
+            if (this._rewardOnSelect) {
+              this._rewardOnSelect(chosenId);
+              this._rewardOnSelect = null;
+            }
+          }, 500);
+        }, 600);
+
+        if (this._rewardSelectionHandler) {
+          window.removeEventListener("keydown", this._rewardSelectionHandler);
+          this._rewardSelectionHandler = null;
+        }
+      }
+    };
+    window.addEventListener("keydown", this._rewardSelectionHandler);
+
+    // Camera zoom for emphasis
+    if (this.chaseCamActive) {
+      this.cameraZoomPulse = -0.4;
+    }
+  }
+
+  // ── Cleaning Animation ────────────────────────────────────
+  private _cleanAnimTimer: number = 0;
+  private _cleanAnimPhase: "idle" | "crouch" | "burst" | "recover" = "idle";
+
+  /** Trigger the cleaning animation sequence (called from browser.ts after successful clean) */
+  triggerCleanAnimation(): void {
+    if (this._cleanAnimPhase !== "idle") return;
+    this._cleanAnimTimer = 0;
+    this._cleanAnimPhase = "crouch";
+
+    // Spawn cleaning particle burst
+    const px = this.playerCurrentX;
+    const pz = this.playerCurrentZ;
+
+    // Ring of sparkles — green + purple mix
+    for (let i = 0; i < 14; i++) {
+      const angle = (i / 14) * Math.PI * 2;
+      const isGreen = i % 3 !== 0;
+      const sMat = new THREE.SpriteMaterial({
+        color: isGreen ? 0x44ff88 : 0xaa44ff,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const spark = new THREE.Sprite(sMat);
+      spark.scale.set(0.08, 0.08, 1);
+      spark.position.set(px, 0.05, pz);
+      (spark as any)._life = 0;
+      (spark as any)._maxLife = 0.6 + Math.random() * 0.3;
+      (spark as any)._driftY = 0.3 + Math.random() * 0.5;
+      (spark as any)._driftX = Math.cos(angle) * (0.6 + Math.random() * 0.8);
+      (spark as any)._driftZ = Math.sin(angle) * (0.6 + Math.random() * 0.8);
+      this.scene.add(spark);
+      this._discoverySparkles.push(spark);
+    }
+
+    // Dust cloud particles rising upward
+    for (let i = 0; i < 6; i++) {
+      const dMat = new THREE.SpriteMaterial({
+        color: 0x886644,
+        transparent: true,
+        opacity: 0.4,
+        depthWrite: false,
+        blending: THREE.NormalBlending,
+      });
+      const dust = new THREE.Sprite(dMat);
+      dust.scale.set(0.15, 0.15, 1);
+      dust.position.set(
+        px + (Math.random() - 0.5) * 0.6,
+        0.02,
+        pz + (Math.random() - 0.5) * 0.6,
+      );
+      (dust as any)._life = 0;
+      (dust as any)._maxLife = 0.7 + Math.random() * 0.4;
+      (dust as any)._driftY = 0.8 + Math.random() * 0.6;
+      (dust as any)._driftX = (Math.random() - 0.5) * 0.3;
+      (dust as any)._driftZ = (Math.random() - 0.5) * 0.3;
+      this.scene.add(dust);
+      this._discoverySparkles.push(dust);
+    }
+
+    // Trigger eye widen (happy expression)
+    this._eyeWidenTimer = 0.8;
+  }
+
   // ── Case Closed overlay ────────────────────────────────────
   private _caseClosedActive: boolean = false;
   private _caseClosedDismissHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -3821,7 +4007,39 @@ export class BrowserDisplay3D implements IGameDisplay {
       // Floor-level with subtle breathing + bounce on arrival
       const breathe = Math.sin(elapsed * 2) * 0.01;
       const moveBob = isMoving ? Math.abs(Math.sin(elapsed * 8)) * 0.015 : 0;
-      this.playerMesh.position.y = 0.02 + breathe + moveBob;
+      let cleanAnimYOffset = 0;
+      // Cleaning animation state machine
+      if (this._cleanAnimPhase !== "idle") {
+        this._cleanAnimTimer += delta;
+        const t = this._cleanAnimTimer;
+        if (this._cleanAnimPhase === "crouch" && t < 0.15) {
+          // Anticipation: crouch down
+          cleanAnimYOffset = -0.08 * (t / 0.15);
+        } else if (this._cleanAnimPhase === "crouch" && t >= 0.15) {
+          this._cleanAnimPhase = "burst";
+        }
+        if (this._cleanAnimPhase === "burst" && t < 0.4) {
+          // Burst: vibrate + stay crouched
+          cleanAnimYOffset = -0.08 + (Math.random() - 0.5) * 0.03;
+          this.playerMesh.position.x += (Math.random() - 0.5) * 0.02;
+          this.playerMesh.position.z += (Math.random() - 0.5) * 0.02;
+        } else if (this._cleanAnimPhase === "burst" && t >= 0.4) {
+          this._cleanAnimPhase = "recover";
+        }
+        if (this._cleanAnimPhase === "recover") {
+          // Recovery: spring back up with overshoot
+          const recoverT = (t - 0.4) / 0.4; // 0 to 1
+          if (recoverT >= 1) {
+            this._cleanAnimPhase = "idle";
+            this._cleanAnimTimer = 0;
+          } else {
+            // Spring curve: overshoot then settle
+            const spring = Math.sin(recoverT * Math.PI * 2) * Math.exp(-recoverT * 3) * 0.04;
+            cleanAnimYOffset = -0.08 * (1 - recoverT) + spring;
+          }
+        }
+      }
+      this.playerMesh.position.y = 0.02 + breathe + moveBob + cleanAnimYOffset;
 
       // Smooth rotation towards facing direction
       let targetRot = this.playerFacing;
@@ -3841,11 +4059,12 @@ export class BrowserDisplay3D implements IGameDisplay {
       this.playerMesh.rotation.x += (targetTiltX - this.playerMesh.rotation.x) * 0.15;
       this.playerMesh.rotation.z += (targetTiltZ - this.playerMesh.rotation.z) * 0.15;
 
-      // Cleaning brush spin (children 6 & 7) — spin when moving
+      // Cleaning brush spin (children 6 & 7) — spin when moving, turbo during clean anim
       const brushL = this.playerMesh.children[6];
       const brushR = this.playerMesh.children[7];
       if (brushL && brushR) {
-        const brushSpeed = isMoving ? elapsed * 15 : elapsed * 0.5; // fast when moving, slow idle
+        const cleaning = this._cleanAnimPhase !== "idle";
+        const brushSpeed = cleaning ? elapsed * 40 : isMoving ? elapsed * 15 : elapsed * 0.5;
         brushL.rotation.z = brushSpeed;
         brushR.rotation.z = -brushSpeed; // counter-rotate
       }

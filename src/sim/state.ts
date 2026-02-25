@@ -36,6 +36,7 @@ export function createEmptyState(seed: number, width: number, height: number, di
     maxHp: settings.maxHp,
     stunTurns: 0,
     clearanceLevel: 0,
+    passiveBuffs: {},
   };
 
   return {
@@ -53,5 +54,6 @@ export function createEmptyState(seed: number, width: number, height: number, di
     difficulty,
     maxTurns: settings.maxTurns,
     milestones: new Set<string>(),
+    collectedRewards: [],
   };
 }
