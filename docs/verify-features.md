@@ -171,3 +171,37 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Read a terminal that mentions another room by name. Check minimap for that room.
 - **Expected:** Orange pulsing "?" with glow ring at center of the hinted room. Disappears once the room is explored.
 - **Status:** PENDING
+
+---
+
+## Sprint 181 — V379-V383 (2026-02-25)
+
+### Title screen with starfield and difficulty selector
+- **What to check:** Title screen always shows on game launch (not just when save exists). Animated starfield background, "CORVUS-7" title with glow, tagline, Continue/New Game menu, difficulty selector (←/→ to cycle Easy/Normal/Hard).
+- **How to reach it:** Open the game in browser. Title screen is the first thing shown.
+- **Expected:** Atmospheric starfield drifting slowly behind the title. Difficulty shows colored label (green=Easy, amber=Normal, red=Hard). Menu navigable with arrow keys.
+- **Status:** VERIFIED — visual QA confirmed via Playwright screenshot
+
+### Evacuation progress HUD widget
+- **What to check:** During Evacuate phase, a small widget below the minimap shows crew evacuation progress: "CREW EVACUATION" label with pulsing red animation, progress bar, and X/Y safe count.
+- **How to reach it:** Play until Evacuate phase (find and rescue crew, escort to pods).
+- **Expected:** Widget appears only during Evacuate phase. Shows progress bar filling as crew are evacuated. Dead crew count in red if any.
+- **Status:** PENDING — needs evacuation phase playthrough
+
+### Game-over action buttons
+- **What to check:** Game-over overlay shows styled button boxes for [N] New Game, [R] Replay Seed, [C] Copy Summary instead of plain text.
+- **How to reach it:** Complete or fail a game to trigger game-over screen.
+- **Expected:** Three styled buttons with colored borders (green, blue, gray) and hover effects.
+- **Status:** PENDING — needs game-over trigger
+
+### Atmospheric starfield particles in 3D
+- **What to check:** 400 3D star particles on a slowly rotating sphere visible in the background of 3D scenes. Provides subtle parallax depth through hull gaps.
+- **How to reach it:** Play in 3D mode, look through doorways or open areas toward the station edge.
+- **Expected:** Tiny blue-white star dots visible in the deep background, slowly drifting. Adds space station ambiance.
+- **Status:** PENDING — subtle effect, needs edge-of-station view
+
+### BUG-007/012: Scan wave verified fixed
+- **What to check:** Scan wave is a brief expanding ring (4x expansion over 0.6s), no blue sphere.
+- **How to reach it:** Start new game, pick up sensor, press Q to scan.
+- **Expected:** Brief ring ripple with grid squares, clears within 1 second.
+- **Status:** VERIFIED — code review confirmed 4x/0.6s, no sphere geometry

@@ -9088,8 +9088,53 @@ function showTitleScreen(): void {
   if (hazBorder) { hazBorder.className = ""; hazBorder.style.opacity = ""; }
   const fadeOvl = document.getElementById("room-transition-fade");
   if (fadeOvl) { fadeOvl.style.opacity = "0"; }
-  let titleIdx = 0; // 0 = Continue, 1 = New Game
-  const items = ["Continue", "New Game"];
+  const hasSaveGame = hasSave();
+  const items = hasSaveGame ? ["Continue", "New Game"] : ["New Game"];
+  let titleIdx = 0;
+
+  // Difficulty selector state
+  const difficulties: Difficulty[] = [Difficulty.Easy, Difficulty.Normal, Difficulty.Hard];
+  const diffLabels: Record<string, string> = {
+    [Difficulty.Easy]: "EASY", [Difficulty.Normal]: "NORMAL", [Difficulty.Hard]: "HARD",
+  };
+  const diffColors: Record<string, string> = {
+    [Difficulty.Easy]: "#4f8", [Difficulty.Normal]: "#fa0", [Difficulty.Hard]: "#f44",
+  };
+  let diffIdx = difficulties.indexOf(difficulty);
+  if (diffIdx < 0) diffIdx = 1;
+
+  // Animated starfield background
+  const starCanvas = document.createElement("canvas");
+  starCanvas.style.cssText = "position:absolute;inset:0;z-index:0;pointer-events:none";
+  starCanvas.width = window.innerWidth;
+  starCanvas.height = window.innerHeight;
+  const starCtx = starCanvas.getContext("2d")!;
+  const stars: { x: number; y: number; z: number; speed: number }[] = [];
+  for (let i = 0; i < 200; i++) {
+    stars.push({
+      x: Math.random() * starCanvas.width,
+      y: Math.random() * starCanvas.height,
+      z: Math.random(),
+      speed: 0.05 + Math.random() * 0.2,
+    });
+  }
+  let starAnimFrame = 0;
+  function animateStarfield(): void {
+    starCtx.fillStyle = "rgba(10,10,10,0.15)";
+    starCtx.fillRect(0, 0, starCanvas.width, starCanvas.height);
+    for (const star of stars) {
+      const brightness = 0.2 + star.z * 0.6;
+      const twinkle = Math.sin(Date.now() * 0.002 * star.speed + star.x) * 0.15;
+      starCtx.fillStyle = `rgba(180,210,255,${Math.max(0, brightness + twinkle)})`;
+      const size = 0.5 + star.z * 1.5;
+      starCtx.fillRect(star.x, star.y, size, size);
+      star.y += star.speed * 0.3;
+      if (star.y > starCanvas.height) { star.y = -2; star.x = Math.random() * starCanvas.width; }
+    }
+    starAnimFrame = requestAnimationFrame(animateStarfield);
+  }
+  crawlOverlay.appendChild(starCanvas);
+  animateStarfield();
 
   // Build run stats from history
   const history = getRunHistory();
@@ -9152,27 +9197,48 @@ function showTitleScreen(): void {
     for (let i = 0; i < items.length; i++) {
       const sel = i === titleIdx;
       const color = sel ? "#0fa" : "#556";
-      const bg = sel ? "rgba(0,255,180,0.1)" : "transparent";
-      const border = sel ? "1px solid rgba(0,255,180,0.3)" : "1px solid transparent";
-      const arrow = sel ? `<span style="color:#0fa;margin-right:8px">&gt;</span>` : `<span style="margin-right:8px;opacity:0">&gt;</span>`;
-      menuHtml += `<div style="padding:10px 24px;background:${bg};border:${border};border-radius:4px;color:${color};font-size:16px;cursor:pointer;transition:all 0.15s">${arrow}${items[i]}</div>`;
+      const bg = sel ? "rgba(0,255,180,0.08)" : "transparent";
+      const border = sel ? "1px solid rgba(0,255,180,0.25)" : "1px solid transparent";
+      const arrow = sel ? `<span style="color:#0fa;margin-right:8px">▸</span>` : `<span style="margin-right:8px;opacity:0">▸</span>`;
+      menuHtml += `<div style="padding:10px 24px;background:${bg};border:${border};border-radius:4px;color:${color};font-size:16px;cursor:pointer;transition:all 0.15s;letter-spacing:1px">${arrow}${items[i]}</div>`;
     }
-    crawlOverlay.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;gap:32px;padding:48px">
+
+    // Difficulty selector
+    const dc = diffColors[difficulties[diffIdx]];
+    const dl = diffLabels[difficulties[diffIdx]];
+    const diffHtml = `
+      <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+        <span style="color:#334;font-size:10px;letter-spacing:1.5px">DIFFICULTY</span>
+        <span style="color:#334;cursor:pointer;font-size:14px">◂</span>
+        <span style="color:${dc};font-size:14px;font-weight:bold;letter-spacing:2px;min-width:70px;text-align:center">${dl}</span>
+        <span style="color:#334;cursor:pointer;font-size:14px">▸</span>
+      </div>`;
+
+    // Keep starfield canvas (it was prepended separately)
+    // Build the content container
+    crawlOverlay.innerHTML = "";
+    crawlOverlay.appendChild(starCanvas);
+    const contentDiv = document.createElement("div");
+    contentDiv.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:28px;padding:48px;position:relative;z-index:1";
+    contentDiv.innerHTML = `
         <div style="text-align:center">
-          <div style="font-size:36px;font-weight:bold;color:#0fa;letter-spacing:8px;margin-bottom:8px">${STATION_NAME}</div>
-          <div style="font-size:14px;color:#556;letter-spacing:2px">${STATION_SUBTITLE}</div>
+          <div style="font-size:11px;color:#223;letter-spacing:4px;margin-bottom:12px">DEEP ORBITAL RESEARCH PLATFORM</div>
+          <div style="font-size:48px;font-weight:bold;color:#0fa;letter-spacing:12px;margin-bottom:8px;text-shadow:0 0 30px rgba(0,255,170,0.3),0 0 60px rgba(0,255,170,0.1)">${STATION_NAME}</div>
+          <div style="font-size:12px;color:#445;letter-spacing:3px;font-style:italic;margin-top:8px">${TAGLINE}</div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px;min-width:200px">
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:200px;align-items:center">
           ${menuHtml}
+          ${diffHtml}
         </div>
         ${statsHtml}
-        <div style="font-size:10px;color:#334">[Up/Down] Navigate | [Enter] Select</div>
-      </div>
+        <div style="font-size:10px;color:#223">[↑/↓] Navigate · [←/→] Difficulty · [Enter] Select</div>
     `;
+    crawlOverlay.appendChild(contentDiv);
   }
 
   renderTitle();
+
+  function stopStarfield(): void { cancelAnimationFrame(starAnimFrame); }
 
   const titleInput = (e: KeyboardEvent) => {
     e.preventDefault();
@@ -9182,9 +9248,18 @@ function showTitleScreen(): void {
     } else if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
       titleIdx = (titleIdx + 1) % items.length;
       renderTitle();
+    } else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+      diffIdx = (diffIdx - 1 + difficulties.length) % difficulties.length;
+      difficulty = difficulties[diffIdx];
+      renderTitle();
+    } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+      diffIdx = (diffIdx + 1) % difficulties.length;
+      difficulty = difficulties[diffIdx];
+      renderTitle();
     } else if (e.key === "Enter" || e.key === " ") {
       window.removeEventListener("keydown", titleInput);
       crawlOverlay.removeEventListener("click", titleClick);
+      stopStarfield();
       if (items[titleIdx] === "Continue") {
         // Load the save
         try {
@@ -9240,8 +9315,4 @@ function showTitleScreen(): void {
   crawlOverlay.addEventListener("click", titleClick);
 }
 
-if (hasSave()) {
-  showTitleScreen();
-} else {
-  showOpeningCrawl();
-}
+showTitleScreen();

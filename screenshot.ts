@@ -143,13 +143,19 @@ async function main(): Promise<void> {
     const title = await page.title();
     console.log(`[screenshot] Page title: "${title}"`);
 
-    // Wait for the crawl overlay to be visible
+    // Wait for the crawl overlay to be visible (title screen → seed input → crawl → boot)
     await page.waitForSelector("#crawl-overlay", { state: "visible", timeout: 10000 });
-    console.log("[screenshot] Opening crawl visible, dismissing...");
+    console.log("[screenshot] Title screen visible, navigating through screens...");
 
-    // Wait a moment for the crawl text to start typing, then press a key to skip
+    // Step through: title screen → Enter → seed input → Enter → crawl → Space → boot (2.6s)
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Enter");   // Title: select "New Game" (or "Continue" if save exists)
     await page.waitForTimeout(500);
-    await page.keyboard.press("Space");
+    await page.keyboard.press("Enter");   // Seed input: accept default seed → starts crawl
+    await page.waitForTimeout(500);
+    await page.keyboard.press("Space");   // Crawl: skip typewriter → starts boot sequence
+    // Boot sequence takes ~2.6s before hiding the overlay
+    await page.waitForTimeout(3000);
 
     // Wait for the crawl to disappear and the game to render
     await page.waitForSelector("#crawl-overlay", { state: "hidden", timeout: 10000 });

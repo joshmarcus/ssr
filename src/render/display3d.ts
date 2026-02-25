@@ -785,6 +785,7 @@ export class BrowserDisplay3D implements IGameDisplay {
   // Discovery sparkle: rooms visited this session for first-entry effects
   private _visitedRooms3D: Set<string> = new Set();
   private _discoverySparkles: THREE.Sprite[] = [];
+  private _starParticles: THREE.Points | null = null;
   // Investigation aura: rooms with collected evidence get golden particle motes
   private _investigationRooms: Map<string, { evidenceCount: number; fullyInvestigated: boolean }> = new Map();
   private starfieldPoints: THREE.Points | null = null;
@@ -950,6 +951,38 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.scene.background = this.chaseCamActive ? this._solidBg : this._starfieldBg;
     // Atmospheric fog — subtle fade at the far edges only
     this.scene.fog = new THREE.Fog(COLORS_3D.background, 20, 40);
+
+    // ── 3D starfield particles (visible through hull gaps, provides parallax depth) ──
+    {
+      const starCount = 400;
+      const positions = new Float32Array(starCount * 3);
+      const colors = new Float32Array(starCount * 3);
+      let rng = 7919;
+      const nxt = () => { rng = (rng * 16807 + 1) & 0x7fffffff; return (rng & 0xffff) / 0xffff; };
+      for (let i = 0; i < starCount; i++) {
+        // Distribute on a sphere at distance 45-55
+        const theta = nxt() * Math.PI * 2;
+        const phi = Math.acos(2 * nxt() - 1);
+        const dist = 45 + nxt() * 10;
+        positions[i * 3] = Math.sin(phi) * Math.cos(theta) * dist;
+        positions[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * dist;
+        positions[i * 3 + 2] = Math.cos(phi) * dist;
+        // Slight color variation: cool blue-white
+        const brightness = 0.5 + nxt() * 0.5;
+        colors[i * 3] = brightness * (0.8 + nxt() * 0.2);
+        colors[i * 3 + 1] = brightness * (0.85 + nxt() * 0.15);
+        colors[i * 3 + 2] = brightness;
+      }
+      const starGeo = new THREE.BufferGeometry();
+      starGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      starGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      const starMat = new THREE.PointsMaterial({
+        size: 0.15, vertexColors: true, transparent: true, opacity: 0.7,
+        depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true,
+      });
+      this._starParticles = new THREE.Points(starGeo, starMat);
+      this.scene.add(this._starParticles);
+    }
 
     // ── Camera (orthographic, zoomed-in, follows player) ──
     const aspect = this.getAspect();
@@ -1509,6 +1542,30 @@ export class BrowserDisplay3D implements IGameDisplay {
       }
     }
     tracker.innerHTML = html;
+  }
+
+  private updateEvacWidget(state: GameState): void {
+    const widget = document.getElementById("evac-widget");
+    if (!widget) return;
+    const evac = state.mystery?.evacuation;
+    const phase = state.mystery?.objectivePhase;
+    if (!evac || !evac.active || phase !== ObjectivePhase.Evacuate) {
+      widget.classList.remove("active");
+      return;
+    }
+    widget.classList.add("active");
+    const safe = evac.crewEvacuated.length;
+    const dead = evac.crewDead.length;
+    const total = evac.crewFound.length;
+    const remaining = total - safe - dead;
+    const pct = total > 0 ? Math.round((safe / total) * 100) : 0;
+    let countHtml = `<span class="evac-safe">${safe}</span>/${total} SAFE`;
+    if (dead > 0) countHtml += ` · <span class="evac-dead">${dead} LOST</span>`;
+    if (remaining > 0) countHtml += ` · ${remaining} remaining`;
+    widget.innerHTML = `
+      <div class="evac-label">▸ CREW EVACUATION</div>
+      <div class="evac-bar-bg"><div class="evac-bar-fill" style="width:${pct}%"></div></div>
+      <div class="evac-count">${countHtml}</div>`;
   }
 
   appendNarrativeLocationHeader(roomName: string): void {
@@ -3069,7 +3126,11 @@ export class BrowserDisplay3D implements IGameDisplay {
         ${highlightsHtml}
         ${achievementHtml}
         ${runHistoryHtml}
-        <div class="gameover-restart">[R] Replay · [N] New Game · [C] Copy Summary</div>
+        <div class="gameover-restart">
+          <span class="gameover-btn" style="border-color:rgba(0,255,170,0.3);color:#0fa">[N] New Game</span>
+          <span class="gameover-btn" style="border-color:rgba(102,204,255,0.3);color:#6cf">[R] Replay Seed</span>
+          <span class="gameover-btn" style="border-color:rgba(136,136,136,0.3);color:#888">[C] Copy Summary</span>
+        </div>
       </div>`;
     overlay.classList.add("active");
   }
@@ -3271,6 +3332,16 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._lastNarrativeDupCount = 0;
       this._lastNarrativeEl = null;
     }
+    // Clean up star particles
+    if (this._starParticles) {
+      this.scene.remove(this._starParticles);
+      this._starParticles.geometry.dispose();
+      (this._starParticles.material as THREE.PointsMaterial).dispose();
+      this._starParticles = null;
+    }
+    // Clean up evacuation widget
+    const evacWidget = document.getElementById("evac-widget");
+    if (evacWidget) evacWidget.classList.remove("active");
     // Clean up overlays
     const overlay = document.getElementById("gameover-overlay");
     if (overlay) overlay.classList.remove("active");
@@ -3334,6 +3405,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateEntities(state);
     this.updateClueMarkers(state);
     this.updateCaseTracker(state);
+    this.updateEvacWidget(state);
 
     // Phase-reactive global lighting
     const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
@@ -3853,6 +3925,14 @@ export class BrowserDisplay3D implements IGameDisplay {
     const elapsed = this.clock.getElapsedTime();
     const delta = Math.min(elapsed - (this._lastAnimTime ?? elapsed), 0.1); // cap at 100ms
     this._lastAnimTime = elapsed;
+
+    // Slowly rotate 3D starfield for subtle parallax
+    if (this._starParticles) {
+      this._starParticles.rotation.y = elapsed * 0.008;
+      this._starParticles.rotation.x = Math.sin(elapsed * 0.003) * 0.02;
+      // Track player position so stars move with camera
+      this._starParticles.position.set(this.playerCurrentX, 0, this.playerCurrentZ);
+    }
 
     // Smooth movement interpolation for player
     if (this.playerMesh) {

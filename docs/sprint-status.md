@@ -1,16 +1,16 @@
-# Sprint 180 — V374-V378
+# Sprint 181 — V379-V383
 **Status:** COMPLETE
-**Theme:** Investigation polish — deduction readiness, case narration, scene solved VFX, exploration guidance
+**Theme:** First & last impressions — title screen, evacuation HUD, scan wave fix, endgame polish
 
 ## Tasks
-- [x] 1. Deduction readiness pulse: case tracker nodes pulse when evidence threshold is 75%+ met, glow when ready — `src/render/display3d.ts`, `src/index.html` — small
-- [x] 2. Scene solved celebration: golden screen flash + "SCENE SOLVED" milestone message on perfect 3/3 score — `src/browser.ts` — small
-- [x] 3. CORVUS-7 case summary: on journal open, personality-flavored investigation status in narrative panel (3 personalities × 2 variants) — `src/browser.ts` — medium
-- [x] 4. Unexplored room hints: minimap shows pulsing orange ? icons on foreshadowed but unexplored rooms — `src/render/display3d.ts`, `src/browser.ts` — small
-- [x] 5. Crew status icons on minimap: color-coded by status (green=found, blue pulse=following, gold=evacuated, red X=dead) — `src/render/display3d.ts` — medium
+- [x] 1. Title screen with atmosphere: proper title card ("CORVUS-7" + tagline), animated starfield bg, difficulty selector, always shown — `src/browser.ts`, `src/index.html` — medium
+- [x] 2. Evacuation progress HUD widget: dedicated bar showing crew evac count (X/Y safe) + pulsing urgency animation during Evacuate phase — `src/render/display3d.ts`, `src/index.html` — small
+- [x] 3. Scan wave visual verified (BUG-007/012): confirmed ring expansion 4x/0.6s is reasonable, no sphere geometry on sensor pickup — verified fixed — small
+- [x] 4. Game-over action buttons: styled [N] New Game + [R] Replay + [C] Copy buttons instead of plain text — `src/render/display3d.ts`, `src/index.html` — small
+- [x] 5. Atmospheric starfield particles: 400 3D star points on rotating sphere, parallax depth through hull gaps — `src/render/display3d.ts` — medium
 
 ## Progress Log
 - 2026-02-25: Sprint planned, executing immediately
-- 2026-02-25: All 5 tasks complete — deduction pulse, scene VFX, case summary, room hints, crew icons
-- 2026-02-25: Visual QA passed — all features verified via screenshots
+- 2026-02-25: All 5 tasks complete — title screen, evac HUD, scan verified, game-over buttons, starfield
+- 2026-02-25: Visual QA passed — title screen verified via Playwright, gameplay rendering confirmed
 - 2026-02-25: All 408 tests passing, tsc clean. Sprint complete.

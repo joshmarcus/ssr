@@ -4,13 +4,13 @@
 
 ## Current State
 
-- **Phase**: Sprint 180 (V378 completed — investigation polish: deduction readiness, case narration, scene VFX, crew minimap icons)
+- **Phase**: Sprint 181 (V383 completed — title screen with starfield, evacuation HUD, game-over buttons, 3D starfield particles, scan wave verified)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable
 - **Archetypes**: 6 active (Mutiny added — "The Divide")
 - **Save key**: v8
-- **Difficulty**: Easy / Normal / Hard — URL param `?difficulty=easy|hard`
+- **Difficulty**: Easy / Normal / Hard — title screen selector + URL param `?difficulty=easy|hard`
 - **Turn limit**: Difficulty-scaled (Easy: 1300, Normal: 1000, Hard: 700) with proportional warnings at 70%/80%/90%
 - **Victory condition**: Crew evacuation (primary) or data core transmit (bittersweet fallback)
 - **Playtest results**: All tested seeds VICTORY with 100% deduction success (184201, 42, 777, 100, 54321). Seed 777 improved from 900→142 turns after scene-deduction linking.

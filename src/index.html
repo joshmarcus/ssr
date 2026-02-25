@@ -81,6 +81,55 @@
       background: rgba(4, 6, 12, 0.8);
       pointer-events: none;
     }
+    /* ── Evacuation progress widget ────────────────── */
+    #evac-widget {
+      display: none;
+      position: absolute;
+      top: 218px;
+      right: 4px;
+      z-index: 11;
+      width: 196px;
+      padding: 6px 8px;
+      background: rgba(4,6,12,0.88);
+      border: 1px solid rgba(255,40,0,0.25);
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      pointer-events: none;
+    }
+    #evac-widget.active { display: block; }
+    .evac-label {
+      font-size: 9px;
+      color: #f44;
+      letter-spacing: 1.5px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      animation: evac-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes evac-pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; text-shadow: 0 0 4px rgba(255,40,0,0.4); }
+    }
+    .evac-bar-bg {
+      height: 4px;
+      background: #1a0808;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 3px;
+    }
+    .evac-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f44 0%, #fa0 50%, #0f0 100%);
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+    .evac-count {
+      font-size: 11px;
+      color: #fa0;
+      text-align: center;
+    }
+    .evac-count .evac-safe { color: #0f0; font-weight: bold; }
+    .evac-count .evac-dead { color: #f44; }
+
     /* Vignette overlay in 3D mode */
     .mode-3d #rot-display::after {
       content: "";
@@ -170,9 +219,25 @@
     }
     .gameover-restart {
       margin-top: 20px;
-      color: #555;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .gameover-btn {
+      padding: 8px 16px;
+      border: 1px solid #333;
+      border-radius: 4px;
       font-size: 12px;
-      animation: crawl-skip-pulse 1.5s ease-in-out infinite;
+      font-family: monospace;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: rgba(0,0,0,0.3);
+      letter-spacing: 1px;
+    }
+    .gameover-btn:hover {
+      background: rgba(255,255,255,0.05);
+      transform: translateY(-1px);
     }
 
     /* ── HP critical pulse on sidebar ──────────────────── */
@@ -1639,7 +1704,7 @@
   </div>
   <div id="game-container">
     <div id="map-column">
-      <div id="rot-display"><canvas id="minimap-canvas" width="200" height="200" style="display:none"></canvas><canvas id="compass-canvas" width="60" height="60" style="display:none"></canvas></div>
+      <div id="rot-display"><canvas id="minimap-canvas" width="200" height="200" style="display:none"></canvas><canvas id="compass-canvas" width="60" height="60" style="display:none"></canvas><div id="evac-widget"></div></div>
     </div>
   </div>
   <script type="module" src="./browser.ts"></script>

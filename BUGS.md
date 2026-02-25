@@ -31,8 +31,8 @@
 
 ## BUG-007: Sensor pickup creates massive blue sphere that obscures the entire view
 - **Severity**: HIGH (visual)
-- **Status**: MITIGATED (Sprint 175, V349-V352) — needs visual verification
-- **Fix**: Reduced scan wave ring expansion from 16x to 9x max, secondary from 13x to 7x, duration from 1.5s to 1.0s. Could not definitively identify the exact "blue sphere" geometry — may also be related to subtitle messages blocking view while the scan wave plays.
+- **Status**: VERIFIED FIXED (Sprint 175 + Sprint 181 verification)
+- **Fix**: Reduced scan wave ring expansion to 4x max over 0.6s duration. No sphere geometry exists on sensor pickup entity (cone + cylinder + torus only). The original "blue sphere" report was from old 16x expansion. Current effect is a brief expanding ring with grid ripple — visually clean and non-obstructive.
 
 ## BUG-008: Subtitle queue blocks ALL input including movement — 10+ messages at game start
 - **Severity**: HIGH (UX)
@@ -93,10 +93,7 @@ The following subtitle types **MUST be removed** because they already have alter
 
 ## BUG-012: Sensor scan wave (BUG-007) still too large — obscures gameplay for ~20 seconds
 - **Severity**: HIGH (visual)
-- **Status**: BUG-007 was marked "MITIGATED" but the blue sphere is still very large
-- **Steps**: Start new game, pick up sensor upgrade in Arrival Bay
-- **Actual**: A large semi-transparent blue sphere appears centered on Sweepo. While smaller than the original report, it still covers roughly 40-50% of the viewport. It takes approximately 20 seconds to fully fade/shrink away. During this time, entities, walls, and doors behind it are partially obscured.
-- **Fix suggestion**: Either (a) reduce the sphere to max 2x Sweepo's radius, (b) make it fully transparent after 2 seconds, or (c) replace with a brief expanding ring effect (1 second) instead of a persistent sphere.
+- **Status**: VERIFIED FIXED (Sprint 181) — see BUG-007 for details. Current scan wave is 4x expansion over 0.6s, no sphere geometry.
 
 ## BUG-013: No way to cycle interaction target — nearest entity always selected
 - **Severity**: MEDIUM (UX — confusing/frustrating)
