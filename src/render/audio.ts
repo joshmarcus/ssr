@@ -616,6 +616,93 @@ export class AudioManager {
       this.bgMusic = null;
     }
     this.bgMusicStarted = false;
+    this._musicPhase = "clean";
+  }
+
+  private _musicPhase: string = "clean";
+  private _musicFilter: BiquadFilterNode | null = null;
+
+  /** Shift music intensity/filter for phase transitions */
+  setMusicPhase(phase: string): void {
+    if (phase === this._musicPhase) return;
+    this._musicPhase = phase;
+    if (!this.bgMusic || !this.ctx) return;
+
+    // Adjust volume and playback rate for tension
+    const configs: Record<string, { volume: number; rate: number }> = {
+      clean: { volume: 0.06, rate: 1.0 },
+      investigate: { volume: 0.07, rate: 1.0 },
+      recover: { volume: 0.09, rate: 1.05 },
+      evacuate: { volume: 0.12, rate: 1.1 },
+    };
+    const cfg = configs[phase] || configs.clean;
+    // Smooth volume transition
+    const startVol = this.bgMusic.volume;
+    const targetVol = cfg.volume * this._volumeLevel;
+    const steps = 20;
+    let step = 0;
+    const fade = setInterval(() => {
+      step++;
+      if (!this.bgMusic) { clearInterval(fade); return; }
+      this.bgMusic.volume = startVol + (targetVol - startVol) * (step / steps);
+      this.bgMusic.playbackRate = 1.0 + (cfg.rate - 1.0) * (step / steps);
+      if (step >= steps) clearInterval(fade);
+    }, 50);
+  }
+
+  /** Dramatic sting for Crack Moment discovery (dissonant chord → resolve) */
+  playCrackMomentSting(): void {
+    const { ctx, master } = this.ensure();
+    // Dramatic low chord
+    const freqs = [110, 138.59, 164.81, 220]; // A2, C#3, E3, A3
+    for (const freq of freqs) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(freq * 1.02, ctx.currentTime + 0.8); // slight detune for tension
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 1.5);
+    }
+    // Resolution chord after 0.8s
+    setTimeout(() => {
+      const resolveFreqs = [220, 277.18, 329.63]; // A3, C#4, E4
+      for (const freq of resolveFreqs) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.0);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 1.0);
+      }
+    }, 800);
+  }
+
+  /** Satisfying relay completion chord (ascending power-up) */
+  playRelayComplete(): void {
+    const { ctx, master } = this.ensure();
+    const notes = [196, 261.63, 329.63, 392]; // G3, C4, E4, G4
+    for (let i = 0; i < notes.length; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const startTime = ctx.currentTime + i * 0.08;
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(notes[i], startTime);
+      gain.gain.setValueAtTime(0.25, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(startTime);
+      osc.stop(startTime + 0.4);
+    }
   }
 
   // ── Text-to-speech ────────────────────────────────────────

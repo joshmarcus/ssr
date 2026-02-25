@@ -51,6 +51,8 @@ import {
   CORVUS_MECHANIC_TIPS,
   CORVUS_HP_CONCERN,
   CORVUS_DIFFICULTY_GREETING,
+  CREW_HAZARD_REACTIONS,
+  CREW_EVAC_FAREWELL,
 } from "./data/narrative.js";
 import type { Action, MysteryChoice, Deduction, CrewMember, Entity, CrewDossier, RoomScene } from "./shared/types.js";
 import { ActionType, SensorType, EntityType, ObjectivePhase, DeductionCategory, Direction, Difficulty, IncidentArchetype, CrewRole, CrewFate, TileType, SceneActivity, SceneOutcome, TimelinePhase } from "./shared/types.js";
@@ -257,6 +259,9 @@ let lastStationEventTurn = 0; // cooldown for station-wide ambient events
 let lastJournalLength = 0; // track journal size for insight notifications
 const previouslyUnlockedDeductions = new Set<string>(); // track deduction IDs that were already unlocked
 const firedHpConcernThresholds = new Set<string>(); // track which HP concern thresholds have fired
+const crewHazardReactionFired = new Map<string, Set<string>>(); // entityId → set of hazard types reacted to
+const crewEvacFarewellFired = new Set<string>(); // crew who have already said goodbye
+let prevCrewEvacCount = 0; // track evacuated crew count for farewell detection
 const foreshadowedRooms = new Map<string, string>(); // room name → log excerpt (for manuscript echo)
 const echoedRooms = new Set<string>(); // rooms where we've already shown the echo
 let journalOpen = false;
@@ -1038,6 +1043,7 @@ function showDiscoveryOverlay(opts: {
 /** Trigger Crack Moment visual event — the Official Story fractures. */
 function triggerCrackMoment(): void {
   display.triggerScreenFlash("damage");
+  audio.playCrackMomentSting();
   // Archetype-personality crack moment line
   const crackArch = state.mystery?.timeline?.archetype;
   if (crackArch) {
@@ -2280,6 +2286,9 @@ function resetGameState(newSeed: number): void {
   lastJournalLength = 0;
   previouslyUnlockedDeductions.clear();
   firedHpConcernThresholds.clear();
+  crewHazardReactionFired.clear();
+  crewEvacFarewellFired.clear();
+  prevCrewEvacCount = 0;
   goalPanelOpen = false;
   goalPanelIdx = 0;
   focusedGoalId = null;
@@ -3330,6 +3339,91 @@ function handleAction(action: Action): void {
     }
   }
 
+  // Crew hazard reactions: following crew react to heat/pressure/near escape pod
+  if (state.turn !== prevTurn && state.turn % 8 === 0) {
+    for (const [entityId, entity] of state.entities) {
+      if (entity.type !== EntityType.CrewNPC) continue;
+      if (entity.props["following"] !== true) continue;
+      if (entity.props["dead"] === true || entity.props["evacuated"] === true) continue;
+      const personality = (entity.props["personality"] as string) || "cautious";
+      const crewName = `${entity.props["firstName"]} ${entity.props["lastName"]}`;
+      const reactions = CREW_HAZARD_REACTIONS[personality];
+      if (!reactions) continue;
+      const tile = state.tiles[entity.pos.y]?.[entity.pos.x];
+      if (!tile) continue;
+      if (!crewHazardReactionFired.has(entityId)) crewHazardReactionFired.set(entityId, new Set());
+      const fired = crewHazardReactionFired.get(entityId)!;
+
+      // Check for nearby escape pod
+      let nearPod = false;
+      for (const [, e2] of state.entities) {
+        if (e2.type === EntityType.EscapePod) {
+          const dist = Math.abs(e2.pos.x - entity.pos.x) + Math.abs(e2.pos.y - entity.pos.y);
+          if (dist <= 3) { nearPod = true; break; }
+        }
+      }
+
+      let line: string | null = null;
+      let hazardKey = "";
+      if (tile.heat > 30 && !fired.has("heat")) {
+        hazardKey = "heat";
+        const lines = reactions.heat;
+        line = `${crewName} ${lines[state.seed % lines.length]}`;
+      } else if (tile.pressure < 50 && !fired.has("pressure")) {
+        hazardKey = "pressure";
+        const lines = reactions.pressure;
+        line = `${crewName} ${lines[state.seed % lines.length]}`;
+      } else if (nearPod && !fired.has("nearPod")) {
+        hazardKey = "nearPod";
+        const lines = reactions.nearPod;
+        line = `${crewName} ${lines[state.seed % lines.length]}`;
+      }
+
+      if (line && hazardKey) {
+        fired.add(hazardKey);
+        display.addLog(line, "narrative");
+        const ROLE_COLORS: Record<string, string> = {
+          captain: "#ffd700", engineer: "#ff8c00", medic: "#44cc66", security: "#4488ff",
+          scientist: "#aa66ff", robotics: "#00cccc", life_support: "#cccccc", comms: "#44ccaa",
+        };
+        display.showCrewSpeechBubble?.(entityId, line, ROLE_COLORS[(entity.props["role"] as string) || ""] || "#4cf");
+        break; // one reaction per turn
+      }
+    }
+  }
+
+  // Crew evacuation farewell: speech bubble + log when crew boards escape pod
+  {
+    const evacCount = state.mystery?.evacuation?.crewEvacuated?.length ?? 0;
+    if (evacCount > prevCrewEvacCount) {
+      // Find which crew just evacuated
+      const newEvacIds = state.mystery!.evacuation!.crewEvacuated.slice(prevCrewEvacCount);
+      for (const crewId of newEvacIds) {
+        if (crewEvacFarewellFired.has(crewId)) continue;
+        crewEvacFarewellFired.add(crewId);
+        // Find the crew entity to get personality and name
+        for (const [entityId, entity] of state.entities) {
+          if (entity.type !== EntityType.CrewNPC) continue;
+          if (entity.id !== crewId && `${entity.props["firstName"]}_${entity.props["lastName"]}` !== crewId) continue;
+          const personality = (entity.props["personality"] as string) || "cautious";
+          const crewName = `${entity.props["firstName"]} ${entity.props["lastName"]}`;
+          const farewell = CREW_EVAC_FAREWELL[personality];
+          if (farewell) {
+            const line = farewell(crewName);
+            display.addLog(line, "narrative");
+            const ROLE_COLORS: Record<string, string> = {
+              captain: "#ffd700", engineer: "#ff8c00", medic: "#44cc66", security: "#4488ff",
+              scientist: "#aa66ff", robotics: "#00cccc", life_support: "#cccccc", comms: "#44ccaa",
+            };
+            display.showCrewSpeechBubble?.(entityId, line, ROLE_COLORS[(entity.props["role"] as string) || ""] || "#4cf");
+          }
+          break;
+        }
+      }
+    }
+    prevCrewEvacCount = evacCount;
+  }
+
   // Item 3 (Sprint 2): Per-drone unique encounter logs + general status messages
   if (state.turn !== prevTurn) {
     const px = state.player.entity.pos.x;
@@ -3423,6 +3517,16 @@ function handleAction(action: Action): void {
       const dedTip = CORVUS_MECHANIC_TIPS[corvusPersonality]?.first_deduction;
       if (dedTip) display.addLog(dedTip, "narrative");
       audio.playDeductionReady();
+      // Guided deduction teaching overlay
+      if (display.showHUDNotification) {
+        display.showHUDNotification({
+          label: "DEDUCTION READY",
+          text: "You've gathered enough evidence to form a hypothesis. Press [V] to open the Investigation Hub, then select CONNECTIONS to answer.",
+          hint: "Choose carefully — wrong answers cost HP and turns. Evidence in your journal provides clues.",
+          color: "#fa0",
+          duration: 12000,
+        });
+      }
     }
     // CORVUS-7 investigation progress milestones (evidence count)
     {
@@ -3640,6 +3744,7 @@ function handleAction(action: Action): void {
     display.addLog(TUTORIAL_HINT_INVESTIGATION, "system");
     display.triggerScreenFlash("milestone");
     audio.playPhaseTransition();
+    audio.setMusicPhase("investigate");
   }
   if (state.mystery && lastObjectivePhase === ObjectivePhase.Investigate &&
       state.mystery.objectivePhase === ObjectivePhase.Recover) {
@@ -3650,6 +3755,7 @@ function handleAction(action: Action): void {
     display.addLog("Cleaning directive OVERRIDDEN. You have a new priority.", "milestone");
     display.addLog("NEW OBJECTIVE: Restore power relays and transmit the data bundle from the Data Core.", "milestone");
     audio.playPhaseTransition();
+    audio.setMusicPhase("recover");
     display.addLog("Find the Thermal Sensor to locate overheating relays. Reroute all relays to unlock the Data Core.", "system");
     display.triggerScreenFlash("milestone");
   }
@@ -3664,6 +3770,7 @@ function handleAction(action: Action): void {
     display.addLog("TIP: Check the station map [m] to locate the Escape Pod Bay.", "system");
     display.triggerScreenFlash("milestone");
     audio.playEvacuation();
+    audio.setMusicPhase("evacuate");
   }
 
   // Detect crew boarding events for audio
@@ -3739,6 +3846,7 @@ function handleAction(action: Action): void {
           logText.includes("sensor module installed") || logText.includes("Sensor module installed") ||
           logText.includes("sensor installed")) {
         display.triggerScreenFlash("milestone");
+        if (logText.includes("rerouted")) audio.playRelayComplete();
         break;
       }
     }

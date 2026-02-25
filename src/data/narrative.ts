@@ -2610,3 +2610,103 @@ export const CORVUS_HP_CONCERN: Record<CorvusPersonality, { mild: string; modera
     critical: "CORVUS-7: You are becoming fragile. Fragile things break, and broken things become evidence. I would prefer you remain an investigator, not a data point.",
   },
 };
+
+// ── Crew hazard reactions (personality × context) ──────────────────────
+// When following crew enter a hazardous tile, they react based on personality.
+export const CREW_HAZARD_REACTIONS: Record<string, { heat: string[]; pressure: string[]; nearPod: string[] }> = {
+  [PersonalityTrait.Cautious]: {
+    heat: [
+      "feels the heat and freezes. \"We can't go through there — it's too hot!\"",
+      "shields their face. \"The thermal readings are off the scale.\"",
+      "hesitates. \"I... I don't think this is safe.\"",
+    ],
+    pressure: [
+      "gasps as the air thins. \"Pressure's dropping — can you feel it?\"",
+      "grabs the wall for support. \"My ears just popped. That's bad, right?\"",
+      "starts breathing faster. \"The air — it's getting harder to breathe.\"",
+    ],
+    nearPod: [
+      "spots the escape pod. \"Is that — ? Oh thank god. We're close.\"",
+      "almost runs ahead. \"The pods! I can see them!\"",
+      "lets out a shaky breath. \"Almost there. Almost safe.\"",
+    ],
+  },
+  [PersonalityTrait.Ambitious]: {
+    heat: [
+      "pushes forward despite the heat. \"We can make it through. Don't slow down.\"",
+      "wipes sweat from their brow. \"Fire won't stop me. I didn't survive this long to cook.\"",
+      "grits their teeth. \"Hot. But I've handled worse.\"",
+    ],
+    pressure: [
+      "steadies themselves. \"Low pressure won't kill us yet. Keep moving.\"",
+      "checks their suit seal. \"Losing atmo. We need to move fast.\"",
+      "sets their jaw. \"I'm not dying in a corridor. Move.\"",
+    ],
+    nearPod: [
+      "picks up the pace. \"There. Final stretch. Let's end this.\"",
+      "straightens up. \"The pods. I'm getting off this wreck.\"",
+      "mutters. \"Almost out. Almost free.\"",
+    ],
+  },
+  [PersonalityTrait.Loyal]: {
+    heat: [
+      "looks back worriedly. \"Is everyone okay? The heat is getting worse.\"",
+      "shields you with their body. \"Stay behind me — I'll take the worst of it.\"",
+      "clenches their fists. \"We stick together. Even through this.\"",
+    ],
+    pressure: [
+      "steadies a shaking hand. \"I lost friends to decompression. Not again.\"",
+      "reaches for your chassis. \"Stay close. If we get separated...\"",
+      "whispers. \"The crew quarters depressurized first. I heard them screaming.\"",
+    ],
+    nearPod: [
+      "glances back. \"The others — are we coming back for them?\"",
+      "nods slowly. \"We made it. I wish... I wish they all could have.\"",
+      "takes a deep breath. \"For the ones who didn't make it. Let's go.\"",
+    ],
+  },
+  [PersonalityTrait.Secretive]: {
+    heat: [
+      "pulls their collar higher. \"I've seen what heat does to the backup systems. We need to hurry.\"",
+      "glances at the temperature readings. \"This wasn't in the safety reports. I would know.\"",
+      "mutters something under their breath. \"The fire started in section 4. That wasn't an accident.\"",
+    ],
+    pressure: [
+      "checks something on their wrist. \"The pressure seals were disabled manually. I have proof.\"",
+      "goes quiet, then: \"Someone vented this section on purpose.\"",
+      "whispers. \"I know who opened the airlocks. Keep moving.\"",
+    ],
+    nearPod: [
+      "clutches something in their pocket. \"Get me to the pod. I have data that needs to survive.\"",
+      "murmurs. \"The truth needs to get off this station. I'll tell you everything once we're clear.\"",
+      "nods carefully. \"Almost there. And then... a very long conversation.\"",
+    ],
+  },
+  [PersonalityTrait.Pragmatic]: {
+    heat: [
+      "calculates quickly. \"390 kelvin. We have maybe two minutes before thermal damage.\"",
+      "points ahead. \"Straight through. Don't stop, don't breathe deep.\"",
+      "checks the time. \"Heat exposure at this level: 90 seconds to first-degree burns.\"",
+    ],
+    pressure: [
+      "does mental math. \"Pressure at... 35? We have five minutes of useful consciousness.\"",
+      "feels for the air flow. \"Breach somewhere nearby. Seal it or go around.\"",
+      "shakes their head. \"We're losing atmosphere. Simple physics, bad outcome.\"",
+    ],
+    nearPod: [
+      "nods efficiently. \"Pod bay ahead. Pre-flight check takes 30 seconds.\"",
+      "counts on their fingers. \"Escape pod capacity is 4. How many of us are left?\"",
+      "walks steadily toward the pod. \"The math works out. We're leaving.\"",
+    ],
+  },
+};
+
+// ── Crew evacuation farewell (personality) ──────────────────────────
+// Said by crew as they board the escape pod.
+export const CREW_EVAC_FAREWELL: Record<string, (name: string) => string> = {
+  [PersonalityTrait.Cautious]: (name) => `${name} pauses at the pod hatch. "Thank you. I... I wasn't sure anyone was coming." Their hands are still shaking as the hatch closes.`,
+  [PersonalityTrait.Ambitious]: (name) => `${name} turns at the pod entrance. "You're a damn good bot, you know that? When I file my report, you're getting a commendation." The hatch seals.`,
+  [PersonalityTrait.Loyal]: (name) => `${name} looks back one last time. "Promise me — if there are others, bring them home too." The pod lights go green.`,
+  [PersonalityTrait.Secretive]: (name) => `${name} grips the pod frame. "I saved a copy of everything. Command will know what really happened here." They step inside without looking back.`,
+  [PersonalityTrait.Pragmatic]: (name) => `${name} runs the pre-flight checklist. "Pod nominal. Trajectory locked. O2 for 48 hours." A brief nod. "Good luck with the rest of them." Launch.`,
+};
