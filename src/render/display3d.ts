@@ -1508,6 +1508,19 @@ export class BrowserDisplay3D implements IGameDisplay {
   /** Room names mentioned in terminal logs — for minimap exploration hints */
   private _foreshadowedRoomNames: Set<string> = new Set();
 
+  // Crew floating labels + speech bubbles (3D→2D projected CSS overlays)
+  private _crewLabelsContainer: HTMLElement | null = null;
+  private _crewLabelElements: Map<string, HTMLElement> = new Map();
+  private _speechBubbles: { el: HTMLElement; entityId: string; expireAt: number }[] = [];
+  private _vec3Temp: THREE.Vector3 = new THREE.Vector3();
+
+  // Scanner compass HUD
+  private _scannerCompass: HTMLElement | null = null;
+  private _compassArrows: Map<string, HTMLElement> = new Map();
+
+  // Evidence discovery celebration
+  private _lastEvidenceCount: number = 0;
+
   /** Mark a room name as foreshadowed (mentioned in a log the player read) */
   setForeshadowedRoom(roomName: string): void {
     this._foreshadowedRoomNames.add(roomName);
@@ -1756,6 +1769,261 @@ export class BrowserDisplay3D implements IGameDisplay {
       else if (distFromEnd >= 8) el.classList.add("aged-2");
       else if (distFromEnd >= 4) el.classList.add("aged-1");
     }
+  }
+
+  // ── Crew floating labels & speech bubbles (3D→2D projected) ────────
+
+  /** Project a 3D world position to 2D screen coordinates */
+  private worldToScreen(worldX: number, worldY: number, worldZ: number): { x: number; y: number; behind: boolean } {
+    this._vec3Temp.set(worldX, worldY, worldZ);
+    this._vec3Temp.project(this.camera);
+    const hw = window.innerWidth / 2;
+    const hh = window.innerHeight / 2;
+    return {
+      x: this._vec3Temp.x * hw + hw,
+      y: -this._vec3Temp.y * hh + hh,
+      behind: this._vec3Temp.z > 1,
+    };
+  }
+
+  /** Update crew floating name labels above NPC models */
+  private updateCrewLabels(state: GameState): void {
+    if (!this._crewLabelsContainer) {
+      this._crewLabelsContainer = document.getElementById("crew-labels-container");
+    }
+    if (!this._crewLabelsContainer) return;
+
+    const ROLE_COLORS: Record<string, string> = {
+      captain: "#ffd700", engineer: "#ff8c00", medic: "#44cc66", security: "#4488ff",
+      scientist: "#aa66ff", robotics: "#00cccc", life_support: "#cccccc", comms: "#44ccaa",
+    };
+
+    const activeIds = new Set<string>();
+
+    for (const [id, entity] of state.entities) {
+      if (entity.type !== EntityType.CrewNPC) continue;
+      if (entity.props["evacuated"] === true) continue;
+
+      const mesh = this.entityMeshes.get(id);
+      if (!mesh || !mesh.visible) continue;
+
+      activeIds.add(id);
+
+      const crewName = (entity.props["name"] as string) || "Crew";
+      const role = (entity.props["role"] as string) || "";
+      const following = entity.props["following"] === true;
+      const sealed = entity.props["sealed"] === true;
+      const found = entity.props["found"] === true;
+
+      // Project position above the crew model (1.8 units high)
+      const screen = this.worldToScreen(mesh.position.x, 1.8, mesh.position.z);
+      if (screen.behind) {
+        const el = this._crewLabelElements.get(id);
+        if (el) el.style.opacity = "0";
+        continue;
+      }
+
+      let el = this._crewLabelElements.get(id);
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "crew-label";
+        el.innerHTML = `<div class="crew-label-name"></div><div class="crew-label-role"></div><div class="crew-label-status"></div>`;
+        this._crewLabelsContainer.appendChild(el);
+        this._crewLabelElements.set(id, el);
+      }
+
+      const roleColor = ROLE_COLORS[role] || "#aab";
+      const nameEl = el.querySelector(".crew-label-name") as HTMLElement;
+      const roleEl = el.querySelector(".crew-label-role") as HTMLElement;
+      const statusEl = el.querySelector(".crew-label-status") as HTMLElement;
+
+      if (nameEl) { nameEl.textContent = crewName.split(" ").pop() || crewName; }
+      if (roleEl) { roleEl.textContent = role.toUpperCase(); roleEl.style.color = roleColor; }
+
+      if (statusEl) {
+        if (following) { statusEl.textContent = "FOLLOWING"; statusEl.className = "crew-label-status following"; }
+        else if (sealed) { statusEl.textContent = "SEALED"; statusEl.className = "crew-label-status sealed"; }
+        else if (!found) { statusEl.textContent = ""; statusEl.className = "crew-label-status"; }
+        else { statusEl.textContent = ""; statusEl.className = "crew-label-status"; }
+      }
+
+      // Clamp to screen bounds
+      const sx = Math.max(40, Math.min(window.innerWidth - 40, screen.x));
+      const sy = Math.max(20, Math.min(window.innerHeight - 80, screen.y));
+      el.style.left = `${sx}px`;
+      el.style.top = `${sy}px`;
+      el.style.opacity = "1";
+    }
+
+    // Hide labels for entities no longer visible
+    for (const [id, el] of this._crewLabelElements) {
+      if (!activeIds.has(id)) el.style.opacity = "0";
+    }
+  }
+
+  /** Show a speech bubble above a crew NPC */
+  showCrewSpeechBubble(entityId: string, text: string, roleColor?: string): void {
+    if (!this._crewLabelsContainer) {
+      this._crewLabelsContainer = document.getElementById("crew-labels-container");
+    }
+    if (!this._crewLabelsContainer) return;
+
+    // Remove existing bubble for this entity
+    this._speechBubbles = this._speechBubbles.filter(b => {
+      if (b.entityId === entityId) { b.el.remove(); return false; }
+      return true;
+    });
+
+    const el = document.createElement("div");
+    el.className = "speech-bubble";
+    el.style.borderLeftColor = roleColor || "#4cf";
+    // Truncate long text
+    const displayText = text.length > 120 ? text.slice(0, 117) + "..." : text;
+    el.textContent = displayText;
+    this._crewLabelsContainer.appendChild(el);
+
+    this._speechBubbles.push({ el, entityId, expireAt: performance.now() + 4000 });
+  }
+
+  /** Update speech bubble positions and expiry */
+  private updateSpeechBubbles(): void {
+    const now = performance.now();
+    this._speechBubbles = this._speechBubbles.filter(bubble => {
+      if (now > bubble.expireAt) {
+        bubble.el.classList.add("fade-out");
+        setTimeout(() => bubble.el.remove(), 500);
+        return false;
+      }
+      // Find entity mesh and project
+      const mesh = this.entityMeshes.get(bubble.entityId);
+      if (!mesh || !mesh.visible) {
+        bubble.el.style.opacity = "0";
+        return true;
+      }
+      const screen = this.worldToScreen(mesh.position.x, 2.3, mesh.position.z);
+      if (screen.behind) {
+        bubble.el.style.opacity = "0";
+        return true;
+      }
+      const sx = Math.max(60, Math.min(window.innerWidth - 60, screen.x));
+      const sy = Math.max(30, Math.min(window.innerHeight - 80, screen.y));
+      bubble.el.style.left = `${sx}px`;
+      bubble.el.style.top = `${sy}px`;
+      bubble.el.style.opacity = "";
+      return true;
+    });
+  }
+
+  // ── Scanner compass HUD ───────────────────────────────────────────
+
+  /** Update directional arrows on screen edges pointing toward scanner detections */
+  private updateScannerCompass(state: GameState): void {
+    if (!this._scannerCompass) {
+      this._scannerCompass = document.getElementById("scanner-compass");
+    }
+    if (!this._scannerCompass) return;
+
+    // Only show when scanner has active results
+    const px = state.player.entity.pos.x;
+    const py = state.player.entity.pos.y;
+
+    // Find detectable entities (evidence, sensors, crew) within range
+    const detections: { dx: number; dy: number; type: string }[] = [];
+    for (const [, entity] of state.entities) {
+      if (entity.type !== EntityType.EvidenceTrace && entity.type !== EntityType.SensorPickup && entity.type !== EntityType.CrewNPC) continue;
+      if (entity.type === EntityType.CrewNPC && entity.props["evacuated"] === true) continue;
+      if (entity.type === EntityType.EvidenceTrace && entity.props["collected"] === true) continue;
+      if (entity.type === EntityType.SensorPickup && entity.props["collected"] === true) continue;
+      const dx = entity.pos.x - px;
+      const dy = entity.pos.y - py;
+      const dist = Math.abs(dx) + Math.abs(dy);
+      if (dist > 0 && dist <= 15) {
+        detections.push({ dx, dy, type: entity.type });
+      }
+    }
+
+    // Group detections into 8 compass directions
+    const dirs: Record<string, { count: number; closest: number; type: string }> = {};
+    for (const det of detections) {
+      const angle = Math.atan2(det.dy, det.dx);
+      const dist = Math.abs(det.dx) + Math.abs(det.dy);
+      // Quantize to 8 directions
+      const octant = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+      const key = `${Math.round(Math.cos(octant) * 10)}_${Math.round(Math.sin(octant) * 10)}`;
+      if (!dirs[key] || dist < dirs[key].closest) {
+        dirs[key] = { count: (dirs[key]?.count || 0) + 1, closest: dist, type: det.type };
+      }
+    }
+
+    const activeKeys = new Set<string>();
+    const w = window.innerWidth;
+    const h = window.innerHeight - 48; // above HUD bar
+
+    for (const [key, info] of Object.entries(dirs)) {
+      activeKeys.add(key);
+      let arrow = this._compassArrows.get(key);
+      if (!arrow) {
+        arrow = document.createElement("div");
+        arrow.className = "compass-arrow";
+        this._scannerCompass.appendChild(arrow);
+        this._compassArrows.set(key, arrow);
+      }
+
+      const [cxS, cyS] = key.split("_").map(Number);
+      const cx = cxS / 10;
+      const cy = cyS / 10;
+
+      // Position arrow on screen edge
+      const arrowChar = cx > 0.5 ? (cy > 0.5 ? "↘" : cy < -0.5 ? "↗" : "→") :
+                         cx < -0.5 ? (cy > 0.5 ? "↙" : cy < -0.5 ? "↖" : "←") :
+                         cy > 0.5 ? "↓" : "↑";
+
+      const edgeX = cx > 0.5 ? w - 30 : cx < -0.5 ? 340 : w / 2; // 340 = past narrative panel
+      const edgeY = cy > 0.5 ? h - 20 : cy < -0.5 ? 60 : h / 2;
+
+      // Color by type
+      const color = info.type === EntityType.CrewNPC ? "#fe6" :
+                    info.type === EntityType.SensorPickup ? "#4f8" : "#4cf";
+
+      // Opacity based on distance (closer = brighter)
+      const distFade = Math.max(0.4, 1 - info.closest / 15);
+
+      arrow.textContent = arrowChar;
+      arrow.style.left = `${edgeX}px`;
+      arrow.style.top = `${edgeY}px`;
+      arrow.style.color = color;
+      arrow.style.opacity = String(distFade);
+      arrow.classList.add("active");
+    }
+
+    // Hide arrows with no detection
+    for (const [key, arrow] of this._compassArrows) {
+      if (!activeKeys.has(key)) {
+        arrow.classList.remove("active");
+        arrow.style.opacity = "0";
+      }
+    }
+  }
+
+  // ── Evidence discovery celebration ─────────────────────────────────
+
+  /** Check for new evidence and trigger celebration VFX */
+  private checkEvidenceDiscovery(state: GameState): void {
+    const currentCount = state.mystery?.journal?.length ?? 0;
+    if (currentCount > this._lastEvidenceCount && this._lastEvidenceCount > 0) {
+      this.triggerEvidenceStarburst();
+    }
+    this._lastEvidenceCount = currentCount;
+  }
+
+  /** Trigger a starburst VFX at center-screen */
+  private triggerEvidenceStarburst(): void {
+    const el = document.createElement("div");
+    el.className = "evidence-starburst";
+    el.style.left = `${window.innerWidth / 2}px`;
+    el.style.top = `${window.innerHeight / 2 - 50}px`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
   }
 
   /** Queue a subtitle message — priority messages go to the front, with queue limit */
@@ -3372,6 +3640,17 @@ export class BrowserDisplay3D implements IGameDisplay {
       this._lastNarrativeDupCount = 0;
       this._lastNarrativeEl = null;
     }
+    // Clean up crew labels and speech bubbles
+    for (const [, el] of this._crewLabelElements) el.remove();
+    this._crewLabelElements.clear();
+    for (const bubble of this._speechBubbles) bubble.el.remove();
+    this._speechBubbles = [];
+    if (this._crewLabelsContainer) this._crewLabelsContainer.innerHTML = "";
+    // Clean up scanner compass
+    for (const [, arrow] of this._compassArrows) arrow.remove();
+    this._compassArrows.clear();
+    if (this._scannerCompass) this._scannerCompass.innerHTML = "";
+    this._lastEvidenceCount = 0;
     // Clean up star particles
     if (this._starParticles) {
       this.scene.remove(this._starParticles);
@@ -3446,6 +3725,7 @@ export class BrowserDisplay3D implements IGameDisplay {
     this.updateClueMarkers(state);
     this.updateCaseTracker(state);
     this.updateEvacWidget(state);
+    this.checkEvidenceDiscovery(state);
 
     // Phase-reactive global lighting
     const phase = state.mystery?.objectivePhase ?? ObjectivePhase.Clean;
@@ -6485,6 +6765,13 @@ export class BrowserDisplay3D implements IGameDisplay {
     this._cullFrame++;
     if (this._cullFrame % 5 === 0) {
       this.updateDistanceCulling();
+    }
+
+    // Update CSS overlays (crew labels, speech bubbles, scanner compass) before render
+    if (this._lastState && this._cullFrame % 3 === 0) {
+      this.updateCrewLabels(this._lastState);
+      this.updateSpeechBubbles();
+      this.updateScannerCompass(this._lastState);
     }
 
     // Render: bloom composer (default), outline effect, or plain renderer

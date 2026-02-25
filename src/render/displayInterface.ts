@@ -73,4 +73,5 @@ export interface IGameDisplay {
   toggleChaseCam?(): void;
   toggleOutline?(): void;
   toggleNarrativePanel?(): void;
+  showCrewSpeechBubble?(entityId: string, text: string, roleColor?: string): void;
 }

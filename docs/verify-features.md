@@ -299,3 +299,31 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Return to title screen or start the game fresh.
 - **Expected:** Small text showing the current seed number, useful for sharing runs.
 - **Status:** VERIFIED — visible as "SEED: 184202" in Playwright QA
+
+---
+
+## Sprint 186 — V404-V408 (2026-02-25)
+
+### Crew 3D floating name labels
+- **What to check:** Crew NPCs should have floating name labels above them showing last name, role (color-coded), and status (FOLLOWING/SEALED). Labels track 3D position via projection.
+- **How to reach it:** Navigate to a room with crew NPCs. Look above their models.
+- **Expected:** Small monospace text floating above each crew NPC, color-coded by role.
+- **Status:** PENDING — needs crew NPC navigation
+
+### Crew speech bubbles
+- **What to check:** When crew NPCs speak during escort arc dialogue (every 12 turns while following), a speech bubble appears above them in 3D space, auto-fading after 4 seconds.
+- **How to reach it:** Find a crew NPC, have them follow you, walk 12+ turns.
+- **Expected:** Role-colored speech bubble with crew dialogue text, positioned above the NPC.
+- **Status:** PENDING — needs escort gameplay
+
+### Scanner compass HUD
+- **What to check:** Directional arrows on screen edges pointing toward nearby scanner detections. Color-coded: cyan=evidence, green=sensors, yellow=crew.
+- **How to reach it:** Enter 3D mode and look at screen edges while scanner detects nearby entities.
+- **Expected:** Subtle pulsing arrows on screen edges, fading with distance.
+- **Status:** VERIFIED — 4 active arrows confirmed via DOM inspection in Playwright QA
+
+### Evidence discovery celebration
+- **What to check:** Brief starburst VFX at center-screen + ascending E-G-B chime when collecting new evidence.
+- **How to reach it:** Interact with evidence traces or terminals that yield new journal entries.
+- **Expected:** Sparkle particle effect + pleasant 3-note ascending chime.
+- **Status:** PENDING — needs evidence collection playthrough

@@ -2536,8 +2536,9 @@ function handleAction(action: Action): void {
   const newJournalCount = state.mystery?.journal.length ?? 0;
   if (newJournalCount > prevJournalCount && state.mystery) {
     const newEntries = state.mystery.journal.slice(prevJournalCount);
-    // Evidence discovery screen flash
+    // Evidence discovery screen flash + audio chime
     display.triggerScreenFlash?.("evidence");
+    audio.playEvidenceDiscovery();
     // CORVUS-7 tip on first crew discovery
     if (!triggeredTutorialHints.has("first_crew") && newEntries.some(e => e.category === "crew")) {
       triggeredTutorialHints.add("first_crew");
@@ -3314,7 +3315,15 @@ function handleAction(action: Action): void {
       const step = (escortArcSteps.get(entityId) ?? 0);
       const arc = CREW_ESCORT_ARC[personality];
       if (arc && step < arc.length) {
-        display.addLog(arc[step](crewName), "narrative");
+        const line = arc[step](crewName);
+        display.addLog(line, "narrative");
+        // Show speech bubble above crew NPC in 3D
+        const ROLE_BUBBLE_COLORS: Record<string, string> = {
+          captain: "#ffd700", engineer: "#ff8c00", medic: "#44cc66", security: "#4488ff",
+          scientist: "#aa66ff", robotics: "#00cccc", life_support: "#cccccc", comms: "#44ccaa",
+        };
+        const crewRole = (entity.props["role"] as string) || "";
+        display.showCrewSpeechBubble?.(entityId, line, ROLE_BUBBLE_COLORS[crewRole] || "#4cf");
         escortArcSteps.set(entityId, step + 1);
         break; // one line per tick
       }

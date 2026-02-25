@@ -4,7 +4,7 @@
 
 ## Current State
 
-- **Phase**: Sprint 185 (V403 completed — crew role suit colors, difficulty-specific CORVUS-7 greeting, seed display on title screen, BUG-011 closed)
+- **Phase**: Sprint 186 (V408 completed — crew floating labels, speech bubbles, scanner compass HUD, evidence discovery celebration)
 - **Test status**: 408 tests passing across 31 test files (0 failing)
 - **Build**: TypeScript strict mode, tsc clean
 - **Archetype selection**: Seed-based (`seed % 6`), all 6 archetypes reachable

@@ -231,6 +231,13 @@ export class AudioManager {
     setTimeout(() => this.tone(150, 0.2, 0.25, "sawtooth", 80), 160);
   }
 
+  /** Sparkly discovery chime for new evidence (ascending arpeggio E5-G5-B5). */
+  playEvidenceDiscovery(): void {
+    this.tone(659, 0.06, 0.2, "sine");          // E5
+    setTimeout(() => this.tone(784, 0.06, 0.18, "sine"), 70);   // G5
+    setTimeout(() => this.tone(988, 0.1, 0.15, "sine"), 140);   // B5
+  }
+
   /** Brief static burst for PA announcements. */
   playPA(): void {
     const { ctx, master } = this.ensure();
