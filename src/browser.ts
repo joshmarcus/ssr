@@ -1242,6 +1242,8 @@ function checkRoomEntry(): void {
 
   if (currentRoom && currentRoom.id !== lastPlayerRoomId) {
     lastPlayerRoomId = currentRoom.id;
+    // Door transition SFX
+    audio.playDoorTransition();
     // Room location header in narrative panel (like DE chapter markers)
     if ('appendNarrativeLocationHeader' in display) {
       (display as any).appendNarrativeLocationHeader(currentRoom.name);
@@ -2598,7 +2600,7 @@ function handleAction(action: Action): void {
       // First evidence celebration — screen flash
       if (simLog.id.startsWith("log_first_evidence_")) {
         display.triggerScreenFlash("milestone");
-        audio.playInteract();
+        audio.playPickup();
       }
       // Timeline phase unlocked — screen flash + audio
       if (simLog.id.startsWith("log_timeline_unlock_")) {
@@ -2613,7 +2615,7 @@ function handleAction(action: Action): void {
       // Sensor-gated clue reveal — screen flash + audio
       if (simLog.id.startsWith("log_sensor_reveal_")) {
         display.triggerScreenFlash("milestone");
-        audio.playInteract();
+        audio.playPickup();
       }
       // Scene completion ceremony — screen flash + celebratory audio
       if (simLog.id.startsWith("log_scene_ceremony_")) {
@@ -2751,6 +2753,7 @@ function handleAction(action: Action): void {
 
   // Item 12: Cleaning narrative flavor (only when there was actual dirt/smoke to clean)
   if (action.type === ActionType.Clean && state.turn !== prevTurn && prevDirt > 0) {
+    audio.playClean();
     const cleanMsg = CLEANING_MESSAGES[cleanMsgIndex % CLEANING_MESSAGES.length];
     display.addLog(cleanMsg, "narrative");
     cleanMsgIndex++;
@@ -4153,6 +4156,19 @@ function showHelp(): void {
         <div><span style="color:#fa0">INVESTIGATION</span>  Read terminals, collect evidence, solve deductions</div>
         <div><span style="color:#f44">RECOVERY</span>  Reroute relays, transmit data from Data Core</div>
         <div><span style="color:#f0f">EVACUATION</span>  Lead crew survivors to powered Escape Pods</div>
+      </div>
+
+      <div style="margin-top:12px;border-top:1px solid #333;padding-top:12px;max-width:700px;margin-left:auto;margin-right:auto">
+        <div style="color:#4ec9b0;font-weight:bold;margin-bottom:6px">── How to Investigate ──</div>
+        <div style="color:#aab;font-size:12px;line-height:1.6">
+          <div style="margin-bottom:4px"><span style="color:#0ff">1.</span> <span style="color:#fff">Read every terminal</span> — Logs reveal timeline, motives, and crew secrets</div>
+          <div style="margin-bottom:4px"><span style="color:#0ff">2.</span> <span style="color:#fff">Examine rooms</span> <span style="color:#4a4">[X]</span> — Scene clues tell stories that terminals can't</div>
+          <div style="margin-bottom:4px"><span style="color:#0ff">3.</span> <span style="color:#fff">Scan everywhere</span> <span style="color:#fa0">[Q]</span> — Sensors reveal hidden evidence and hazards</div>
+          <div style="margin-bottom:4px"><span style="color:#0ff">4.</span> <span style="color:#fff">Check the Investigation Hub</span> <span style="color:#6cf">[R/V]</span> — Review evidence, crew, and connections</div>
+          <div style="margin-bottom:4px"><span style="color:#0ff">5.</span> <span style="color:#fff">Answer deductions carefully</span> — Wrong answers cost HP and turns (max 2 attempts)</div>
+          <div style="margin-bottom:4px"><span style="color:#0ff">6.</span> <span style="color:#fff">Follow the chain</span> — WHAT \u2192 WHERE \u2192 WHY \u2192 WHO \u2192 BLAME, each unlocks the next</div>
+          <div style="margin-top:6px;color:#556;font-size:11px;font-style:italic">"The evidence tells the story. Your job is to listen." \u2014 CORVUS-7</div>
+        </div>
       </div>
 
       <div style="margin-top:12px;border-top:1px solid #333;padding-top:12px;max-width:700px;margin-left:auto;margin-right:auto">
@@ -5757,7 +5773,11 @@ function getEvidenceEntries(): { entries: EvidenceEntry[]; threads: Map<string, 
 
 // ── Pause Menu ────────────────────────────────────────────────
 
-const PAUSE_MENU_ITEMS = ["Resume", "Save Game", "Load Game", "Help", "New Game"] as const;
+const PAUSE_MENU_ITEMS = ["Resume", "Save Game", "Load Game", "Help", "Settings", "New Game"] as const;
+
+let pauseSettingsOpen = false;
+let pauseSettingsIdx = 0;
+const SETTINGS_ITEMS = ["Volume", "Camera", "Outline", "Relay Feed", "TTS"] as const;
 
 let pauseSaveFlash = ""; // brief status message shown in pause menu
 let pauseSaveFlashTimer: ReturnType<typeof setTimeout> | null = null;
@@ -5765,6 +5785,11 @@ let pauseSaveFlashTimer: ReturnType<typeof setTimeout> | null = null;
 function renderPauseMenu(): void {
   const overlay = document.getElementById("broadcast-overlay");
   if (!overlay) return;
+
+  if (pauseSettingsOpen) {
+    renderPauseSettings(overlay);
+    return;
+  }
 
   const archetype = state.mystery?.timeline.archetype ?? "unknown";
   const archetypeLabel = archetype.replace(/([A-Z])/g, " $1").trim();
@@ -5803,15 +5828,111 @@ function renderPauseMenu(): void {
   overlay.classList.add("active");
 }
 
+function renderPauseSettings(overlay: HTMLElement): void {
+  const vol = audio.getVolume();
+  const volPct = Math.round(vol * 100);
+  const volSteps = 4;
+  const volFilled = Math.round(vol * volSteps);
+  const volBar = "\u2588".repeat(volFilled) + "\u2591".repeat(volSteps - volFilled);
+  const chaseCam = display.isChaseCamActive?.() ?? true;
+  const outlineOn = display.isOutlineActive?.() ?? true;
+  const relayFeedOn = !document.getElementById("narrative-panel")?.classList.contains("narr-hidden");
+  const ttsOn = audio.isTTSEnabled();
+
+  const values: string[] = [
+    `\u25C2 ${volBar} ${volPct}% \u25B8`,
+    chaseCam ? "Chase Cam" : "Ortho Cam",
+    outlineOn ? "ON" : "OFF",
+    relayFeedOn ? "ON" : "OFF",
+    ttsOn ? "ON" : "OFF",
+  ];
+
+  let settingsHtml = "";
+  for (let i = 0; i < SETTINGS_ITEMS.length; i++) {
+    const label = SETTINGS_ITEMS[i];
+    const sel = i === pauseSettingsIdx;
+    const bg = sel ? "rgba(0,255,180,0.12)" : "transparent";
+    const border = sel ? "1px solid rgba(0,255,180,0.4)" : "1px solid transparent";
+    const labelColor = sel ? "#0fa" : "#8899aa";
+    const valColor = sel ? "#4cf" : "#667";
+    const arrow = sel ? `<span style="color:#0fa;margin-right:8px">\u25B8</span>` : `<span style="margin-right:8px;opacity:0">\u25B8</span>`;
+    settingsHtml += `<div style="padding:8px 16px;background:${bg};border:${border};border-radius:4px;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s">
+      <span style="color:${labelColor};font-size:14px">${arrow}${label}</span>
+      <span style="color:${valColor};font-size:13px;font-family:'Courier New',monospace">${values[i]}</span>
+    </div>`;
+  }
+
+  overlay.innerHTML = `
+    <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);z-index:9999">
+      <div style="background:rgba(6,6,16,0.95);border:1px solid rgba(0,255,180,0.3);border-radius:8px;padding:32px 48px;min-width:380px;text-align:center;box-shadow:0 0 40px rgba(0,255,180,0.1)">
+        <div style="font-size:22px;font-weight:bold;color:#4cf;letter-spacing:4px;margin-bottom:20px">SETTINGS</div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:20px">
+          ${settingsHtml}
+        </div>
+        <div style="font-size:10px;color:#445;margin-top:12px">[ESC] Back | [\u2191/\u2193] Navigate | [\u2190/\u2192] Change</div>
+      </div>
+    </div>
+  `;
+  overlay.classList.add("active");
+}
+
 function closePauseMenu(): void {
   pauseMenuOpen = false;
   pauseMenuIdx = 0;
+  pauseSettingsOpen = false;
+  pauseSettingsIdx = 0;
   const overlay = document.getElementById("broadcast-overlay");
   if (overlay) { overlay.classList.remove("active"); overlay.innerHTML = ""; }
 }
 
 function handlePauseInput(e: KeyboardEvent): void {
   e.preventDefault();
+
+  // ── Settings sub-panel ──
+  if (pauseSettingsOpen) {
+    if (e.key === "Escape") {
+      pauseSettingsOpen = false;
+      renderPauseMenu();
+      return;
+    }
+    if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
+      pauseSettingsIdx = (pauseSettingsIdx - 1 + SETTINGS_ITEMS.length) % SETTINGS_ITEMS.length;
+      renderPauseMenu();
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
+      pauseSettingsIdx = (pauseSettingsIdx + 1) % SETTINGS_ITEMS.length;
+      renderPauseMenu();
+      return;
+    }
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter" || e.key === " ") {
+      const setting = SETTINGS_ITEMS[pauseSettingsIdx];
+      if (setting === "Volume") {
+        const current = audio.getVolume();
+        const step = 0.25;
+        const newVol = e.key === "ArrowLeft"
+          ? Math.max(0, Math.round((current - step) * 100) / 100)
+          : Math.min(1, Math.round((current + step) * 100) / 100);
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          audio.setVolume(newVol);
+          try { localStorage.setItem("ssr_volume", String(newVol)); } catch { /* ignore */ }
+        }
+      } else if (setting === "Camera") {
+        display.toggleChaseCam?.();
+      } else if (setting === "Outline") {
+        display.toggleOutline?.();
+      } else if (setting === "Relay Feed") {
+        display.toggleNarrativePanel?.();
+      } else if (setting === "TTS") {
+        audio.setTTS(!audio.isTTSEnabled());
+      }
+      renderPauseMenu();
+      return;
+    }
+    return;
+  }
+
+  // ── Main pause menu ──
   if (e.key === "Escape") {
     closePauseMenu();
     renderAll();
@@ -5886,6 +6007,10 @@ function handlePauseInput(e: KeyboardEvent): void {
       closePauseMenu();
       helpOpen = true;
       showHelp();
+    } else if (selected === "Settings") {
+      pauseSettingsOpen = true;
+      pauseSettingsIdx = 0;
+      renderPauseMenu();
     } else if (selected === "New Game") {
       closePauseMenu();
       showSeedInput((chosenSeed) => {

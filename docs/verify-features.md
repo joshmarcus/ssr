@@ -205,3 +205,25 @@ Status key: `PENDING` → `VERIFIED` or `FAILED — {reason}`
 - **How to reach it:** Start new game, pick up sensor, press Q to scan.
 - **Expected:** Brief ring ripple with grid squares, clears within 1 second.
 - **Status:** VERIFIED — code review confirmed 4x/0.6s, no sphere geometry
+
+---
+
+## Sprint 182 — V384-V388 (2026-02-25)
+
+### Pause menu settings panel
+- **What to check:** Escape opens pause menu with new "Settings" option. Selecting Settings opens sub-panel with Volume (visual bar, ←/→), Camera (Chase/Ortho), Outline (On/Off), Relay Feed (Show/Hide), TTS (On/Off). Changes apply immediately.
+- **How to reach it:** During gameplay, press Escape, navigate to Settings, press Enter.
+- **Expected:** Settings panel with current values, ←/→ changes volume, Enter toggles other settings, Escape returns to pause menu.
+- **Status:** VERIFIED — Playwright QA confirmed all settings functional
+
+### Help screen investigation tips
+- **What to check:** Help screen (?) has new "How to Investigate" section between Game Phases and Display & Debug, with 6 numbered strategy tips and CORVUS-7 quote.
+- **How to reach it:** Press ? during gameplay.
+- **Expected:** Teal-colored section header, numbered tips with colored key hints, italic CORVUS-7 quote at bottom.
+- **Status:** VERIFIED — Playwright QA confirmed section present with correct content
+
+### Room-entry door transition SFX
+- **What to check:** Brief pneumatic whoosh when entering a new room. Cleaning produces sweep sound. Evidence pickup produces ascending chime.
+- **How to reach it:** Walk between rooms. Press C to clean. Collect evidence.
+- **Expected:** Subtle procedural sounds for door transitions, cleaning, and pickups.
+- **Status:** PENDING — needs audio verification (Playwright can't test audio)

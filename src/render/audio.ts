@@ -79,6 +79,55 @@ export class AudioManager {
     this.tone(100, 0.08, 0.3, "sawtooth");
   }
 
+  /** Pneumatic door whoosh for room transitions (200ms). */
+  playDoorTransition(): void {
+    const { ctx, master } = this.ensure();
+    const bufferSize = Math.floor(ctx.sampleRate * 0.2);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / bufferSize);
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(2000, ctx.currentTime);
+    filter.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.2);
+    filter.Q.value = 1.5;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    source.start();
+    source.stop(ctx.currentTime + 0.25);
+  }
+
+  /** Sweeping sound for cleaning action (120ms). */
+  playClean(): void {
+    const { ctx, master } = this.ensure();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(180, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(320, ctx.currentTime + 0.06);
+    osc.frequency.linearRampToValueAtTime(160, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+  }
+
+  /** Brief ascending chime for item/evidence pickup (150ms). */
+  playPickup(): void {
+    this.tone(523.25, 0.08, 0.3, "sine"); // C5
+    setTimeout(() => this.tone(659.25, 0.08, 0.25, "sine"), 60); // E5
+  }
+
   /** Ascending C-E-G chord played sequentially (150ms each). */
   playVictory(): void {
     const { ctx, master } = this.ensure();

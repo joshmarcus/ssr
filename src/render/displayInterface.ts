@@ -68,4 +68,9 @@ export interface IGameDisplay {
     color?: string;
     duration?: number;
   }): void;
+  isChaseCamActive?(): boolean;
+  isOutlineActive?(): boolean;
+  toggleChaseCam?(): void;
+  toggleOutline?(): void;
+  toggleNarrativePanel?(): void;
 }

@@ -1589,6 +1589,45 @@ export class BrowserDisplay3D implements IGameDisplay {
     }
   }
 
+  /** Query whether chase cam is active (vs ortho overview). */
+  isChaseCamActive(): boolean { return this.chaseCamActive; }
+
+  /** Query whether outline post-processing is active. */
+  isOutlineActive(): boolean { return this.outlineEnabled; }
+
+  /** Toggle chase cam / ortho cam (same as F2). */
+  toggleChaseCam(): void {
+    this.chaseCamActive = !this.chaseCamActive;
+    this.camera = this.chaseCamActive ? this.chaseCamera : this.orthoCamera;
+    this.ceilingMesh.visible = this.chaseCamActive;
+    this._voidGround.visible = this.chaseCamActive;
+    this._voidCeiling.visible = this.chaseCamActive;
+    this.scene.background = this.chaseCamActive ? this._solidBg : this._starfieldBg;
+    if (this.starfieldPoints) this.starfieldPoints.visible = !this.chaseCamActive;
+    if (this._nebulaMesh) this._nebulaMesh.visible = !this.chaseCamActive;
+    if (this.chaseCamActive) {
+      const facing = this.playerFacing;
+      this.chaseCamPosX = this.playerCurrentX - Math.sin(facing) * 2.5;
+      this.chaseCamPosZ = this.playerCurrentZ - Math.cos(facing) * 2.5;
+      this.chaseCamPosY = 1.8;
+      this.chaseCamLookX = this.playerCurrentX + Math.sin(facing) * 2.0;
+      this.chaseCamLookZ = this.playerCurrentZ + Math.cos(facing) * 2.0;
+    }
+    this.handleResize();
+  }
+
+  /** Toggle outline effect (cycles bloom → outline → plain → bloom, same as F4). */
+  toggleOutline(): void {
+    if (this.bloomEnabled) {
+      this.bloomEnabled = false;
+      this.outlineEnabled = true;
+    } else if (this.outlineEnabled) {
+      this.outlineEnabled = false;
+    } else {
+      this.bloomEnabled = true;
+    }
+  }
+
   private initNarrativePanel(): void {
     this._narrativePanel = document.getElementById("narrative-panel");
     if (!this._narrativePanel) return;
