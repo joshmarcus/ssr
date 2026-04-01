@@ -132,37 +132,20 @@
     display: block;
     filter: contrast(1.05) saturate(1.1);
   }
-  /* Tiny car silhouette composited on top of the Mars photo */
-  .car-overlay {
-    position: absolute;
-    z-index: 2;
-    bottom: 28%;
-    left: 52%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 20px;
-    background: #b8a48a;
-    border-radius: 3px 3px 2px 2px;
-    box-shadow: 0 1px 6px rgba(0,0,0,0.35);
-    opacity: 0.85;
-    filter: blur(0.4px);
+  /* Comparison image */
+  .comparison-figure {
+    margin: 24px -20px;
+    position: relative;
   }
-  .car-overlay::before {
-    content: '';
-    position: absolute;
-    top: -9px; left: 11px;
-    width: 36px; height: 10px;
-    background: #b8a48a;
-    border-radius: 6px 6px 0 0;
+  .comparison-figure img {
+    width: 100%;
+    display: block;
   }
-  .car-overlay::after {
-    content: '';
-    position: absolute;
-    bottom: -3px; left: 8px;
-    width: 9px; height: 6px;
-    background: #4a4035;
-    border-radius: 50%;
-    box-shadow: 33px 0 0 #4a4035;
+  .comparison-figure .image-caption {
+    padding: 8px 20px;
+  }
+  .comparison-figure .image-credit {
+    padding: 2px 20px 0;
   }
 
   .image-caption {
@@ -288,7 +271,6 @@
   <div class="article-image">
     <div class="mars-photo">
       <img src="https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/01221/ids/edr/browse/zcam/ZL0_1221_0775339326_553EBY_N0561010ZCAM03940_0480LMJ01_1200.jpg" alt="Mars surface captured by Perseverance rover Mastcam-Z">
-      <div class="car-overlay"></div>
     </div>
   </div>
   <div class="image-caption">An enhanced-color composite image from Perseverance's Mastcam-Z shows the anomalous object, designated "Sol-1847-A," partially embedded in wind-eroded sediment in Jezero Crater.</div>
@@ -311,6 +293,12 @@
   <p>Mineralogical analysis of the surrounding regolith suggests the object has been on the Martian surface for at least several hundred years, though some researchers believe it could be much older. A thin layer of iron oxide dust coats the exterior, but the underlying surface appears to be in remarkably good condition.</p>
 
   <p>"The paint &mdash; if we can call it that &mdash; is a neutral tan or champagne tone," noted Dr. Sarah Kim, a materials scientist at MIT who reviewed the spectral data. "It's extraordinarily similar to what Honda called 'Desert Mist Metallic' in the mid-2000s, though obviously the implications of that are... well, we're still processing."</p>
+
+  <div class="comparison-figure">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/Honda_Accord_2.4_EX-L_2007.jpg/500px-Honda_Accord_2.4_EX-L_2007.jpg" alt="A 2006 Honda Accord sedan for comparison">
+    <div class="image-caption">A 2006 Honda Accord EX-L sedan photographed on Earth. Researchers noted the object on Mars shares the same proportions, roofline profile, and wheel placement as this model.</div>
+    <div class="image-credit">Wikimedia Commons</div>
+  </div>
 
   <div class="related-box">
     <h4>Related Coverage</h4>
