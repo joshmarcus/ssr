@@ -14,6 +14,7 @@ playtest_log.txt
 screenshots/
 screenshot*.png
 public/*
+!public/april-fools.html
 !public/music/
 !public/models/
 !public/model-list.json

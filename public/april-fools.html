@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Evidence of Alien Life Discovered on Mars Surface - The New York Times</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&family=Franklin+Gothic+Medium&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Serif', 'Georgia', serif;
+    background: #fff;
+    color: #121212;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Top bar */
+  .top-bar {
+    border-bottom: 2px solid #000;
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 11px;
+    color: #666;
+  }
+  .top-bar .date { text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Masthead */
+  .masthead {
+    text-align: center;
+    padding: 10px 16px 8px;
+    border-bottom: 1px solid #e2e2e2;
+  }
+  .masthead h1 {
+    font-family: 'Noto Serif', 'Georgia', serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #000;
+  }
+  .masthead .tagline {
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* Section label */
+  .section-label {
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #666;
+    padding: 12px 20px 0;
+  }
+
+  /* Article */
+  .article { padding: 0 20px 40px; max-width: 600px; margin: 0 auto; }
+
+  .article h2 {
+    font-size: 26px;
+    line-height: 1.2;
+    font-weight: 700;
+    margin: 12px 0 6px;
+    color: #121212;
+  }
+
+  .article .summary {
+    font-size: 16px;
+    color: #555;
+    margin-bottom: 12px;
+    line-height: 1.4;
+  }
+
+  .byline {
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 2px;
+  }
+  .byline a { color: #333; text-decoration: underline; }
+  .pub-date {
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 16px;
+  }
+
+  .social-icons {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e2e2e2;
+  }
+  .social-icons span {
+    width: 32px; height: 32px;
+    background: #f0f0f0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #555;
+  }
+
+  /* Image */
+  .article-image {
+    margin: 0 -20px 20px;
+    position: relative;
+  }
+  .article-image img {
+    width: 100%;
+    display: block;
+  }
+  .generated-image {
+    width: 100%;
+    aspect-ratio: 16/10;
+    background: linear-gradient(145deg, #c4753b 0%, #d4885a 20%, #b86840 50%, #a05530 80%, #8a4420 100%);
+    position: relative;
+    overflow: hidden;
+    display: block;
+  }
+  /* Mars terrain */
+  .generated-image::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 65%;
+    background:
+      radial-gradient(ellipse 120px 40px at 25% 80%, #a86035 0%, transparent 70%),
+      radial-gradient(ellipse 80px 25px at 65% 70%, #b06838 0%, transparent 70%),
+      radial-gradient(ellipse 200px 60px at 50% 90%, #9a5530 0%, transparent 60%),
+      linear-gradient(180deg, transparent 0%, #b86840 30%, #a05530 100%);
+  }
+  /* Sky gradient */
+  .generated-image::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 45%;
+    background: linear-gradient(180deg, #d4a07a 0%, #dbb898 40%, #c4855a 100%);
+  }
+  /* The "Honda Accord" silhouette */
+  .car-shape {
+    position: absolute;
+    z-index: 2;
+    bottom: 32%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 28px;
+    background: #8a7a65;
+    border-radius: 4px 4px 2px 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .car-shape::before {
+    content: '';
+    position: absolute;
+    top: -12px; left: 14px;
+    width: 50px; height: 14px;
+    background: #8a7a65;
+    border-radius: 8px 8px 0 0;
+  }
+  .car-shape::after {
+    content: '';
+    position: absolute;
+    bottom: -4px; left: 10px;
+    width: 12px; height: 8px;
+    background: #3a3a3a;
+    border-radius: 50%;
+    box-shadow: 46px 0 0 #3a3a3a;
+  }
+
+  .image-caption {
+    padding: 8px 20px;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.4;
+  }
+  .image-credit {
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 11px;
+    color: #999;
+    padding: 2px 20px 0;
+  }
+
+  /* Body text */
+  .article p {
+    font-size: 17px;
+    line-height: 1.7;
+    margin-bottom: 16px;
+    color: #333;
+  }
+  .article p.drop-cap::first-letter {
+    float: left;
+    font-size: 58px;
+    line-height: 0.85;
+    padding-right: 6px;
+    padding-top: 4px;
+    font-weight: 700;
+    color: #121212;
+  }
+
+  .pull-quote {
+    border-left: 3px solid #121212;
+    margin: 24px 0;
+    padding: 8px 0 8px 20px;
+    font-size: 20px;
+    font-style: italic;
+    color: #333;
+    line-height: 1.4;
+  }
+
+  /* Related box */
+  .related-box {
+    background: #f7f7f7;
+    border: 1px solid #e2e2e2;
+    padding: 16px;
+    margin: 24px 0;
+    border-radius: 2px;
+  }
+  .related-box h4 {
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  .related-box a {
+    font-size: 15px;
+    color: #326891;
+    text-decoration: none;
+    display: block;
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+
+  /* Breaking banner */
+  .breaking-banner {
+    background: #cc0000;
+    color: #fff;
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    text-align: center;
+    padding: 6px 16px;
+    font-weight: 700;
+  }
+
+  /* Bottom nav */
+  .bottom-nav {
+    border-top: 2px solid #000;
+    padding: 20px;
+    text-align: center;
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 12px;
+    color: #999;
+    margin-top: 20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="breaking-banner">Breaking News</div>
+
+<div class="top-bar">
+  <span class="date">Tuesday, April 1, 2026</span>
+  <span>Updated 7:42 a.m. ET</span>
+</div>
+
+<div class="masthead">
+  <h1>The New York Times</h1>
+  <div class="tagline">All the News That's Fit to Print</div>
+</div>
+
+<div class="section-label">Science</div>
+
+<div class="article">
+  <h2>NASA Rover Discovers Artificial Structure on Mars, Igniting Debate Over Extraterrestrial Origins</h2>
+
+  <p class="summary">An object found half-buried in Martian regolith bears an uncanny resemblance to a mid-2000s sedan. Scientists are calling it the most significant find in the history of planetary exploration.</p>
+
+  <div class="byline">By <a href="#">Kenneth Chang</a> and <a href="#">Jonathan Corum</a></div>
+  <div class="pub-date">April 1, 2026, 6:18 a.m. ET</div>
+
+  <div class="social-icons">
+    <span>&#x1F4E4;</span>
+    <span>&#x1F516;</span>
+    <span>&#x1F4AC;</span>
+  </div>
+
+  <div class="article-image">
+    <div class="generated-image">
+      <div class="car-shape"></div>
+    </div>
+  </div>
+  <div class="image-caption">An enhanced-color composite image from Perseverance's Mastcam-Z shows the anomalous object, designated "Sol-1847-A," partially embedded in wind-eroded sediment in Jezero Crater.</div>
+  <div class="image-credit">NASA/JPL-Caltech/ASU</div>
+
+  <p class="drop-cap">In what scientists are calling the most stunning discovery in the history of space exploration, NASA's Perseverance rover has transmitted images of a large, clearly artificial structure found partially buried in the Martian surface that bears an unmistakable resemblance to a tan 2006 Honda Accord sedan.</p>
+
+  <p>The object, designated Sol-1847-A, was first detected during a routine survey of the western edge of Jezero Crater on March 28. Initial spectral analysis indicated a metallic composition inconsistent with known Martian geology. When Perseverance maneuvered closer, the high-resolution Mastcam-Z imagery left mission controllers at the Jet Propulsion Laboratory in stunned silence.</p>
+
+  <p>"We double-checked the data, then triple-checked it," said Dr. Elena Vasquez, the mission's lead astrobiologist. "The object is approximately 4.8 meters in length, 1.8 meters wide, and exhibits bilateral symmetry with what appear to be transparent panels along its upper structure. It has four circular protrusions on its underside consistent with some form of locomotion apparatus."</p>
+
+  <div class="pull-quote">"When we transmitted the acoustic pulse, the object's internal systems briefly activated. A faint signal returned &mdash; what can only be described as a response to a designation. It answered to 'Spaceship.'"</div>
+
+  <p>Perhaps most astonishing was the acoustic resonance test conducted yesterday using Perseverance's SuperCam instrument. When a targeted laser pulse struck the object's surface, onboard microphones detected a faint but distinct response from what appeared to be an internal electronic system.</p>
+
+  <p>"When we transmitted the acoustic pulse, the object's internal systems briefly activated," said Dr. James Whitfield, a planetary acoustics specialist at Caltech. "A faint signal returned &mdash; what can only be described as a response to a designation. It answered to 'Spaceship.'"</p>
+
+  <p>The finding has sent shockwaves through the scientific community. Within hours of the first images being transmitted, the International Astronomical Union convened an emergency session. Social media erupted, with #MarsHonda and #Spaceship trending worldwide within minutes.</p>
+
+  <p>Mineralogical analysis of the surrounding regolith suggests the object has been on the Martian surface for at least several hundred years, though some researchers believe it could be much older. A thin layer of iron oxide dust coats the exterior, but the underlying surface appears to be in remarkably good condition.</p>
+
+  <p>"The paint &mdash; if we can call it that &mdash; is a neutral tan or champagne tone," noted Dr. Sarah Kim, a materials scientist at MIT who reviewed the spectral data. "It's extraordinarily similar to what Honda called 'Desert Mist Metallic' in the mid-2000s, though obviously the implications of that are... well, we're still processing."</p>
+
+  <div class="related-box">
+    <h4>Related Coverage</h4>
+    <a href="#">How NASA's Perseverance Rover Changed Everything We Know About Mars</a>
+    <a href="#">What Scientists Say Could Explain the Object on Mars</a>
+    <a href="#">The Search for Life Beyond Earth: A Timeline</a>
+  </div>
+
+  <p>Rear imaging revealed what appears to be a recessed compartment &mdash; a cargo area of substantial volume. More intriguingly, faint markings on the posterior surface appear to include alphanumeric characters, though dust accumulation has made them difficult to read. JPL engineers are planning a targeted air-blast clearing using the rover's sampling system in the coming days.</p>
+
+  <p>NASA Administrator Bill Nelson addressed reporters in a hastily arranged briefing at 11 p.m. Eastern time on Monday. "This is a moment that may redefine our understanding of our place in the cosmos," he said. "We are proceeding with the utmost scientific rigor, but I want to be candid with the American people: what we are seeing on Mars appears to be an engineered vehicle of extraordinary familiarity."</p>
+
+  <p>Not all scientists are convinced of the object's provenance. Dr. Richard Zurek, a retired Mars climate researcher, urged caution. "Pareidolia &mdash; the tendency to see familiar patterns in random data &mdash; is powerful," he said. "Before we conclude that a Japanese midsize sedan traveled 140 million miles to Mars, we should exhaust every geological explanation."</p>
+
+  <p>Honda Motor Company released a brief statement saying it was "aware of the reports" and that "the 2006 Accord was engineered for reliability, but interplanetary travel was not among its rated capabilities." The company declined further comment.</p>
+
+  <p>Perseverance will continue to study the object over the coming weeks. An attempt to open what appears to be a driver-side access panel is scheduled for Thursday. Mission planners have also directed the Ingenuity helicopter &mdash; recently reactivated after a six-month hibernation &mdash; to conduct an aerial survey of the surrounding terrain for any additional anomalies.</p>
+
+  <p>The discovery has reignited public interest in Mars exploration. President Biden is expected to address the finding during a scheduled press conference Tuesday afternoon, and congressional leaders from both parties have signaled support for an accelerated crewed Mars mission.</p>
+
+  <p>"Whatever this object turns out to be," Dr. Vasquez said, "Mars just became a lot more interesting."</p>
+
+</div>
+
+<div class="bottom-nav">
+  &copy; 2026 The New York Times Company
+  &nbsp;&middot;&nbsp; Privacy Policy
+  &nbsp;&middot;&nbsp; Terms of Service
+</div>
+
+</body>
+</html>
