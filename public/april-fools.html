@@ -121,63 +121,48 @@
     width: 100%;
     display: block;
   }
-  .generated-image {
+  .mars-photo {
     width: 100%;
-    aspect-ratio: 16/10;
-    background: linear-gradient(145deg, #c4753b 0%, #d4885a 20%, #b86840 50%, #a05530 80%, #8a4420 100%);
     position: relative;
     overflow: hidden;
     display: block;
   }
-  /* Mars terrain */
-  .generated-image::before {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 65%;
-    background:
-      radial-gradient(ellipse 120px 40px at 25% 80%, #a86035 0%, transparent 70%),
-      radial-gradient(ellipse 80px 25px at 65% 70%, #b06838 0%, transparent 70%),
-      radial-gradient(ellipse 200px 60px at 50% 90%, #9a5530 0%, transparent 60%),
-      linear-gradient(180deg, transparent 0%, #b86840 30%, #a05530 100%);
+  .mars-photo img {
+    width: 100%;
+    display: block;
+    filter: contrast(1.05) saturate(1.1);
   }
-  /* Sky gradient */
-  .generated-image::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 45%;
-    background: linear-gradient(180deg, #d4a07a 0%, #dbb898 40%, #c4855a 100%);
-  }
-  /* The "Honda Accord" silhouette */
-  .car-shape {
+  /* Tiny car silhouette composited on top of the Mars photo */
+  .car-overlay {
     position: absolute;
     z-index: 2;
-    bottom: 32%;
-    left: 50%;
+    bottom: 28%;
+    left: 52%;
     transform: translateX(-50%);
-    width: 80px;
-    height: 28px;
-    background: #8a7a65;
-    border-radius: 4px 4px 2px 2px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    width: 60px;
+    height: 20px;
+    background: #b8a48a;
+    border-radius: 3px 3px 2px 2px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.35);
+    opacity: 0.85;
+    filter: blur(0.4px);
   }
-  .car-shape::before {
+  .car-overlay::before {
     content: '';
     position: absolute;
-    top: -12px; left: 14px;
-    width: 50px; height: 14px;
-    background: #8a7a65;
-    border-radius: 8px 8px 0 0;
+    top: -9px; left: 11px;
+    width: 36px; height: 10px;
+    background: #b8a48a;
+    border-radius: 6px 6px 0 0;
   }
-  .car-shape::after {
+  .car-overlay::after {
     content: '';
     position: absolute;
-    bottom: -4px; left: 10px;
-    width: 12px; height: 8px;
-    background: #3a3a3a;
+    bottom: -3px; left: 8px;
+    width: 9px; height: 6px;
+    background: #4a4035;
     border-radius: 50%;
-    box-shadow: 46px 0 0 #3a3a3a;
+    box-shadow: 33px 0 0 #4a4035;
   }
 
   .image-caption {
@@ -301,8 +286,9 @@
   </div>
 
   <div class="article-image">
-    <div class="generated-image">
-      <div class="car-shape"></div>
+    <div class="mars-photo">
+      <img src="https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/01221/ids/edr/browse/zcam/ZL0_1221_0775339326_553EBY_N0561010ZCAM03940_0480LMJ01_1200.jpg" alt="Mars surface captured by Perseverance rover Mastcam-Z" crossorigin="anonymous">
+      <div class="car-overlay"></div>
     </div>
   </div>
   <div class="image-caption">An enhanced-color composite image from Perseverance's Mastcam-Z shows the anomalous object, designated "Sol-1847-A," partially embedded in wind-eroded sediment in Jezero Crater.</div>
